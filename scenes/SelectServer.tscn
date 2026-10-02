@@ -1,0 +1,33 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/UI/SelectServerView.cs" id="1_ss"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_btn"]
+
+[node name="SelectServer" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_ss")
+
+[node name="BG" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.05, 0.05, 0.15, 1)
+
+[node name="Panel" type="Panel" parent="."]
+offset_left = 198.0
+offset_top = 74.0
+offset_right = 602.0
+offset_bottom = 526.0
+
+[node name="LblInfo" type="Label" parent="Panel"]
+offset_left = 30.0
+offset_top = 410.0
+offset_right = 374.0
+offset_bottom = 435.0
+text = "请选择服务器"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)

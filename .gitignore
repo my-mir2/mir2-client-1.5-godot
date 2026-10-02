@@ -1,0 +1,33 @@
+# Godot
+.godot/
+*.import
+export_presets.cfg
+*.translation
+
+# 资源（不提交大文件）
+resources/wil/*.png
+resources/wil/*.wil
+resources/wil/*.wix
+resources/wil/*.idx
+
+# 工具输出
+wil_output/
+tools/__pycache__/
+tools/*.pyc
+# Build & Binary
+build/
+*.pck
+extension_api.json
+
+# Large game assets
+resources/
+screenshots/
+crop_*.png
+sub_4C1EF4_code.c
+__pycache__/
+*.pyc
+
+# Local IDE / OS
+.DS_Store
+.vscode/
+.idea/

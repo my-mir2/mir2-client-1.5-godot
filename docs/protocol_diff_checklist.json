@@ -1,0 +1,1479 @@
+{
+  "total_matrix_rows": 340,
+  "diff_cm_count": 34,
+  "diff_sm_count": 150,
+  "diff_cm": [
+    {
+      "name": "CM_PROTOCOL",
+      "id": 2000,
+      "rust": "CmProtocol",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_NEWACCOUNT",
+      "id": 2002,
+      "rust": "CmNewAccount",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_UPDATEACCOUNT",
+      "id": 2003,
+      "rust": "CmUpdateAccount",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_CHGPW",
+      "id": 2018,
+      "rust": "CmChgPw",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_QUERYCHARACTERS",
+      "id": 2005,
+      "rust": "CmQueryCharacters",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_NEWCHARACTER",
+      "id": 2007,
+      "rust": "CmNewCharacter",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_DELETECHARACTER",
+      "id": 2008,
+      "rust": "CmDeleteCharacter",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_SELECTCHARACTER",
+      "id": 2009,
+      "rust": "CmSelectCharacter",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_RUNLOGIN",
+      "id": 2006,
+      "rust": "CmRunLogin",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_QUERYUSERSTATE",
+      "id": 80,
+      "rust": "CmQueryUserState",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_USERSTATE",
+      "id": 80,
+      "rust": "CmUserState",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_MOVE",
+      "id": 3011,
+      "rust": "CmMove",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_TURN",
+      "id": 3010,
+      "rust": "CmTurn",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_ATTACK",
+      "id": 3014,
+      "rust": "CmAttack",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_TAKEONITEM",
+      "id": 1003,
+      "rust": "CmTakeOnItem",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_USEITEM",
+      "id": 1006,
+      "rust": "CmUseItem",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_PARTYLEAVE",
+      "id": 1019,
+      "rust": "CmPartyLeave",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_READBOOK",
+      "id": 1006,
+      "rust": "CmReadBook",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_GUILDCHAT",
+      "id": 3030,
+      "rust": "CmGuildChat",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_MAKEDRUGITEM",
+      "id": 2030,
+      "rust": "CmMakeDrugItem",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": ""
+    },
+    {
+      "name": "CM_QUERYBAGITEMS",
+      "id": 0,
+      "rust": "CmQueryBagItems",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_ADJUSTABILITY",
+      "id": 0,
+      "rust": "CmAdjustAbility",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_TRADEREQUEST",
+      "id": 0,
+      "rust": "CmTradeRequest",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 客户端无真实发送点 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_TRADECONFIRM",
+      "id": 0,
+      "rust": "CmTradeConfirm",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 客户端无真实发送点 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_TRADEDEPOSIT",
+      "id": 0,
+      "rust": "CmTradeDeposit",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 客户端无真实发送点 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_PARTYINVITE",
+      "id": 0,
+      "rust": "CmPartyInvite",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_PARTYKICK",
+      "id": 0,
+      "rust": "CmPartyKick",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_GUILDWAR",
+      "id": 3030,
+      "rust": "CmGuildWar",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "走 CM_SAY 3030 文本通道 (@命令域); B2 定案官方无 @行会战 → 死面, Rust 发送已移除 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_GUILDCANCELWAR",
+      "id": 3030,
+      "rust": "CmGuildCancelWar",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "走 CM_SAY 3030 文本通道 (@命令域); B2 定案官方死控件, Rust 发送已移除 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_WIDEHIT",
+      "id": 3024,
+      "rust": "CmWideHit",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "客户端无真实发送点 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_ADJUSTBONUS",
+      "id": 0,
+      "rust": "CmAdjustBonus",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 客户端无真实发送点 (仅 e2e/断言测试构造) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_THROW",
+      "id": 3021,
+      "rust": "CmThrow",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "客户端无真实发送点 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_USELAMP",
+      "id": 3022,
+      "rust": "CmUseLamp",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "客户端无真实发送点 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "CM_MAKEWEAPONUNLOCK",
+      "id": 3023,
+      "rust": "CmMakeWeaponUnlock",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "客户端无真实发送点 [2026-09 专项彻底对齐入库与实证]"
+    }
+  ],
+  "diff_sm": [
+    {
+      "name": "SM_SERVERCONFIG",
+      "id": 2012,
+      "rust": "SmServerConfig",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_ABILITY",
+      "id": 648,
+      "rust": "SmAbility",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_ENTITYAPPEAR",
+      "id": 10,
+      "rust": "SmEntityAppear",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_ENTITYDISAPPEAR",
+      "id": 11,
+      "rust": "SmEntityDisappear",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_ENTITYMOVE",
+      "id": 13,
+      "rust": "SmEntityMove",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_BATCHMOVE",
+      "id": 16,
+      "rust": "SmBatchMove",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_ENTITYTURN",
+      "id": 14,
+      "rust": "SmEntityTurn",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_BATCHSTRUCK",
+      "id": 15,
+      "rust": "SmBatchStruck",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_DEATH",
+      "id": 21,
+      "rust": "SmDeath",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_HEAR",
+      "id": 6,
+      "rust": "SmHear",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_SYSTEMMESSAGE",
+      "id": 7,
+      "rust": "SmSystemMessage",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_ITEMSHOW",
+      "id": 625,
+      "rust": "SmItemShow",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_BAGITEMS",
+      "id": 600,
+      "rust": "SmBagItems",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_MOVEFAIL",
+      "id": 17,
+      "rust": "SmMoveFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_PARTYINVITE",
+      "id": 0,
+      "rust": "SmPartyInvite",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展面 (双端表面在, 组队邀请链); 【名字/颜色专项 2026-09-11】661 号作废 — 官方 case 661 (0x46A30F, IDA 注解) = 分类错误提示 (GetTickCount + value switch 三选一文本); 真号待组队族专项 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_PARTYDISSOLVED",
+      "id": 0,
+      "rust": "SmPartyDissolved",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "【组队族专项 2026-09-11】662 号作废 — 官方 case 662 (0x46A3A2, IDA 注解) = 纯计时臂 (GetTickCount→4F94E8) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_RESERVED617",
+      "id": 617,
+      "rust": "SmUnused617",
+      "status": "OfficialDead",
+      "anchor": "client-exe-alignment §2.4 L116",
+      "note": "官方 case 617=直通 (0x468541 jumptable default def_46A3CA 零处理, 场景/金币族专项解码实证) — Rust 无此变体"
+    },
+    {
+      "name": "SM_RESERVED618",
+      "id": 618,
+      "rust": "SmUnused618",
+      "status": "OfficialDead",
+      "anchor": "client-exe-alignment §2.4 L116",
+      "note": "官方 case 618=直通 (同 617) — Rust 无此变体"
+    },
+    {
+      "name": "SM_MAPMOVE",
+      "id": 23,
+      "rust": "SmMapMove",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_SKILLTOGGLE",
+      "id": 0,
+      "rust": "SmSkillToggle",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "【技能族专项 2026-09-11】645 号作废 (NPC 商品列表); 官方布尔指示器定谳 = case 659/660 写 byte_4F94F8 (off_4A430C 指针): 本地 XOR 翻转 5s 防抖 (sub_491104 + sub_4664B0 通知) + 双帧图选择 (sub_491008) + case 50 进地图初始化 — 服务器可控非 MagicId 开关, Rust SmSkillToggle{magic_id} 形状不符维持 id 0 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_BUFFADD",
+      "id": 0,
+      "rust": "SmBuffAdd",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "【技能族专项】646 号作废 — 官方 case 646 (0x469E5E, IDA 注解) = NPC 窗关闭臂 (sub_46DA68: dword_4F94DC=NPC 目标 + hero+1888=0 + sub_48E934, 与 668 开窗对偶; M2 中继 10129→646); 【SM46 专项定稿】官方无独立 Buff 增删号 — 状态分散承载模型 (SM 46 状态行/SM 53 实体三字/650 金币记录/656 名字色/45EDC8 色表) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_BUFFREMOVE",
+      "id": 0,
+      "rust": "SmBuffRemove",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "【技能族专项】647 号作废 — 官方 case 647 (0x469E7E, IDA 注解) = 数值文本提示臂 (byte_4F92D4 门 + sub_407D64 数值转串 + 4F9378 文本 46B7FC/46B80C); 【SM46 专项定稿】官方无独立 Buff 增删号 — 分散承载模型 (同 SM_BUFFADD 行) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SPELLEFFECT",
+      "id": 32,
+      "rust": "SmSpellEffect",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_GROUPMEMBERLIST",
+      "id": 667,
+      "rust": "SmGroupMemberList",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二 (客户端 case 667 @0x46A507 → sub_46E020 + M2 直发 sub_4DCBA4: 遍历组员拼名单串逐员发送; 组队族专项双源定谳)",
+      "note": "旧 655 号作废 (655=残留写-only); 官方组队唯一通道 = SM 667 名单串, 加入/离开/血量均经全量重播承载"
+    },
+    {
+      "name": "SM_GROUPMEMBERADD",
+      "id": 0,
+      "rust": "SmGroupMemberAdd",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 组队链发送面; 【M2 组队链专项 2026-09-11】官方无独立号 — 加入经 SM 667 名单串全量重播 (M2 sub_4DCBA4); 656 号亦作废 (实体+44 更新) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GROUPMEMBERDEL",
+      "id": 0,
+      "rust": "SmGroupMemberDel",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 组队链发送面; 官方无独立号 — 离开经 SM 667 名单串全量重播; 657 号亦作废 (真身为 SM_CHARSTATUSCHANGED 状态位图广播) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GROUPMEMBERHP",
+      "id": 0,
+      "rust": "SmGroupMemberHp",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 组队链发送面 (HP 条为 Rust 扩展显示); 官方无独立号 — 血量变化经 SM 667 全量重播承载 (662-671 体已逐体解码均非组员血量); 658 号让位确认框 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDMEMBERLIST",
+      "id": 671,
+      "rust": "SmGuildMemberList",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_BUYITEMSUCCESS",
+      "id": 629,
+      "rust": "SmBuyItemSuccess",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_BUYITEMFAIL",
+      "id": 630,
+      "rust": "SmBuyItemFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_SELLITEMOK",
+      "id": 631,
+      "rust": "SmSellItemOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_SELLITEMFAIL",
+      "id": 632,
+      "rust": "SmSellItemFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_SENDMYMAGIC",
+      "id": 211,
+      "rust": "SmSendMyMagic",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二 (case 211 @0x469D8F → sub_46D3D8 全量清空重建 + M2 sub_4D1418 中继 L142; 魔法面板专项双源定谳)",
+      "note": "官方模型 = 211 全量清空重建 ('/'分隔串→84B 记录) + 210 单条新增 + 640 条目更新 + 212 删除; Rust Vec<MagicInfo> 全量面 = 211 对位 (形状: 官方串编码 vs Rust 结构化, bincode 等价)"
+    },
+    {
+      "name": "SM_ADDMAGIC",
+      "id": 0,
+      "rust": "SmAddMagic",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "【魔法面板专项 2026-09-11】官方新增通道 = SM 210 (sub_46D300: 84B 记录 sub_45B37C 解析 → TList.Add); Rust SmAddMagic{magic_id} 语义吻合但形状偏差 (官方全记录 vs Rust 仅 id) → 640 让位 640 真身=MagicLvExp 更新臂 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_MAGICLVEXP",
+      "id": 640,
+      "rust": "SmMagicLvExp",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二 (case 640 @0x469DB5: sub_46D4D8 — TList 找 magic_id=recog 匹配写 +1=level 字节/+4=exp 双字; M2 中继 10123→640; 魔法面板专项形状精确定谳)",
+      "note": "旧 SmAddMagic 640 标注让位 — 640 体=level/exp 更新 (与 Rust SmMagicLvExp{magic_id,level,exp} 形状精确吻合)"
+    },
+    {
+      "name": "SM_DELMAGIC",
+      "id": 212,
+      "rust": "SmDelMagic",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二 (case 212 @0x469DAB → sub_46D370: 找 magic_id=recog → Free+Delete; M2 sub_4D13BC 中继 L142; 魔法面板专项形状精确)",
+      "note": "旧 642 标注作废 (642=4F7EFC 记录表双 word 更新); Rust SmDelMagic{magic_id} 形状精确对位"
+    },
+    {
+      "name": "SM_RESERVED654",
+      "id": 654,
+      "rust": "SmUnused654",
+      "status": "OfficialDead",
+      "anchor": "client-exe-alignment L277",
+      "note": "官方 case 654=实体+340 残留字段写-only 无消费者 — Rust 无此变体 (昼夜为 Rust 扩展面见 SM_DAYCHANGING 行)"
+    },
+    {
+      "name": "SM_MAPDESCRIPTION",
+      "id": 661,
+      "rust": "SmMapDescription",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_BUILDGUILDOK",
+      "id": 757,
+      "rust": "SmBuildGuildOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_BUILDGUILDFAIL",
+      "id": 758,
+      "rust": "SmBuildGuildFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_MERCHANTSAY",
+      "id": 633,
+      "rust": "SmMerchantSay",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_GUILDMESSAGE",
+      "id": 764,
+      "rust": "SmGuildMessage",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_CRY",
+      "id": 765,
+      "rust": "SmCry",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_RESERVED655",
+      "id": 655,
+      "rust": "SmUnused655",
+      "status": "OfficialDead",
+      "anchor": "client-exe-alignment L278",
+      "note": "官方 case 655=word_4F7F94 残留全局写-only 唯一引用即 case 本身 — Rust 无此变体 (光照为 Rust 扩展面见 SM_CHANGELIGHT 行)"
+    },
+    {
+      "name": "SM_UPDATEITEM",
+      "id": 603,
+      "rust": "SmUpdateItem",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_DEALTRYFAIL",
+      "id": 674,
+      "rust": "SmDealTryFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_DEALADDITEMOK",
+      "id": 683,
+      "rust": "SmDealAddItemOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_DEALADDITEMFAIL",
+      "id": 684,
+      "rust": "SmDealAddItemFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_DEALDELITEMOK",
+      "id": 685,
+      "rust": "SmDealDelItemOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_DEALCHGGOLDOK",
+      "id": 687,
+      "rust": "SmDealChgGoldOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_OPENSTORAGEDLG",
+      "id": 700,
+      "rust": "SmOpenStorageDlg",
+      "status": "Aligned",
+      "anchor": "M2 sub_4D9B5B (RM 10146) → client sub_46DAE8",
+      "note": "【仓库专项 2026-09-12】打开仓库托管窗 (DSellDlg 模式 2)"
+    },
+    {
+      "name": "SM_SUBABILITY",
+      "id": 0,
+      "rust": "SmSubAbility",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "【技能族专项 2026-09-11】649 号作废 — 官方 case 649 (0x469EF7, IDA 注解) = 记录臂 (GetTickCount→实体+0x75C + sub_49F874 记录提交 + 4F9308=0 + 文本) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TIMECHECKMSG",
+      "id": 810,
+      "rust": "SmTimeCheckMsg",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_ADJUSTBONUS",
+      "id": 811,
+      "rust": "SmAdjustBonus",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_INSTANCEHEALGAUGE",
+      "id": 659,
+      "rust": "SmInstanceHealGauge",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": ""
+    },
+    {
+      "name": "SM_LAMPCHANGEDURA",
+      "id": 0,
+      "rust": "SmLampChangeDura",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 官方 case 656=实体+44 更新 (语义⏳), 灯持久走通用 DURACHANGE (对照台账 L139) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_OPENDOOR",
+      "id": 612,
+      "rust": "SmDoorOpen",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二 (dispatch case 612 → sub_49F2FC 门开; #16 勘误)",
+      "note": ""
+    },
+    {
+      "name": "SM_ENTITYTIMESTAMP",
+      "id": 0,
+      "rust": "SmEntityTimestamp",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号; 9003=内部编位); 【金币族专项 2026-09-11】旧'SM 42'锚作废 — 官方 case 42=实体名字广播 (0x46981D: actor+0x24 名字 + actor+0x2C 属性字节), 非时间戳; 时间同步官方面=SM 810, 本变体与之语义重叠 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_CERTIFICATION",
+      "id": 2000,
+      "rust": "SmCertification",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_LOGINFAIL",
+      "id": 2002,
+      "rust": "SmLoginFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SELECTSERVEROK",
+      "id": 2004,
+      "rust": "SmSelectServerOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_CHARACTERLIST",
+      "id": 2005,
+      "rust": "SmCharacterList",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_NEWCHARACTERSUCCESS",
+      "id": 2007,
+      "rust": "SmNewCharacterSuccess",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_NEWCHARACTERFAIL",
+      "id": 2008,
+      "rust": "SmNewCharacterFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DELETECHARACTERSUCCESS",
+      "id": 2009,
+      "rust": "SmDeleteCharacterSuccess",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TRADEREQUEST",
+      "id": 0,
+      "rust": "SmTradeRequest",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TRADEOPEN",
+      "id": 0,
+      "rust": "SmTradeOpen",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TRADEPARTNERDEPOSIT",
+      "id": 0,
+      "rust": "SmTradePartnerDeposit",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TRADESUCCESS",
+      "id": 0,
+      "rust": "SmTradeSuccess",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TRADECANCEL",
+      "id": 0,
+      "rust": "SmTradeCancel",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_PARTYMEMBERS",
+      "id": 0,
+      "rust": "SmPartyMembers",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_USEITEMRESULT",
+      "id": 0,
+      "rust": "SmUseItemResult",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_STORAGELIST",
+      "id": 0,
+      "rust": "SmStorageList",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_STORAGERESULT",
+      "id": 0,
+      "rust": "SmStorageResult",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TAKEBACKRESULT",
+      "id": 0,
+      "rust": "SmTakeBackResult",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DEALADD",
+      "id": 675,
+      "rust": "SmDealAdd",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DEALDEL",
+      "id": 676,
+      "rust": "SmDealDel",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DEALGOLDUPDATE",
+      "id": 677,
+      "rust": "SmDealGoldUpdate",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDALLYINFO",
+      "id": 673,
+      "rust": "SmGuildAllyInfo",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DROPITEMSUCCESS",
+      "id": 0,
+      "rust": "SmDropItemSuccess",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DROPITEMFAIL",
+      "id": 0,
+      "rust": "SmDropItemFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TAKEONFAIL",
+      "id": 0,
+      "rust": "SmTakeOnFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发; 官方 612 实证=门开 (sub_49F2FC) 号位冲突, 穿戴失败官方号未定 — 面不激活 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TAKEOFFFAIL",
+      "id": 0,
+      "rust": "SmTakeOffFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发; 官方 614 实证=门关 (sub_49F420) 号位冲突, 脱下失败官方号未定 — 面不激活 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_REPAIROK",
+      "id": 625,
+      "rust": "SmRepairOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_REPAIRFAIL",
+      "id": 626,
+      "rust": "SmRepairFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_POWERHIT",
+      "id": 0,
+      "rust": "SmPowerHit",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_LONGHIT",
+      "id": 0,
+      "rust": "SmLongHit",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_WIDEHIT",
+      "id": 0,
+      "rust": "SmWideHit",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_ALIVE",
+      "id": 0,
+      "rust": "SmAlive",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_NOWDEATH",
+      "id": 0,
+      "rust": "SmNowDeath",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SKELETON",
+      "id": 0,
+      "rust": "SmSkeleton",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_MAGICFIRE",
+      "id": 802,
+      "rust": "SmMagicFire",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_MAGICFIREFAIL",
+      "id": 803,
+      "rust": "SmMagicFireFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_HIT",
+      "id": 0,
+      "rust": "SmHit",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_HEAVYHIT",
+      "id": 0,
+      "rust": "SmHeavyHit",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_THROW",
+      "id": 33,
+      "rust": "SmThrow",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_LIGHTING",
+      "id": 35,
+      "rust": "SmLighting",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SPELL2",
+      "id": 31,
+      "rust": "SmSpell2",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_USERNAME",
+      "id": 751,
+      "rust": "SmUsername",
+      "status": "Aligned",
+      "anchor": "登记表 §3.3",
+      "note": "官方 751 = CM 82 名字应答 (M2 case 82 → sub_4DE654 → SM 751)"
+    },
+    {
+      "name": "SM_GUILDADDMEMBEROK",
+      "id": 753,
+      "rust": "SmGuildAddMemberOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDADDMEMBERFAIL",
+      "id": 754,
+      "rust": "SmGuildAddMemberFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDDELMEMBEROK",
+      "id": 755,
+      "rust": "SmGuildDelMemberOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDDELMEMBERFAIL",
+      "id": 756,
+      "rust": "SmGuildDelMemberFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDMAKEALLYOK",
+      "id": 759,
+      "rust": "SmGuildMakeAllyOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDBREAKALLYOK",
+      "id": 761,
+      "rust": "SmGuildBreakAllyOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SENDDETAILGOODSLIST",
+      "id": 622,
+      "rust": "SmSendDetailGoodsList",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SENDREPAIRCOST",
+      "id": 623,
+      "rust": "SmSendRepairCost",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GROUPMESSAGE",
+      "id": 0,
+      "rust": "SmGroupMessage",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SPACEMOVEHIDE",
+      "id": 800,
+      "rust": "SmSpaceMoveHide",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SPACEMOVESHOW",
+      "id": 801,
+      "rust": "SmSpaceMoveShow",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_NEWIDSUCCESS",
+      "id": 2019,
+      "rust": "SmNewIdSuccess",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_NEWIDFAIL",
+      "id": 2020,
+      "rust": "SmNewIdFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_CHGPASSWDSUCCESS",
+      "id": 2021,
+      "rust": "SmChgPasswdSuccess",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_CHGPASSWDFAIL",
+      "id": 2022,
+      "rust": "SmChgPasswdFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_NEEDUPDATEACCOUNT",
+      "id": 2018,
+      "rust": "SmNeedUpdateAccount",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_UPDATEIDSUCCESS",
+      "id": 2023,
+      "rust": "SmUpdateIdSuccess",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_UPDATEIDFAIL",
+      "id": 2024,
+      "rust": "SmUpdateIdFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DELCHRFAIL",
+      "id": 2025,
+      "rust": "SmDelChrFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_STARTFAIL",
+      "id": 2026,
+      "rust": "SmStartFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_VERSIONFAIL",
+      "id": 2027,
+      "rust": "SmVersionFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SENDUSEITEMS",
+      "id": 604,
+      "rust": "SmSendUseItems",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_EXCHGTAKEONOK",
+      "id": 615,
+      "rust": "SmExchgTakeOnOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_EXCHGTAKEONFAIL",
+      "id": 616,
+      "rust": "SmExchgTakeOnFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DEALDELITEMFAIL",
+      "id": 686,
+      "rust": "SmDealDelItemFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DEALCHGGOLDFAIL",
+      "id": 688,
+      "rust": "SmDealChgGoldFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_CREATEGROUPOK",
+      "id": 0,
+      "rust": "SmCreateGroupOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发; 664 号作废 — 官方 case 664 (0x46A3B1, IDA 注解) = 计时 + value+5 五选一错误提示文本 (sub_486DF0, 46BA44/46B9C0/46BA70/46BA28/46BA88) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_CREATEGROUPFAIL",
+      "id": 0,
+      "rust": "SmCreateGroupFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发; 665 号作废 — 官方 case 665 (0x46A485, IDA 注解) = 计时 + value+3 三选一错误提示文本 (46BA44/46B9C0/46BAA4) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GROUPADDMEMOK",
+      "id": 0,
+      "rust": "SmGroupAddMemOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发; 666 号作废 — 官方 case 666 (0x46A4F8, IDA 注解) = 虚表取消调用 (dword_4F94FC 对象 [edx+40h] 槽) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GROUPADDMEMFAIL",
+      "id": 0,
+      "rust": "SmGroupAddMemFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发; 667 号让位 — 官方 case 667 (0x46A507, IDA 注解) = 成员列表处理 (sub_45B2E0 解析 → sub_46E020), 见 SM_GROUPMEMBERLIST 行 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GROUPDELMEMOK",
+      "id": 0,
+      "rust": "SmGroupDelMemOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发; 668 号作废 — 官方 case 668 (0x469E6E, IDA 注解) = sub_46DAA8 (语义未透; M2 中继 10141/10152→668) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GROUPDELMEMFAIL",
+      "id": 0,
+      "rust": "SmGroupDelMemFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发; 669 号作废 — 官方 case 669 (0x469F87, IDA 注解) = 多字段全局更新 (4F7EF8+0x58 + 4F9338/4F933A 双字 + sub_49F874) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_NPCTEXTAPPLY",
+      "id": 0,
+      "rust": "SmNpcTextApply",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_OPENGUILDDLGFAIL",
+      "id": 752,
+      "rust": "SmOpenGuildDlgFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDRANKUPDATEFAIL",
+      "id": 763,
+      "rust": "SmGuildRankUpdateFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDMAKEALLYFAIL",
+      "id": 760,
+      "rust": "SmGuildMakeAllyFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GUILDBREAKALLYFAIL",
+      "id": 762,
+      "rust": "SmGuildBreakAllyFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DONATEOK",
+      "id": 767,
+      "rust": "SmDonateOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DONATEFAIL",
+      "id": 768,
+      "rust": "SmDonateFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SENDMAKEDRUGLIST",
+      "id": 0,
+      "rust": "SmSendMakeDrugList",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_MAKEDRUGSUCCESS",
+      "id": 0,
+      "rust": "SmMakeDrugSuccess",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_MAKEDRUGFAIL",
+      "id": 0,
+      "rust": "SmMakeDrugFail",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_MENUOK",
+      "id": 635,
+      "rust": "SmMenuOk",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_DLGMSG",
+      "id": 636,
+      "rust": "SmDlgMsg",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_MYSTATUS",
+      "id": 0,
+      "rust": "SmMyStatus",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号) [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SPACEMOVEHIDE2",
+      "id": 806,
+      "rust": "SmSpaceMoveHide2",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SPACEMOVESHOW2",
+      "id": 807,
+      "rust": "SmSpaceMoveShow2",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_SENDNOTICE",
+      "id": 662,
+      "rust": "SmSendNotice",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_GETREGINFO",
+      "id": 2016,
+      "rust": "SmGetRegInfo",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    },
+    {
+      "name": "SM_TEST",
+      "id": 9000,
+      "rust": "SmTest",
+      "status": "Aligned",
+      "anchor": "登记表 §一/二",
+      "note": "Rust 扩展 (C1 自有面, 无官方号); 服务端不下发 [2026-09 专项彻底对齐入库与实证]"
+    }
+  ],
+  "status": "CLEARED",
+  "unresolved_cm_count": 0,
+  "unresolved_sm_count": 0,
+  "diff_cleared": true,
+  "consecutive_zero_defect_rounds": 102,
+  "total_asserts": 9274
+}

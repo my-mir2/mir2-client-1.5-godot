@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mir2Client", "Mir2Client.csproj", "{A6922C0A-AE2B-4A1C-9E5C-00E261DE7F9B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mir2Client.Tests", "tests/CSharp/Mir2Client.Tests.csproj", "{B8922C0A-BE2B-4A1C-9E5C-11E261DE7F9B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A6922C0A-AE2B-4A1C-9E5C-00E261DE7F9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6922C0A-AE2B-4A1C-9E5C-00E261DE7F9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6922C0A-AE2B-4A1C-9E5C-00E261DE7F9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6922C0A-AE2B-4A1C-9E5C-00E261DE7F9B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B8922C0A-BE2B-4A1C-9E5C-11E261DE7F9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B8922C0A-BE2B-4A1C-9E5C-11E261DE7F9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B8922C0A-BE2B-4A1C-9E5C-11E261DE7F9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B8922C0A-BE2B-4A1C-9E5C-11E261DE7F9B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

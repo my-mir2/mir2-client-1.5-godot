@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://c_test_proto_matrix"]
+
+[ext_resource type="Script" path="res://tests/CSharp/TestProtocolMatrix.cs" id="1_test"]
+
+[node name="TestCSharpProtocol" type="Node"]
+script = ExtResource("1_test")

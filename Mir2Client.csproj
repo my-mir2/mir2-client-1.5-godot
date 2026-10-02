@@ -1,0 +1,11 @@
+<Project Sdk="Godot.NET.Sdk/4.4.0">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace></RootNamespace>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/CSharp/**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>
