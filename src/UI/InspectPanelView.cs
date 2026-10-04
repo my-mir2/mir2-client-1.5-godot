@@ -77,7 +77,7 @@ public partial class InspectPanelView : Control, IManagedWindow
 
         // 官方原生观察他人纸娃娃立绘背景 (Prguse_0376 @ Left=38, Top=52, 168x199, IDA sub_488AF4)
         var texDoll = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0376.png");
-        var dollBg = new TextureRect
+        _dollBg = new TextureRect
         {
             Name = "InspectDollBg",
             Position = new Vector2(38, 52),
@@ -85,59 +85,50 @@ public partial class InspectPanelView : Control, IManagedWindow
             Texture = texDoll,
             MouseFilter = MouseFilterEnum.Ignore
         };
-        _panel.AddChild(dollBg);
+        _panel.AddChild(_dollBg);
 
         // 盛大官方 1.5 观察他人纸娃娃核心立绘层 (挂在 dollBg 下，展示被观察者道士神装纸娃娃)
         // 1. 衣服立绘层: StateItem_0064 (幽灵战衣男 80x129 @ 39, 63)
         var texCloth = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0064.png");
-        if (texCloth != null)
+        _dollCloth = new TextureRect
         {
-            var clothRect = new TextureRect
-            {
-                Name = "InspectDollCloth",
-                Texture = texCloth,
-                Position = new Vector2(39, 63),
-                Size = new Vector2(80, 129),
-                MouseFilter = MouseFilterEnum.Ignore,
-                ZIndex = 1
-            };
-            clothRect.Visible = false; // 演示立绘非官方数据,待观察协议数据接入
-            dollBg.AddChild(clothRect);
-        }
+            Name = "InspectDollCloth",
+            Texture = texCloth,
+            Position = new Vector2(39, 63),
+            Size = new Vector2(80, 129),
+            MouseFilter = MouseFilterEnum.Ignore,
+            ZIndex = 1,
+            Visible = false
+        };
+        _dollBg?.AddChild(_dollCloth);
 
         // 2. 武器立绘层: StateItem_0053 (龙纹剑 44x112 @ 14, 20，置于衣服上方手部咬合处)
         var texWeapon = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0053.png");
-        if (texWeapon != null)
+        _dollWeapon = new TextureRect
         {
-            var weaponRect = new TextureRect
-            {
-                Name = "InspectDollWeapon",
-                Texture = texWeapon,
-                Position = new Vector2(14, 20),
-                Size = new Vector2(44, 112),
-                MouseFilter = MouseFilterEnum.Ignore,
-                ZIndex = 2
-            };
-            weaponRect.Visible = false; // 演示立绘非官方数据,待观察协议数据接入
-            dollBg.AddChild(weaponRect);
-        }
+            Name = "InspectDollWeapon",
+            Texture = texWeapon,
+            Position = new Vector2(14, 20),
+            Size = new Vector2(44, 112),
+            MouseFilter = MouseFilterEnum.Ignore,
+            ZIndex = 2,
+            Visible = false
+        };
+        _dollBg?.AddChild(_dollWeapon);
 
         // 3. 头盔立绘层: StateItem_0108 (道士头盔 20x23 @ 74, 42，严丝合缝罩在头部)
         var texHelm = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0108.png");
-        if (texHelm != null)
+        _dollHelm = new TextureRect
         {
-            var helmRect = new TextureRect
-            {
-                Name = "InspectDollHelm",
-                Texture = texHelm,
-                Position = new Vector2(74, 42),
-                Size = new Vector2(20, 23),
-                MouseFilter = MouseFilterEnum.Ignore,
-                ZIndex = 3
-            };
-            helmRect.Visible = false; // 演示立绘非官方数据,待观察协议数据接入
-            dollBg.AddChild(helmRect);
-        }
+            Name = "InspectDollHelm",
+            Texture = texHelm,
+            Position = new Vector2(74, 42),
+            Size = new Vector2(20, 23),
+            MouseFilter = MouseFilterEnum.Ignore,
+            ZIndex = 3,
+            Visible = false
+        };
+        _dollBg?.AddChild(_dollHelm);
 
         // 盛大官方 1.5 观人面板底部属性内胆 (Prguse_0370 凹槽区域 x:[33..213], y:[268..317]，内部文本内缩置于 (38, 271, 172, 44))
         _lblInspectDesc = new RichTextLabel
@@ -173,13 +164,6 @@ public partial class InspectPanelView : Control, IManagedWindow
         {
             int slot = s.Slot;
 
-            // 观察目标（无涯 - 道士会长）全套道术神装首饰贴图
-            string? iconFile = null; // 演示首饰图标为非官方数据,无观察协议数据时槽位留空
-
-            Texture2D? equipIcon = !string.IsNullOrEmpty(iconFile)
-                ? ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}")
-                : null;
-
             var btn = new SlotButton
             {
                 Name = $"InspectSlot_{slot}",
@@ -189,26 +173,16 @@ public partial class InspectPanelView : Control, IManagedWindow
                 Size = new Vector2(s.W, s.H),
                 CustomMinimumSize = new Vector2(s.W, s.H),
                 Flat = true,
-                ItemTexture = equipIcon,
+                ItemTexture = null,
                 ZIndex = 5
             };
 
             btn.MouseEntered += () =>
             {
-                var (itemName, itemDesc) = slot switch
+                if (_lblInspectDesc != null && _slotDesc.TryGetValue(slot, out var d))
                 {
-                    0 => ("幽灵战衣(男)", "[color=#c0c0c0]重量 26   持久力 28/28[/color]\n[color=#ffff00]防御 4-7   魔御 3-4   道术 1-4[/color]\n[color=#c0c0c0]需要精神力 27[/color]"),
-                    1 => ("龙纹剑", "[color=#c0c0c0]重量 40   持久力 22/22[/color]\n[color=#ffff00]攻击 8-20   道术 3-6[/color] [color=#00ffff]幸运+7[/color]\n[color=#c0c0c0]需要等级 35[/color]"),
-                    2 => ("荣誉勋章", "[color=#c0c0c0]重量 1   持久力 50/50[/color]\n[color=#ffff00]道术 1-3[/color]"),
-                    3 => ("天珠项链", "[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]道术 1-5[/color]\n[color=#c0c0c0]需要精神力 22[/color]"),
-                    4 => ("道士头盔", "[color=#c0c0c0]重量 3   持久力 8/8[/color]\n[color=#ffff00]防御 1-2   魔御 2-3[/color] [color=#00ffff](道术+1)[/color]\n[color=#c0c0c0]需要等级 24[/color]"),
-                    5 => ("三眼手镯(右)", "[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]防御 1-1   道术 1-3[/color]\n[color=#c0c0c0]需要精神力 22[/color]"),
-                    6 => ("三眼手镯(左)", "[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]防御 1-1   道术 1-3[/color]\n[color=#c0c0c0]需要精神力 22[/color]"),
-                    7 => ("铂金戒指(右)", "[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]防御 0-2   道术 0-4[/color]\n[color=#c0c0c0]需要精神力 17[/color]"),
-                    8 => ("铂金戒指(左)", "[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]防御 0-2   道术 0-4[/color]\n[color=#c0c0c0]需要精神力 17[/color]"),
-                    _ => ("装备", "[color=#c0c0c0]重量 1   持久力 10/10[/color]")
-                };
-                if (_lblInspectDesc != null && _slotDesc.TryGetValue(slot, out var d)) _lblInspectDesc.Text = d;
+                    _lblInspectDesc.Text = d;
+                }
             };
             btn.MouseExited += () =>
             {
@@ -218,12 +192,75 @@ public partial class InspectPanelView : Control, IManagedWindow
             _slotButtons[slot] = btn;
             _panel.AddChild(btn);
         }
-
-        // 官方无默认描述: 仅在鼠标悬停槽位时显示该装备文本,默认保持为空
     }
 
+    private TextureRect? _dollCloth;
+    private TextureRect? _dollWeapon;
+    private TextureRect? _dollHelm;
+    private TextureRect? _dollBg;
     private readonly System.Collections.Generic.Dictionary<int, SlotButton> _slotButtons = new();
     private readonly System.Collections.Generic.Dictionary<int, string> _slotDesc = new();
+    private RichTextLabel? _lblInspectDesc;
+
+    /// <summary>
+    /// 设置纸娃娃立绘(衣服、武器、头盔)。资源位于 StateItem WIL。
+    /// </summary>
+    public void SetDoll(string? clothFile, string? weaponFile, string? helmFile)
+    {
+        if (_dollCloth != null)
+        {
+            if (!string.IsNullOrEmpty(clothFile))
+            {
+                _dollCloth.Texture = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{clothFile}");
+                _dollCloth.Visible = _dollCloth.Texture != null;
+            }
+            else
+            {
+                _dollCloth.Texture = null;
+                _dollCloth.Visible = false;
+            }
+        }
+
+        if (_dollWeapon != null)
+        {
+            if (!string.IsNullOrEmpty(weaponFile))
+            {
+                _dollWeapon.Texture = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{weaponFile}");
+                _dollWeapon.Visible = _dollWeapon.Texture != null;
+            }
+            else
+            {
+                _dollWeapon.Texture = null;
+                _dollWeapon.Visible = false;
+            }
+        }
+
+        if (_dollHelm != null)
+        {
+            if (!string.IsNullOrEmpty(helmFile))
+            {
+                _dollHelm.Texture = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{helmFile}");
+                _dollHelm.Visible = _dollHelm.Texture != null;
+            }
+            else
+            {
+                _dollHelm.Texture = null;
+                _dollHelm.Visible = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 设置目标角色性别 (0=男 Prguse_0376, 1=女 Prguse_0377, IDA sub_49219C [0x49226f])
+    /// </summary>
+    public void SetGender(int gender)
+    {
+        string pic = gender == 1 ? "Prguse_0377.png" : "Prguse_0376.png";
+        if (_dollBg != null)
+        {
+            _dollBg.Texture = ResPath.LoadImageTexture($"resources/wil/png/Prguse/{pic}");
+        }
+    }
 
     /// <summary>设置观察目标某装备位(来源:观察协议解析结果或 e2e mock);iconFile 为 StateItem 资源名。</summary>
     public void SetSlotItem(int slot, string? iconFile, string? bbDesc)
@@ -232,8 +269,6 @@ public partial class InspectPanelView : Control, IManagedWindow
             btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}");
         if (string.IsNullOrEmpty(bbDesc)) _slotDesc.Remove(slot); else _slotDesc[slot] = bbDesc;
     }
-
-    private RichTextLabel? _lblInspectDesc;
 
     public void Inspect(string targetName)
     {

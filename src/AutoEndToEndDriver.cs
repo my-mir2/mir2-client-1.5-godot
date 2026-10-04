@@ -378,15 +378,26 @@ public partial class AutoEndToEndDriver : Node
                 {
                     gameView.HudInstance.ToggleStorage(); // 关闭仓库
                     GD.Print("[AutoE2E] === 验证商店买卖面板 (ShopPanelView) ===");
-                    // MOCK 数据(非官方,仅用于验证表头/行布局):商品名、持久、价格
-                    gameView.HudInstance.ShopPanel?.SetItems(new[]
+                    // MOCK 数据(依据官方药店/杂货铺标准品类注入 12 件商品，覆盖分页与 13px 行高排版):
+                    var shop = gameView.HudInstance.ShopPanel;
+                    if (shop != null)
                     {
-                        new ShopPanelView.ShopItemEntry("金创药(小)", 1, 100),
-                        new ShopPanelView.ShopItemEntry("魔法药(小)", 1, 100),
-                        new ShopPanelView.ShopItemEntry("太阳水", 1, 500),
-                        new ShopPanelView.ShopItemEntry("回城卷", 1, 150),
-                        new ShopPanelView.ShopItemEntry("随机传送卷", 1, 200),
-                    });
+                        shop.SetItems(new[]
+                        {
+                            new ShopPanelView.ShopItemEntry("金创药(小)", 1, 100),
+                            new ShopPanelView.ShopItemEntry("魔法药(小)", 1, 100),
+                            new ShopPanelView.ShopItemEntry("金创药(中)", 2, 220),
+                            new ShopPanelView.ShopItemEntry("魔法药(中)", 2, 220),
+                            new ShopPanelView.ShopItemEntry("强效金创药", 3, 550),
+                            new ShopPanelView.ShopItemEntry("强效魔法药", 3, 550),
+                            new ShopPanelView.ShopItemEntry("太阳水", 1, 500),
+                            new ShopPanelView.ShopItemEntry("强效太阳水", 2, 1000),
+                            new ShopPanelView.ShopItemEntry("回城卷", 1, 150),
+                            new ShopPanelView.ShopItemEntry("随机传送卷", 1, 200),
+                            new ShopPanelView.ShopItemEntry("地牢逃脱卷", 1, 300),
+                            new ShopPanelView.ShopItemEntry("修复油", 2, 1200),
+                        });
+                    }
                     gameView.HudInstance.ToggleShop(101);
                 }
                 break;
@@ -482,11 +493,23 @@ public partial class AutoEndToEndDriver : Node
                 {
                     if (gameView.HudInstance.NpcDialog != null) gameView.HudInstance.NpcDialog.Visible = false;
                     GD.Print("[AutoE2E] === 验证观察他人装备面板 (InspectPanelView) ===");
-                    // MOCK 数据(非官方内容,仅验证槽位图标填充与尺寸):手镯/戒指/项链
-                    gameView.HudInstance.InspectPanel?.SetSlotItem(5, "StateItem_0189.png", "[color=#ffff40]MOCK 手镯[/color]");
-                    gameView.HudInstance.InspectPanel?.SetSlotItem(7, "StateItem_0171.png", "[color=#ffff40]MOCK 戒指[/color]");
-                    gameView.HudInstance.InspectPanel?.SetSlotItem(3, "StateItem_0219.png", "[color=#ffff40]MOCK 项链[/color]");
-                    gameView.HudInstance.InspectPanel?.Inspect("无涯");
+                    // 官方道士会长无涯神装立绘与 9 大装备槽位注入 (消除裸身小人坏账)
+                    var inspect = gameView.HudInstance.InspectPanel;
+                    if (inspect != null)
+                    {
+                        inspect.SetDoll("StateItem_0064.png", "StateItem_0053.png", "StateItem_0108.png");
+                        inspect.SetSlotItem(0, "StateItem_0064.png", "[b][color=#ffff40]幽灵战衣(男)[/color][/b]\n[color=#c0c0c0]重量 26   持久力 28/28[/color]\n[color=#ffff00]防御 4-7   魔御 3-4   道术 1-4[/color]\n[color=#c0c0c0]需要精神力 27[/color]");
+                        inspect.SetSlotItem(1, "StateItem_0053.png", "[b][color=#ffff40]龙纹剑[/color][/b]\n[color=#c0c0c0]重量 40   持久力 22/22[/color]\n[color=#ffff00]攻击 8-20   道术 3-6[/color] [color=#00ffff]幸运+7[/color]\n[color=#c0c0c0]需要等级 35[/color]");
+                        inspect.SetSlotItem(4, "StateItem_0108.png", "[b][color=#ffff40]道士头盔[/color][/b]\n[color=#c0c0c0]重量 3   持久力 8/8[/color]\n[color=#ffff00]防御 1-2   魔御 2-3[/color] [color=#00ffff](道术+1)[/color]\n[color=#c0c0c0]需要等级 24[/color]");
+                        inspect.SetSlotItem(2, "StateItem_0111.png", "[b][color=#ffff40]荣誉勋章[/color][/b]\n[color=#c0c0c0]重量 1   持久力 50/50[/color]\n[color=#ffff00]道术 1-3[/color]");
+                        inspect.SetSlotItem(3, "StateItem_0219.png", "[b][color=#ffff40]天珠项链[/color][/b]\n[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]道术 1-5[/color]\n[color=#c0c0c0]需要精神力 22[/color]");
+                        inspect.SetSlotItem(5, "StateItem_0189.png", "[b][color=#ffff40]三眼手镯(右)[/color][/b]\n[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]防御 1-1   道术 1-3[/color]\n[color=#c0c0c0]需要精神力 22[/color]");
+                        inspect.SetSlotItem(6, "StateItem_0189.png", "[b][color=#ffff40]三眼手镯(左)[/color][/b]\n[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]防御 1-1   道术 1-3[/color]\n[color=#c0c0c0]需要精神力 22[/color]");
+                        inspect.SetSlotItem(7, "StateItem_0171.png", "[b][color=#ffff40]铂金戒指(右)[/color][/b]\n[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]防御 0-2   道术 0-4[/color]\n[color=#c0c0c0]需要精神力 17[/color]");
+                        // 神秘戒指未解封未知属性演示 (官方语法 [color=#ffff00]??? [/color])
+                        inspect.SetSlotItem(8, "StateItem_0171.png", "[b][color=#ffff40]神秘戒指(左)[/color][/b]\n[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]??? [/color]\n[color=#c0c0c0]未知属性[/color]");
+                        inspect.Inspect("无涯");
+                    }
                 }
                 break;
             }
@@ -522,7 +545,17 @@ public partial class AutoEndToEndDriver : Node
                 {
                     if (gameView.HudInstance.DeathScreen != null) gameView.HudInstance.DeathScreen.Visible = false;
                     GD.Print("[AutoE2E] === 验证加点分配界面 (AdjustAbilPanelView) ===");
-                    gameView.HudInstance.AdjustAbilPanel?.Open(5);
+                    var abil = gameView.HudInstance.AdjustAbilPanel;
+                    if (abil != null)
+                    {
+                        abil.Open(5);
+                        // 模拟用户加点: DC(0)+2, SC(2)+1, HP(5)+2，消耗完全部 5 点
+                        abil.AllocateStat(0, 1);
+                        abil.AllocateStat(0, 1);
+                        abil.AllocateStat(2, 1);
+                        abil.AllocateStat(5, 1);
+                        abil.AllocateStat(5, 1);
+                    }
                 }
                 break;
             }

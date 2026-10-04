@@ -28,9 +28,14 @@ public partial class ShopPanelView : Control, IManagedWindow
 
     public const float PanelWidth = 308.0f;
     public const float PanelHeight = 205.0f;
+    public const int PageSize = 10; // 官方固定每页 10 行 (IDA sub_48F020 / sub_48FC14)
 
     private int _npcUid = 0;
     private Panel? _panel;
+    private VBoxContainer? _itemListContainer;
+    private int _selectedIndex = -1;
+    private int _pageIndex = 0;
+    private readonly List<Panel> _itemRowPanels = new();
 
     public string WindowName => "ShopPanelView";
     public new bool IsVisible
@@ -40,6 +45,21 @@ public partial class ShopPanelView : Control, IManagedWindow
     }
     public (int x, int y, int width, int height) Bounds =>
         ((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
+
+    public struct ShopItemEntry
+    {
+        public string Name;
+        public int Weight;
+        public int Price;
+        public ShopItemEntry(string name, int weight, int price)
+        {
+            Name = name;
+            Weight = weight;
+            Price = price;
+        }
+    }
+
+    private readonly List<ShopItemEntry> _items = new();
 
     public override void _Ready()
     {
@@ -74,7 +94,16 @@ public partial class ShopPanelView : Control, IManagedWindow
         btnClose.Pressed += OnClose;
         _panel.AddChild(btnClose);
 
-        // 官方原生商品列表展示区域 (Left: 10, Top: 27, Width: 265, Height: 137，对应货架高光框内胆)
+        // 官方表头 sub_48F020 0x48f10b..0x48f181: 物品列表(19,8)/价格(156,8)/持久(245,8)
+        foreach (var (txt, hx) in new[] { ("物品列表", 19), ("价格", 156), ("持久", 245) })
+        {
+            var hl = new Label { Text = txt, Position = new Vector2(hx, 8) };
+            hl.AddThemeFontSizeOverride("font_size", 12);
+            hl.AddThemeColorOverride("font_color", Colors.White);
+            _panel.AddChild(hl);
+        }
+
+        // 官方原生商品列表展示区域 (Left: 0, Top: 32, Width: 307, Height: 130，10 行 x 13px)
         _itemListContainer = new VBoxContainer
         {
             Name = "ShopItemListContainer",
@@ -83,76 +112,88 @@ public partial class ShopPanelView : Control, IManagedWindow
             MouseFilter = MouseFilterEnum.Pass
         };
         _itemListContainer.AddThemeConstantOverride("separation", 0);
-        // 官方表头 sub_48F020 0x48f10b..0x48f181: 物品列表(19,11)/价格(156,11)/持久(245,11),行 y=32+13*i
-        foreach (var (txt, hx) in new[] { ("物品列表", 19), ("价格", 156), ("持久", 245) })
-        {
-            var hl = new Label { Text = txt, Position = new Vector2(hx, 11 - 3) };
-            hl.AddThemeFontSizeOverride("font_size", 12);
-            hl.AddThemeColorOverride("font_color", Colors.White);
-            _panel.AddChild(hl);
-        }
         _panel.AddChild(_itemListContainer);
 
-        // 初始化官方标准药店/杂货铺商品列表
-        PopulateDefaultShopItems();
+        // 监听滚轮翻页支持 (IDA sub_48FC14/sub_48FCB4)
+        _panel.GuiInput += OnPanelGuiInput;
 
-        // 官方原生购买按钮 (Prguse_0388 @ 43, 175, 物理尺寸 24x24, IDA sub_481dd4 [0x484fde..0x485011])
-        var texBuy = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0388.png");
+        // 官方原生上一页按钮 (Prguse_0388 @ 43, 175, 物理尺寸 24x24, IDA sub_481dd4 [0x484fde..0x485011] & sub_48FC14)
+        var texPrev = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0388.png");
+        var btnPrev = new TextureButton
+        {
+            Name = "BtnShopPrev",
+            Position = new Vector2(43, 175),
+            Size = new Vector2(24, 24),
+            TextureNormal = texPrev
+        };
+        btnPrev.Pressed += OnPrevPage;
+        _panel.AddChild(btnPrev);
+
+        // 官方原生下一页按钮 (Prguse_0387 @ 90, 175, 物理尺寸 24x24, IDA sub_481dd4 [0x485024..0x485057] & sub_48FCB4)
+        var texNext = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0387.png");
+        var btnNext = new TextureButton
+        {
+            Name = "BtnShopNext",
+            Position = new Vector2(90, 175),
+            Size = new Vector2(24, 24),
+            TextureNormal = texNext
+        };
+        btnNext.Pressed += OnNextPage;
+        _panel.AddChild(btnNext);
+
+        // 官方原生确定购买按钮 (Prguse_0386 OK 标识 @ 215, 171, 物理尺寸 44x16, IDA sub_481dd4 [0x48506a..0x48509d] & sub_48FA80)
+        var texBuy = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0386.png");
         var btnBuy = new TextureButton
         {
             Name = "BtnShopBuy",
-            Position = new Vector2(43, 175),
-            Size = new Vector2(24, 24),
-            TextureNormal = texBuy
-        };
-        btnBuy.Pressed += () => EmitSignal(SignalName.BuyRequested, _npcUid, _selectedIndex, 1);
-        _panel.AddChild(btnBuy);
-
-        // 官方原生产出/出售按钮 (Prguse_0387 @ 90, 175, 物理尺寸 24x24, IDA sub_481dd4 [0x485024..0x485057])
-        var texSell = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0387.png");
-        var btnSell = new TextureButton
-        {
-            Name = "BtnShopSell",
-            Position = new Vector2(90, 175),
-            Size = new Vector2(24, 24),
-            TextureNormal = texSell
-        };
-        btnSell.Pressed += () => EmitSignal(SignalName.SellRequested, _npcUid, 0);
-        _panel.AddChild(btnSell);
-
-        // 官方原生修理/特修按钮 (Prguse_0386 @ 215, 171, 物理尺寸 44x16, IDA sub_481dd4 [0x48506a..0x48509d])
-        var texRepair = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0386.png");
-        var btnRepair = new TextureButton
-        {
-            Name = "BtnShopRepair",
             Position = new Vector2(215, 171),
             Size = new Vector2(44, 16),
-            TextureNormal = texRepair
+            TextureNormal = texBuy
         };
-        btnRepair.Pressed += () => EmitSignal(SignalName.RepairSpecialRequested, _npcUid, 0);
-        _panel.AddChild(btnRepair);
-
+        btnBuy.Pressed += OnBuyCurrentSelection;
+        _panel.AddChild(btnBuy);
     }
 
-    private VBoxContainer? _itemListContainer;
-    private int _selectedIndex = -1;
-    private readonly List<Panel> _itemRowPanels = new();
-
-    public struct ShopItemEntry
+    private void OnPanelGuiInput(InputEvent @event)
     {
-        public string Name;
-        public int Weight;
-        public int Price;
-        public ShopItemEntry(string name, int weight, int price)
+        if (@event is InputEventMouseButton mb && mb.Pressed)
         {
-            Name = name;
-            Weight = weight;
-            Price = price;
+            if (mb.ButtonIndex == MouseButton.WheelUp)
+            {
+                OnPrevPage();
+            }
+            else if (mb.ButtonIndex == MouseButton.WheelDown)
+            {
+                OnNextPage();
+            }
         }
     }
 
-    // 官方商品数据来自服务端,客户端无内置商品(原写死 7 件为非官方数据,已移除)
-    private readonly List<ShopItemEntry> _items = new();
+    private void OnPrevPage()
+    {
+        if (_pageIndex > 0)
+        {
+            _pageIndex--;
+            RefreshPageDisplay();
+        }
+    }
+
+    private void OnNextPage()
+    {
+        if ((_pageIndex + 1) * PageSize < _items.Count)
+        {
+            _pageIndex++;
+            RefreshPageDisplay();
+        }
+    }
+
+    private void OnBuyCurrentSelection()
+    {
+        if (_selectedIndex >= 0 && _selectedIndex < _items.Count)
+        {
+            EmitSignal(SignalName.BuyRequested, _npcUid, _selectedIndex, 1);
+        }
+    }
 
     /// <summary>
     /// 设置商品列表(来源:服务端商店消息解析结果,或 e2e 的 mock 数据)。
@@ -162,30 +203,37 @@ public partial class ShopPanelView : Control, IManagedWindow
         _items.Clear();
         _items.AddRange(items);
         _selectedIndex = -1;
-        PopulateDefaultShopItems();
+        _pageIndex = 0;
+        RefreshPageDisplay();
     }
 
-    private void PopulateDefaultShopItems()
+    private void RefreshPageDisplay()
     {
         if (_itemListContainer == null) return;
         foreach (var c in _itemListContainer.GetChildren()) c.QueueFree();
         _itemRowPanels.Clear();
 
-        for (int i = 0; i < _items.Count; i++)
+        int startIdx = _pageIndex * PageSize;
+        int endIdx = Math.Min(startIdx + PageSize, _items.Count);
+
+        for (int i = startIdx; i < endIdx; i++)
         {
-            int idx = i;
-            var item = _items[i];
+            int globalIdx = i;
+            var item = _items[globalIdx];
 
             var row = new Panel
             {
                 CustomMinimumSize = new Vector2(307, 13),
+                Size = new Vector2(307, 13),
                 MouseFilter = MouseFilterEnum.Stop
             };
-            row.AddThemeStyleboxOverride("panel", idx == _selectedIndex 
+
+            bool isSelected = (globalIdx == _selectedIndex);
+            row.AddThemeStyleboxOverride("panel", isSelected 
                 ? new StyleBoxFlat { BgColor = new Color(0.18f, 0.25f, 0.45f, 0.85f) } 
                 : new StyleBoxEmpty());
 
-            // 1. 商品名称 (Left=6, Width=120)
+            // 1. 商品名称 (Left=19, Width=130, 官方 13px 行高)
             var lblName = new Label
             {
                 Position = new Vector2(19, -2),
@@ -194,22 +242,10 @@ public partial class ShopPanelView : Control, IManagedWindow
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblName.AddThemeFontSizeOverride("font_size", 11);
-            lblName.AddThemeColorOverride("font_color", idx == _selectedIndex ? new Color(1.0f, 1.0f, 0.4f) : new Color(0.9f, 0.9f, 0.9f));
+            lblName.AddThemeColorOverride("font_color", isSelected ? new Color(1.0f, 1.0f, 0.4f) : new Color(0.9f, 0.9f, 0.9f));
             row.AddChild(lblName);
 
-            // 2. 重量 (Left=130, Width=40)
-            var lblWeight = new Label
-            {
-                Position = new Vector2(245, -2),
-                Size = new Vector2(40, 16),
-                Text = item.Weight.ToString(),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            lblWeight.AddThemeFontSizeOverride("font_size", 11);
-            lblWeight.AddThemeColorOverride("font_color", new Color(0.75f, 0.75f, 0.75f));
-            row.AddChild(lblWeight);
-
-            // 3. 价格 (Left=175, Width=80)
+            // 2. 价格 (Left=156, Width=80)
             var lblPrice = new Label
             {
                 Position = new Vector2(156, -2),
@@ -221,11 +257,50 @@ public partial class ShopPanelView : Control, IManagedWindow
             lblPrice.AddThemeColorOverride("font_color", new Color(1.0f, 0.85f, 0.3f));
             row.AddChild(lblPrice);
 
+            // 3. 重量/持久 (Left=245, Width=40)
+            var lblWeight = new Label
+            {
+                Position = new Vector2(245, -2),
+                Size = new Vector2(40, 16),
+                Text = item.Weight.ToString(),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            lblWeight.AddThemeFontSizeOverride("font_size", 11);
+            lblWeight.AddThemeColorOverride("font_color", new Color(0.75f, 0.75f, 0.75f));
+            row.AddChild(lblWeight);
+
+            // 鼠标悬停高亮与点击选中
+            row.MouseEntered += () =>
+            {
+                if (globalIdx != _selectedIndex)
+                {
+                    row.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0.25f, 0.35f, 0.55f, 0.35f) });
+                }
+            };
+            row.MouseExited += () =>
+            {
+                if (globalIdx != _selectedIndex)
+                {
+                    row.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+                }
+            };
+
             row.GuiInput += (ev) =>
             {
-                if (ev is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+                if (ev is InputEventMouseButton mb && mb.Pressed)
                 {
-                    SelectRow(idx);
+                    if (mb.ButtonIndex == MouseButton.Left)
+                    {
+                        if (mb.DoubleClick)
+                        {
+                            SelectRow(globalIdx);
+                            OnBuyCurrentSelection();
+                        }
+                        else
+                        {
+                            SelectRow(globalIdx);
+                        }
+                    }
                 }
             };
 
@@ -234,17 +309,22 @@ public partial class ShopPanelView : Control, IManagedWindow
         }
     }
 
-    private void SelectRow(int idx)
+    private void SelectRow(int globalIdx)
     {
-        _selectedIndex = idx;
-        for (int i = 0; i < _itemRowPanels.Count; i++)
+        _selectedIndex = globalIdx;
+        int startIdx = _pageIndex * PageSize;
+
+        for (int p = 0; p < _itemRowPanels.Count; p++)
         {
-            var p = _itemRowPanels[i];
-            bool selected = (i == _selectedIndex);
-            p.AddThemeStyleboxOverride("panel", selected 
+            int curGlobalIdx = startIdx + p;
+            var panel = _itemRowPanels[p];
+            bool selected = (curGlobalIdx == _selectedIndex);
+
+            panel.AddThemeStyleboxOverride("panel", selected 
                 ? new StyleBoxFlat { BgColor = new Color(0.18f, 0.25f, 0.45f, 0.85f) } 
                 : new StyleBoxEmpty());
-            var nameLbl = p.GetChildOrNull<Label>(0);
+
+            var nameLbl = panel.GetChildOrNull<Label>(0);
             if (nameLbl != null)
             {
                 nameLbl.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 1.0f, 0.4f) : new Color(0.9f, 0.9f, 0.9f));
@@ -255,7 +335,9 @@ public partial class ShopPanelView : Control, IManagedWindow
     public void OpenForNpc(int npcUid)
     {
         _npcUid = npcUid;
-        SelectRow(-1);
+        _selectedIndex = -1;
+        _pageIndex = 0;
+        RefreshPageDisplay();
         Visible = true;
     }
 

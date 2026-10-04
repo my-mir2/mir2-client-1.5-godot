@@ -35,11 +35,10 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
     private readonly int[] _statAllocations = new int[9];
     private readonly Label[] _lblStatAllocations = new Label[9];
 
-    // 官方 9 大属性名称与行索引
-    private static readonly string[] StatNames =
+    // 官方 9 大属性名称与行索引 (严格对齐底板 Prguse_0226 真实印制顺序与 IDA sub_494304)
+    public static readonly string[] StatNames =
     [
-        "生命值", "魔法值", "防御下限", "防御上限",
-        "魔防下限", "魔防上限", "攻击力", "魔法力", "道术力"
+        "DC", "MC", "SC", "AC", "MAC", "HP", "MP", "HIT", "SPD"
     ];
 
     // IDA sub_481dd4 0x485fb8~0x486471: 加/减按钮 Top 逐项 101,121,140,160,181,201,220,240,261 (非等距)
@@ -204,7 +203,23 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         }
 
         if (_lblRemain != null) _lblRemain.Text = _remainingPoints.ToString();
-        if (_lblStatAllocations[statIdx] != null) _lblStatAllocations[statIdx].Text = _statAllocations[statIdx].ToString();
+        if (_lblStatAllocations[statIdx] != null)
+        {
+            int val = _statAllocations[statIdx];
+            _lblStatAllocations[statIdx].Text = val > 0 ? $"+{val}" : "0";
+            _lblStatAllocations[statIdx].AddThemeColorOverride("font_color", val > 0 ? new Color(1.0f, 1.0f, 0.3f) : new Color(0.95f, 0.95f, 0.8f));
+        }
+    }
+
+    /// <summary>
+    /// 外部属性微调接口 (用于协议下发属性增量或 E2E 自动化测试)
+    /// </summary>
+    public void AllocateStat(int statIdx, int delta)
+    {
+        if (statIdx >= 0 && statIdx < 9)
+        {
+            OnModifyStat(statIdx, delta);
+        }
     }
 
     public void Open(int points)
