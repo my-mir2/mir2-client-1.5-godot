@@ -154,6 +154,17 @@ public partial class ShopPanelView : Control, IManagedWindow
     // 官方商品数据来自服务端,客户端无内置商品(原写死 7 件为非官方数据,已移除)
     private readonly List<ShopItemEntry> _items = new();
 
+    /// <summary>
+    /// 设置商品列表(来源:服务端商店消息解析结果,或 e2e 的 mock 数据)。
+    /// </summary>
+    public void SetItems(IEnumerable<ShopItemEntry> items)
+    {
+        _items.Clear();
+        _items.AddRange(items);
+        _selectedIndex = -1;
+        PopulateDefaultShopItems();
+    }
+
     private void PopulateDefaultShopItems()
     {
         if (_itemListContainer == null) return;

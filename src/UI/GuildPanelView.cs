@@ -292,6 +292,23 @@ public partial class GuildPanelView : Control, IManagedWindow
         }
     }
 
+    /// <summary>
+    /// 行会主页文本(官方格式 sub_46E0B8:"公告"/"敌对行会"/"联盟行会" 三段,段内逐行,默认白色 0xFFFFFF)。
+    /// 文本区位置沿用现有 (12,42):官方 left/top 尚无 IDA 证据。
+    /// </summary>
+    public void SetHomeText(IEnumerable<string> notice, IEnumerable<string> killGuilds, IEnumerable<string> allyGuilds)
+    {
+        if (_noticeText == null) return;
+        var sb = new System.Text.StringBuilder();
+        sb.Append("公告\n");
+        foreach (var l in notice) sb.Append(l).Append('\n');
+        sb.Append("\n敌对行会\n");
+        foreach (var l in killGuilds) sb.Append(l).Append('\n');
+        sb.Append("\n联盟行会\n");
+        foreach (var l in allyGuilds) sb.Append(l).Append('\n');
+        _noticeText.Text = sb.ToString();
+    }
+
     private void OnClose()
     {
         Visible = false;

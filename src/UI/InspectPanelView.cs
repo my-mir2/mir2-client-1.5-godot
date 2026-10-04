@@ -208,17 +208,29 @@ public partial class InspectPanelView : Control, IManagedWindow
                     8 => ("铂金戒指(左)", "[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]防御 0-2   道术 0-4[/color]\n[color=#c0c0c0]需要精神力 17[/color]"),
                     _ => ("装备", "[color=#c0c0c0]重量 1   持久力 10/10[/color]")
                 };
-                // 演示描述为非官方数据,不再显示(待真实观察数据)
+                if (_lblInspectDesc != null && _slotDesc.TryGetValue(slot, out var d)) _lblInspectDesc.Text = d;
             };
             btn.MouseExited += () =>
             {
                 if (_lblInspectDesc != null) _lblInspectDesc.Text = "";
             };
 
+            _slotButtons[slot] = btn;
             _panel.AddChild(btn);
         }
 
         // 官方无默认描述: 仅在鼠标悬停槽位时显示该装备文本,默认保持为空
+    }
+
+    private readonly System.Collections.Generic.Dictionary<int, SlotButton> _slotButtons = new();
+    private readonly System.Collections.Generic.Dictionary<int, string> _slotDesc = new();
+
+    /// <summary>设置观察目标某装备位(来源:观察协议解析结果或 e2e mock);iconFile 为 StateItem 资源名。</summary>
+    public void SetSlotItem(int slot, string? iconFile, string? bbDesc)
+    {
+        if (_slotButtons.TryGetValue(slot, out var btn))
+            btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}");
+        if (string.IsNullOrEmpty(bbDesc)) _slotDesc.Remove(slot); else _slotDesc[slot] = bbDesc;
     }
 
     private RichTextLabel? _lblInspectDesc;

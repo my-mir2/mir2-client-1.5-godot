@@ -5903,3 +5903,4 @@
 | 21 加点 | 对齐中 | 基础值列数据入口缺失 |
 范围说明:联机数据层(客户端目前无任何 PacketReceived 订阅者)不属于静态对齐范围,运行期内容均只能为骨架。
 - 装备(370 自身):复核 e2e step5 截图,9 槽图标(含手套)均落在 IDA 槽位矩形内,未见超框;为目视核对,未做逐像素量化,仍为 [对齐中]。
+- Mock 数据驱动验证(e2e,mock 均已在代码中标注"非官方"):ShopPanelView.SetItems/GuildPanelView.SetHomeText(官方三段格式)/InspectPanelView.SetSlotItem/StatusPanel.UpdateAbilityValue(2~10 行) 接口已就绪,截图确认:商店 5 行 13px 行距落在表头列下;行会三段(公告/敌对行会/联盟行会)渲染;能力页 11 行齐全;观察页槽位图标填充于 34x31 槽内。真实数据待消息分发层接入,取值格式(如负重量 a/b)非官方实证。

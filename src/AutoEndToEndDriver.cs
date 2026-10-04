@@ -285,6 +285,10 @@ public partial class AutoEndToEndDriver : Node
                     // 官方能力页 (IDA sub_488AF4 0x4892c2) 截图,随后回退一步让本 case 再执行一次以关闭面板
                     _abilityPageCaptured = true;
                     gameView.HudInstance.StatusPanel.SetAbilityPage(true);
+                    // MOCK 数据(非官方取值格式,仅验证第 2~10 行布局): 负重量/腕力/精确/敏捷/魔防/毒防/毒恢复/体恢复/魔恢复
+                    string[] mockRows = { "12/50", "45/60", "9", "9", "0", "0", "0", "10%", "10%" };
+                    for (int mr = 0; mr < mockRows.Length; mr++)
+                        gameView.HudInstance.StatusPanel.UpdateAbilityValue(2 + mr, mockRows[mr]);
                     RequestCapture("step5_2_status_ability_page");
                     _step--;
                     break;
@@ -366,6 +370,15 @@ public partial class AutoEndToEndDriver : Node
                 {
                     gameView.HudInstance.ToggleStorage(); // 关闭仓库
                     GD.Print("[AutoE2E] === 验证商店买卖面板 (ShopPanelView) ===");
+                    // MOCK 数据(非官方,仅用于验证表头/行布局):商品名、持久、价格
+                    gameView.HudInstance.ShopPanel?.SetItems(new[]
+                    {
+                        new ShopPanelView.ShopItemEntry("金创药(小)", 1, 100),
+                        new ShopPanelView.ShopItemEntry("魔法药(小)", 1, 100),
+                        new ShopPanelView.ShopItemEntry("太阳水", 1, 500),
+                        new ShopPanelView.ShopItemEntry("回城卷", 1, 150),
+                        new ShopPanelView.ShopItemEntry("随机传送卷", 1, 200),
+                    });
                     gameView.HudInstance.ToggleShop(101);
                 }
                 break;
@@ -420,6 +433,11 @@ public partial class AutoEndToEndDriver : Node
                 {
                     gameView.HudInstance.ToggleTrade(); // 关闭交易
                     GD.Print("[AutoE2E] === 验证行会面板 (GuildPanelView) ===");
+                    // MOCK 数据(非官方内容,仅验证官方三段格式的渲染)
+                    gameView.HudInstance.GuildPanel?.SetHomeText(
+                        new[] { "本周六晚八点攻城。", "请备足药品。" },
+                        new[] { "不败神话" },
+                        new[] { "邪风军团", "昔日同盟" });
                     gameView.HudInstance.ToggleGuild();
                 }
                 break;
@@ -456,6 +474,10 @@ public partial class AutoEndToEndDriver : Node
                 {
                     if (gameView.HudInstance.NpcDialog != null) gameView.HudInstance.NpcDialog.Visible = false;
                     GD.Print("[AutoE2E] === 验证观察他人装备面板 (InspectPanelView) ===");
+                    // MOCK 数据(非官方内容,仅验证槽位图标填充与尺寸):手镯/戒指/项链
+                    gameView.HudInstance.InspectPanel?.SetSlotItem(5, "StateItem_0189.png", "[color=#ffff40]MOCK 手镯[/color]");
+                    gameView.HudInstance.InspectPanel?.SetSlotItem(7, "StateItem_0171.png", "[color=#ffff40]MOCK 戒指[/color]");
+                    gameView.HudInstance.InspectPanel?.SetSlotItem(3, "StateItem_0219.png", "[color=#ffff40]MOCK 项链[/color]");
                     gameView.HudInstance.InspectPanel?.Inspect("无涯");
                 }
                 break;
