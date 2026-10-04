@@ -339,7 +339,7 @@ public partial class HudController : CanvasLayer
             var lblGold = new Label
             {
                 Name = "LblBagGold",
-                Position = new Vector2(64, 182),
+                Position = new Vector2(64, 185),
                 Size = new Vector2(140, 16),
                 Text = "0",
                 HorizontalAlignment = HorizontalAlignment.Left,
@@ -354,15 +354,16 @@ public partial class HudController : CanvasLayer
             var lblBagDesc = new RichTextLabel
             {
                 Name = "LblBagItemDesc",
-                Position = new Vector2(68, 214),
-                Size = new Vector2(230, 42),
+                Position = new Vector2(70, 215), // IDA sub_48DC24: 文本原点 (70,215),行距 14 (215/229/243)
+                Size = new Vector2(228, 42),
                 BbcodeEnabled = true,
                 ScrollActive = false,
+                ClipContents = true,
                 AutowrapMode = TextServer.AutowrapMode.WordSmart,
                 MouseFilter = Control.MouseFilterEnum.Ignore
             };
             lblBagDesc.AddThemeFontSizeOverride("normal_font_size", 10);
-            lblBagDesc.AddThemeConstantOverride("line_separation", 1);
+            lblBagDesc.AddThemeConstantOverride("line_separation", -2);
             _lblBagItemDesc = lblBagDesc;
             _bagPanel.AddChild(lblBagDesc);
 
