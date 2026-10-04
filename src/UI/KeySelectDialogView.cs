@@ -58,14 +58,14 @@ public partial class KeySelectDialogView : Control, IManagedWindow
         }
         AddChild(_panel);
 
-        // 官方原生技能图标槽 (IDA 0x4852b6: Left=51, Top=27, 内胆黑色雕刻槽 28x28)
+        // 官方原生技能图标槽 (IDA 0x4852b6/0x4852c9: Left=52, Top=29;图标铺满底板 0229 自带的黑色槽)
         _iconRect = new TextureRect
         {
             Name = "KeySelectSkillIcon",
-            Position = new Vector2(51, 27),
-            Size = new Vector2(28, 28),
+            Position = new Vector2(52, 29),
+            Size = new Vector2(32, 32),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            StretchMode = TextureRect.StretchModeEnum.Scale,
             MouseFilter = MouseFilterEnum.Ignore
         };
         _panel.AddChild(_iconRect);
@@ -75,6 +75,7 @@ public partial class KeySelectDialogView : Control, IManagedWindow
             Position = new Vector2(92, 34),
             Size = new Vector2(240, 20),
             Text = "设置快捷键",
+            Visible = false, // IDA sub_481dd4 [0x4852a3..0x485585] 该窗体仅创建底板/图标槽/F1-F8/none/确定,无任何文本控件
             VerticalAlignment = VerticalAlignment.Center
         };
         _lblTitle.AddThemeFontSizeOverride("font_size", 11);
