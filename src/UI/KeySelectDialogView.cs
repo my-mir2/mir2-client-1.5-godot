@@ -24,6 +24,13 @@ public partial class KeySelectDialogView : Control, IManagedWindow
     private Panel? _panel;
     private Label? _lblTitle;
     private TextureRect? _iconRect;
+    private readonly TextureButton[] _btnFKeys = new TextureButton[8];
+    private TextureButton? _btnNone;
+    private readonly Texture2D?[] _texFNormal = new Texture2D?[8];
+    private readonly Texture2D?[] _texFPressed = new Texture2D?[8];
+    private Texture2D? _texNoneNormal;
+    private Texture2D? _texNonePressed;
+
     private int _currentMagicId = 0;
     private int _selectedKey = 0;
 
@@ -58,7 +65,7 @@ public partial class KeySelectDialogView : Control, IManagedWindow
         }
         AddChild(_panel);
 
-        // 官方原生技能图标槽 (IDA 0x4852b6/0x4852c9: Left=52, Top=29;图标铺满底板 0229 自带的黑色槽)
+        // 官方原生技能图标槽 (IDA 0x4852b6/0x4852c9: Left=52, Top=29; 图标铺满底板 0229 自带的黑色槽 32x32)
         _iconRect = new TextureRect
         {
             Name = "KeySelectSkillIcon",
@@ -70,12 +77,14 @@ public partial class KeySelectDialogView : Control, IManagedWindow
         };
         _panel.AddChild(_iconRect);
 
+        // 官方原生标题文本 (IDA sub_4907D8 [0x4908a0..0x4908c7]: Left=95, Top=38)
+        // 拼接字符串 0x49090C: "{skillName} 快捷键盘被设置为."
         _lblTitle = new Label
         {
-            Position = new Vector2(92, 34),
+            Position = new Vector2(95, 38),
             Size = new Vector2(240, 20),
-            Text = "设置快捷键",
-            Visible = false, // IDA sub_481dd4 [0x4852a3..0x485585] 该窗体仅创建底板/图标槽/F1-F8/none/确定,无任何文本控件
+            Text = "",
+            Visible = true,
             VerticalAlignment = VerticalAlignment.Center
         };
         _lblTitle.AddThemeFontSizeOverride("font_size", 11);
@@ -97,39 +106,41 @@ public partial class KeySelectDialogView : Control, IManagedWindow
         _panel.AddChild(btnClose);
 
         // 官方原生 F1 - F8 按键 (Prguse_0232, 0234, 0236, 0238, 0240, 0242, 0244, 0246 @ Top=83, 32x30)
+        // IDA sub_4907D8 / 0x4909F0..0x490B80: 选中的快捷键显示按下凹陷态贴图
         for (int i = 0; i < 8; i++)
         {
             int keyNum = i + 1;
             int texIdxNormal = 232 + i * 2;
             int texIdxPressed = texIdxNormal + 1;
-            var texNormal = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{texIdxNormal:D4}.png");
-            var texPressed = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{texIdxPressed:D4}.png");
+            _texFNormal[i] = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{texIdxNormal:D4}.png");
+            _texFPressed[i] = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{texIdxPressed:D4}.png");
 
             var btn = new TextureButton
             {
                 Name = $"BtnF{keyNum}",
                 Position = new Vector2(FKeysX[i], 83),
                 Size = new Vector2(32, 30),
-                TextureNormal = texNormal,
-                TexturePressed = texPressed
+                TextureNormal = _texFNormal[i],
+                TexturePressed = _texFPressed[i]
             };
             btn.Pressed += () => OnKeySelected(keyNum);
+            _btnFKeys[i] = btn;
             _panel.AddChild(btn);
         }
 
         // 官方原生 None/清除 按键 (Prguse_0230 凸起 / 0231 凹陷 @ 299, 83, 40x30)
-        var texNoneNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0230.png");
-        var texNonePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0231.png");
-        var btnNone = new TextureButton
+        _texNoneNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0230.png");
+        _texNonePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0231.png");
+        _btnNone = new TextureButton
         {
             Name = "BtnKeyNone",
             Position = new Vector2(299, 83),
             Size = new Vector2(40, 30),
-            TextureNormal = texNoneNormal,
-            TexturePressed = texNonePressed
+            TextureNormal = _texNoneNormal,
+            TexturePressed = _texNonePressed
         };
-        btnNone.Pressed += () => OnKeySelected(0);
-        _panel.AddChild(btnNone);
+        _btnNone.Pressed += () => OnKeySelected(0);
+        _panel.AddChild(_btnNone);
 
         // 官方原生确定按钮 (Prguse_0062 @ 222, 131, 76x33, IDA 0x48555f)
         var texConfirm = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0062.png");
@@ -142,6 +153,31 @@ public partial class KeySelectDialogView : Control, IManagedWindow
         };
         btnOk.Pressed += OnConfirm;
         _panel.AddChild(btnOk);
+
+        RefreshButtonStates();
+    }
+
+    /// <summary>
+    /// 依据 IDA 0x4909F0..0x490B80：刷新按键凹陷按下态展示
+    /// 选中的 F 键或 None 键常驻展示 Pressed 贴图，未选中的展示 Normal 贴图
+    /// </summary>
+    private void RefreshButtonStates()
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            int keyNum = i + 1;
+            bool isSelected = (_selectedKey == keyNum);
+            if (_btnFKeys[i] != null)
+            {
+                _btnFKeys[i].TextureNormal = isSelected ? _texFPressed[i] : _texFNormal[i];
+            }
+        }
+
+        if (_btnNone != null)
+        {
+            bool isNoneSelected = (_selectedKey == 0);
+            _btnNone.TextureNormal = isNoneSelected ? _texNonePressed : _texNoneNormal;
+        }
     }
 
     public void OpenForSkill(int magicId, string skillName, int currentKey)
@@ -150,7 +186,9 @@ public partial class KeySelectDialogView : Control, IManagedWindow
         _selectedKey = currentKey;
         if (_lblTitle != null)
         {
-            _lblTitle.Text = $"设置【{skillName}】快捷键";
+            // 官方原生 IDA 0x4908a0 文本拼接："{skillName} 快捷键盘被设置为."
+            _lblTitle.Text = $"{skillName} 快捷键盘被设置为.";
+            _lblTitle.Visible = true;
         }
 
         if (_iconRect != null)
@@ -164,12 +202,14 @@ public partial class KeySelectDialogView : Control, IManagedWindow
             _iconRect.Texture = ResPath.LoadImageTexture($"resources/wil/png/MagIcon/MagIcon_{iconIdx:D4}.png");
         }
 
+        RefreshButtonStates();
         Visible = true;
     }
 
     private void OnKeySelected(int keyNum)
     {
         _selectedKey = keyNum;
+        RefreshButtonStates();
     }
 
     private void OnConfirm()
@@ -181,5 +221,6 @@ public partial class KeySelectDialogView : Control, IManagedWindow
     private void OnClose()
     {
         Visible = false;
+        EmitSignal(SignalName.DialogClosed);
     }
 }

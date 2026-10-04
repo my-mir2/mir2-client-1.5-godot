@@ -31,6 +31,8 @@ public partial class RepairPanelView : Control, IManagedWindow
         ((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
 
     private Label? _lblTitle;
+    private TextureButton? _btnOk;
+    private Texture2D? _texRepair;
 
     /// <summary>
     /// 仓库托管模式(官方 SM 700 → sub_46DAE8: 窗体 +1888=2 " 托管物品",DSellDlg 位于 (260,176));
@@ -40,6 +42,11 @@ public partial class RepairPanelView : Control, IManagedWindow
     {
         Position = storage ? new Vector2(260, 176) : new Vector2(138, 163);
         if (_lblTitle != null) _lblTitle.Text = storage ? " 托管物品" : "特殊修理";
+        if (_btnOk != null)
+        {
+            // 官方托管模式下底板 Prguse_0392 自身烘焙 OK 凸起，TextureNormal 为空显露原生 OK；修理模式下覆盖 Prguse_0393
+            _btnOk.TextureNormal = storage ? null : _texRepair;
+        }
     }
 
     public override void _Ready()
@@ -116,16 +123,16 @@ public partial class RepairPanelView : Control, IManagedWindow
         slotRepair.AddChild(repairSlotBtn);
 
         // 官方原生单件特修按钮 (Prguse_0393 @ 85, 150, 24x13, IDA sub_481dd4 [0x485159..0x48518c])
-        var texRepair = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0393.png");
-        var btnOk = new TextureButton
+        _texRepair = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0393.png");
+        _btnOk = new TextureButton
         {
             Name = "BtnRepairOk",
             Position = new Vector2(85, 150),
             Size = new Vector2(24, 13),
-            TextureNormal = texRepair
+            TextureNormal = _texRepair
         };
-        btnOk.Pressed += OnRepair;
-        _panel.AddChild(btnOk);
+        _btnOk.Pressed += OnRepair;
+        _panel.AddChild(_btnOk);
     }
 
     public void TogglePanel()

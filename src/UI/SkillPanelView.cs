@@ -116,10 +116,26 @@ public partial class SkillPanelView : Control, IManagedWindow
         };
         _panel.AddChild(_slotsContainer);
 
+        // 官方原生底部技能描述与修炼信息区域 (IDA sub_488AF4 [0x489d6c..0x489e80]: Left=37, Top=260, 8-9号字, 浅黄)
+        // 彻底消除魔法书底板底部凹槽黑洞死区
+        _lblSkillDesc = new Label
+        {
+            Name = "LblSkillDesc",
+            Position = new Vector2(37, 260),
+            Size = new Vector2(158, 48),
+            Text = "",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        _lblSkillDesc.AddThemeFontSizeOverride("font_size", 9);
+        _lblSkillDesc.AddThemeColorOverride("font_color", new Color(0.95f, 0.9f, 0.5f));
+        _panel.AddChild(_lblSkillDesc);
+
         RenderCurrentPage();
     }
 
     private Control? _slotsContainer;
+    private Label? _lblSkillDesc;
     private int _currentPage = 0;
 
     // 官方 1.5 技能魔法书每页 5 大槽位绝对物理坐标 (IDA sub_481dd4 [0x48419c..0x484305]):
@@ -137,23 +153,22 @@ public partial class SkillPanelView : Control, IManagedWindow
         (208, 33)
     ];
 
-    // 全量技能列表定义 (魔改支持战法道全套 1.5 原生技能库，每页 5 项)
     // 全量技能列表定义 (支持战法道全套 1.5 原生技能库，每页 5 项)
-    // 包含技能 ID, 名称, 贴图索引, 快捷键, 当前等级, 当前修炼点数, 升级所需修炼点数
-    private static readonly (int MagicId, string Name, int IconIdx, string Key, int Level, int CurTrain, int MaxTrain)[] AllSkills =
+    // 包含技能 ID, 名称, 贴图索引, 快捷键, 当前等级, 当前修炼点数, 升级所需修炼点数, 技能说明
+    private static readonly (int MagicId, string Name, int IconIdx, string Key, int Level, int CurTrain, int MaxTrain, string Desc)[] AllSkills =
     [
         // 第一页: 战士核心近战
-        (3, "基本剑术", 0, "F1", 3, 1200, 1200),
-        (7, "攻杀剑术", 1, "F2", 3, 2400, 2400),
-        (12, "刺杀剑术", 2, "F3", 2, 1450, 3000),
-        (25, "半月弯刀", 3, "F4", 1, 680, 4000),
-        (26, "烈火剑法", 4, "F5", 0, 120, 5000),
+        (3, "基本剑术", 0, "F1", 3, 1200, 1200, "战士基本剑术，随修炼等级提升命中率与攻击稳定性。"),
+        (7, "攻杀剑术", 1, "F2", 3, 2400, 2400, "战士被动攻击剑术，攻击时有一定几率造成额外破坏力。"),
+        (12, "刺杀剑术", 2, "F3", 2, 1450, 3000, "战士隔位强攻技能，剑气可穿透目标防御与魔法盾。"),
+        (25, "半月弯刀", 3, "F4", 1, 680, 4000, "战士群体剑气技能，对扇形范围内的多个目标造成伤害。"),
+        (26, "烈火剑法", 4, "F5", 0, 120, 5000, "战士终极近战爆发技能，凝聚烈火精灵造成超强暴击。"),
         // 第二页: 战士与法道进阶
-        (27, "野蛮冲撞", 5, "F6", 1, 350, 2000),
-        (1, "火球术", 6, "F7", 3, 1000, 1000),
-        (10, "雷电术", 10, "F8", 2, 1800, 3500),
-        (2, "治愈术", 20, "", 3, 2000, 2000),
-        (13, "灵魂火符", 23, "", 1, 420, 2500)
+        (27, "野蛮冲撞", 5, "F6", 1, 350, 2000, "利用强健的体魄冲撞前方的敌人，使其陷入短暂僵直。"),
+        (1, "火球术", 6, "F7", 3, 1000, 1000, "法师基础攻击魔法，凝聚火焰对单个敌人造成魔法伤害。"),
+        (10, "雷电术", 10, "F8", 2, 1800, 3500, "召唤九天神雷劈击敌人，对亡灵不死系怪物有极高克制。"),
+        (2, "治愈术", 20, "", 3, 2000, 2000, "道士基础回血魔法，消耗精神力回复自身或队友的生命值。"),
+        (13, "灵魂火符", 23, "", 1, 420, 2500, "道士核心远程攻击符咒，消耗护身符与法力掷出爆破火符。")
     ];
 
     private void RenderCurrentPage()
@@ -165,6 +180,11 @@ public partial class SkillPanelView : Control, IManagedWindow
         }
 
         int startIdx = _currentPage * 5;
+        if (startIdx < AllSkills.Length && _lblSkillDesc != null)
+        {
+            _lblSkillDesc.Text = AllSkills[startIdx].Desc;
+        }
+
         for (int i = 0; i < 5; i++)
         {
             int dataIdx = startIdx + i;
@@ -224,12 +244,21 @@ public partial class SkillPanelView : Control, IManagedWindow
 
             int magicId = skill.MagicId;
             string magicName = skill.Name;
+            string skillDesc = skill.Desc;
             int keyNum = 0;
             if (!string.IsNullOrEmpty(skill.Key) && skill.Key.StartsWith("F") && int.TryParse(skill.Key[1..], out int k))
             {
                 keyNum = k;
             }
-            btnSlot.Pressed += () => EmitSignal(SignalName.RequestOpenKeySelect, magicId, magicName, keyNum);
+            btnSlot.Pressed += () =>
+            {
+                if (_lblSkillDesc != null) _lblSkillDesc.Text = skillDesc;
+                EmitSignal(SignalName.RequestOpenKeySelect, magicId, magicName, keyNum);
+            };
+            btnSlot.MouseEntered += () =>
+            {
+                if (_lblSkillDesc != null) _lblSkillDesc.Text = skillDesc;
+            };
             _slotsContainer.AddChild(btnSlot);
 
             // 官方原生快捷键贴图 (IDA 0x48999d..0x489a37: F1~F8 对应 Prguse_0248..0255, 坐标 x0+145=183, y0+8+slot*37=60+slot*37)
@@ -308,7 +337,7 @@ public partial class SkillPanelView : Control, IManagedWindow
             {
                 string keyStr = keyNum > 0 ? $"F{keyNum}" : "";
                 var old = AllSkills[i];
-                AllSkills[i] = (old.MagicId, old.Name, old.IconIdx, keyStr, old.Level, old.CurTrain, old.MaxTrain);
+                AllSkills[i] = (old.MagicId, old.Name, old.IconIdx, keyStr, old.Level, old.CurTrain, old.MaxTrain, old.Desc);
                 RenderCurrentPage();
                 break;
             }
