@@ -97,6 +97,30 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         _lblRemain.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.4f));
         panel.AddChild(_lblRemain);
 
+        // 官方加点页提示文本 (IDA sub_494304 0x494412~0x494465: 起点 (窗体+36, 窗体+22),4 行行距 14,颜色 0xC0C0C0;
+        // 字符串 GBK 取自 0x494EC0/0x494EE8/0x494F08/0x494F2C)
+        string[] introLines =
+        {
+            "恭喜: 你已经到了下一个等级了!.",
+            "选择你想提高的能力。",
+            "这样的选择只可以做一次。",
+            "最好能很小心的选择。."
+        };
+        for (int k = 0; k < introLines.Length; k++)
+        {
+            var lblIntro = new Label
+            {
+                Name = $"LblAdjustIntro_{k}",
+                Text = introLines[k],
+                Position = new Vector2(36, 22 + 14 * k),
+                Size = new Vector2(280, 14),
+                MouseFilter = MouseFilterEnum.Ignore
+            };
+            lblIntro.AddThemeFontSizeOverride("font_size", 12);
+            lblIntro.AddThemeColorOverride("font_color", new Color(0xC0 / 255f, 0xC0 / 255f, 0xC0 / 255f));
+            panel.AddChild(lblIntro);
+        }
+
         // 官方 9 属性加减按键矩阵 (IDA sub_481dd4 0x485ffe ~ 0x486471: Left=216 为加号，Left=227 为减号)
         var texPlus = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0227.png");
         var texMinus = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0228.png");
@@ -104,16 +128,16 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         for (int i = 0; i < 9; i++)
         {
             int statIdx = i;
-            float top = RowTops[i];
+            float top = 101f + 20f * i; // IDA sub_494304 0x4949b4: y0=窗体+101,行距 20 (偏移 0,14h,28h,3Ch,50h,64h,78h,8Ch,A0h)
 
             // 属性分配当前数值显示 (精准咬合于黑底凹槽 151..214, W=64, H=16)
             var lblVal = new Label
             {
                 Name = $"LblStat_{statIdx}",
-                Position = new Vector2(151, top),
-                Size = new Vector2(64, 16),
+                Position = new Vector2(155, top), // IDA 0x494994: 加点增量列 x=窗体+155
+                Size = new Vector2(56, 16),
                 Text = "0",
-                HorizontalAlignment = HorizontalAlignment.Right,
+                HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblVal.AddThemeFontSizeOverride("font_size", 11);
