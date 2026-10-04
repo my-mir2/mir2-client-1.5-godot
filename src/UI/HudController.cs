@@ -118,15 +118,35 @@ public partial class HudController : CanvasLayer
     private TextureButton? _btnHudGroup;
     private TextureRect? _attackModeIcon;
 
+    private int _currentAttackMode = 1;
+    public int CurrentAttackMode => _currentAttackMode;
+
     /// <summary>攻击模式图标(官方 sub_48B2A0 0x48b8e0..0x48b92b): mode∈[1,4] 取 Prguse_(15+mode),其余不绘制。</summary>
     public void SetAttackMode(int mode)
     {
+        _currentAttackMode = mode;
         if (_attackModeIcon == null) return;
         if (mode < 1 || mode > 4) { _attackModeIcon.Visible = false; return; }
         var tex = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{15 + mode:D4}.png");
         _attackModeIcon.Texture = tex;
         if (tex != null) _attackModeIcon.Size = tex.GetSize();
         _attackModeIcon.Visible = tex != null;
+    }
+
+    /// <summary>快捷键 Ctrl+H 攻击模式循环切换 (全体 -> 和平 -> 夫妻 -> 师徒)</summary>
+    public void CycleNextAttackMode()
+    {
+        int nextMode = _currentAttackMode >= 4 ? 1 : _currentAttackMode + 1;
+        SetAttackMode(nextMode);
+        string modeDesc = nextMode switch
+        {
+            1 => "全体攻击模式",
+            2 => "和平攻击模式",
+            3 => "夫妻攻击模式",
+            4 => "师徒攻击模式",
+            _ => "全体攻击模式"
+        };
+        AddChat("系统", $"[系统] 切换为{modeDesc}。", new Color(1f, 1f, 0f));
     }
 
     private TextureRect? _dayNightIcon;
@@ -232,9 +252,9 @@ public partial class HudController : CanvasLayer
             ZIndex = 0
         };
         AddChild(_attackModeIcon);
-        SetAttackMode(1); // 暂无真实模式来源(未实现 Ctrl+H/CM_CHANGEATTACKMODE),保持原截图所用的模式 1
+        SetAttackMode(1);
 
-        // 昼夜图标 (IDA sub_48B2A0 0x48b3bd..0x48b476: 全局 off_4A3DD0 为 0 取 Prguse_0015, 1/2/3 取 0012/0013/0014, 以 (748, HUD底板top349+79=428) 绘制)
+        // 昼夜图标 (IDA sub_48B2A0 0x48b3bd..0x48b476: 全局 off_4A3DD0 为 0 取 Prguse_0015, 1/2/3 取 0012/0013/0014, 以 (748, 349+79=428) 居于日夜月相轮盘大圆环中心)
         _dayNightIcon = new TextureRect
         {
             Name = "HudDayNightIcon",
@@ -1329,6 +1349,15 @@ public partial class HudController : CanvasLayer
                     if (keyEvent.CtrlPressed || keyEvent.ShiftPressed || keyEvent.AltPressed)
                     {
                         ToggleAdjustAbil(5);
+                        GetViewport().SetInputAsHandled();
+                    }
+                    break;
+                }
+                case Key.H:
+                {
+                    if (keyEvent.CtrlPressed)
+                    {
+                        CycleNextAttackMode();
                         GetViewport().SetInputAsHandled();
                     }
                     break;

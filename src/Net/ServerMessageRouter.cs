@@ -22,6 +22,7 @@ public sealed class ServerMessageRouter
     public const short SM_WINEXP                 = 619;  // Delphi 杀怪/任务获得经验 (619)
     public const short SM_SENDUSERSTATE          = 52;   // 角色基础四维属性 (攻魔道防)
     public const short SM_HEALTHSPELLCHANGED     = 53;   // HP/MP 血量魔法值变动
+    public const short SM_CHANGELIGHT            = 46;   // 全局昼夜光照范围与火把状态 (46)
     public const short SM_NPCDIALOG              = 54;   // NPC 对话脚本页面
     public const short SM_LOGICSTATE             = 208;  // 主角坐标与朝向设定 (208)
     public const short SM_USERSPAWN              = 210;  // 玩家进入视野 (210)
@@ -97,6 +98,9 @@ public sealed class ServerMessageRouter
                 break;
             case SM_WEIGHTCHANGED:
                 HandleWeightChanged(packet);
+                break;
+            case SM_CHANGELIGHT:
+                HandleChangeLight(packet);
                 break;
             case SM_LOGICSTATE:
                 HandleLogicState(packet);
@@ -233,6 +237,38 @@ public sealed class ServerMessageRouter
         int curWeight = pkt.Recog;
         int maxWeight = pkt.Param > 0 ? pkt.Param : 50;
         _hud?.UpdateWeight(curWeight, maxWeight);
+
+        // 若携带制表符 6 字段扩展 (weight, max_weight, wear_weight, max_wear_weight, hand_weight, max_hand_weight)
+        // 自动驱动状态面板 (StatusPanelView) 能力页第 1 (背包重)、第 2 (负重)、第 3 (腕力)
+        if (!string.IsNullOrEmpty(pkt.ExtraStr) && pkt.ExtraStr.Contains('\t'))
+        {
+            var parts = pkt.ExtraStr.Split('\t');
+            if (parts.Length >= 6)
+            {
+                var sp = _hud?.StatusPanel;
+                if (sp != null)
+                {
+                    sp.UpdateAbilityValue(1, $"{parts[0]}/{parts[1]}", int.TryParse(parts[0], out var w) && int.TryParse(parts[1], out var mw) && w > mw);
+                    sp.UpdateAbilityValue(2, $"{parts[2]}/{parts[3]}", int.TryParse(parts[2], out var ww) && int.TryParse(parts[3], out var mww) && ww > mww);
+                    sp.UpdateAbilityValue(3, $"{parts[4]}/{parts[5]}", int.TryParse(parts[4], out var hw) && int.TryParse(parts[5], out var mhw) && hw > mhw);
+                }
+            }
+        }
+    }
+
+    private void HandleChangeLight(ServerPacket pkt)
+    {
+        int light = pkt.Param;
+        int state = light switch
+        {
+            <= 0 => 2, // 黑夜
+            1 => 1,    // 黄昏
+            2 => 3,    // 清晨
+            _ => 0     // 正午白天
+        };
+        _hud?.SetDayNightState(state);
+        bool isDark = state == 1 || state == 2;
+        _hud?.UpdateVisionFog(isDark, isDark ? 6 : 15, new Godot.Vector2(400, 225));
     }
 
     private void HandleAddItem(ServerPacket pkt)
@@ -439,20 +475,48 @@ public sealed class ServerMessageRouter
             int job = infoParts.Length > 2 && int.TryParse(infoParts[2], out var j) ? j : 0;
             int gender = infoParts.Length > 3 && int.TryParse(infoParts[3], out var g) ? g : 0;
 
-            var inspect = _hud?.InspectPanel;
-            if (inspect != null)
+            // 1. 若为 751 (SM_SENDUSERSTATE_INSPECT 观人下行)，驱动 InspectPanel
+            if (pkt.Ident == SM_SENDUSERSTATE_INSPECT)
             {
-                inspect.SetGender(gender);
-                inspect.Inspect(name);
-
-                if (baseParts.Length > 1)
+                var inspect = _hud?.InspectPanel;
+                if (inspect != null)
                 {
-                    var slotItems = baseParts[1].Split(',');
-                    for (int i = 0; i < slotItems.Length && i < 9; i++)
+                    inspect.SetGender(gender);
+                    inspect.Inspect(name);
+
+                    if (baseParts.Length > 1)
                     {
-                        if (int.TryParse(slotItems[i], out var itemIdx) && itemIdx > 0)
+                        var slotItems = baseParts[1].Split(',');
+                        for (int i = 0; i < slotItems.Length && i < 9; i++)
                         {
-                            inspect.SetSlotItem(i, $"StateItem_{itemIdx:D4}.png", $"[color=#ffff40]装备 #{itemIdx}[/color]");
+                            if (int.TryParse(slotItems[i], out var itemIdx) && itemIdx > 0)
+                            {
+                                inspect.SetSlotItem(i, $"StateItem_{itemIdx:D4}.png", $"[color=#ffff40]装备 #{itemIdx}[/color]");
+                            }
+                        }
+                    }
+                }
+            }
+            // 2. 若为 52 (SM_SENDUSERSTATE 主角属性下行)，驱动主角自己的 StatusPanel 与 HUD
+            else
+            {
+                _hud?.UpdateName(name);
+                _hud?.UpdateLevel(level);
+
+                var sp = _hud?.StatusPanel;
+                if (sp != null)
+                {
+                    sp.UpdateStat("Name", name);
+                    sp.UpdateStat("Level", level.ToString());
+                    sp.UpdateStat("Job", job switch { 0 => "战士", 1 => "法师", 2 => "道士", _ => "战士" });
+
+                    if (baseParts.Length > 1)
+                    {
+                        var tokens = baseParts[1].Split(new[] { '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        // 驱动能力页第 4~10 行属性 (准确、敏捷、魔御、中毒防御、中毒恢复、体力恢复、魔法恢复)
+                        for (int i = 0; i < tokens.Length && (4 + i) <= 10; i++)
+                        {
+                            sp.UpdateAbilityValue(4 + i, tokens[i].Trim());
                         }
                     }
                 }

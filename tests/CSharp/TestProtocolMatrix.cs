@@ -527,4 +527,29 @@ public class TestProtocolMatrix
         router.OnPacket(ServerMessageRouter.SM_CLEAROBJECTS, clrPkt.AsSpan(1..^1).ToArray());
         Assert.Equal(0, em.Count);
     }
+
+    [Fact]
+    public void TestServerMessageRouter_LightAndWeightExtension_Parsing()
+    {
+        var router = new ServerMessageRouter(null);
+
+        // 1. 验证 SM_CHANGELIGHT (46) 协议常数正确定义
+        Assert.Equal(46, ServerMessageRouter.SM_CHANGELIGHT);
+
+        // 2. 模拟 SM_CHANGELIGHT (46) 接收
+        byte[] lightPkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_CHANGELIGHT, 0, 2, 0);
+        router.OnPacket(ServerMessageRouter.SM_CHANGELIGHT, lightPkt.AsSpan(1..^1).ToArray());
+
+        // 3. 模拟 SM_WEIGHTCHANGED (622) 携带 6 字段扩展制表符文本下发
+        string weightExtra = "35\t100\t18\t50\t12\t30";
+        byte[] weightPkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_WEIGHTCHANGED, 35, 100, 0,
+            System.Text.Encoding.UTF8.GetBytes(weightExtra));
+        router.OnPacket(ServerMessageRouter.SM_WEIGHTCHANGED, weightPkt.AsSpan(1..^1).ToArray());
+
+        // 4. 模拟 SM_SENDUSERSTATE (52) 主角自身属性与能力页 4~10 行下发
+        string userStateExtra = "无敌战士/45/0/0|15,18,12-18,2-4,3-5,10,20";
+        byte[] statePkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_SENDUSERSTATE, 0, 0, 0,
+            System.Text.Encoding.UTF8.GetBytes(userStateExtra));
+        router.OnPacket(ServerMessageRouter.SM_SENDUSERSTATE, statePkt.AsSpan(1..^1).ToArray());
+    }
 }
