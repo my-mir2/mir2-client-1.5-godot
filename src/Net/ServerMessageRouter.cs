@@ -19,6 +19,7 @@ public sealed class ServerMessageRouter
     public const short SM_SENDUSERSTATE = 751;
     public const short SM_OPENGUILDDLG = 753;
     public const short SM_SENDGUILDMEMBERLIST = 756;
+    public const short SM_NEEDPASSWORD = 2014;
 
     private readonly HudController _hud;
 
@@ -36,6 +37,9 @@ public sealed class ServerMessageRouter
                 break;
             case SM_OPENGUILDDLG:
                 _hud.ToggleGuild();
+                break;
+            case SM_NEEDPASSWORD:
+                _hud.OnNeedPassword();
                 break;
             case SM_SENDUSERSTATE:
             case SM_SENDGUILDMEMBERLIST:

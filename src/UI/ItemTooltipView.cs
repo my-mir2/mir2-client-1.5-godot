@@ -50,7 +50,7 @@ public partial class ItemTooltipView : Control
             BbcodeEnabled = true,
             FitContent = true,
             ScrollActive = false,
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            AutowrapMode = TextServer.AutowrapMode.Off,
             MouseFilter = MouseFilterEnum.Ignore,
             Position = new Vector2(8, 6)
         };
@@ -74,10 +74,38 @@ public partial class ItemTooltipView : Control
             lines += split.Length;
         }
 
-        // 每行字体 12px + 2px 行距约 16px，标题约 18px，内边距上下各 6px
-        float targetWidth = 150f;
-        float targetHeight = 12f + (lines * 16f) + 4f;
+        // 每行字体 12px + 2px 行距约 18px，内边距上下各 8px + 底部留白 12px
+        float targetWidth = 175f;
+        float targetHeight = 16f + (lines * 18f) + 12f;
 
+        UpdateBounds(targetWidth, targetHeight, globalMousePos);
+        Visible = true;
+    }
+
+    /// <summary>
+    /// 装备对比浮动提示框：展示新装备属性并与当前已穿戴同槽位装备对比
+    /// </summary>
+    public void ShowComparisonTooltip(string currentEquipName, string currentDesc, string newEquipName, string newDesc, Vector2 globalMousePos)
+    {
+        string fullText = $"[b][color=#ffff40]{newEquipName}[/color][/b] [color=#00ffff][对比][/color]\n{newDesc}\n[color=#808080]------------------------[/color]\n[color=#a0a0a0]已装备: [/color][b][color=#ffff40]{currentEquipName}[/color][/b]\n{currentDesc}";
+        if (_lblContent != null)
+        {
+            _lblContent.Text = fullText;
+        }
+
+        var split = fullText.Split('\n');
+        int lines = split.Length;
+
+        // 对比模式包含对比标记与分隔线，宽度拓宽至 195f，高度每行 18px 留足充裕空间 (底边安全余量 24px)
+        float targetWidth = 195f;
+        float targetHeight = 16f + (lines * 18f) + 24f;
+
+        UpdateBounds(targetWidth, targetHeight, globalMousePos);
+        Visible = true;
+    }
+
+    private void UpdateBounds(float targetWidth, float targetHeight, Vector2 globalMousePos)
+    {
         Size = new Vector2(targetWidth, targetHeight);
         CustomMinimumSize = Size;
         if (_panel != null)
@@ -88,14 +116,25 @@ public partial class ItemTooltipView : Control
         if (_lblContent != null)
         {
             _lblContent.Position = new Vector2(8, 6);
-            _lblContent.Size = new Vector2(targetWidth - 16, targetHeight - 12);
+            _lblContent.Size = new Vector2(targetWidth - 16, targetHeight - 14);
         }
 
-        // 依据屏幕宽高限制边界，避免超出 800x600 视口
-        float x = Math.Clamp(globalMousePos.X + 15, 10, 800 - targetWidth - 10);
-        float y = Math.Clamp(globalMousePos.Y + 15, 10, 600 - targetHeight - 10);
+        // 依据屏幕宽高限制边界与智能翻转，避免遮挡悬停图标与超出 800x600 视口
+        float x = globalMousePos.X + 15;
+        if (x + targetWidth > 795)
+        {
+            x = globalMousePos.X - targetWidth - 8;
+        }
+        x = Math.Clamp(x, 5, 800 - targetWidth - 5);
+
+        float y = globalMousePos.Y + 15;
+        if (y + targetHeight > 595)
+        {
+            y = globalMousePos.Y - targetHeight - 8;
+        }
+        y = Math.Clamp(y, 5, 600 - targetHeight - 5);
+
         GlobalPosition = new Vector2(x, y);
-        Visible = true;
     }
 
     public void HideTooltip()

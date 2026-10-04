@@ -219,4 +219,8 @@ public static class ProtocolConsts
     public const short SM_THROW                   = 33;   // 投掷
     public const short SM_TIMECHECKMSG            = 810;  // 时间同步
     public const short SM_ITEMUPDATE              = 1500; // 物品更新
+    public const short SM_NEEDPASSWORD            = 2014; // 需要输入密码 (二次验证) (对齐 mir-shared / Delphi DPassword)
+    public const short SM_PASSWORDSTATUS          = 2015; // 密码状态 (对齐 SM_PASSWORDSTATUS)
+    public const short SM_GETREGINFO              = 2016; // 获取注册信息 (对齐 SM_GETREGINFO)
+    public const short SM_PASSWORD                = 2017; // 密码设置确认 (对齐 SM_PASSWORD)
 }

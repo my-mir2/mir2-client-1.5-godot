@@ -18,6 +18,8 @@ public partial class AutoEndToEndDriver : Node
     private Main? _main;
     private int _step = 0;
     private bool _abilityPageCaptured = false;
+    private bool _securityPasswordCaptured = false;
+    private bool _equipComparisonCaptured = false;
     private double _timer = 0.0;
     private bool _pendingCapture = false;
     private string _pendingTag = string.Empty;
@@ -334,6 +336,15 @@ public partial class AutoEndToEndDriver : Node
             case 31:
             {
                 var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (!_securityPasswordCaptured && gameView?.HudInstance != null)
+                {
+                    _securityPasswordCaptured = true;
+                    GD.Print("[AutoE2E] === 验证官方二级安全密码弹窗 (MessageBoxDialog/TxtInput.Secret=true 密文遮蔽) ===");
+                    gameView.HudInstance.ShowSecurityPasswordDialog("该操作需要二次密码验证，请输入安全密码：", "secret123");
+                    RequestCapture("step7_1_security_password_dialog");
+                    _step--;
+                    break;
+                }
                 if (gameView?.HudInstance != null)
                 {
                     gameView.HudInstance.CloseTopDialog(); // 关闭模态框
@@ -667,15 +678,29 @@ public partial class AutoEndToEndDriver : Node
             case 61:
             {
                 var gameView = _main.GetNodeOrNull<GameView>("Game");
-                if (gameView?.HudInstance != null)
+                if (!_equipComparisonCaptured && gameView?.HudInstance != null)
                 {
+                    _equipComparisonCaptured = true;
                     gameView.HudInstance.ToggleSkill(); // 关闭技能
                     GD.Print("[AutoE2E] === 验证装备槽位极品属性高亮染色 (+1) 官方内胆回显 ===");
                     gameView.HudInstance.ToggleEquip(); // 打开装备面板
                     // 盛大原版 1.5 规则：鼠标悬停在装备槽位时，极品与基础属性回显在面板底部内胆凹槽内
                     gameView.HudInstance.ShowSlotTooltip("死神手套(右)", "[color=#c0c0c0]重量 2   持久力 8/8[/color]\n[color=#ffff00]攻击 1-3[/color] [color=#00ffff](+1)[/color]\n[color=#c0c0c0]需要等级 22[/color]", new Vector2(560, 160), showFloating: false);
+                    RequestCapture("step25_equip_god_stat_tooltip");
+                    _step--;
+                    break;
                 }
-                RequestCapture("step25_equip_god_stat_tooltip");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证浮动装备对比 Tooltip (智能翻转与双装对比) ===");
+                    gameView.HudInstance.ShowComparisonTooltip(
+                        "死神手套(右)",
+                        "[color=#c0c0c0]重量 2  持久力 8/8[/color]\n[color=#ffff00]攻击 1-3[/color] [color=#00ffff](+1)[/color]",
+                        "阎罗手套",
+                        "[color=#c0c0c0]重量 8  持久力 10/10[/color]\n[color=#ffff00]防御 0-4[/color]\n[color=#00ffff]反伤 10%[/color]",
+                        new Vector2(620, 200));
+                    RequestCapture("step25_1_equip_comparison_tooltip");
+                }
                 break;
             }
 

@@ -145,7 +145,7 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         Visible = true;
     }
 
-    public void ShowInput(string prompt, string defaultValue = "", Action<string>? onConfirm = null)
+    public void ShowInput(string prompt, string defaultValue = "", Action<string>? onConfirm = null, bool isPassword = false)
     {
         _isInputMode = true;
         _inputCallback = onConfirm;
@@ -157,6 +157,11 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         if (_txtInput != null)
         {
             _txtInput.Text = defaultValue;
+            _txtInput.Secret = isPassword;
+            if (isPassword)
+            {
+                _txtInput.SecretCharacter = "*";
+            }
             _txtInput.Visible = true;
             _txtInput.OffsetTop = 75.0f;
             _txtInput.OffsetBottom = 75.0f + 16.0f;
@@ -165,7 +170,7 @@ public partial class MessageBoxDialog : Control, IManagedWindow
             _txtInput.SelectAll();
         }
         if (_btnCancel != null) _btnCancel.Visible = true;
-        if (_btnOk != null) _btnOk.Position = new Vector2(130, 120);
+        if (_btnOk != null) _btnOk.Position = new Vector2(130, 126);
         Visible = true;
     }
 

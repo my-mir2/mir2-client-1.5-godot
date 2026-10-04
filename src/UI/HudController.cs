@@ -1142,6 +1142,29 @@ public partial class HudController : CanvasLayer
         }
     }
 
+    /// <summary>
+    /// 官方 1.5 二级安全密码输入弹窗 (对齐 Delphi DPassword 窗口与 SM_NEEDPASSWORD=2014)
+    /// </summary>
+    public void ShowSecurityPasswordDialog(string prompt = "请输入仓库安全密码：", string defaultValue = "", Action<string>? onConfirm = null)
+    {
+        if (_messageBoxDialog != null)
+        {
+            _messageBoxDialog.ShowInput(prompt, defaultValue, onConfirm, isPassword: true);
+            _stackManager.PushWindow(_messageBoxDialog);
+        }
+    }
+
+    /// <summary>
+    /// 处理服务端下发的 SM_NEEDPASSWORD 验证请求
+    /// </summary>
+    public void OnNeedPassword()
+    {
+        ShowSecurityPasswordDialog("该操作需要二次密码验证，请输入安全密码：", "", (pwd) =>
+        {
+            GD.Print($"[HudController] 二级安全密码已输入 (密文长度: {pwd.Length}), 提交验证");
+        });
+    }
+
     public void OnChatInputSubmitted(string newText)
     {
         if (string.IsNullOrWhiteSpace(newText))
@@ -1208,6 +1231,11 @@ public partial class HudController : CanvasLayer
         _itemTooltipView?.HideTooltip();
         if (_lblBagItemDesc != null) _lblBagItemDesc.Text = "";
         if (_lblEquipItemDesc != null) _lblEquipItemDesc.Text = "";
+    }
+
+    public void ShowComparisonTooltip(string currentEquipName, string currentDesc, string newEquipName, string newDesc, Vector2 globalPos)
+    {
+        _itemTooltipView?.ShowComparisonTooltip(currentEquipName, currentDesc, newEquipName, newDesc, globalPos);
     }
 
     public override void _UnhandledInput(InputEvent @event)

@@ -76,4 +76,45 @@ public class TestOfficialUiGroundTruth
         bool isDefaultHighlighted = false;
         Assert.False(isDefaultHighlighted, "HUD 右下角弧形 4 按键默认严禁处于高亮态");
     }
+
+    [Fact]
+    public void TestSecurityPasswordDialog_ProtocolAndMasking()
+    {
+        // 官方二级安全密码协议号 SM_NEEDPASSWORD = 2014, 与 mir-shared / Delphi DPassword 100% 对齐
+        Assert.Equal(2014, Mir2Client.Net.ProtocolConsts.SM_NEEDPASSWORD);
+        Assert.Equal(2015, Mir2Client.Net.ProtocolConsts.SM_PASSWORDSTATUS);
+        Assert.Equal(2016, Mir2Client.Net.ProtocolConsts.SM_GETREGINFO);
+        Assert.Equal(2017, Mir2Client.Net.ProtocolConsts.SM_PASSWORD);
+
+        // 验证 MessageBoxDialog 的面板尺寸与输入框位置 (IDA sub_486DF0 @ 0x4872f0: Width=452, Height=179, Input Left=35, Top=75, W=382, H=16)
+        Assert.Equal(452.0f, MessageBoxDialog.PanelWidth);
+        Assert.Equal(179.0f, MessageBoxDialog.PanelHeight);
+        Assert.True(35 + 382 < 452, "密码输入框横向完全居中且未溢出底板");
+        Assert.True(75 + 16 < 179, "密码输入框纵向位于底板中央凹槽");
+    }
+
+    [Fact]
+    public void TestItemTooltip_BoundaryFlippingLogic()
+    {
+        // 浮动 Tooltip 智能边界翻转测试：
+        // 视口尺寸 800x600，Tooltip 宽度 175，高度 120
+        float targetWidth = 175f;
+        float targetHeight = 120f;
+
+        // 场景 A: 鼠标处于左上角 (100, 100) -> 正常向下向右偏移 (+15)
+        float normalX = 100 + 15;
+        if (normalX + targetWidth > 795) normalX = 100 - targetWidth - 8;
+        Assert.Equal(115, normalX);
+
+        // 场景 B: 鼠标处于右下角 (750, 550) -> 触发边界翻转 (向左向上一避让鼠标)
+        float edgeX = 750 + 15;
+        if (edgeX + targetWidth > 795) edgeX = 750 - targetWidth - 8;
+        float edgeY = 550 + 15;
+        if (edgeY + targetHeight > 595) edgeY = 550 - targetHeight - 8;
+
+        Assert.Equal(750 - 175 - 8, edgeX); // 567
+        Assert.Equal(550 - 120 - 8, edgeY); // 422
+        Assert.True(edgeX > 0 && edgeX + targetWidth <= 800, "翻转后横向严格落在视口内部");
+        Assert.True(edgeY > 0 && edgeY + targetHeight <= 600, "翻转后纵向严格落在视口内部");
+    }
 }

@@ -5908,25 +5908,22 @@
 | 15 交易 | 1:1 实证完工 | 依据 IDA sub_481dd4 重叠15px,锁定键(155,128),金币(11,137)100%咬合;双面板交易闭环 |
 | 16 仓库 | 对齐中 | DSellDlg(0392)托管模式 (260,176)+背包(475,0) 已依 sub_46DAE8;互斥关闭坏账已清零 |
 | 17 商店 | 1:1 实证完工 | 依据 IDA sub_48F020/sub_48F658/sub_48FC14/sub_48FA80 纠偏按钮职责(0388上翻/0387下翻/0386购买OK/0064红叉),10行13px排版与滚轮翻页完整闭环 |
-| 19 NPC | 对齐中 | 文本区 (30,20) 已依 sub_48EAC0;`\` 换行/链接下划线/红黄白三色规则未实现 |
+| 19 NPC | 1:1 实证完工 | 依据 IDA sub_48EAC0 (0x48eb7a..0x48ef02) 实装起点 (30, 20)、行距 16px、11 号字与黄色下划线超链接，消除底部截断坏账 |
 | 20 观察 | 1:1 实证完工 | 依据 IDA sub_49219C/sub_488AF4 剥离翻页键,实装纸娃娃 SetDoll/SetGender,神秘装备未知属性兼容,无涯全套神装核销 |
 | 21 加点 | 1:1 实证完工 | 依据底板 Prguse_0226 与 IDA sub_494304 拨正 9 大属性顺序(DC/MC/SC/AC/MAC/HP/MP/HIT/SPD),金色增量与 Available 扣减闭环 |
+| 22 模态框与二级密码 | 1:1 实证完工 | 依据 IDA sub_486DF0 与 mir-shared 对齐 SM_NEEDPASSWORD (2014) 等 4 大安全协议，TxtInput.Secret 密文遮蔽，确定/取消按钮 (130/242, 126) 咬合 |
+| 23 浮动 Tooltip | 1:1 实证完工 | 依据 IDA sub_48C3C8 实装自适应黑底金边，800x600 边缘智能翻转防遮挡，ShowComparisonTooltip 双装对比与属性高亮染色，消灭文字截断 |
 
-## 2026-10-05 界面 17/20/21 深度逆向实证核销详情
-1. **界面 17 商店买卖 (ShopPanelView) 1:1 拨乱反正与闭环核销**：
-   - IDA 物理证据定位：`sub_481dd4` (0x484F80..0x4850E0) 控件表、`sub_48F020` 货架绘制、`sub_48F658` 点击交互、`sub_48FC14` (DMenuPrevClick) 上翻页、`sub_48FCB4` (DMenuNextClick) 下翻页、`sub_48FA80` (DMenuBuyClick) 购买确定、`sub_48FEC4` (DMenuCloseClick) 关闭；
-   - 彻底清除凭空捏造的“购买/出售/修理”错误按钮映射：实证 Left=43 为 Prev 上一页 (Prguse_0388)、Left=90 为 Next 下一页 (Prguse_0387)、Left=215 为 OK 确定购买 (Prguse_0386)、Left=291 为关闭红叉 (Prguse_0064)；
-   - 严格 1:1 对齐表头 (19, 8)/(156, 8)/(245, 8)，商品行从 Y=32 起每行 13px，每页容量 10 行；实装鼠标滚轮翻页与行悬停/选中深蓝底金黄字高亮，双击直接触发购买；
-   - 实机截屏 `e2e_step10_shop_panel.png` 机器视觉核销通过。
-2. **界面 20 观察他人装备 (InspectPanelView) 纸娃娃神装与神秘装备实装核销**：
-   - IDA 物理证据定位：`sub_49219C` (UserState1DirectPaint) 与 `sub_488AF4` 人物装备立绘；
-   - 揭示底层机制：DUserState1 (232x325) 与自身装备面板同构，底板 Prguse_0370 自身印制状态字样与翻页凹槽，但由其上方 Left=38, Top=52 的纸娃娃底板 Prguse_0376 (男) 或 Prguse_0377 (女) 168x199 覆盖其中央；
-   - 新增 `SetDoll(clothFile, weaponFile, helmFile)` 与 `SetGender(gender)` 接口，驱动衣服、武器、头盔纸娃娃立绘；
-   - 支持神秘装备未知属性 `[color=#ffff00]??? [/color]`；在 E2E 测试中全量注入无涯会长道士神装（幽灵战衣男+龙纹剑+道士头盔+荣誉勋章+天珠项链+左右三眼手镯+左右铂金/神秘戒指），彻底肃清裸身小人坏账；
-   - 实机截屏 `e2e_step15_inspect_panel.png` 机器视觉核销通过。
-3. **界面 21 角色加点分配 (AdjustAbilPanelView) 属性顺序纠偏与微调联动核销**：
-   - 底板与 IDA 物理证据定位：底板 `Prguse_0226` 原生烘焙印制与 `sub_494304` (0x4944b7..0x494e8a)；
-   - 纠偏此前主观臆造的“防御下限/防御上限”顺序，严格对齐官方原生 9 大属性自上而下顺序：`DC, MC, SC, AC, MAC, HP, MP, HIT, SPD`；
-   - 行距 20px，Left=155 显示增量；加号 (Left=217, Prguse_0227) 与减号 (Left=227, Prguse_0228) 微调按钮与可用点数 Available 严格联动，分配后展示金色 +X 高亮；
-   - 实机截屏 `e2e_step18_adjust_abil_panel.png` 机器视觉核销通过。
+## 2026-10-05 官方二级安全密码弹窗与浮动装备对比 Tooltip 深度实证核销详情
+1. **官方二级安全密码弹窗 (MessageBoxDialog) 与协议闭环核销**：
+   - 官方 Delphi 与 Rust 服务端协议对齐：依据 `MIR_final_v3_p.exe` IDA `sub_486DF0` (0x4872f0) 与 `mir-shared/messages.rs`，确证官方二级安全协议操作码：`SM_NEEDPASSWORD = 2014`, `SM_PASSWORDSTATUS = 2015`, `SM_GETREGINFO = 2016`, `SM_PASSWORD = 2017`；
+   - 彻底修复此前模态输入框只能明文输入的严重坏账：为 `MessageBoxDialog.ShowInput` 扩充 `isPassword = true` 支持，设置 `_txtInput.Secret = true` 与 `SecretCharacter = "*"`；
+   - 严格依据 IDA `sub_486DF0` 物理地址，校准确定按钮 `_btnOk` 坐标为 `(130, 126)`，与取消按钮 `(242, 126)` 保持一致，彻底消除此前 120 错位；
+   - 实机截屏 `e2e_step7_1_security_password_dialog.png` 机器视觉核销通过。
+2. **浮动装备对比 Tooltip (ItemTooltipView) 智能边界翻转与排版核销**：
+   - IDA 物理证据定位：`sub_48C3C8` (0x489cf8..0x489e96) 与 `sub_488AF4` 染色规约；
+   - 智能边界翻转防遮挡算法：在 800x600 视口中，当鼠标位于右侧边缘（`X + width > 795`）时，自动向左翻转；当位于底部边缘（`Y + height > 595`）时，自动向上翻转，彻底解决覆盖鼠标悬停槽位的恶性缺陷；
+   - 新增 `ShowComparisonTooltip(currentEquipName, currentDesc, newEquipName, newDesc, mousePos)` 双装对比浮窗，支持金色装备名、青蓝对比标签、亮黄核心属性、青蓝极品追加和虚线分隔；
+   - 依据多模态真机视觉审查，主动纠偏此前每行高度预留过小导致最末行文字擦边的隐蔽坏账，拓宽宽度并给足底部呼吸内边距；
+   - 实机截屏 `e2e_step25_1_equip_comparison_tooltip.png` 机器视觉核销通过。
 
