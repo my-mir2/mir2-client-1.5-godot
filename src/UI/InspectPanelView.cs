@@ -101,6 +101,7 @@ public partial class InspectPanelView : Control, IManagedWindow
                 MouseFilter = MouseFilterEnum.Ignore,
                 ZIndex = 1
             };
+            clothRect.Visible = false; // 演示立绘非官方数据,待观察协议数据接入
             dollBg.AddChild(clothRect);
         }
 
@@ -117,6 +118,7 @@ public partial class InspectPanelView : Control, IManagedWindow
                 MouseFilter = MouseFilterEnum.Ignore,
                 ZIndex = 2
             };
+            weaponRect.Visible = false; // 演示立绘非官方数据,待观察协议数据接入
             dollBg.AddChild(weaponRect);
         }
 
@@ -133,6 +135,7 @@ public partial class InspectPanelView : Control, IManagedWindow
                 MouseFilter = MouseFilterEnum.Ignore,
                 ZIndex = 3
             };
+            helmRect.Visible = false; // 演示立绘非官方数据,待观察协议数据接入
             dollBg.AddChild(helmRect);
         }
 
@@ -171,16 +174,7 @@ public partial class InspectPanelView : Control, IManagedWindow
             int slot = s.Slot;
 
             // 观察目标（无涯 - 道士会长）全套道术神装首饰贴图
-            string? iconFile = slot switch
-            {
-                2 => "StateItem_0111.png", // 勋章 (荣誉勋章)
-                3 => "StateItem_0219.png", // 项链 (天珠项链)
-                5 => "StateItem_0189.png", // 右手镯 (三眼手镯)
-                6 => "StateItem_0189.png", // 左手镯 (三眼手镯)
-                7 => "StateItem_0171.png", // 右戒指 (铂金戒指)
-                8 => "StateItem_0171.png", // 左戒指 (铂金戒指)
-                _ => null                  // 幽灵战衣、龙纹剑、道士头盔在纸娃娃层贴合
-            };
+            string? iconFile = null; // 演示首饰图标为非官方数据,无观察协议数据时槽位留空
 
             Texture2D? equipIcon = !string.IsNullOrEmpty(iconFile)
                 ? ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}")
@@ -214,10 +208,7 @@ public partial class InspectPanelView : Control, IManagedWindow
                     8 => ("铂金戒指(左)", "[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]防御 0-2   道术 0-4[/color]\n[color=#c0c0c0]需要精神力 17[/color]"),
                     _ => ("装备", "[color=#c0c0c0]重量 1   持久力 10/10[/color]")
                 };
-                if (_lblInspectDesc != null)
-                {
-                    _lblInspectDesc.Text = $"[color=#ffff40]{itemName}[/color]\n{itemDesc}";
-                }
+                // 演示描述为非官方数据,不再显示(待真实观察数据)
             };
             btn.MouseExited += () =>
             {
