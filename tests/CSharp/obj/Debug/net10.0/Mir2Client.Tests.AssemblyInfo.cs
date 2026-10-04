@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Mir2Client.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4cc19d3212920541316b2d2f9e219580cb263424")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3e32fc8ef936f5a066270bc3e8608e4283827781")]
 [assembly: System.Reflection.AssemblyProductAttribute("Mir2Client.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Mir2Client.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

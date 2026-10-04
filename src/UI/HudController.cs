@@ -110,6 +110,16 @@ public partial class HudController : CanvasLayer
     private TextureButton? _btnHudEquip;
     private TextureButton? _btnHudSkill;
     private TextureButton? _btnHudGroup;
+    private TextureRect? _dayNightIcon;
+
+    /// <summary>昼夜状态(官方 off_4A3DD0):0=Prguse_0015,1/2/3=0012/0013/0014。</summary>
+    public void SetDayNightState(int state)
+    {
+        if (_dayNightIcon == null) return;
+        int idx = state switch { 1 => 12, 2 => 13, 3 => 14, _ => 15 };
+        _dayNightIcon.Texture = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{idx:D4}.png");
+    }
+
     private Texture2D? _texHighlightBag;
     private Texture2D? _texHighlightEquip;
     private Texture2D? _texHighlightSkill;
@@ -208,6 +218,18 @@ public partial class HudController : CanvasLayer
                 ZIndex = 0
             });
         }
+
+        // 昼夜图标 (IDA sub_48B2A0 0x48b3bd..0x48b476: 全局 off_4A3DD0 为 0 取 Prguse_0015, 1/2/3 取 0012/0013/0014, 以 (748, HUD底板top349+79=428) 绘制)
+        _dayNightIcon = new TextureRect
+        {
+            Name = "HudDayNightIcon",
+            Position = new Vector2(748, 428),
+            Size = new Vector2(32, 54),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            ZIndex = 0
+        };
+        AddChild(_dayNightIcon);
+        SetDayNightState(0);
 
         var barTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0007.png");
         if (barTex != null)
