@@ -72,6 +72,7 @@ public partial class HudController : CanvasLayer
     private MessageBoxDialog? _messageBoxDialog;
     private ItemTooltipView? _itemTooltipView;
 
+    public Panel? EquipPanel => _equipPanel;
     public SkillPanelView? SkillPanel => _skillPanelView;
     public StatusPanelView? StatusPanel => _statusPanelView;
     public GroupPanelView? GroupPanel => _groupPanelView;
@@ -325,7 +326,7 @@ public partial class HudController : CanvasLayer
                             Name = $"Slot_{slot}",
                             CurrentSlotType = SlotButton.SlotType.Bag,
                             SlotIndex = slot,
-                            CustomMinimumSize = new Vector2(35f, 32f),
+                            CustomMinimumSize = new Vector2(36f, 32f), // 严格对齐官方 IDA sub_457D88 (CellWidth=36, CellHeight=32)
                             Flat = true
                         };
                         btn.Pressed += () => EmitSignal(SignalName.UseItemRequested, slot);
@@ -964,7 +965,16 @@ public partial class HudController : CanvasLayer
         if (_equipPanel != null)
         {
             _equipPanel.Visible = !_equipPanel.Visible;
-            if (!_equipPanel.Visible) HideSlotTooltip();
+            if (_equipPanel.Visible)
+            {
+                // 盛大官方 1.5 DStateWnd 互斥原则：装备、状态、能力、技能面板同属 DStateWnd 四大 Page，绝对互斥
+                if (_skillPanelView != null && _skillPanelView.Visible) _stackManager.PopWindow(_skillPanelView);
+                if (_statusPanelView != null && _statusPanelView.Visible) _stackManager.PopWindow(_statusPanelView);
+            }
+            else
+            {
+                HideSlotTooltip();
+            }
             RefreshBottomBarButtonStates();
             GD.Print($"[HudController] 切换装备面板显示状态: {_equipPanel.Visible}");
         }
@@ -1003,9 +1013,10 @@ public partial class HudController : CanvasLayer
         if (_statusPanelView != null)
         {
             _stackManager.ToggleWindow(_statusPanelView);
-            if (_statusPanelView.Visible && _equipPanel != null)
+            if (_statusPanelView.Visible)
             {
-                _equipPanel.Visible = false;
+                if (_equipPanel != null) _equipPanel.Visible = false;
+                if (_skillPanelView != null && _skillPanelView.Visible) _stackManager.PopWindow(_skillPanelView);
             }
             RefreshBottomBarButtonStates();
         }
@@ -1016,6 +1027,11 @@ public partial class HudController : CanvasLayer
         if (_skillPanelView != null)
         {
             _stackManager.ToggleWindow(_skillPanelView);
+            if (_skillPanelView.Visible)
+            {
+                if (_equipPanel != null) _equipPanel.Visible = false;
+                if (_statusPanelView != null && _statusPanelView.Visible) _stackManager.PopWindow(_statusPanelView);
+            }
             RefreshBottomBarButtonStates();
             GD.Print($"[HudController] 切换技能面板显示状态: {_skillPanelView.Visible}");
         }
@@ -1062,7 +1078,7 @@ public partial class HudController : CanvasLayer
         if (_bagPanel != null)
         {
             if (open) { _bagPosBeforeStorage = _bagPanel.Position; _bagPanel.Position = new Vector2(475, 0); _bagPanel.Visible = true; }
-            else { _bagPanel.Position = _bagPosBeforeStorage; }
+            else { _bagPanel.Position = _bagPosBeforeStorage; _bagPanel.Visible = false; }
         }
         GD.Print($"[HudController] 切换仓库(DSellDlg 托管模式)显示状态: {_repairPanelView.Visible}");
     }

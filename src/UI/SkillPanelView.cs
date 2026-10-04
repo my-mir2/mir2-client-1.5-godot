@@ -76,17 +76,20 @@ public partial class SkillPanelView : Control, IManagedWindow
         btnClose.Pressed += OnClose;
         _panel.AddChild(btnClose);
 
-        // 技能页翻页键在右侧 (IDA sub_481dd4 [0x484325..0x48439b]: Prguse_0398 @ (213,113) / Prguse_0396 @ (213,143), 12x21)
-        // 技能页不使用左侧 373/372 上下键 (该对仅用于装备/状态/观察页)
-        var texUp = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0398.png");
-        var texDown = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0396.png");
+        // 技能页翻页键在右侧 (IDA sub_481dd4 [0x484325..0x48439b]: 向上 399/398 @ (213,113), 向下 397/396 @ (213,143), 12x21)
+        // 官方 1:1 实证：常态为暗色贴图 (399/397)，按下态才显示高亮贴图 (398/396)
+        var texUpNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0399.png");
+        var texUpPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0398.png");
+        var texDownNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0397.png");
+        var texDownPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0396.png");
 
         var btnUp = new TextureButton
         {
             Name = "BtnSkillPageUp",
             Position = new Vector2(213, 113),
             Size = new Vector2(12, 21),
-            TextureNormal = texUp,
+            TextureNormal = texUpNormal,
+            TexturePressed = texUpPressed,
             FocusMode = FocusModeEnum.None
         };
         btnUp.Pressed += PrevPage;
@@ -97,7 +100,8 @@ public partial class SkillPanelView : Control, IManagedWindow
             Name = "BtnSkillPageDown",
             Position = new Vector2(213, 143),
             Size = new Vector2(12, 21),
-            TextureNormal = texDown,
+            TextureNormal = texDownNormal,
+            TexturePressed = texDownPressed,
             FocusMode = FocusModeEnum.None
         };
         btnDown.Pressed += NextPage;
@@ -228,45 +232,52 @@ public partial class SkillPanelView : Control, IManagedWindow
             btnSlot.Pressed += () => EmitSignal(SignalName.RequestOpenKeySelect, magicId, magicName, keyNum);
             _slotsContainer.AddChild(btnSlot);
 
-            // 技能名称 (82, rowY + 1)
+            // 官方原生快捷键贴图 (IDA 0x48999d..0x489a37: F1~F8 对应 Prguse_0248..0255, 坐标 x0+145=183, y0+8+slot*37=60+slot*37)
+            if (keyNum >= 1 && keyNum <= 8)
+            {
+                int keyImgIdx = 247 + keyNum; // F1 -> 248, F8 -> 255
+                var texKey = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{keyImgIdx:D4}.png");
+                if (texKey != null)
+                {
+                    var rectKey = new TextureRect
+                    {
+                        Name = $"KeyImg_{dataIdx}",
+                        Texture = texKey,
+                        Position = new Vector2(183, 60 + i * 37),
+                        Size = new Vector2(16, 16),
+                        MouseFilter = MouseFilterEnum.Ignore
+                    };
+                    _slotsContainer.AddChild(rectKey);
+                }
+            }
+
+            // 官方技能名称 (IDA sub_488AF4 [0x489b8f..0x489ba4]: x0+48=86, y0+8+slot*37=60+slot*37)
             var lblName = new Label
             {
                 Name = $"LblSkillName_{dataIdx}",
-                Position = new Vector2(82, rowY + 1),
-                Size = new Vector2(65, 14),
+                Position = new Vector2(86, 60 + i * 37),
+                Size = new Vector2(90, 14),
                 Text = skill.Name,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblName.AddThemeFontSizeOverride("font_size", 9);
-            lblName.AddThemeColorOverride("font_color", new Color(0.95f, 0.95f, 0.85f));
+            lblName.AddThemeColorOverride("font_color", new Color(0xC0 / 255f, 0xC0 / 255f, 0xC0 / 255f));
             _slotsContainer.AddChild(lblName);
 
-            // 技能等级 (150, rowY + 1)
-            var lblLevel = new Label
-            {
-                Name = $"LblSkillLevel_{dataIdx}",
-                Position = new Vector2(150, rowY + 1),
-                Size = new Vector2(40, 14),
-                Text = $"Lv.{skill.Level}",
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            lblLevel.AddThemeFontSizeOverride("font_size", 9);
-            lblLevel.AddThemeColorOverride("font_color", new Color(0.5f, 0.85f, 1.0f));
-            _slotsContainer.AddChild(lblLevel);
-
-            // 官方原生纯文本技能修炼经验 (IDA sub_481dd4, 纯文本呈现，无自绘 ColorRect 进度条)
+            // 官方原生修炼经验/满级文本 (IDA sub_488AF4 [0x489be0..0x489ca4]: x0+48+16=102, y0+23+slot*37=75+slot*37)
+            // 满级(Lv3)官方字符串为 "-" (dword_489FE8), 未满级为 "cur/max" (dword_489FF4 为 "/")
+            string trainText = skill.Level >= 3 ? "-" : $"{skill.CurTrain}/{skill.MaxTrain}";
             var lblTrain = new Label
             {
                 Name = $"LblSkillTrain_{dataIdx}",
-                Position = new Vector2(82, rowY + 16),
-                Size = new Vector2(108, 14),
-                Text = skill.Level >= 3 ? "已满级" : $"{skill.CurTrain}/{skill.MaxTrain}",
+                Position = new Vector2(86, 75 + i * 37),
+                Size = new Vector2(100, 14),
+                Text = trainText,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblTrain.AddThemeFontSizeOverride("font_size", 9);
-            lblTrain.AddThemeColorOverride("font_color", new Color(0.85f, 0.85f, 0.8f));
+            lblTrain.AddThemeColorOverride("font_color", new Color(0xC0 / 255f, 0xC0 / 255f, 0xC0 / 255f));
             _slotsContainer.AddChild(lblTrain);
         }
     }

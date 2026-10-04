@@ -52,6 +52,18 @@ public partial class DebugGridOverlay : Node
                     RemoveOverlayIfPresent(ctrl);
                 }
             }
+            // 头顶受击微型血条 (HpBarBg, IDA sub_46B210) 纳入审计线框
+            else if (ctrl is ColorRect cr && cr.Name.ToString() == "HpBarBg")
+            {
+                if (cr.IsVisibleInTree())
+                {
+                    EnsureOverlay(cr);
+                }
+                else
+                {
+                    RemoveOverlayIfPresent(cr);
+                }
+            }
             // 对 Label / RichTextLabel 增加判空：无实质文本或空白串时不画框，彻底消除登录面板等处多出的空框
             // 对 Label / RichTextLabel 增加判空：无实质文本或空白串时不画框，且忽略药水槽内部计数标签（杜绝物品栏内多出小框）
             else if (ctrl is Label lbl)

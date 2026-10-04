@@ -48,6 +48,7 @@ public partial class SlotButton : Button
         // 关键：采用独立的居中 TextureRect 渲染槽位物品图标，绝对禁用 Button.Icon！
         // 从而彻底杜绝 Godot Button 在设置 Icon 时由于贴图大于按钮尺寸而强行把按钮物理 Bounds 和调试框拉大的严重缺陷！
         Icon = null;
+        ClipContents = true; // 官方 1:1 实证：槽位按钮硬裁剪，严禁贴图溢出槽位边框
 
         _iconRect = new TextureRect
         {

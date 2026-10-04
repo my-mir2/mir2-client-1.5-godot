@@ -242,14 +242,14 @@ public partial class TradePanelView : Control, IManagedWindow
         lblMyGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
         myGoldBox.AddChild(lblMyGold);
 
-        // 官方原生交易锁定按钮 (Prguse_0391 @ 153, 128, 44x16, 完美咬合底板凹槽 153..197)
+        // 官方原生交易锁定按钮 (Prguse_0391 @ 155, 128, 44x16, IDA sub_481dd4 [0x485846..0x485867]: Left=155 (0x9B), Top=128 (0x80))
         // 未按下显示立体凸起 trade_btn_raised，按下或锁定态显示凹陷 Prguse_0391，消除凹陷黑斑感
         var texConfirmNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/trade_btn_raised.png");
         var texConfirmPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0391.png");
         var btnConfirm = new TextureButton
         {
             Name = "BtnTradeLock",
-            Position = new Vector2(153, 128),
+            Position = new Vector2(155, 128),
             Size = new Vector2(44, 16),
             TextureNormal = texConfirmNormal,
             TexturePressed = texConfirmPressed

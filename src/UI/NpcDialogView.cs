@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using Mir2Client.Utils;
 
@@ -35,6 +36,8 @@ public partial class NpcDialogView : Control, IManagedWindow
     public (int x, int y, int width, int height) Bounds =>
         ((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
 
+    private List<string> _optionActions = new();
+
     public override void _Ready()
     {
         Visible = false;
@@ -49,17 +52,35 @@ public partial class NpcDialogView : Control, IManagedWindow
             }
 
             _lblTitle = _panel.GetNodeOrNull<Label>("Title");
-            _lblContent = _panel.GetNodeOrNull<RichTextLabel>("Content");
-            _optionsContainer = _panel.GetNodeOrNull<VBoxContainer>("Options");
-            _btnClose = _panel.GetNodeOrNull<Button>("BtnClose");
+            if (_lblTitle != null) _lblTitle.Visible = false; // 官方原版 sub_48EAC0 无独立 NPC 标题
 
-            // 官方原生 NPC 对话框关闭按钮 (Prguse_0064 @ 399, 1, 16x23, IDA sub_481DD4 [0x484f32..0x484f65])
-            // Prguse_0384 底板在 (399, 1) 处已自带烘焙凸起红叉，TextureNormal 必须为 null，按下态显示凹陷 Prguse_0064
-            var texClose = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0064.png");
+            _optionsContainer = _panel.GetNodeOrNull<VBoxContainer>("Options");
+            if (_optionsContainer != null) _optionsContainer.Visible = false; // 官方无独立选项容器，全由文本流统一驱动
+
+            _lblContent = _panel.GetNodeOrNull<RichTextLabel>("Content");
+            if (_lblContent != null)
+            {
+                // 盛大官方 1.5 NPC 对话框文本区域绝对物理坐标 (IDA sub_48EAC0 [0x48eb7a..0x48ef02]):
+                // 起点 (30, 20), 宽 355, 高 145, 行高 16px
+                _lblContent.Position = new Vector2(30, 20);
+                _lblContent.Size = new Vector2(355, 145);
+                _lblContent.BbcodeEnabled = true;
+                _lblContent.ScrollActive = false;
+                _lblContent.AddThemeFontSizeOverride("normal_font_size", 12);
+                _lblContent.AddThemeConstantOverride("line_separation", 2); // 配合12号字体严格对齐16px行高
+                _lblContent.AddThemeColorOverride("default_color", new Color(1f, 1f, 1f));
+                _lblContent.MetaClicked += OnMetaClicked;
+            }
+
+            _btnClose = _panel.GetNodeOrNull<Button>("BtnClose");
             if (_btnClose != null)
             {
                 _btnClose.Visible = false; // 隐藏旧节点
             }
+
+            // 官方原生 NPC 对话框关闭按钮 (Prguse_0064 @ 399, 1, 16x23, IDA sub_481DD4 [0x484f32..0x484f65])
+            // Prguse_0384 底板在 (399, 1) 处已自带烘焙凸起红叉，TextureNormal 必须为 null，按下态显示凹陷 Prguse_0064
+            var texClose = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0064.png");
             var btnCloseTex = new TextureButton
             {
                 Name = "BtnNpcCloseTex",
@@ -75,68 +96,119 @@ public partial class NpcDialogView : Control, IManagedWindow
         GD.Print("[NpcDialogView] NPC 对话框场景节点绑定就绪");
     }
 
-    public void ShowDialog(string title, string content, string[]? options = null)
+    /// <summary>
+    /// 解析并展示官方 NPC 脚本对话文本 (严格 1:1 对齐 IDA sub_48EAC0 语法):
+    /// 1. 换行符: '\' (ASCII 92) 或标准换行
+    /// 2. 普通文本: 纯白 0xFFFFFF, 无下划线
+    /// 3. 超链接段: '<' 与 '>' 包裹, 含 '/' 则前半部分为展示文本、后半部分为 Action 标签;
+    ///    默认黄色 0x00FFFF (RGB: 255, 255, 0) 并带下划线; 鼠标悬停高亮
+    /// </summary>
+    public void ShowDialog(string content)
     {
-        if (_lblTitle != null) _lblTitle.Text = title;
-        if (_lblContent != null) _lblContent.Text = content;
+        if (_lblContent == null) return;
+        _optionActions.Clear();
 
-        if (_optionsContainer != null)
+        // 将文本统一按 '\' 或换行符切割
+        string normalized = content.Replace("\r\n", "\\").Replace("\n", "\\");
+        string[] rawLines = normalized.Split('\\');
+
+        var sb = new System.Text.StringBuilder();
+        int actionIndex = 0;
+
+        for (int lineIdx = 0; lineIdx < rawLines.Length; lineIdx++)
         {
-            foreach (Node child in _optionsContainer.GetChildren())
-            {
-                child.QueueFree();
-            }
+            if (lineIdx > 0) sb.Append("\n");
+            string line = rawLines[lineIdx];
+            if (string.IsNullOrEmpty(line)) continue;
 
-            if (options != null)
+            // 逐字符解析内层超链接 <.../...>
+            int cursor = 0;
+            while (cursor < line.Length)
             {
-                for (int i = 0; i < options.Length; i++)
+                int linkStart = line.IndexOf('<', cursor);
+                if (linkStart == -1)
                 {
-                    int idx = i;
-                    string optText = options[i];
-
-                    // 盛大官方 1.5 NPC 脚本交互选项 (IDA sub_484ee2 / sub_49C780):
-                    // 默认暗黄带下划线，悬浮高亮纯白，具有原版经典的网页/脚本链接触感
-                    var btn = new Button
-                    {
-                        Text = optText.StartsWith("<") ? optText : $"< {optText} >",
-                        Flat = true,
-                        Alignment = HorizontalAlignment.Left,
-                        CustomMinimumSize = new Vector2(0, 20),
-                        MouseDefaultCursorShape = CursorShape.PointingHand
-                    };
-                    btn.AddThemeFontSizeOverride("font_size", 11);
-                    btn.AddThemeColorOverride("font_color", new Color(0.95f, 0.82f, 0.35f)); // 经典官方暗金黄
-                    btn.AddThemeColorOverride("font_hover_color", new Color(1.0f, 1.0f, 1.0f)); // 悬浮高亮纯白
-                    btn.AddThemeColorOverride("font_pressed_color", new Color(1.0f, 0.6f, 0.2f)); // 按下微橙
-
-                    var btnStyle = new StyleBoxEmpty
-                    {
-                        ContentMarginLeft = 2.0f,
-                        ContentMarginRight = 4.0f,
-                        ContentMarginTop = 1.0f,
-                        ContentMarginBottom = 1.0f
-                    };
-                    btn.AddThemeStyleboxOverride("normal", btnStyle);
-                    btn.AddThemeStyleboxOverride("hover", btnStyle);
-                    btn.AddThemeStyleboxOverride("pressed", btnStyle);
-                    btn.AddThemeStyleboxOverride("focus", btnStyle);
-                    btn.Pressed += () => OnOptionClicked(idx);
-                    _optionsContainer.AddChild(btn);
+                    // 剩余纯白文本 (0xFFFFFF, IDA 0x48ecfe / 0x48eefd)
+                    string rest = line.Substring(cursor);
+                    sb.Append("[color=#ffffff]").Append(rest).Append("[/color]");
+                    break;
                 }
+
+                if (linkStart > cursor)
+                {
+                    string normalSegment = line.Substring(cursor, linkStart - cursor);
+                    sb.Append("[color=#ffffff]").Append(normalSegment).Append("[/color]");
+                }
+
+                int linkEnd = line.IndexOf('>', linkStart);
+                if (linkEnd == -1)
+                {
+                    // 未闭合链接，按普通白字处理
+                    string rest = line.Substring(linkStart);
+                    sb.Append("[color=#ffffff]").Append(rest).Append("[/color]");
+                    break;
+                }
+
+                string linkContent = line.Substring(linkStart + 1, linkEnd - linkStart - 1);
+                string displayText = linkContent;
+                string actionTag = linkContent;
+
+                int slashIdx = linkContent.IndexOf('/');
+                if (slashIdx != -1)
+                {
+                    displayText = linkContent.Substring(0, slashIdx);
+                    actionTag = linkContent.Substring(slashIdx + 1);
+                }
+
+                // 官方超链接样式 (IDA 0x48edb0 byte_48EF8C=4 下划线, 0x48ee50 0x00FFFF 黄色)
+                _optionActions.Add(actionTag);
+                sb.Append($"[url={actionIndex}][color=#ffff00][u]{displayText}[/u][/color][/url]");
+                actionIndex++;
+
+                cursor = linkEnd + 1;
             }
         }
 
+        _lblContent.Text = sb.ToString();
         Visible = true;
     }
 
-    public void ShowDialog(string content)
+    public void ShowDialog(string title, string content, string[]? options = null)
     {
-        ShowDialog("NPC", content, null);
+        // 兼容模式: 将 options 合并转化为官方标准 NPC 对话文本流
+        var sb = new System.Text.StringBuilder();
+        sb.Append(content);
+        if (options != null && options.Length > 0)
+        {
+            sb.Append("\\ \\");
+            for (int i = 0; i < options.Length; i++)
+            {
+                string opt = options[i];
+                if (opt.StartsWith("<") && opt.EndsWith(">"))
+                {
+                    sb.Append("\\").Append(opt);
+                }
+                else
+                {
+                    sb.Append($"\\<{opt}/@{i}>");
+                }
+            }
+        }
+        ShowDialog(sb.ToString());
     }
 
-    private void OnOptionClicked(int index)
+    private void OnMetaClicked(Variant meta)
     {
-        EmitSignal(SignalName.OptionSelected, index);
+        string metaStr = meta.AsString();
+        if (int.TryParse(metaStr, out int idx))
+        {
+            EmitSignal(SignalName.OptionSelected, idx);
+        }
+        else
+        {
+            int foundIdx = _optionActions.IndexOf(metaStr);
+            EmitSignal(SignalName.OptionSelected, foundIdx >= 0 ? foundIdx : 0);
+        }
     }
 
     private void OnClose()

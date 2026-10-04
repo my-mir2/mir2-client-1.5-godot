@@ -297,6 +297,10 @@ public partial class AutoEndToEndDriver : Node
                 {
                     gameView.HudInstance.StatusPanel?.SetAbilityPage(false);
                     gameView.HudInstance.CloseTopDialog(); // 关闭独立状态面板
+                    if (gameView.HudInstance.EquipPanel != null)
+                    {
+                        gameView.HudInstance.EquipPanel.Visible = false;
+                    }
                     GD.Print("[AutoE2E] === 验证快捷键呼出技能魔法书 (F11) ===");
                     gameView.HudInstance.ToggleSkill();
                 }
@@ -334,6 +338,10 @@ public partial class AutoEndToEndDriver : Node
                 {
                     gameView.HudInstance.CloseTopDialog(); // 关闭模态框
                     GD.Print("[AutoE2E] === 验证组队面板 (GroupPanelView) ===");
+                    // 依据 IDA sub_490DFC 注入官方 1:1 双列队员排版 Mock 数据
+                    gameView.HudInstance.GroupPanel?.SetMembers(
+                        "传奇无敌",
+                        new[] { "烈火狂战", "冰雪法皇", "治愈神道", "雷电行者" });
                     gameView.HudInstance.ToggleGroup();
                 }
                 break;
