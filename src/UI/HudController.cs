@@ -850,6 +850,8 @@ public partial class HudController : CanvasLayer
             _expBar.MaxValue = maxExp > 0 ? maxExp : 1;
             _expBar.Value = Math.Clamp(curExp, 0, (long)_expBar.MaxValue);
         }
+        // 官方能力页第 0 行 (IDA sub_488AF4 0x48935e: 100*[+48h]/[+4Ch],保留 2 位小数并追加 "%")
+        _statusPanelView?.UpdateAbilityValue(0, maxExp > 0 ? $"{100.0 * curExp / maxExp:F2}%" : "0.00%");
     }
 
     public void UpdateWeight(int curWeight, int maxWeight)
@@ -859,6 +861,8 @@ public partial class HudController : CanvasLayer
             _weightBar.MaxValue = maxWeight > 0 ? maxWeight : 1;
             _weightBar.Value = Math.Clamp(curWeight, 0, (int)_weightBar.MaxValue);
         }
+        // 官方能力页第 1 行 背包重量 (IDA 0x4893f4: [+50h]/[+52h] 两个 word,超限时红色 0x0000FF)
+        _statusPanelView?.UpdateAbilityValue(1, $"{curWeight}/{maxWeight}", curWeight > maxWeight);
     }
 
     public void UpdateLevel(int level)

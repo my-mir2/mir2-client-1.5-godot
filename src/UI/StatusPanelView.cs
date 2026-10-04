@@ -185,9 +185,12 @@ public partial class StatusPanelView : Control, IManagedWindow
         foreach (var n in _statusPageNodes) n.Visible = !show;
     }
 
-    public void UpdateAbilityValue(int row, string text)
+    public void UpdateAbilityValue(int row, string text, bool overLimit = false)
     {
-        if (row >= 0 && row < _abilityValues.Length && _abilityValues[row] != null) _abilityValues[row].Text = text;
+        if (row < 0 || row >= _abilityValues.Length || _abilityValues[row] == null) return;
+        _abilityValues[row].Text = text;
+        // 官方超限时以 0x0000FF (GDI BGR 即纯红) 绘制
+        _abilityValues[row].AddThemeColorOverride("font_color", overLimit ? new Color(1f, 0f, 0f) : new Color(1f, 1f, 1f));
     }
 
     public void UpdateStat(string statName, string val)
