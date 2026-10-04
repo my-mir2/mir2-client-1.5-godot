@@ -1042,12 +1042,17 @@ public partial class HudController : CanvasLayer
 
     public void ToggleStorage()
     {
-        // 仓库复用官方商人窗体 (Prguse_0385, IDA sub_481DD4 0x484f88)
-        if (_shopPanelView != null)
+        // 官方仓库流程(服务端注释 + IDA sub_46DAE8): 复用 DSellDlg(Prguse_0392) 置 " 托管物品" 模式于 (260,176),
+        // 背包 DItemBag 移至 (475,0)。存取协议(CM1031/1032, SM704/705)尚未接入。
+        if (_repairPanelView == null) return;
+        bool open = !_repairPanelView.Visible;
+        _repairPanelView.SetStorageMode(open);
+        _stackManager.ToggleWindow(_repairPanelView);
+        if (_bagPanel != null)
         {
-            _stackManager.ToggleWindow(_shopPanelView);
-            GD.Print($"[HudController] 切换仓库(商人窗体 Storage 模式)显示状态: {_shopPanelView.Visible}");
+            if (open) { _bagPanel.Position = new Vector2(475, 0); _bagPanel.Visible = true; }
         }
+        GD.Print($"[HudController] 切换仓库(DSellDlg 托管模式)显示状态: {_repairPanelView.Visible}");
     }
 
     public void ToggleShop(int npcUid = 0)

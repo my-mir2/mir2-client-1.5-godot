@@ -30,6 +30,18 @@ public partial class RepairPanelView : Control, IManagedWindow
     public (int x, int y, int width, int height) Bounds =>
         ((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
 
+    private Label? _lblTitle;
+
+    /// <summary>
+    /// 仓库托管模式(官方 SM 700 → sub_46DAE8: 窗体 +1888=2 " 托管物品",DSellDlg 位于 (260,176));
+    /// 普通修理模式复位到 (138,163) 与 "特殊修理"。
+    /// </summary>
+    public void SetStorageMode(bool storage)
+    {
+        Position = storage ? new Vector2(260, 176) : new Vector2(138, 163);
+        if (_lblTitle != null) _lblTitle.Text = storage ? " 托管物品" : "特殊修理";
+    }
+
     public override void _Ready()
     {
         Visible = false;
@@ -74,6 +86,7 @@ public partial class RepairPanelView : Control, IManagedWindow
         };
         lblTitle.AddThemeFontSizeOverride("font_size", 10);
         lblTitle.AddThemeColorOverride("font_color", new Color(0.95f, 0.85f, 0.45f));
+        _lblTitle = lblTitle;
         _panel.AddChild(lblTitle);
 
         // 官方原生待修装备放置槽位 (Left=27, Top=67, Width=61, Height=52, IDA sub_481dd4 [0x4851d4..0x485215])
