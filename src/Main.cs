@@ -101,6 +101,14 @@ public partial class Main : Node
                     node.ServerHost = DefaultHost;
                     node.ServerPort = DefaultPort;
                     node.LoginRequested += OnLoginRequested;
+                    node.RegisterRequested += (acc, pwd) =>
+                    {
+                        GD.Print($"[Main] 收到新账号注册请求: {acc}");
+                    };
+                    node.ChangePasswordRequested += (acc, oldP, newP) =>
+                    {
+                        GD.Print($"[Main] 收到修改密码请求: {acc}");
+                    };
                     AddChild(node);
                     _currentSceneNode = node;
                 }

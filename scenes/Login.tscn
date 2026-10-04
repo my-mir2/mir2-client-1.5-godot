@@ -145,6 +145,7 @@ theme_override_styles/read_only = SubResource("StyleBoxEmpty_edit")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 11
 secret = true
+secret_character = "*"
 max_length = 20
 
 [node name="TxtRegPass2" type="LineEdit" parent="NewUserPanel"]
@@ -158,6 +159,7 @@ theme_override_styles/read_only = SubResource("StyleBoxEmpty_edit")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 11
 secret = true
+secret_character = "*"
 max_length = 20
 
 [node name="BtnRegSubmit" type="Button" parent="NewUserPanel"]
@@ -212,6 +214,7 @@ theme_override_styles/read_only = SubResource("StyleBoxEmpty_edit")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 11
 secret = true
+secret_character = "*"
 max_length = 20
 
 [node name="TxtNewPass1" type="LineEdit" parent="ChangePwdPanel"]
@@ -225,6 +228,7 @@ theme_override_styles/read_only = SubResource("StyleBoxEmpty_edit")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 11
 secret = true
+secret_character = "*"
 max_length = 20
 
 [node name="TxtNewPass2" type="LineEdit" parent="ChangePwdPanel"]
@@ -238,6 +242,7 @@ theme_override_styles/read_only = SubResource("StyleBoxEmpty_edit")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 11
 secret = true
+secret_character = "*"
 max_length = 20
 
 [node name="BtnChangeSubmit" type="Button" parent="ChangePwdPanel"]

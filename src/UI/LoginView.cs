@@ -14,6 +14,12 @@ public partial class LoginView : Control
     [Signal]
     public delegate void LoginRequestedEventHandler(string host, int port, string username, string password);
 
+    [Signal]
+    public delegate void RegisterRequestedEventHandler(string username, string password);
+
+    [Signal]
+    public delegate void ChangePasswordRequestedEventHandler(string username, string oldPassword, string newPassword);
+
     public string ServerHost { get; set; } = "127.0.0.1";
     public int ServerPort { get; set; } = 7100;
 
@@ -338,6 +344,7 @@ public partial class LoginView : Control
         }
 
         GD.Print($"[LoginView] 提交官方注册新账号: {u}");
+        EmitSignal(SignalName.RegisterRequested, u, p1);
         SwitchSubState(0);
         if (_lblStatus != null)
         {
@@ -364,7 +371,9 @@ public partial class LoginView : Control
             return;
         }
 
-        GD.Print("[LoginView] 提交修改密码请求成功");
+        string acc = _txtAccount?.Text?.Trim() ?? string.Empty;
+        GD.Print($"[LoginView] 提交修改密码请求成功: account={acc}");
+        EmitSignal(SignalName.ChangePasswordRequested, acc, oldP, newP1);
         SwitchSubState(0);
         if (_lblStatus != null)
         {
