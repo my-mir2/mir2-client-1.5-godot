@@ -227,11 +227,8 @@ public partial class InspectPanelView : Control, IManagedWindow
             _panel.AddChild(btn);
         }
 
-        // 默认在底部内胆显示被观察玩家核心神装概览
-        if (_lblInspectDesc != null)
-        {
-            _lblInspectDesc.Text = "[color=#ffff40]龙纹剑[/color]\n[color=#c0c0c0]持久 22/22[/color]  [color=#ffff00]道术 3-6[/color]  [color=#00ffff]幸运+7[/color]";
-        }
+        // 官方无默认描述: 仅在鼠标悬停槽位时显示该装备文本,默认保持为空
+    }
     }
 
     private RichTextLabel? _lblInspectDesc;
