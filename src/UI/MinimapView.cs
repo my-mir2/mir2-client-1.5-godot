@@ -17,6 +17,14 @@ public partial class MinimapView : Control, IManagedWindow
         Big = 2
     }
 
+    public enum RadarEntityType
+    {
+        Player,
+        Npc,
+        Monster,
+        GroupMember
+    }
+
     [Signal]
     public delegate void ModeChangedEventHandler(int newMode);
 
@@ -25,6 +33,8 @@ public partial class MinimapView : Control, IManagedWindow
     private Panel? _bgPanel;
     private Label? _lblMapCoord;
     private ColorRect? _playerDot;
+    private Control? _entityDotsContainer;
+    private readonly System.Collections.Generic.List<ColorRect> _dotPool = new();
     private float _blinkTimer = 0.0f;
     private bool _blinkState = true;
     private string _mapName = "比奇省";
@@ -100,6 +110,13 @@ public partial class MinimapView : Control, IManagedWindow
         };
         AddChild(_playerDot);
 
+        _entityDotsContainer = new Control
+        {
+            Name = "EntityDotsContainer",
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        AddChild(_entityDotsContainer);
+
         GD.Print("[MinimapView] 小地图场景节点绑定就绪");
     }
 
@@ -111,6 +128,59 @@ public partial class MinimapView : Control, IManagedWindow
         if (_lblMapCoord != null)
         {
             _lblMapCoord.Text = $"{_mapName} ({_playerX},{_playerY})";
+        }
+    }
+
+    public void UpdateRadarEntities(System.Collections.Generic.IEnumerable<(int tileX, int tileY, RadarEntityType type)> entities)
+    {
+        if (_currentMode == MinimapMode.Closed || _entityDotsContainer == null) return;
+
+        // 小地图中心坐标：Mini 模式 (58, 58)，Big 模式 (178, 118)
+        Vector2 center = _currentMode == MinimapMode.Mini ? new Vector2(58, 58) : new Vector2(178, 118);
+        Vector2 bounds = _currentMode == MinimapMode.Mini ? new Vector2(116, 116) : new Vector2(356, 236);
+        float scale = _currentMode == MinimapMode.Mini ? 1.5f : 1.0f; // 视野缩放
+
+        int dotIdx = 0;
+        foreach (var (tx, ty, type) in entities)
+        {
+            float dx = (tx - _playerX) * scale;
+            float dy = (ty - _playerY) * scale;
+            Vector2 dotPos = center + new Vector2(dx, dy);
+
+            // 裁剪越界点
+            if (dotPos.X < 2 || dotPos.X > bounds.X || dotPos.Y < 2 || dotPos.Y > bounds.Y)
+                continue;
+
+            Color dotColor = type switch
+            {
+                RadarEntityType.Npc => new Color(1.0f, 0.95f, 0.1f),      // NPC 亮黄点
+                RadarEntityType.Monster => new Color(1.0f, 0.2f, 0.2f),  // 怪物红点
+                RadarEntityType.GroupMember => new Color(0.2f, 0.6f, 1.0f), // 队友蓝点
+                _ => new Color(1.0f, 1.0f, 1.0f)                          // 其他玩家白点
+            };
+
+            while (_dotPool.Count <= dotIdx)
+            {
+                var newDot = new ColorRect
+                {
+                    Size = new Vector2(3, 3),
+                    MouseFilter = MouseFilterEnum.Ignore
+                };
+                _entityDotsContainer.AddChild(newDot);
+                _dotPool.Add(newDot);
+            }
+
+            var dot = _dotPool[dotIdx];
+            dot.Position = dotPos;
+            dot.Color = dotColor;
+            dot.Visible = true;
+            dotIdx++;
+        }
+
+        // 隐藏未用到的点
+        for (int i = dotIdx; i < _dotPool.Count; i++)
+        {
+            _dotPool[i].Visible = false;
         }
     }
 

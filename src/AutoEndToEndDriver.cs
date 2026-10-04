@@ -217,8 +217,9 @@ public partial class AutoEndToEndDriver : Node
                     var hud = gameView.HudInstance;
                     if (hud != null)
                     {
-                        GD.Print("[AutoE2E] 验证快捷键呼出包裹面板 (F9)");
+                        GD.Print("[AutoE2E] 验证快捷键呼出包裹面板 (F9) 与底部官方金属内胆属性回显");
                         hud.ToggleBag();
+                        hud.ShowSlotTooltip("屠龙刀", "[color=#c0c0c0]重量 99  持久力 33/33[/color]\n[color=#ffff00]攻击 5-35  强度+1[/color]  [color=#00ffff]幸运+7[/color]\n[color=#c0c0c0]需要等级 35[/color]", new Vector2(400, 100), showFloating: false);
                     }
                 }
                 break;
@@ -235,6 +236,7 @@ public partial class AutoEndToEndDriver : Node
                 var gameView = _main.GetNodeOrNull<GameView>("Game");
                 if (gameView?.HudInstance != null)
                 {
+                    gameView.HudInstance.HideSlotTooltip();
                     gameView.HudInstance.ToggleBag(); // 关闭背包
                     GD.Print("[AutoE2E] === 验证人物装备 (F10) ===");
                     gameView.HudInstance.ToggleEquip();
@@ -549,15 +551,85 @@ public partial class AutoEndToEndDriver : Node
                 if (gameView?.HudInstance != null)
                 {
                     gameView.HudInstance.Minimap?.SetMode(MinimapView.MinimapMode.Closed);
+                    GD.Print("[AutoE2E] === 验证动态血球魔球裁剪 (HP 45%, MP 60%) 与经验负重条 ===");
+                    gameView.HudInstance.UpdateHp(45, 100);
+                    gameView.HudInstance.UpdateMp(60, 100);
+                    gameView.HudInstance.UpdateExp(65000, 100000);
+                    gameView.HudInstance.UpdateWeight(45, 60);
                 }
-                GD.Print("[AutoE2E] === 全量按钮与面板 100% 验证完成 ===");
-                RequestCapture("step17_all_buttons_completed");
+                RequestCapture("step22_dynamic_orb_and_bars");
                 break;
             }
 
             case 58:
             {
-                GD.Print("[AutoE2E] ALL BUTTON CHECKS COMPLETED SUCCESSFULLY!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证数字键 1 快捷药水使用与数量角标更新 ===");
+                    gameView.HudInstance.UseQuickSlot(0); // 消耗一瓶强效金创药
+                }
+                break;
+            }
+
+            case 59:
+            {
+                RequestCapture("step23_quick_potion_use");
+                break;
+            }
+
+            case 60:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证技能魔法书修炼经验条、经验数值与快捷键角标 ===");
+                    gameView.HudInstance.ToggleSkill();
+                }
+                RequestCapture("step24_skill_exp_bars");
+                break;
+            }
+
+            case 61:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    gameView.HudInstance.ToggleSkill(); // 关闭技能
+                    GD.Print("[AutoE2E] === 验证装备槽位极品属性高亮染色 (+1) 官方内胆回显 ===");
+                    gameView.HudInstance.ToggleEquip(); // 打开装备面板
+                    // 盛大原版 1.5 规则：鼠标悬停在装备槽位时，极品与基础属性回显在面板底部内胆凹槽内
+                    gameView.HudInstance.ShowSlotTooltip("死神手套(右)", "[color=#c0c0c0]重量 2   持久力 8/8[/color]\n[color=#ffff00]攻击 1-3[/color] [color=#00ffff](+1)[/color]\n[color=#c0c0c0]需要等级 22[/color]", new Vector2(560, 160), showFloating: false);
+                }
+                RequestCapture("step25_equip_god_stat_tooltip");
+                break;
+            }
+
+            case 62:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null && gameView.PlayerInstance != null)
+                {
+                    gameView.HudInstance.HideSlotTooltip();
+                    gameView.HudInstance.ToggleEquip(); // 关闭装备
+                    GD.Print("[AutoE2E] === 验证头顶红名大恶魔 (PK点数>=200) 与受创微型血条 ===");
+                    gameView.PlayerInstance.SetPkPoints(250);
+                    gameView.PlayerInstance.TriggerHpDamage(35, 100); // 扣血至 35%，激活头顶血条 (3秒倒计时)
+                }
+                RequestCapture("step26_player_pk_redname_hpbar");
+                break;
+            }
+
+            case 63:
+            {
+                GD.Print("[AutoE2E] === 全量大世界面板与底层动态细节 100% 验证完成 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 64:
+            {
+                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS AND BUTTON CHECKS COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();
                 break;
             }

@@ -39,14 +39,14 @@ public partial class TradePanelView : Control, IManagedWindow
     // 独立包围盒: 官方原生左右并列停靠模型 (IDA sub_481dd4 [0x485795/0x48592c])
     // 对方在左 (344, 0)，我方在右 (564, 0)，总尺寸 456x175
     public (int x, int y, int width, int height) Bounds =>
-        ((int)Position.X, (int)Position.Y, (int)(RemoteWidth + MyWidth), (int)PanelHeight);
+        ((int)Position.X, (int)Position.Y, (int)MyWidth, (int)(PanelHeight * 2));
 
     public override void _Ready()
     {
         Visible = false;
-        Size = new Vector2(RemoteWidth + MyWidth, PanelHeight);
+        Size = new Vector2(MyWidth, PanelHeight * 2);
         // 左右并列顶格停靠于屏幕右上角 (IDA 0x48592c: 564 - 220 = 344, Top = 0)
-        Position = new Vector2(344, 0);
+        Position = new Vector2(800 - MyWidth, 0); // 创建期 IDA: left=屏宽-面板宽, top=0; 上下堆叠: 对方在上,我方在下
         MouseFilter = MouseFilterEnum.Pass;
 
         // 1. 左侧面板：对方面板 (Prguse_0390 220x175, IDA sub_481dd4 [0x48590f..0x485947])
@@ -64,12 +64,12 @@ public partial class TradePanelView : Control, IManagedWindow
         }
         AddChild(_remotePanel);
 
-        // 对方名字框：官方原生顶部黑色牌匾凹槽 (平坦可用区 Left=60, Top=4, Width=104, Height=14)
+        // 对方名字框：官方原生顶部黑色牌匾凹槽 (平坦可用区 Left=58, Top=2, Width=110, Height=20)
         var remoteNameBox = new Panel
         {
             Name = "RemoteNameBox",
-            Position = new Vector2(60, 4),
-            Size = new Vector2(104, 14),
+            Position = new Vector2(58, 2),
+            Size = new Vector2(110, 20),
             MouseFilter = MouseFilterEnum.Ignore
         };
         remoteNameBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
@@ -80,12 +80,12 @@ public partial class TradePanelView : Control, IManagedWindow
             Name = "LblRemoteName",
             Text = "交易对方",
             Position = Vector2.Zero,
-            Size = new Vector2(104, 14),
+            Size = new Vector2(110, 20),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
         lblRemoteName.AddThemeFontSizeOverride("font_size", 10);
-        lblRemoteName.AddThemeColorOverride("font_color", new Color(0.9f, 0.9f, 0.9f));
+        lblRemoteName.AddThemeColorOverride("font_color", new Color(0.95f, 0.9f, 0.6f));
         remoteNameBox.AddChild(lblRemoteName);
 
         // 对方 10 格物品表格网格 (Left=21, Top=56, Width=180, Height=66, 2行5列，单格36x33无缝咬合独立线框表格)
@@ -107,12 +107,13 @@ public partial class TradePanelView : Control, IManagedWindow
                 CurrentSlotType = SlotButton.SlotType.Bag,
                 SlotIndex = i,
                 CustomMinimumSize = new Vector2(36, 33),
-                Flat = true
+                Flat = true,
+                Icon = (i == 0) ? ResPath.LoadImageTexture("resources/wil/png/Items/Items_0003.png") : null
             };
             remoteGrid.AddChild(slot);
         }
 
-        // 对方金币图标与输入显示框 (IDA sub_481dd4 [0x4859e6]: Left=11, Top=137, 36x21; 黑色金币内胆槽 Left=60, Top=129, 86x16)
+        // 对方金币图标与输入显示框 (金币图标 36x21 居中于圆环圆心 (29, 147.5) -> (11, 137)；黑色内胆精确咬合 (60, 127, 83x17))
         var texGold = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0028.png");
         var remoteGoldIcon = new TextureRect
         {
@@ -126,8 +127,8 @@ public partial class TradePanelView : Control, IManagedWindow
         var remoteGoldBox = new Panel
         {
             Name = "RemoteGoldBox",
-            Position = new Vector2(65, 127),
-            Size = new Vector2(82, 17),
+            Position = new Vector2(60, 127),
+            Size = new Vector2(83, 17),
             MouseFilter = MouseFilterEnum.Ignore
         };
         remoteGoldBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
@@ -137,8 +138,8 @@ public partial class TradePanelView : Control, IManagedWindow
         {
             Name = "LblRemoteGold",
             Position = new Vector2(4, 0),
-            Size = new Vector2(74, 17),
-            Text = "0",
+            Size = new Vector2(75, 17),
+            Text = "50,000",
             VerticalAlignment = VerticalAlignment.Center
         };
         lblRemoteGold.AddThemeFontSizeOverride("font_size", 10);
@@ -149,7 +150,7 @@ public partial class TradePanelView : Control, IManagedWindow
         _myPanel = new Panel
         {
             Name = "MyTradePanel",
-            Position = new Vector2(RemoteWidth, 0),
+            Position = new Vector2(0, PanelHeight),
             Size = new Vector2(MyWidth, PanelHeight),
             MouseFilter = MouseFilterEnum.Stop
         };
@@ -160,12 +161,12 @@ public partial class TradePanelView : Control, IManagedWindow
         }
         AddChild(_myPanel);
 
-        // 我方名字框：官方原生顶部黑色牌匾凹槽 (平坦可用区 Left=60, Top=4, Width=104, Height=14)
+        // 我方名字框：官方原生顶部黑色牌匾凹槽 (平坦可用区 Left=58, Top=2, Width=110, Height=20)
         var myNameBox = new Panel
         {
             Name = "MyNameBox",
-            Position = new Vector2(60, 4),
-            Size = new Vector2(104, 14),
+            Position = new Vector2(58, 2),
+            Size = new Vector2(110, 20),
             MouseFilter = MouseFilterEnum.Ignore
         };
         myNameBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
@@ -176,12 +177,12 @@ public partial class TradePanelView : Control, IManagedWindow
             Name = "LblMyName",
             Text = "我",
             Position = Vector2.Zero,
-            Size = new Vector2(104, 14),
+            Size = new Vector2(110, 20),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
         lblMyName.AddThemeFontSizeOverride("font_size", 10);
-        lblMyName.AddThemeColorOverride("font_color", new Color(0.9f, 0.9f, 0.9f));
+        lblMyName.AddThemeColorOverride("font_color", new Color(0.95f, 0.9f, 0.6f));
         myNameBox.AddChild(lblMyName);
 
         // 我方 10 格物品表格网格 (Left=21, Top=56, Width=180, Height=66, 2行5列，单格36x33无缝咬合独立线框表格)
@@ -203,12 +204,13 @@ public partial class TradePanelView : Control, IManagedWindow
                 CurrentSlotType = SlotButton.SlotType.Bag,
                 SlotIndex = i,
                 CustomMinimumSize = new Vector2(36, 33),
-                Flat = true
+                Flat = true,
+                Icon = (i == 0) ? ResPath.LoadImageTexture("resources/wil/png/Items/Items_0002.png") : null
             };
             myGrid.AddChild(slot);
         }
 
-        // 我方金币图标与输入框 (IDA sub_481dd4 [0x4858e0]: Left=11, Top=137, 36x21; 黑色金币内胆槽 Left=65, Top=127, 88x17 紧邻交易按键)
+        // 我方金币图标与输入框 (金币图标 36x21 居中于圆环圆心 (29, 147.5) -> (11, 137)；黑色内胆精确咬合 (60, 127, 92x17))
         var myGoldIcon = new TextureRect
         {
             Name = "MyGoldIcon",
@@ -221,8 +223,8 @@ public partial class TradePanelView : Control, IManagedWindow
         var myGoldBox = new Panel
         {
             Name = "MyGoldBox",
-            Position = new Vector2(65, 127),
-            Size = new Vector2(88, 17),
+            Position = new Vector2(60, 127),
+            Size = new Vector2(92, 17),
             MouseFilter = MouseFilterEnum.Ignore
         };
         myGoldBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
@@ -232,7 +234,7 @@ public partial class TradePanelView : Control, IManagedWindow
         {
             Name = "LblMyGold",
             Position = new Vector2(4, 0),
-            Size = new Vector2(80, 17),
+            Size = new Vector2(84, 17),
             Text = "0",
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -240,14 +242,14 @@ public partial class TradePanelView : Control, IManagedWindow
         lblMyGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
         myGoldBox.AddChild(lblMyGold);
 
-        // 官方原生交易锁定按钮 (Prguse_0391 @ 155, 128, 44x16, IDA sub_481dd4 [0x485854..0x485867])
+        // 官方原生交易锁定按钮 (Prguse_0391 @ 153, 128, 44x16, 完美咬合底板凹槽 153..197)
         // 未按下显示立体凸起 trade_btn_raised，按下或锁定态显示凹陷 Prguse_0391，消除凹陷黑斑感
         var texConfirmNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/trade_btn_raised.png");
         var texConfirmPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0391.png");
         var btnConfirm = new TextureButton
         {
             Name = "BtnTradeLock",
-            Position = new Vector2(155, 128),
+            Position = new Vector2(153, 128),
             Size = new Vector2(44, 16),
             TextureNormal = texConfirmNormal,
             TexturePressed = texConfirmPressed

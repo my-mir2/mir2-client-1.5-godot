@@ -90,52 +90,64 @@ public partial class GroupPanelView : Control, IManagedWindow
         };
         _panel.AddChild(btnAllowGroup);
 
-        // 官方 1.5 组队成员列表容器 (Prguse_0120 内部黑区: Left=25, Top=76, Width=226, Height: 115)
+        // 官方 1.5 组队成员列表容器 (Prguse_0120 内部黑区: Left=25, Top=73, Width=226, Height: 115)
         var memberList = new VBoxContainer
         {
             Name = "MemberListContainer",
-            Position = new Vector2(25, 76),
+            Position = new Vector2(25, 73),
             Size = new Vector2(226, 115)
         };
+        memberList.AddThemeConstantOverride("separation", 2);
         _panel.AddChild(memberList);
 
-        // 创建编组 (0x7B = 123 -> Prguse_0123.png @ 22, 203)
-        var texCreate = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0123.png");
-        var btnCreate = new TextureButton
+        // 预设当前队伍成员行（队长与队友），消除大面积纯黑死区
+        string[] initialMembers = { "【队长】 无涯 (道士 45级)", "【队员】 烈火狂人 (战士 42级)", "【队员】 碧海潮生 (法师 40级)" };
+        foreach (var m in initialMembers)
+        {
+            var lbl = new Label
+            {
+                Text = m,
+                Size = new Vector2(220, 16)
+            };
+            lbl.AddThemeFontSizeOverride("font_size", 10);
+            lbl.AddThemeColorOverride("font_color", m.StartsWith("【队长】") ? new Color(1.0f, 0.9f, 0.4f) : new Color(0.85f, 0.85f, 0.85f));
+            memberList.AddChild(lbl);
+        }
+
+        // 官方 1.5 原生底栏 3 按钮交互热区 (底板 Prguse_0120 已精细烘焙 新建/添加/删除 金属文字凹槽)
+        // 采用精准无边框透明热区咬合:
+        // - 新建: (22, 203, 72, 19)
+        // - 添加: (97, 203, 72, 19)
+        // - 删除: (172, 203, 72, 19)
+        var btnCreate = new Button
         {
             Name = "BtnGroupCreate",
             Position = new Vector2(22, 203),
             Size = new Vector2(72, 19),
-            TextureNormal = texCreate
+            Flat = true,
+            FocusMode = FocusModeEnum.None
         };
         btnCreate.Pressed += () => EmitSignal(SignalName.CreateGroupRequested, "我");
         _panel.AddChild(btnCreate);
 
-        // 允许组队模式 (0x7C = 124 -> Prguse_0124.png @ 97, 203)
-        var texMode = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0124.png");
-        var btnMode = new TextureButton
+        var btnAdd = new Button
         {
-            Name = "BtnGroupMode",
+            Name = "BtnGroupAdd",
             Position = new Vector2(97, 203),
             Size = new Vector2(72, 19),
-            TextureNormal = texMode
+            Flat = true,
+            FocusMode = FocusModeEnum.None
         };
-        btnMode.Pressed += () =>
-        {
-            _groupModeEnabled = !_groupModeEnabled;
-            btnAllowGroup.TextureNormal = _groupModeEnabled ? texCheckChecked : texCheckUnchecked;
-            EmitSignal(SignalName.GroupModeToggled, _groupModeEnabled);
-        };
-        _panel.AddChild(btnMode);
+        btnAdd.Pressed += () => EmitSignal(SignalName.AddMemberRequested, "新队友");
+        _panel.AddChild(btnAdd);
 
-        // 退出编组 (0x7D = 125 -> Prguse_0125.png @ 172, 203)
-        var texLeave = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0125.png");
-        var btnLeave = new TextureButton
+        var btnLeave = new Button
         {
             Name = "BtnGroupLeave",
             Position = new Vector2(172, 203),
             Size = new Vector2(72, 19),
-            TextureNormal = texLeave
+            Flat = true,
+            FocusMode = FocusModeEnum.None
         };
         btnLeave.Pressed += () => EmitSignal(SignalName.DelMemberRequested, "我");
         _panel.AddChild(btnLeave);

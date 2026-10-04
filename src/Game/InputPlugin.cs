@@ -23,6 +23,7 @@ namespace Mir2Client.Game
         [Signal] public delegate void MinimapToggleRequestedEventHandler();
         [Signal] public delegate void EscapeRequestedEventHandler();
         [Signal] public delegate void SkillKeyPressedEventHandler(int slot);
+        [Signal] public delegate void QuickItemKeyPressedEventHandler(int slot);
         [Signal] public delegate void PkModeToggleRequestedEventHandler();
         [Signal] public delegate void AltShowItemsToggledEventHandler(bool show);
         [Signal] public delegate void TargetSelectedEventHandler(int targetUid);
@@ -188,6 +189,10 @@ namespace Mir2Client.Game
                     {
                         switch (key.Keycode)
                         {
+                            case Key.Key1: case Key.Key2: case Key.Key3:
+                            case Key.Key4: case Key.Key5: case Key.Key6:
+                                EmitSignal(SignalName.QuickItemKeyPressed, (int)key.Keycode - (int)Key.Key1);
+                                break;
                             case Key.F1: case Key.F2: case Key.F3: case Key.F4:
                             case Key.F5: case Key.F6: case Key.F7: case Key.F8:
                                 EmitSignal(SignalName.SkillKeyPressed, (int)key.Keycode - (int)Key.F1);

@@ -115,27 +115,17 @@ public partial class StoragePanelView : Control, IManagedWindow
         _panel.AddChild(goldIcon);
 
         // 金币数量显示内胆 (Left=96, Top=250, 140x18)
-        var goldBox = new Panel
-        {
-            Name = "StorageGoldBox",
-            Position = new Vector2(96, 250),
-            Size = new Vector2(140, 18),
-            MouseFilter = MouseFilterEnum.Ignore
-        };
-        goldBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
-        _panel.AddChild(goldBox);
-
         _lblGold = new Label
         {
             Name = "LblStorageGold",
-            Position = new Vector2(4, 0),
-            Size = new Vector2(132, 18),
+            Position = new Vector2(96, 250),
+            Size = new Vector2(140, 18),
             Text = "0",
             VerticalAlignment = VerticalAlignment.Center
         };
         _lblGold.AddThemeFontSizeOverride("font_size", 11);
         _lblGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
-        goldBox.AddChild(_lblGold);
+        _panel.AddChild(_lblGold);
 
         // 存入金币按钮 (Prguse_0062 76x33 @ 250, 242)
         var texConfirm = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0062.png");

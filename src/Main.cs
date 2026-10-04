@@ -51,7 +51,8 @@ public partial class Main : Node
         if (args != null) allArgs.AddRange(args);
         if (userArgs != null) allArgs.AddRange(userArgs);
 
-        if (allArgs.Contains("--autotest") || allArgs.Contains("--debug-grid"))
+        // 满足人工与自动化机器审计：启动 1 像素高对比度细线框审计层（当携带 --debug-grid 或 --autotest 时自动启用）
+        if (allArgs.Contains("--debug-grid") || allArgs.Contains("--autotest"))
         {
             AddChild(new DebugGridOverlay());
         }

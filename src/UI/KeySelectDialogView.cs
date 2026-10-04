@@ -23,6 +23,7 @@ public partial class KeySelectDialogView : Control, IManagedWindow
 
     private Panel? _panel;
     private Label? _lblTitle;
+    private TextureRect? _iconRect;
     private int _currentMagicId = 0;
     private int _selectedKey = 0;
 
@@ -57,9 +58,21 @@ public partial class KeySelectDialogView : Control, IManagedWindow
         }
         AddChild(_panel);
 
+        // 官方原生技能图标槽 (IDA 0x4852b6: Left=51, Top=27, 内胆黑色雕刻槽 28x28)
+        _iconRect = new TextureRect
+        {
+            Name = "KeySelectSkillIcon",
+            Position = new Vector2(51, 27),
+            Size = new Vector2(28, 28),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        _panel.AddChild(_iconRect);
+
         _lblTitle = new Label
         {
-            Position = new Vector2(95, 36),
+            Position = new Vector2(92, 34),
             Size = new Vector2(240, 20),
             Text = "设置快捷键",
             VerticalAlignment = VerticalAlignment.Center
@@ -88,8 +101,8 @@ public partial class KeySelectDialogView : Control, IManagedWindow
             int keyNum = i + 1;
             int texIdxNormal = 232 + i * 2;
             int texIdxPressed = texIdxNormal + 1;
-            var texNormal = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{texIdxNormal:04d}.png");
-            var texPressed = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{texIdxPressed:04d}.png");
+            var texNormal = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{texIdxNormal:D4}.png");
+            var texPressed = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{texIdxPressed:D4}.png");
 
             var btn = new TextureButton
             {
@@ -138,6 +151,18 @@ public partial class KeySelectDialogView : Control, IManagedWindow
         {
             _lblTitle.Text = $"设置【{skillName}】快捷键";
         }
+
+        if (_iconRect != null)
+        {
+            int iconIdx = 0;
+            var meta = Mir2Client.Game.SkillFormulas.GetSkill((short)magicId);
+            if (meta.HasValue)
+            {
+                iconIdx = meta.Value.IconIndex;
+            }
+            _iconRect.Texture = ResPath.LoadImageTexture($"resources/wil/png/MagIcon/MagIcon_{iconIdx:D4}.png");
+        }
+
         Visible = true;
     }
 

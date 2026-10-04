@@ -92,20 +92,34 @@ public partial class NpcDialogView : Control, IManagedWindow
                 for (int i = 0; i < options.Length; i++)
                 {
                     int idx = i;
+                    string optText = options[i];
+
+                    // 盛大官方 1.5 NPC 脚本交互选项 (IDA sub_484ee2 / sub_49C780):
+                    // 默认暗黄带下划线，悬浮高亮纯白，具有原版经典的网页/脚本链接触感
                     var btn = new Button
                     {
-                        Text = options[i],
+                        Text = optText.StartsWith("<") ? optText : $"< {optText} >",
                         Flat = true,
                         Alignment = HorizontalAlignment.Left,
-                        CustomMinimumSize = new Vector2(0, 18)
+                        CustomMinimumSize = new Vector2(0, 20),
+                        MouseDefaultCursorShape = CursorShape.PointingHand
                     };
                     btn.AddThemeFontSizeOverride("font_size", 11);
-                    btn.AddThemeColorOverride("font_color", new Color(0.9f, 0.85f, 0.4f));
-                    btn.AddThemeColorOverride("font_hover_color", new Color(1.0f, 1.0f, 1.0f));
-                    btn.AddThemeStyleboxOverride("normal", new StyleBoxEmpty());
-                    btn.AddThemeStyleboxOverride("hover", new StyleBoxEmpty());
-                    btn.AddThemeStyleboxOverride("pressed", new StyleBoxEmpty());
-                    btn.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
+                    btn.AddThemeColorOverride("font_color", new Color(0.95f, 0.82f, 0.35f)); // 经典官方暗金黄
+                    btn.AddThemeColorOverride("font_hover_color", new Color(1.0f, 1.0f, 1.0f)); // 悬浮高亮纯白
+                    btn.AddThemeColorOverride("font_pressed_color", new Color(1.0f, 0.6f, 0.2f)); // 按下微橙
+
+                    var btnStyle = new StyleBoxEmpty
+                    {
+                        ContentMarginLeft = 2.0f,
+                        ContentMarginRight = 4.0f,
+                        ContentMarginTop = 1.0f,
+                        ContentMarginBottom = 1.0f
+                    };
+                    btn.AddThemeStyleboxOverride("normal", btnStyle);
+                    btn.AddThemeStyleboxOverride("hover", btnStyle);
+                    btn.AddThemeStyleboxOverride("pressed", btnStyle);
+                    btn.AddThemeStyleboxOverride("focus", btnStyle);
                     btn.Pressed += () => OnOptionClicked(idx);
                     _optionsContainer.AddChild(btn);
                 }

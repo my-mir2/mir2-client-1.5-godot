@@ -44,7 +44,7 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
 
     private static readonly float[] RowTops =
     [
-        101.0f, 121.0f, 140.0f, 160.0f, 181.0f, 201.0f, 220.0f, 240.0f, 261.0f
+        99.0f, 119.0f, 139.0f, 159.0f, 179.0f, 199.0f, 219.0f, 239.0f, 259.0f
     ];
 
     public override void _Ready()
@@ -81,11 +81,11 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         btnClose.Pressed += OnClose;
         panel.AddChild(btnClose);
 
-        // 剩余点数标签 (底板 Available 文字右侧: Left 98, Top 276)
+        // 剩余点数标签 (底板 Available 文字右侧: Left 98, Top 285)
         _lblRemain = new Label
         {
             Name = "LblRemainPoints",
-            Position = new Vector2(98, 276),
+            Position = new Vector2(98, 285),
             Size = new Vector2(60, 18),
             Text = _remainingPoints.ToString(),
             VerticalAlignment = VerticalAlignment.Center
@@ -94,21 +94,21 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         _lblRemain.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.4f));
         panel.AddChild(_lblRemain);
 
-        // 官方 9 属性加减按键矩阵 (IDA sub_481dd4 0x485ffe ~ 0x486471: Left=217 为减，Left=227 为加)
-        var texMinus = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0227.png");
-        var texPlus = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0228.png");
+        // 官方 9 属性加减按键矩阵 (IDA sub_481dd4 0x485ffe ~ 0x486471: Left=216 为加号，Left=227 为减号)
+        var texPlus = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0227.png");
+        var texMinus = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0228.png");
 
         for (int i = 0; i < 9; i++)
         {
             int statIdx = i;
             float top = RowTops[i];
 
-            // 属性分配当前数值显示 (居中于黑底凹槽 160~205)
+            // 属性分配当前数值显示 (精准咬合于黑底凹槽 151..214, W=64, H=16)
             var lblVal = new Label
             {
                 Name = $"LblStat_{statIdx}",
-                Position = new Vector2(160, top - 2),
-                Size = new Vector2(45, 16),
+                Position = new Vector2(151, top),
+                Size = new Vector2(64, 16),
                 Text = "0",
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center
@@ -118,36 +118,40 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
             panel.AddChild(lblVal);
             _lblStatAllocations[statIdx] = lblVal;
 
-            // 减点按钮 (IDA 0x485ffe: Left = 217)
-            var btnDec = new TextureButton
-            {
-                Name = $"BtnDec_{statIdx}",
-                Position = new Vector2(217, top),
-                Size = new Vector2(9, 13),
-                TextureNormal = texMinus
-            };
-            btnDec.Pressed += () => OnModifyStat(statIdx, -1);
-            panel.AddChild(btnDec);
-
-            // 加点按钮 (IDA 0x48622e: Left = 227)
+            // 官方底板 Prguse_0226 已经精细烘焙了印制好的微调凹槽底图！
+            // 平时 TextureNormal = null 透出底板原生质感，按下时 TexturePressed 显示高亮+-号，杜绝贴片感！
+            // 加点按钮 (Left=216, Top=top+2, 12x11)
             var btnInc = new TextureButton
             {
                 Name = $"BtnInc_{statIdx}",
-                Position = new Vector2(227, top),
-                Size = new Vector2(9, 13),
-                TextureNormal = texPlus
+                Position = new Vector2(216, top + 2),
+                Size = new Vector2(12, 11),
+                TextureNormal = null,
+                TexturePressed = texPlus
             };
             btnInc.Pressed += () => OnModifyStat(statIdx, +1);
             panel.AddChild(btnInc);
+
+            // 减点按钮 (Left=227, Top=top+2, 12x11)
+            var btnDec = new TextureButton
+            {
+                Name = $"BtnDec_{statIdx}",
+                Position = new Vector2(227, top + 2),
+                Size = new Vector2(12, 11),
+                TextureNormal = null,
+                TexturePressed = texMinus
+            };
+            btnDec.Pressed += () => OnModifyStat(statIdx, -1);
+            panel.AddChild(btnDec);
         }
 
-        // 官方原生确认加点按钮 (IDA sub_481dd4 0x485f72: Left 220, Top 298)
+        // 官方原生确认加点按钮 (IDA sub_481dd4 0x485f72: 严格对齐底板金属 OK 框 221, 299, 88x30)
         // 底板已自带 OK 贴图，TextureNormal 为空透明响应，按下显示轻微按下态
         var btnConfirm = new TextureButton
         {
             Name = "BtnAdjustConfirm",
-            Position = new Vector2(220, 298),
-            Size = new Vector2(80, 28)
+            Position = new Vector2(221, 299),
+            Size = new Vector2(88, 30)
         };
         btnConfirm.Pressed += OnConfirm;
         panel.AddChild(btnConfirm);

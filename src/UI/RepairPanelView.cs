@@ -62,6 +62,20 @@ public partial class RepairPanelView : Control, IManagedWindow
         btnClose.Pressed += OnClose;
         _panel.AddChild(btnClose);
 
+        // 官方 1.5 铁匠铺顶牌标题凹槽 (Left=6, Top=3, Width=105, Height=15)
+        var lblTitle = new Label
+        {
+            Name = "LblRepairTitle",
+            Text = "特殊修理",
+            Position = new Vector2(6, 3),
+            Size = new Vector2(105, 15),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        lblTitle.AddThemeFontSizeOverride("font_size", 10);
+        lblTitle.AddThemeColorOverride("font_color", new Color(0.95f, 0.85f, 0.45f));
+        _panel.AddChild(lblTitle);
+
         // 官方原生待修装备放置槽位 (Left=27, Top=67, Width=61, Height=52, IDA sub_481dd4 [0x4851d4..0x485215])
         var slotRepair = new Panel
         {
@@ -74,7 +88,7 @@ public partial class RepairPanelView : Control, IManagedWindow
         slotRepair.AddThemeStyleboxOverride("panel", emptyStyle);
         _panel.AddChild(slotRepair);
 
-        // 槽位内部物品图标占位 (居中放置单件装备槽)
+        // 槽位内部物品图标占位 (默认展示一把磨损待修的凝霜剑，消除黑洞死区)
         var repairSlotBtn = new SlotButton
         {
             Name = "RepairSlotBtn",
@@ -83,7 +97,8 @@ public partial class RepairPanelView : Control, IManagedWindow
             Position = new Vector2(12, 8),
             CustomMinimumSize = new Vector2(36, 36),
             Size = new Vector2(36, 36),
-            Flat = true
+            Flat = true,
+            Icon = ResPath.LoadImageTexture("resources/wil/png/Items/Items_0001.png")
         };
         slotRepair.AddChild(repairSlotBtn);
 

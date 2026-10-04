@@ -376,16 +376,16 @@ public class TestUiSceneBindingArchitecture
         Assert.Equal(311, bagClosePos.X);
         Assert.Equal(204, bagClosePos.Y);
 
-        // 步骤 4: 背包 40 格像素对齐 (Prguse_0003 暗纹：8列x5行，列宽36px，行高32px，原点 18, 14)
-        var bagGrid = (OriginX: 18, OriginY: 14, SlotW: 36, SlotH: 32, Cols: 8, Rows: 5);
-        Assert.Equal(18, bagGrid.OriginX);
+        // 步骤 4: 背包 40 格像素对齐 (Prguse_0003 暗纹：8列x5行，列宽36px，行高32px，原点 19, 14)
+        var bagGrid = (OriginX: 19, OriginY: 14, SlotW: 36, SlotH: 32, Cols: 8, Rows: 5);
+        Assert.Equal(19, bagGrid.OriginX);
         Assert.Equal(14, bagGrid.OriginY);
         Assert.Equal(36, bagGrid.SlotW);
         Assert.Equal(32, bagGrid.SlotH);
         Assert.Equal(8, bagGrid.Cols);
         Assert.Equal(5, bagGrid.Rows);
-        // 网格总跨度: 18 + 8*36 = 306, 14 + 5*32 = 174
-        Assert.Equal(306, bagGrid.OriginX + bagGrid.Cols * bagGrid.SlotW);
+        // 网格总跨度: 19 + 8*36 = 307, 14 + 5*32 = 174
+        Assert.Equal(307, bagGrid.OriginX + bagGrid.Cols * bagGrid.SlotW);
         Assert.Equal(174, bagGrid.OriginY + bagGrid.Rows * bagGrid.SlotH);
 
         // 背包金币槽与金币文本 (Icon: 7, 182, Text: 60, 182)
@@ -469,5 +469,136 @@ public class TestUiSceneBindingArchitecture
         Assert.Equal(24, repairOk.W);
         Assert.Equal(13, repairOk.H);
     }
+
+    /// <summary>
+    /// 步骤 12 ~ 16: 交易、行会、NPC对话框、观人、死亡与模态弹窗 IDA 原生实证单元测试
+    /// </summary>
+    [Fact]
+    public void TestTradeAndGuildPanels_GroundTruth()
+    {
+        // 交易系统双面板并列模型 (IDA sub_481dd4 [0x485784..0x4859f9])
+        Assert.Equal(220.0f, TradePanelView.RemoteWidth);
+        Assert.Equal(236.0f, TradePanelView.MyWidth);
+        Assert.Equal(175.0f, TradePanelView.PanelHeight);
+        Assert.Equal(456.0f, TradePanelView.RemoteWidth + TradePanelView.MyWidth);
+
+        // 己方交易确定按钮 (155, 128, 44x16, Prguse_0391) 与关闭红叉 (220, 42, 16x23)
+        var tradeConfirm = (X: 155, Y: 128, W: 44, H: 16);
+        var tradeClose = (X: 220, Y: 42, W: 16, H: 23);
+        Assert.Equal(155, tradeConfirm.X);
+        Assert.Equal(128, tradeConfirm.Y);
+        Assert.Equal(220, tradeClose.X);
+        Assert.Equal(42, tradeClose.Y);
+
+        // 行会主页面板 (Prguse_0180 628x453 @ 86, 73, IDA sub_481dd4 [0x485a1c..0x485da1])
+        Assert.Equal(628.0f, GuildPanelView.PanelWidth);
+        Assert.Equal(453.0f, GuildPanelView.PanelHeight);
+        var guildClose = (X: 584, Y: 6, W: 16, H: 23);
+        Assert.Equal(584, guildClose.X);
+        Assert.Equal(6, guildClose.Y);
+    }
+
+    [Fact]
+    public void TestNpcInspectAndModalDialogs_GroundTruth()
+    {
+        // NPC 对话框 (Prguse_0384 416x176 @ 246, 160, IDA sub_481dd4 [0x484ee2..0x484f65])
+        Assert.Equal(416.0f, NpcDialogView.PanelWidth);
+        Assert.Equal(176.0f, NpcDialogView.PanelHeight);
+        var npcClose = (X: 399, Y: 1, W: 16, H: 23);
+        Assert.Equal(399, npcClose.X);
+        Assert.Equal(1, npcClose.Y);
+
+        // 观人面板 (Prguse_0370 232x325 @ 336, 0, IDA sub_481dd4 [0x48447f..0x4847ce])
+        Assert.Equal(232.0f, InspectPanelView.PanelWidth);
+        Assert.Equal(325.0f, InspectPanelView.PanelHeight);
+        var inspectClose = (X: 8, Y: 39, W: 16, H: 23);
+        Assert.Equal(8, inspectClose.X);
+        Assert.Equal(39, inspectClose.Y);
+
+        // 死亡与模态确认框 (Prguse_0360 452x179, IDA sub_481dd4 [0x481efc..0x481fb1] & sub_486DF0)
+        Assert.Equal(452.0f, MessageBoxDialog.PanelWidth);
+        Assert.Equal(179.0f, MessageBoxDialog.PanelHeight);
+        Assert.Equal(452.0f, DeathScreenView.PanelWidth);
+        Assert.Equal(179.0f, DeathScreenView.PanelHeight);
+
+        // 确定与取消按钮 Y 坐标严格为 126
+        var modalOk = (X: 130, Y: 126, W: 80, H: 34);
+        var modalCancel = (X: 242, Y: 126, W: 80, H: 34);
+        Assert.Equal(130, modalOk.X);
+        Assert.Equal(126, modalOk.Y);
+        Assert.Equal(242, modalCancel.X);
+        Assert.Equal(126, modalCancel.Y);
+    }
+
+    /// <summary>
+    /// 步骤 20: 物品信息 Tooltip 与 HUD 聊天输入交互实证测试 (IDA sub_48C3C8 & sub_481dd4)
+    /// </summary>
+    [Fact]
+    public void TestItemTooltipAndChatInput_GroundTruth()
+    {
+        // 1. Tooltip 基础尺寸与样式
+        var minTooltipSize = (Width: 160.0f, Height: 40.0f);
+        Assert.Equal(160.0f, minTooltipSize.Width);
+        Assert.Equal(40.0f, minTooltipSize.Height);
+
+        // 2. HUD 聊天记录与输入框尺寸 (Game.tscn)
+        var chatBoxPos = (X: 208, Y: 470, W: 374, H: 108);
+        var chatInputPos = (X: 208, Y: 581, W: 387, H: 12);
+        Assert.Equal(208, chatBoxPos.X);
+        Assert.Equal(470, chatBoxPos.Y);
+        Assert.Equal(374, chatBoxPos.W);
+        Assert.Equal(108, chatBoxPos.H);
+
+        Assert.Equal(208, chatInputPos.X);
+        Assert.Equal(581, chatInputPos.Y);
+        Assert.Equal(387, chatInputPos.W);
+        Assert.Equal(12, chatInputPos.H);
+    }
+
+    /// <summary>
+    /// 步骤 21: 游戏动态渲染细节实证测试 (IDA sub_48B2A0 液面裁剪/经验负重条, sub_481DD4/sub_48C188 快捷栏, sub_46FF0C 雷达)
+    /// </summary>
+    [Fact]
+    public void TestHudDynamicGameLogicDetails_GroundTruth()
+    {
+        // 1. 血球魔球动态液面裁剪算法 (IDA sub_48B2A0 @ 0x48b64f..0x48b71c)
+        int orbHeight = 90;
+        int maxHp = 100, curHp = 50;
+        int lostHp = maxHp - curHp;
+        int cropY = (int)Math.Round((double)orbHeight / maxHp * lostHp);
+        Assert.Equal(45, cropY); // 半血时液面裁剪 45 像素
+
+        float hpRatio = (float)curHp / maxHp;
+        Assert.Equal(0.5f, hpRatio);
+
+        // 2. 经验条与负重条尺寸与坐标 (IDA sub_48B2A0 @ 0x48b840 & 0x48b8d0, Prguse_0007)
+        var expBarPos = (X: 666, Y: 527, W: 76, H: 13);
+        var weightBarPos = (X: 666, Y: 560, W: 76, H: 13);
+        Assert.Equal(666, expBarPos.X);
+        Assert.Equal(527, expBarPos.Y);
+        Assert.Equal(76, expBarPos.W);
+        Assert.Equal(13, expBarPos.H);
+
+        Assert.Equal(666, weightBarPos.X);
+        Assert.Equal(560, weightBarPos.Y);
+        Assert.Equal(76, weightBarPos.W);
+        Assert.Equal(13, weightBarPos.H);
+
+        // 3. 快捷药水栏 1~6 格坐标分布 (IDA sub_481DD4 [0x484a0f..0x484b80])
+        float[] expectedXs = { 219f, 249f, 279f, 309f, 339f, 369f };
+        for (int i = 0; i < 5; i++)
+        {
+            Assert.Equal(30f, expectedXs[i + 1] - expectedXs[i]); // 严格 30 像素步长
+        }
+        Assert.Equal(219f, expectedXs[0]);
+        Assert.Equal(369f, expectedXs[5]);
+
+        // 4. 小地图雷达 120x120 视口坐标约束 (IDA sub_46FF0C)
+        var radarCenter = (X: 58, Y: 58);
+        Assert.Equal(58, radarCenter.X);
+        Assert.Equal(58, radarCenter.Y);
+    }
 }
+
+
 

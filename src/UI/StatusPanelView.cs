@@ -31,8 +31,6 @@ public partial class StatusPanelView : Control, IManagedWindow
     private readonly Dictionary<string, Label> _statLabels = new();
     private Label? _lblDetail;
 
-    public event Action? SwitchToEquipRequested;
-
     public override void _Ready()
     {
         Size = PanelSize;
@@ -68,39 +66,27 @@ public partial class StatusPanelView : Control, IManagedWindow
         btnClose.Pressed += () => Visible = false;
         AddChild(btnClose);
 
-        // 3. 向上按钮 (切回装备页 Tab 1): Prguse_0398 (正常) / 0399 (按压), Left=213, Top=113, Size=12x21
-        var texTabUp = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0398.png");
-        var texTabUpPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0399.png");
-        var btnTab1 = new TextureButton
+        // 4. 七大属性数值槽位 (官方 Prguse_0370 底板自带中文艺术字标题"攻击/魔御/攻击力/魔法/道术/生命/魔法")
+        // 数值显示在纯黑长条内胆右侧: X=107, W=72, H=14
+        // IDA sub_488AF4 [0x4892c2..0x4896e5] 实证：官方以 dword_48A000/48A01C/48A030... 标识各属性字符串
+        // 官方属性标签与顺序（依据 Prguse_0370 底板铭文从上到下）：
+        // 攻击(AC) / 魔御(MAC) / 攻击力(DC) / 魔法(MC) / 道术(SC) / 生命(HP) / 魔法值(MP)
+        var statSlotDefs = new (string StatKey, string DisplayName, int Y, string DefaultVal)[]
         {
-            Name = "BtnStatusTab1",
-            Position = new Vector2(213, 113),
-            Size = new Vector2(12, 21),
-            TextureNormal = texTabUp,
-            TexturePressed = texTabUpPressed,
-            FocusMode = FocusModeEnum.None
-        };
-        btnTab1.Pressed += () => SwitchToEquipRequested?.Invoke();
-        AddChild(btnTab1);
-
-        // 4. 七大属性数值槽位 (AC/MAC/DC/MC/SC/HP/MP)
-        // 官方 Prguse_0370 底板自带艺术字标题，数值槽位严格位于纯黑长条内胆: X=107, W=72, H=14
-        var statSlotDefs = new (string StatName, int Y, string DefaultVal)[]
-        {
-            ("AC", 97, "0-0"),
-            ("MAC", 117, "0-0"),
-            ("DC", 137, "0-0"),
-            ("MC", 157, "0-0"),
-            ("SC", 177, "0-0"),
-            ("HP", 197, "100/100"),
-            ("MP", 217, "50/50")
+            ("AC",  "攻击",  97,  "0-0"),
+            ("MAC", "魔御",  117, "0-0"),
+            ("DC",  "攻击力",137, "0-0"),
+            ("MC",  "魔法",  157, "0-0"),
+            ("SC",  "道术",  177, "0-0"),
+            ("HP",  "生命",  197, "100/100"),
+            ("MP",  "魔法值",217, "50/50")
         };
 
         foreach (var def in statSlotDefs)
         {
             var lblVal = new Label
             {
-                Name = $"LblStatVal_{def.StatName}",
+                Name = $"LblStatVal_{def.StatKey}",
                 Position = new Vector2(107, def.Y),
                 Size = new Vector2(72, 14),
                 Text = def.DefaultVal,
@@ -110,16 +96,17 @@ public partial class StatusPanelView : Control, IManagedWindow
             lblVal.AddThemeFontSizeOverride("font_size", 10);
             lblVal.AddThemeColorOverride("font_color", new Color(0.95f, 0.95f, 0.95f));
             AddChild(lblVal);
-            _statLabels[def.StatName] = lblVal;
+            _statLabels[def.StatKey] = lblVal;
         }
 
-        // 5. 下方状态说明框文本区域 (底板自身凹槽内胆暗纹实证 @ (34, 264, 178x51))
+        // 5. 下方状态说明框文本区域 (底板自身凹槽内胆暗纹实证 @ (34, 266, 178x48))
+        // 盛大原版此区域为纯净内胆凹槽，默认不渲染任何硬编码描述，仅在特定技能/状态交互时动态显示
         _lblDetail = new Label
         {
             Name = "LblStatusDetail",
-            Position = new Vector2(34, 264),
-            Size = new Vector2(178, 51),
-            Text = "热血传奇 1.5 虎卫传说\n玛法大陆 战法道属性全集",
+            Position = new Vector2(34, 266),
+            Size = new Vector2(178, 48),
+            Text = "",
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };

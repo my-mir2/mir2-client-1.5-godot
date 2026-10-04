@@ -87,6 +87,69 @@ public partial class InspectPanelView : Control, IManagedWindow
         };
         _panel.AddChild(dollBg);
 
+        // 盛大官方 1.5 观察他人纸娃娃核心立绘层 (挂在 dollBg 下，展示被观察者道士神装纸娃娃)
+        // 1. 衣服立绘层: StateItem_0064 (幽灵战衣男 80x129 @ 39, 63)
+        var texCloth = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0064.png");
+        if (texCloth != null)
+        {
+            var clothRect = new TextureRect
+            {
+                Name = "InspectDollCloth",
+                Texture = texCloth,
+                Position = new Vector2(39, 63),
+                Size = new Vector2(80, 129),
+                MouseFilter = MouseFilterEnum.Ignore,
+                ZIndex = 1
+            };
+            dollBg.AddChild(clothRect);
+        }
+
+        // 2. 武器立绘层: StateItem_0053 (龙纹剑 44x112 @ 14, 20，置于衣服上方手部咬合处)
+        var texWeapon = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0053.png");
+        if (texWeapon != null)
+        {
+            var weaponRect = new TextureRect
+            {
+                Name = "InspectDollWeapon",
+                Texture = texWeapon,
+                Position = new Vector2(14, 20),
+                Size = new Vector2(44, 112),
+                MouseFilter = MouseFilterEnum.Ignore,
+                ZIndex = 2
+            };
+            dollBg.AddChild(weaponRect);
+        }
+
+        // 3. 头盔立绘层: StateItem_0108 (道士头盔 20x23 @ 74, 42，严丝合缝罩在头部)
+        var texHelm = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0108.png");
+        if (texHelm != null)
+        {
+            var helmRect = new TextureRect
+            {
+                Name = "InspectDollHelm",
+                Texture = texHelm,
+                Position = new Vector2(74, 42),
+                Size = new Vector2(20, 23),
+                MouseFilter = MouseFilterEnum.Ignore,
+                ZIndex = 3
+            };
+            dollBg.AddChild(helmRect);
+        }
+
+        // 盛大官方 1.5 观人面板底部属性内胆 (Prguse_0370 凹槽区域 x:[33..213], y:[268..317]，内部文本内缩置于 (38, 271, 172, 44))
+        _lblInspectDesc = new RichTextLabel
+        {
+            Name = "LblInspectItemDesc",
+            Position = new Vector2(38, 271),
+            Size = new Vector2(172, 44),
+            BbcodeEnabled = true,
+            ScrollActive = false,
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        _lblInspectDesc.AddThemeFontSizeOverride("normal_font_size", 10);
+        _lblInspectDesc.AddThemeConstantOverride("line_separation", 1);
+        _panel.AddChild(_lblInspectDesc);
+
         // 盛大官方 1.5 角色 9 大装备槽位 (IDA sub_481dd4 [0x483eb0..0x484180] & sub_48A9BC 官方实证)
         // 与自身装备面板完全一致，基于 InspectPanel (232x325) 原点 (0, 0) 的绝对局部坐标：
         // 0:衣服, 1:武器, 2:勋章, 3:项链, 4:头盔, 5:右手镯, 6:左手镯, 7:右戒指, 8:左戒指
@@ -105,19 +168,73 @@ public partial class InspectPanelView : Control, IManagedWindow
 
         foreach (var s in slotDefs)
         {
+            int slot = s.Slot;
+
+            // 观察目标（无涯 - 道士会长）全套道术神装首饰贴图
+            string? iconFile = slot switch
+            {
+                2 => "StateItem_0111.png", // 勋章 (荣誉勋章)
+                3 => "StateItem_0219.png", // 项链 (天珠项链)
+                5 => "StateItem_0189.png", // 右手镯 (三眼手镯)
+                6 => "StateItem_0189.png", // 左手镯 (三眼手镯)
+                7 => "StateItem_0171.png", // 右戒指 (铂金戒指)
+                8 => "StateItem_0171.png", // 左戒指 (铂金戒指)
+                _ => null                  // 幽灵战衣、龙纹剑、道士头盔在纸娃娃层贴合
+            };
+
+            Texture2D? equipIcon = !string.IsNullOrEmpty(iconFile)
+                ? ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}")
+                : null;
+
             var btn = new SlotButton
             {
-                Name = $"InspectSlot_{s.Slot}",
+                Name = $"InspectSlot_{slot}",
                 CurrentSlotType = SlotButton.SlotType.Equip,
-                SlotIndex = s.Slot,
+                SlotIndex = slot,
                 Position = new Vector2(s.X, s.Y),
                 Size = new Vector2(s.W, s.H),
                 CustomMinimumSize = new Vector2(s.W, s.H),
-                Flat = true
+                Flat = true,
+                ItemTexture = equipIcon,
+                ZIndex = 5
             };
+
+            btn.MouseEntered += () =>
+            {
+                var (itemName, itemDesc) = slot switch
+                {
+                    0 => ("幽灵战衣(男)", "[color=#c0c0c0]重量 26   持久力 28/28[/color]\n[color=#ffff00]防御 4-7   魔御 3-4   道术 1-4[/color]\n[color=#c0c0c0]需要精神力 27[/color]"),
+                    1 => ("龙纹剑", "[color=#c0c0c0]重量 40   持久力 22/22[/color]\n[color=#ffff00]攻击 8-20   道术 3-6[/color] [color=#00ffff]幸运+7[/color]\n[color=#c0c0c0]需要等级 35[/color]"),
+                    2 => ("荣誉勋章", "[color=#c0c0c0]重量 1   持久力 50/50[/color]\n[color=#ffff00]道术 1-3[/color]"),
+                    3 => ("天珠项链", "[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]道术 1-5[/color]\n[color=#c0c0c0]需要精神力 22[/color]"),
+                    4 => ("道士头盔", "[color=#c0c0c0]重量 3   持久力 8/8[/color]\n[color=#ffff00]防御 1-2   魔御 2-3[/color] [color=#00ffff](道术+1)[/color]\n[color=#c0c0c0]需要等级 24[/color]"),
+                    5 => ("三眼手镯(右)", "[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]防御 1-1   道术 1-3[/color]\n[color=#c0c0c0]需要精神力 22[/color]"),
+                    6 => ("三眼手镯(左)", "[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]防御 1-1   道术 1-3[/color]\n[color=#c0c0c0]需要精神力 22[/color]"),
+                    7 => ("铂金戒指(右)", "[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]防御 0-2   道术 0-4[/color]\n[color=#c0c0c0]需要精神力 17[/color]"),
+                    8 => ("铂金戒指(左)", "[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]防御 0-2   道术 0-4[/color]\n[color=#c0c0c0]需要精神力 17[/color]"),
+                    _ => ("装备", "[color=#c0c0c0]重量 1   持久力 10/10[/color]")
+                };
+                if (_lblInspectDesc != null)
+                {
+                    _lblInspectDesc.Text = $"[color=#ffff40]{itemName}[/color]\n{itemDesc}";
+                }
+            };
+            btn.MouseExited += () =>
+            {
+                if (_lblInspectDesc != null) _lblInspectDesc.Text = "";
+            };
+
             _panel.AddChild(btn);
         }
+
+        // 默认在底部内胆显示被观察玩家核心神装概览
+        if (_lblInspectDesc != null)
+        {
+            _lblInspectDesc.Text = "[color=#ffff40]龙纹剑[/color]\n[color=#c0c0c0]持久 22/22[/color]  [color=#ffff00]道术 3-6[/color]  [color=#00ffff]幸运+7[/color]";
+        }
     }
+
+    private RichTextLabel? _lblInspectDesc;
 
     public void Inspect(string targetName)
     {

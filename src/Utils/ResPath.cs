@@ -44,11 +44,26 @@ public static class ResPath
         string path = Resolve(rel);
         if (File.Exists(path))
         {
-            using var img = Image.LoadFromFile(path);
-            if (img != null)
+            try
             {
-                return ImageTexture.CreateFromImage(img);
+                using var img = Image.LoadFromFile(path);
+                if (img != null)
+                {
+                    return ImageTexture.CreateFromImage(img);
+                }
+                else
+                {
+                    GD.PrintErr($"[ResPath] Image.LoadFromFile returned null for: {path}");
+                }
             }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[ResPath] Exception loading {path}: {ex.Message}");
+            }
+        }
+        else
+        {
+            GD.PrintErr($"[ResPath] File not found: rel='{rel}', resolved='{path}'");
         }
         return null;
     }

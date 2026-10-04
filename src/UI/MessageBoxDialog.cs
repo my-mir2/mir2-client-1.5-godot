@@ -104,10 +104,10 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         _txtInput.TextSubmitted += (val) => OnOkPressed();
         panel.AddChild(_txtInput);
 
-        // 确定按钮 (Prguse_0361 @ 130, 120)
+        // 官方原生确定按钮 (Prguse_0361 @ 130, 126, IDA sub_481DD4 [0x481f05..0x481fb1] & sub_486DF0)
         _btnOk = new TextureButton
         {
-            Position = new Vector2(130, 120),
+            Position = new Vector2(130, 126),
             Size = new Vector2(80, 34)
         };
         var texOk = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0361.png");
@@ -115,10 +115,10 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         _btnOk.Pressed += OnOkPressed;
         panel.AddChild(_btnOk);
 
-        // 取消按钮 (Prguse_0365 @ 242, 120)
+        // 官方原生取消按钮 (Prguse_0365 @ 242, 126, IDA sub_481DD4 [0x481f45..0x481fb1] & sub_486DF0)
         _btnCancel = new TextureButton
         {
-            Position = new Vector2(242, 120),
+            Position = new Vector2(242, 126),
             Size = new Vector2(80, 34)
         };
         var texCancel = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0365.png");
@@ -140,7 +140,7 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         if (_btnCancel != null) _btnCancel.Visible = hasCancel;
         if (_btnOk != null)
         {
-            _btnOk.Position = hasCancel ? new Vector2(130, 120) : new Vector2(186, 120);
+            _btnOk.Position = hasCancel ? new Vector2(130, 126) : new Vector2(186, 126);
         }
         Visible = true;
     }

@@ -128,6 +128,39 @@ namespace Mir2Client.UI
                     PlayerInstance.Anim.SetAction(ActionType.Hit, dir);
                     AudioManager.Instance?.PlaySoundId(1);
                 };
+
+                InputPluginInstance.QuickItemKeyPressed += (slot) =>
+                {
+                    HudInstance?.UseQuickSlot(slot);
+                };
+            }
+
+            if (HudInstance != null)
+            {
+                HudInstance.QuickItemUsed += (slot, item) =>
+                {
+                    if (PlayerInstance == null) return;
+                    if (item.Contains("金创") || item.Contains("红"))
+                    {
+                        PlayerInstance.Hp = Math.Min(PlayerInstance.MaxHp, PlayerInstance.Hp + 30);
+                        HudInstance.UpdateHp(PlayerInstance.Hp, PlayerInstance.MaxHp);
+                        HudInstance.AddChat("提示", $"使用了 {item}，生命值恢复 30 点。", new Color(1f, 0.4f, 0.4f));
+                    }
+                    else if (item.Contains("魔法") || item.Contains("蓝"))
+                    {
+                        PlayerInstance.Mp = Math.Min(PlayerInstance.MaxMp, PlayerInstance.Mp + 30);
+                        HudInstance.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
+                        HudInstance.AddChat("提示", $"使用了 {item}，魔法值恢复 30 点。", new Color(0.4f, 0.6f, 1f));
+                    }
+                    else if (item.Contains("太阳水"))
+                    {
+                        PlayerInstance.Hp = Math.Min(PlayerInstance.MaxHp, PlayerInstance.Hp + 50);
+                        PlayerInstance.Mp = Math.Min(PlayerInstance.MaxMp, PlayerInstance.Mp + 50);
+                        HudInstance.UpdateHp(PlayerInstance.Hp, PlayerInstance.MaxHp);
+                        HudInstance.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
+                        HudInstance.AddChat("提示", $"使用了 {item}，生命与魔法恢复 50 点。", new Color(1f, 0.9f, 0.2f));
+                    }
+                };
             }
         }
 
@@ -170,8 +203,53 @@ namespace Mir2Client.UI
                 HudInstance.UpdateMp(100, 100);
                 HudInstance.UpdateLevel(35);
                 HudInstance.UpdateGold(100000);
+                HudInstance.UpdateExp(35000, 100000);
+                HudInstance.UpdateWeight(25, 60);
                 HudInstance.AddChat("系统", "【官方 1.50 虎卫传说】纯 C# 单轨化大世界沙盒引擎已启动！", new Color(1f, 0.8f, 0.2f));
                 HudInstance.AddChat("系统", "已为您自动装配布衣与木剑，置身比奇省安全区中心(330, 270)。", new Color(0.4f, 1f, 0.4f));
+            }
+
+            CurrentMapName = "0";
+            UpdateEnvironmentLighting();
+        }
+
+        public string CurrentMapName { get; set; } = "0";
+
+        public void UpdateEnvironmentLighting()
+        {
+            if (HudInstance == null || PlayerInstance == null) return;
+
+            // 1. 判断是否地牢地图或特定黑暗区域
+            bool isDark = HudInstance.FogManager.IsDarkMap(CurrentMapName);
+
+            // 2. 依据照明装备 (火把/蜡烛) 或地表计算视野瓦片半径
+            int radiusTiles = isDark ? DarknessFogManager.TorchRadius : DarknessFogManager.DaylightRadius;
+            
+            // 3. 计算主角在屏幕主视口上的像素中心位置 (默认中心 400, 225)
+            Vector2 screenPos = new Vector2(400, 225);
+            if (MapRendererInstance != null)
+            {
+                var pWorld = MapRendererInstance.TileToScreen(PlayerInstance.TileX, PlayerInstance.TileY);
+                screenPos = new Vector2(pWorld.X + 24, pWorld.Y + 16);
+            }
+
+            HudInstance.UpdateVisionFog(isDark, radiusTiles, screenPos);
+        }
+
+        public override void _Process(double delta)
+        {
+            if (PlayerInstance != null && HudInstance?.Minimap != null && HudInstance.Minimap.Visible)
+            {
+                HudInstance.Minimap.UpdatePlayerPosition(CurrentMapName == "0" ? "比奇省" : CurrentMapName, PlayerInstance.TileX, PlayerInstance.TileY);
+                var entities = new (int tx, int ty, MinimapView.RadarEntityType type)[]
+                {
+                    (330, 266, MinimapView.RadarEntityType.Npc),
+                    (325, 275, MinimapView.RadarEntityType.Npc),
+                    (345, 280, MinimapView.RadarEntityType.Monster),
+                    (350, 260, MinimapView.RadarEntityType.Monster),
+                    (332, 271, MinimapView.RadarEntityType.GroupMember)
+                };
+                HudInstance.Minimap.UpdateRadarEntities(entities);
             }
         }
 

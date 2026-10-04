@@ -28,6 +28,7 @@ public partial class GuildPanelView : Control, IManagedWindow
     private Control? _memberListView;
     private RichTextLabel? _noticeText;
     private VBoxContainer? _memberListContainer;
+    private LineEdit? _searchEdit;
 
     public string WindowName => "GuildPanelView";
     public new bool IsVisible
@@ -69,13 +70,54 @@ public partial class GuildPanelView : Control, IManagedWindow
         btnClose.Pressed += OnClose;
         _panel.AddChild(btnClose);
 
-        // 中央内容区容器 (Left=20, Top=40, Width=566, Height=355)
+        // 官方 1.5 原生行会顶部成员查找功能 (IDA sub_481dd4 [0x485a20..0x485a68])
+        // 1. 查找按钮热区 (273, 5, 27x14, 对应左侧小凹槽)
+        var btnSearch = new Button
+        {
+            Name = "BtnGuildSearch",
+            Position = new Vector2(273, 5),
+            Size = new Vector2(27, 14),
+            Text = "查找",
+            Flat = true,
+            FocusMode = FocusModeEnum.None
+        };
+        btnSearch.AddThemeFontSizeOverride("font_size", 9);
+        btnSearch.AddThemeColorOverride("font_color", new Color(0.9f, 0.85f, 0.5f));
+        btnSearch.Pressed += () =>
+        {
+            if (_searchEdit != null && !string.IsNullOrWhiteSpace(_searchEdit.Text))
+            {
+                ShowMemberList();
+            }
+        };
+        _panel.AddChild(btnSearch);
+
+        // 2. 搜索输入框 (306, 5, 146x14, 对应右侧黑色凹槽内胆)
+        _searchEdit = new LineEdit
+        {
+            Name = "GuildSearchEdit",
+            Position = new Vector2(306, 5),
+            Size = new Vector2(146, 14),
+            PlaceholderText = "输入成员名字...",
+            FocusMode = FocusModeEnum.Click
+        };
+        _searchEdit.AddThemeFontSizeOverride("font_size", 9);
+        _searchEdit.AddThemeColorOverride("font_color", new Color(1.0f, 1.0f, 0.8f));
+        _searchEdit.AddThemeStyleboxOverride("normal", new StyleBoxEmpty());
+        _searchEdit.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
+        _searchEdit.TextSubmitted += (text) =>
+        {
+            if (!string.IsNullOrWhiteSpace(text)) ShowMemberList();
+        };
+        _panel.AddChild(_searchEdit);
+
+        // 中央内容区容器 (高光边框内胆 Left=15, Top=35, Width=570, Height=368)
         // 1. 主页/公告视图
         _homeView = new Control
         {
             Name = "GuildHomeView",
-            Position = new Vector2(20, 40),
-            Size = new Vector2(566, 355),
+            Position = new Vector2(15, 35),
+            Size = new Vector2(570, 368),
             MouseFilter = MouseFilterEnum.Pass
         };
         _panel.AddChild(_homeView);
@@ -84,7 +126,7 @@ public partial class GuildPanelView : Control, IManagedWindow
         {
             Name = "LblGuildTitle",
             Position = new Vector2(12, 10),
-            Size = new Vector2(540, 24),
+            Size = new Vector2(546, 24),
             Text = "【沙巴克行会】 掌门人：无涯   成员总数：88 人",
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -96,7 +138,7 @@ public partial class GuildPanelView : Control, IManagedWindow
         {
             Name = "GuildNoticeText",
             Position = new Vector2(12, 42),
-            Size = new Vector2(540, 300),
+            Size = new Vector2(546, 315),
             BbcodeEnabled = true,
             Text = "[color=#c0b090]行会公告：[/color]\n\n" +
                    "[color=#ffff88]1. 本周六晚八点准时集结沙巴克攻城战，请所有兄弟备足疗伤药与随机传送卷！[/color]\n" +
@@ -111,8 +153,8 @@ public partial class GuildPanelView : Control, IManagedWindow
         _memberListView = new Control
         {
             Name = "GuildMemberListView",
-            Position = new Vector2(20, 40),
-            Size = new Vector2(566, 355),
+            Position = new Vector2(15, 35),
+            Size = new Vector2(570, 368),
             MouseFilter = MouseFilterEnum.Pass,
             Visible = false
         };
@@ -122,7 +164,7 @@ public partial class GuildPanelView : Control, IManagedWindow
         {
             Name = "LblListHeader",
             Position = new Vector2(12, 10),
-            Size = new Vector2(540, 20),
+            Size = new Vector2(546, 20),
             Text = "职务         角色名         职业       等级       在线状态",
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -134,7 +176,7 @@ public partial class GuildPanelView : Control, IManagedWindow
         {
             Name = "MemberListContainer",
             Position = new Vector2(12, 36),
-            Size = new Vector2(540, 310)
+            Size = new Vector2(546, 320)
         };
         _memberListContainer.AddThemeConstantOverride("separation", 4);
         _memberListView.AddChild(_memberListContainer);
@@ -146,68 +188,72 @@ public partial class GuildPanelView : Control, IManagedWindow
         AddMemberRow("精英", "烈火狂人", "战士", 42, false);
         AddMemberRow("会员", "碧海潮生", "法师", 40, true);
 
-        // 行会主页/公告 (0xC6 = 198 -> Prguse_0198 @ 13, 411, IDA sub_481dd4 [0x485ab2..0x485ae5])
-        var texHome = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0198.png");
+        // 官方 1.5 行会底栏 6 大原生操作按钮 (Prguse_0182~0203 64x16 偶数Normal 奇数Pressed):
+        // 列 1:
+        // - 主页 (198/199 @ 13, 411)
+        // - 成员列表 (200/201 @ 13, 429)
         var btnHome = new TextureButton
         {
             Position = new Vector2(13, 411),
             Size = new Vector2(64, 16),
-            TextureNormal = texHome
+            TextureNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0198.png"),
+            TexturePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0199.png")
         };
         btnHome.Pressed += ShowHome;
         _panel.AddChild(btnHome);
 
-        // 行会成员列表 (0xC8 = 200 -> Prguse_0200 @ 13, 429, IDA sub_481dd4 [0x485af8..0x485b2b])
-        var texMembers = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0200.png");
         var btnMembers = new TextureButton
         {
             Position = new Vector2(13, 429),
             Size = new Vector2(64, 16),
-            TextureNormal = texMembers
+            TextureNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0200.png"),
+            TexturePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0201.png")
         };
         btnMembers.Pressed += ShowMemberList;
         _panel.AddChild(btnMembers);
 
-        // 掌门信息/修改公告 (0xBE = 190 -> Prguse_0190 @ 94, 429, IDA sub_481dd4 [0x485b3e..0x485b71])
-        var texNotice = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0190.png");
+        // 列 2:
+        // - 聊天记录 (190/191 @ 94, 429) -> 注意行会日常聊天/大事记
         var btnNotice = new TextureButton
         {
             Position = new Vector2(94, 429),
             Size = new Vector2(64, 16),
-            TextureNormal = texNotice
+            TextureNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0190.png"),
+            TexturePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0191.png")
         };
         _panel.AddChild(btnNotice);
 
-        // 联盟信息 (0xB6 = 182 -> Prguse_0182 @ 243, 411, IDA sub_481dd4 [0x485b84..0x485bb7])
-        var texAlly = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0182.png");
-        var btnAlly = new TextureButton
+        // 列 3:
+        // - 添加成员 (182/183 @ 243, 411)
+        // - 删除成员 (192/193 @ 243, 429)
+        var btnAddMember = new TextureButton
         {
             Position = new Vector2(243, 411),
             Size = new Vector2(64, 16),
-            TextureNormal = texAlly
+            TextureNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0182.png"),
+            TexturePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0183.png")
         };
-        _panel.AddChild(btnAlly);
+        _panel.AddChild(btnAddMember);
 
-        // 战事状态 (0xC0 = 192 -> Prguse_0192 @ 243, 429, IDA sub_481dd4 [0x485bca..0x485bfd])
-        var texWar = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0192.png");
-        var btnWar = new TextureButton
+        var btnDelMember = new TextureButton
         {
             Position = new Vector2(243, 429),
             Size = new Vector2(64, 16),
-            TextureNormal = texWar
+            TextureNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0192.png"),
+            TexturePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0193.png")
         };
-        _panel.AddChild(btnWar);
+        _panel.AddChild(btnDelMember);
 
-        // 退会/离开 (0xC4 = 196 -> Prguse_0196 @ 325, 411, IDA sub_481dd4 [0x485c10..0x485c43])
-        var texLeave = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0196.png");
-        var btnLeave = new TextureButton
+        // 列 4:
+        // - 编辑公告 (196/197 @ 325, 411)
+        var btnEditNotice = new TextureButton
         {
             Position = new Vector2(325, 411),
             Size = new Vector2(64, 16),
-            TextureNormal = texLeave
+            TextureNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0196.png"),
+            TexturePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0197.png")
         };
-        btnLeave.Pressed += OnClose;
-        _panel.AddChild(btnLeave);
+        _panel.AddChild(btnEditNotice);
     }
 
     private void AddMemberRow(string role, string name, string job, int level, bool online)
