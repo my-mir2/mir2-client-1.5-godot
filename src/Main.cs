@@ -63,6 +63,12 @@ public partial class Main : Node
         }
     }
 
+    public override void _ExitTree()
+    {
+        // 退出前释放自定义鼠标指针纹理,避免引擎退出期纹理泄漏 ERROR
+        Input.SetCustomMouseCursor(null, Input.CursorShape.Arrow, Vector2.Zero);
+    }
+
     private static void SetupCustomCursor()
     {
         string cursorPath = ResPath.Resolve("resources/wil/png/Prguse/Prguse_0000.png");
