@@ -100,53 +100,41 @@ public partial class GroupPanelView : Control, IManagedWindow
         memberList.AddThemeConstantOverride("separation", 2);
         _panel.AddChild(memberList);
 
-        // 预设当前队伍成员行（队长与队友），消除大面积纯黑死区
-        string[] initialMembers = { "【队长】 无涯 (道士 45级)", "【队员】 烈火狂人 (战士 42级)", "【队员】 碧海潮生 (法师 40级)" };
-        foreach (var m in initialMembers)
-        {
-            var lbl = new Label
-            {
-                Text = m,
-                Size = new Vector2(220, 16)
-            };
-            lbl.AddThemeFontSizeOverride("font_size", 10);
-            lbl.AddThemeColorOverride("font_color", m.StartsWith("【队长】") ? new Color(1.0f, 0.9f, 0.4f) : new Color(0.85f, 0.85f, 0.85f));
-            memberList.AddChild(lbl);
-        }
+        // 成员行由服务端队伍数据驱动,不再预置任何伪造成员 (官方 sub_481dd4 仅创建 0120 底板/勾选框/3 按钮,成员文本由绘制函数按真实数据输出)
 
         // 官方 1.5 原生底栏 3 按钮交互热区 (底板 Prguse_0120 已精细烘焙 新建/添加/删除 金属文字凹槽)
         // 采用精准无边框透明热区咬合:
         // - 新建: (22, 203, 72, 19)
         // - 添加: (97, 203, 72, 19)
         // - 删除: (172, 203, 72, 19)
-        var btnCreate = new Button
+        var btnCreate = new TextureButton
         {
             Name = "BtnGroupCreate",
+            TextureNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0123.png"),
             Position = new Vector2(22, 203),
             Size = new Vector2(72, 19),
-            Flat = true,
             FocusMode = FocusModeEnum.None
         };
         btnCreate.Pressed += () => EmitSignal(SignalName.CreateGroupRequested, "我");
         _panel.AddChild(btnCreate);
 
-        var btnAdd = new Button
+        var btnAdd = new TextureButton
         {
             Name = "BtnGroupAdd",
+            TextureNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0124.png"),
             Position = new Vector2(97, 203),
             Size = new Vector2(72, 19),
-            Flat = true,
             FocusMode = FocusModeEnum.None
         };
         btnAdd.Pressed += () => EmitSignal(SignalName.AddMemberRequested, "新队友");
         _panel.AddChild(btnAdd);
 
-        var btnLeave = new Button
+        var btnLeave = new TextureButton
         {
             Name = "BtnGroupLeave",
+            TextureNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0125.png"),
             Position = new Vector2(172, 203),
             Size = new Vector2(72, 19),
-            Flat = true,
             FocusMode = FocusModeEnum.None
         };
         btnLeave.Pressed += () => EmitSignal(SignalName.DelMemberRequested, "我");
