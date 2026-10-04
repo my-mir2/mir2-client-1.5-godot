@@ -256,6 +256,11 @@ namespace Mir2Client.UI
         public void SetNet(NetManager net, int sId, string uname, int ulevel = 35)
         {
             _net = net;
+            if (HudInstance != null)
+            {
+                var router = new ServerMessageRouter(HudInstance);
+                _net.PacketReceived += router.OnPacket;
+            }
             SessionId = sId;
             Username = uname;
             if (PlayerInstance != null)
