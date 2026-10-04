@@ -110,6 +110,19 @@ public partial class HudController : CanvasLayer
     private TextureButton? _btnHudEquip;
     private TextureButton? _btnHudSkill;
     private TextureButton? _btnHudGroup;
+    private TextureRect? _attackModeIcon;
+
+    /// <summary>攻击模式图标(官方 sub_48B2A0 0x48b8e0..0x48b92b): mode∈[1,4] 取 Prguse_(15+mode),其余不绘制。</summary>
+    public void SetAttackMode(int mode)
+    {
+        if (_attackModeIcon == null) return;
+        if (mode < 1 || mode > 4) { _attackModeIcon.Visible = false; return; }
+        var tex = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{15 + mode:D4}.png");
+        _attackModeIcon.Texture = tex;
+        if (tex != null) _attackModeIcon.Size = tex.GetSize();
+        _attackModeIcon.Visible = tex != null;
+    }
+
     private TextureRect? _dayNightIcon;
 
     /// <summary>昼夜状态(官方 off_4A3DD0):0=Prguse_0015,1/2/3=0012/0013/0014。</summary>
@@ -205,19 +218,15 @@ public partial class HudController : CanvasLayer
         AddChild(_lblLevel);
 
         // 攻击模式图标 (IDA sub_48B2A0 0x48b8e0..0x48b92b: 当 mode∈[1,4] 时取 Prguse_(15+mode)，以 (754,553) 绘制)
-        var modeTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0016.png");
-        if (modeTex != null)
+        _attackModeIcon = new TextureRect
         {
-            AddChild(new TextureRect
-            {
-                Name = "HudAttackModeIcon",
-                Texture = modeTex,
-                Position = new Vector2(754, 553),
-                Size = modeTex.GetSize(),
-                MouseFilter = Control.MouseFilterEnum.Ignore,
-                ZIndex = 0
-            });
-        }
+            Name = "HudAttackModeIcon",
+            Position = new Vector2(754, 553),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            ZIndex = 0
+        };
+        AddChild(_attackModeIcon);
+        SetAttackMode(1); // 暂无真实模式来源(未实现 Ctrl+H/CM_CHANGEATTACKMODE),保持原截图所用的模式 1
 
         // 昼夜图标 (IDA sub_48B2A0 0x48b3bd..0x48b476: 全局 off_4A3DD0 为 0 取 Prguse_0015, 1/2/3 取 0012/0013/0014, 以 (748, HUD底板top349+79=428) 绘制)
         _dayNightIcon = new TextureRect
