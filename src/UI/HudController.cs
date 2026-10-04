@@ -187,7 +187,8 @@ public partial class HudController : CanvasLayer
             Text = "45",
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            ZIndex = 0
+            ZIndex = 0,
+            Visible = false // IDA sub_48B2A0 不绘制等级数字,无官方依据的 (636,484) 文本按铁律隐藏
         };
         _lblLevel.AddThemeFontSizeOverride("font_size", 12);
         _lblLevel.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.7f));
