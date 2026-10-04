@@ -78,11 +78,19 @@ public partial class ShopPanelView : Control, IManagedWindow
         _itemListContainer = new VBoxContainer
         {
             Name = "ShopItemListContainer",
-            Position = new Vector2(10, 27),
-            Size = new Vector2(265, 137),
+            Position = new Vector2(0, 32),
+            Size = new Vector2(307, 130),
             MouseFilter = MouseFilterEnum.Pass
         };
-        _itemListContainer.AddThemeConstantOverride("separation", 1);
+        _itemListContainer.AddThemeConstantOverride("separation", 0);
+        // 官方表头 sub_48F020 0x48f10b..0x48f181: 物品列表(19,11)/价格(156,11)/持久(245,11),行 y=32+13*i
+        foreach (var (txt, hx) in new[] { ("物品列表", 19), ("价格", 156), ("持久", 245) })
+        {
+            var hl = new Label { Text = txt, Position = new Vector2(hx, 11 - 3) };
+            hl.AddThemeFontSizeOverride("font_size", 12);
+            hl.AddThemeColorOverride("font_color", Colors.White);
+            _panel.AddChild(hl);
+        }
         _panel.AddChild(_itemListContainer);
 
         // 初始化官方标准药店/杂货铺商品列表
@@ -143,16 +151,8 @@ public partial class ShopPanelView : Control, IManagedWindow
         }
     }
 
-    private readonly List<ShopItemEntry> _items = new()
-    {
-        new ShopItemEntry("超级金创药", 2, 550),
-        new ShopItemEntry("超级魔法药", 2, 550),
-        new ShopItemEntry("太阳水", 2, 550),
-        new ShopItemEntry("强效金创药", 2, 220),
-        new ShopItemEntry("强效魔法药", 2, 220),
-        new ShopItemEntry("随机传送卷", 1, 275),
-        new ShopItemEntry("回城卷", 1, 1100),
-    };
+    // 官方商品数据来自服务端,客户端无内置商品(原写死 7 件为非官方数据,已移除)
+    private readonly List<ShopItemEntry> _items = new();
 
     private void PopulateDefaultShopItems()
     {
@@ -167,7 +167,7 @@ public partial class ShopPanelView : Control, IManagedWindow
 
             var row = new Panel
             {
-                CustomMinimumSize = new Vector2(265, 18),
+                CustomMinimumSize = new Vector2(307, 13),
                 MouseFilter = MouseFilterEnum.Stop
             };
             row.AddThemeStyleboxOverride("panel", idx == _selectedIndex 
@@ -177,8 +177,8 @@ public partial class ShopPanelView : Control, IManagedWindow
             // 1. 商品名称 (Left=6, Width=120)
             var lblName = new Label
             {
-                Position = new Vector2(6, 1),
-                Size = new Vector2(120, 16),
+                Position = new Vector2(19, -2),
+                Size = new Vector2(130, 16),
                 Text = item.Name,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -189,10 +189,9 @@ public partial class ShopPanelView : Control, IManagedWindow
             // 2. 重量 (Left=130, Width=40)
             var lblWeight = new Label
             {
-                Position = new Vector2(130, 1),
+                Position = new Vector2(245, -2),
                 Size = new Vector2(40, 16),
                 Text = item.Weight.ToString(),
-                HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblWeight.AddThemeFontSizeOverride("font_size", 11);
@@ -202,10 +201,9 @@ public partial class ShopPanelView : Control, IManagedWindow
             // 3. 价格 (Left=175, Width=80)
             var lblPrice = new Label
             {
-                Position = new Vector2(175, 1),
+                Position = new Vector2(156, -2),
                 Size = new Vector2(80, 16),
                 Text = item.Price.ToString(),
-                HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblPrice.AddThemeFontSizeOverride("font_size", 11);
