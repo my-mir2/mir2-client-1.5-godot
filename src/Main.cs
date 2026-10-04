@@ -29,6 +29,12 @@ public partial class Main : Node
     private NetManager? _net;
     private AudioManager? _audio;
 
+    private string _account = string.Empty;
+    private string _password = string.Empty;
+    private string _selectedCharName = "热血战士";
+    private int _selectedCharLevel = 35;
+    private int _sessionId = 1;
+
     public Phase CurrentPhase => _currentPhase;
 
     private Node? _currentSceneNode;
@@ -37,6 +43,11 @@ public partial class Main : Node
     {
         _net = GetNodeOrNull<NetManager>("/root/NetManager");
         _audio = GetNodeOrNull<AudioManager>("/root/AudioManager");
+
+        if (_net != null)
+        {
+            _net.PacketReceived += OnGlobalPacketReceived;
+        }
 
         SetupCustomCursor();
         DisplayServer.WindowSetTitle("热血传奇 1.50 - 虎卫传说 (官方 1:1 C# 工业级单轨版)");
@@ -137,7 +148,30 @@ public partial class Main : Node
                         new UI.SelectCharView.CharEntry("热血战士", 0, 0, 35),
                         new UI.SelectCharView.CharEntry("烈焰法师", 1, 1, 38)
                     });
-                    node.CharSelected += (idx, name, lvl) => SwitchPhase(Phase.Game);
+                    node.CharSelected += (idx, name, lvl) =>
+                    {
+                        _selectedCharName = name;
+                        _selectedCharLevel = lvl;
+                        if (_net != null && _net.IsConnectedToServer)
+                        {
+                            _net.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_SELECTCHAR, idx, 0, 0, System.Text.Encoding.UTF8.GetBytes(name)));
+                        }
+                        SwitchPhase(Phase.Game);
+                    };
+                    node.NewCharRequested += (name, job, sex) =>
+                    {
+                        if (_net != null && _net.IsConnectedToServer)
+                        {
+                            _net.SendPacket(PacketEncoder.NewChar(name, job, sex));
+                        }
+                    };
+                    node.DelCharRequested += (idx) =>
+                    {
+                        if (_net != null && _net.IsConnectedToServer)
+                        {
+                            _net.SendPacket(PacketEncoder.DelChar(idx));
+                        }
+                    };
                     AddChild(node);
                     _currentSceneNode = node;
                 }
@@ -151,6 +185,14 @@ public partial class Main : Node
                     var node = gameScene.Instantiate<UI.GameView>();
                     AddChild(node);
                     _currentSceneNode = node;
+                    if (_net != null)
+                    {
+                        node.SetNet(_net, _sessionId, _selectedCharName, _selectedCharLevel);
+                        if (_net.IsConnectedToServer)
+                        {
+                            _net.SendPacket(PacketEncoder.LoginNoticeOk());
+                        }
+                    }
                 }
                 break;
             }
@@ -160,9 +202,15 @@ public partial class Main : Node
     private void OnLoginRequested(string host, int port, string user, string pass)
     {
         GD.Print($"[Main] 收到登录请求: {host}:{port}, 用户: {user}");
+        _account = user;
+        _password = pass;
         if (_net != null)
         {
             _net.ConnectTo(host, port, autoReconnect: false);
+            if (_net.IsConnectedToServer)
+            {
+                _net.SendPacket(PacketEncoder.Login(user, pass));
+            }
         }
 
         // 官方 1.5 逆向实证 (IDA sub_47D6CC @ 0x47D859):
@@ -178,6 +226,53 @@ public partial class Main : Node
         else
         {
             SwitchPhase(Phase.SelectServer);
+        }
+    }
+
+    private void OnGlobalPacketReceived(short smCode, byte[] data)
+    {
+        switch (smCode)
+        {
+            case ProtocolConsts.SM_QUERYCHR:
+            {
+                if (_currentSceneNode is UI.SelectCharView selView && data != null)
+                {
+                    // 动态解析下发的角色列表
+                    var parsed = PacketDecoder.Parse(data);
+                    string text = parsed?.ExtraStr ?? string.Empty;
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        var list = new List<UI.SelectCharView.CharEntry>();
+                        var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var l in lines)
+                        {
+                            var parts = l.Split(new[] { '\t', '/' }, StringSplitOptions.None);
+                            if (parts.Length >= 4)
+                            {
+                                string cname = parts[0];
+                                int job = int.TryParse(parts[1], out var j) ? j : 0;
+                                int gender = int.TryParse(parts[2], out var g) ? g : 0;
+                                int level = int.TryParse(parts[3], out var lvl) ? lvl : 1;
+                                list.Add(new UI.SelectCharView.CharEntry(cname, job, gender, level));
+                            }
+                        }
+                        if (list.Count > 0)
+                        {
+                            selView.SetCharacters(list);
+                        }
+                    }
+                }
+                break;
+            }
+            case ProtocolConsts.SM_NEWCHR_SUCCESS:
+            case ProtocolConsts.SM_DELCHR_SUCCESS:
+            {
+                if (_net != null && _net.IsConnectedToServer)
+                {
+                    _net.SendPacket(PacketEncoder.QueryChr(_account));
+                }
+                break;
+            }
         }
     }
 }

@@ -442,4 +442,42 @@ public class TestProtocolMatrix
         Assert.Equal(80, int.Parse(hpMpParts[2]));
         Assert.Equal(100, int.Parse(hpMpParts[3]));
     }
+
+    [Fact]
+    public void TestSelectChar_ProtocolFlow_And_DataParsing()
+    {
+        // 1. 验证创建角色 CM_NEWCHAR (101) 编码与解码
+        byte[] newCharPkt = PacketEncoder.NewChar("战神归来", 0, 0);
+        var parsedNewChar = PacketDecoder.Parse(newCharPkt.AsSpan(1..^1));
+        Assert.NotNull(parsedNewChar);
+        Assert.Equal(ProtocolConsts.CM_NEWCHAR, parsedNewChar.Value.Ident);
+        string[] ncParts = parsedNewChar.Value.ExtraStr.Split('\t');
+        Assert.Equal("战神归来", ncParts[0]);
+        Assert.Equal("0", ncParts[1]); // 战士
+        Assert.Equal("0", ncParts[2]); // 男
+
+        // 2. 验证删除角色 CM_DELCHAR (102) 编码
+        byte[] delCharPkt = PacketEncoder.DelChar(1);
+        var parsedDelChar = PacketDecoder.Parse(delCharPkt.AsSpan(1..^1));
+        Assert.NotNull(parsedDelChar);
+        Assert.Equal(ProtocolConsts.CM_DELCHAR, parsedDelChar.Value.Ident);
+        Assert.Equal(1, parsedDelChar.Value.Recog);
+
+        // 3. 验证服务端下发角色列表 SM_QUERYCHR (518) 字符串解析为神龛角色模型
+        string chrListStr = "热血战神\t0\t0\t42\n烈焰圣皇\t1\t1\t40";
+        var lines = chrListStr.Split('\n');
+        Assert.Equal(2, lines.Length);
+
+        var char1 = lines[0].Split('\t');
+        Assert.Equal("热血战神", char1[0]);
+        Assert.Equal(0, int.Parse(char1[1]));
+        Assert.Equal(0, int.Parse(char1[2]));
+        Assert.Equal(42, int.Parse(char1[3]));
+
+        var char2 = lines[1].Split('\t');
+        Assert.Equal("烈焰圣皇", char2[0]);
+        Assert.Equal(1, int.Parse(char2[1]));
+        Assert.Equal(1, int.Parse(char2[2]));
+        Assert.Equal(40, int.Parse(char2[3]));
+    }
 }
