@@ -42,6 +42,9 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         "魔防下限", "魔防上限", "攻击力", "魔法力", "道术力"
     ];
 
+    // IDA sub_481dd4 0x485fb8~0x486471: 加/减按钮 Top 逐项 101,121,140,160,181,201,220,240,261 (非等距)
+    private static readonly float[] ButtonTops = [101f, 121f, 140f, 160f, 181f, 201f, 220f, 240f, 261f];
+
     private static readonly float[] RowTops =
     [
         99.0f, 119.0f, 139.0f, 159.0f, 179.0f, 199.0f, 219.0f, 239.0f, 259.0f
@@ -124,7 +127,7 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
             var btnInc = new TextureButton
             {
                 Name = $"BtnInc_{statIdx}",
-                Position = new Vector2(216, top + 2),
+                Position = new Vector2(217, ButtonTops[statIdx]),
                 Size = new Vector2(12, 11),
                 TextureNormal = null,
                 TexturePressed = texPlus
@@ -136,7 +139,7 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
             var btnDec = new TextureButton
             {
                 Name = $"BtnDec_{statIdx}",
-                Position = new Vector2(227, top + 2),
+                Position = new Vector2(227, ButtonTops[statIdx]),
                 Size = new Vector2(12, 11),
                 TextureNormal = null,
                 TexturePressed = texMinus
@@ -150,7 +153,7 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         var btnConfirm = new TextureButton
         {
             Name = "BtnAdjustConfirm",
-            Position = new Vector2(221, 299),
+            Position = new Vector2(220, 298),
             Size = new Vector2(88, 30)
         };
         btnConfirm.Pressed += OnConfirm;
