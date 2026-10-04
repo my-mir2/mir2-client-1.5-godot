@@ -589,8 +589,8 @@ public partial class HudController : CanvasLayer
         _tradePanelView = new TradePanelView();
         AddChild(_tradePanelView);
 
-        _storagePanelView = new StoragePanelView();
-        AddChild(_storagePanelView);
+        // 官方无独立仓库窗体 (IDA: sub_4579F0 全量调用者仅 sub_481DD4/sub_486DF0,无仓库底板);
+        // 服务端协议将仓库作为商人窗口的 Storage 模式,故不再创建非官方的 StoragePanelView (Prguse_0402)。
 
         _shopPanelView = new ShopPanelView();
         AddChild(_shopPanelView);
@@ -1020,10 +1020,11 @@ public partial class HudController : CanvasLayer
 
     public void ToggleStorage()
     {
-        if (_storagePanelView != null)
+        // 仓库复用官方商人窗体 (Prguse_0385, IDA sub_481DD4 0x484f88)
+        if (_shopPanelView != null)
         {
-            _stackManager.ToggleWindow(_storagePanelView);
-            GD.Print($"[HudController] 切换仓库保管箱显示状态: {_storagePanelView.Visible}");
+            _stackManager.ToggleWindow(_shopPanelView);
+            GD.Print($"[HudController] 切换仓库(商人窗体 Storage 模式)显示状态: {_shopPanelView.Visible}");
         }
     }
 
