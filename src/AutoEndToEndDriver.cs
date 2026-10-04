@@ -17,6 +17,7 @@ public partial class AutoEndToEndDriver : Node
 {
     private Main? _main;
     private int _step = 0;
+    private bool _abilityPageCaptured = false;
     private double _timer = 0.0;
     private bool _pendingCapture = false;
     private string _pendingTag = string.Empty;
@@ -279,8 +280,18 @@ public partial class AutoEndToEndDriver : Node
             case 27:
             {
                 var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (!_abilityPageCaptured && gameView?.HudInstance?.StatusPanel != null)
+                {
+                    // 官方能力页 (IDA sub_488AF4 0x4892c2) 截图,随后回退一步让本 case 再执行一次以关闭面板
+                    _abilityPageCaptured = true;
+                    gameView.HudInstance.StatusPanel.SetAbilityPage(true);
+                    RequestCapture("step5_2_status_ability_page");
+                    _step--;
+                    break;
+                }
                 if (gameView?.HudInstance != null)
                 {
+                    gameView.HudInstance.StatusPanel?.SetAbilityPage(false);
                     gameView.HudInstance.CloseTopDialog(); // 关闭独立状态面板
                     GD.Print("[AutoE2E] === 验证快捷键呼出技能魔法书 (F11) ===");
                     gameView.HudInstance.ToggleSkill();

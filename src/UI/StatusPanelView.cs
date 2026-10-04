@@ -113,6 +113,81 @@ public partial class StatusPanelView : Control, IManagedWindow
         _lblDetail.AddThemeFontSizeOverride("font_size", 10);
         _lblDetail.AddThemeColorOverride("font_color", new Color(0.85f, 0.85f, 0.75f));
         AddChild(_lblDetail);
+
+        BuildAbilityPage();
+    }
+
+    // ===== 官方能力页 (IDA sub_488AF4 0x4892c2..0x489869) =====
+    // 先在 (窗体+38, +52) 画黑底 Prguse_0382 (168x199),随后用 GDI TextOut 画 11 行文本:
+    // 文本原点 x0=窗体+38+20=58, y0=窗体+52+10=62;标签 x=x0,取值 x=x0+85;行距 14 (偏移 0,0Eh,1Ch,2Ah,38h,46h,54h,62h,70h,7Eh,8Ch)。
+    // 标签 GBK 串取自 exe 0x48A000..0x48A0CC: 经验值/背包重量/负重量/腕力/精确度/敏捷度/魔法防御/中毒防御/中毒恢复/体力恢复/魔法恢复,颜色 0xC0C0C0。
+    private static readonly string[] AbilityLabels =
+    {
+        "经验值", "背包重量", "负重量", "腕力", "精确度", "敏捷度",
+        "魔法防御", "中毒防御", "中毒恢复", "体力恢复", "魔法恢复"
+    };
+
+    private Control? _abilityPage;
+    private readonly Label[] _abilityValues = new Label[11];
+    private readonly List<Control> _statusPageNodes = new();
+
+    private void BuildAbilityPage()
+    {
+        foreach (var l in _statLabels.Values) _statusPageNodes.Add(l);
+        if (_lblDetail != null) _statusPageNodes.Add(_lblDetail);
+
+        _abilityPage = new Control { Name = "AbilityPage", Visible = false, MouseFilter = MouseFilterEnum.Ignore };
+        _abilityPage.Position = Vector2.Zero;
+        _abilityPage.Size = PanelSize;
+        AddChild(_abilityPage);
+
+        var tex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0382.png");
+        if (tex != null)
+        {
+            _abilityPage.AddChild(new TextureRect
+            {
+                Name = "AbilityBg",
+                Texture = tex,
+                Position = new Vector2(38, 52),
+                Size = new Vector2(168, 199),
+                MouseFilter = MouseFilterEnum.Ignore
+            });
+        }
+
+        for (int i = 0; i < AbilityLabels.Length; i++)
+        {
+            float y = 62 + i * 14;
+            var lbl = new Label { Text = AbilityLabels[i], Position = new Vector2(58, y), Size = new Vector2(85, 14), MouseFilter = MouseFilterEnum.Ignore };
+            lbl.AddThemeFontSizeOverride("font_size", 12);
+            lbl.AddThemeColorOverride("font_color", new Color(0xC0 / 255f, 0xC0 / 255f, 0xC0 / 255f));
+            _abilityPage.AddChild(lbl);
+
+            var val = new Label { Text = "", Position = new Vector2(143, y), Size = new Vector2(60, 14), MouseFilter = MouseFilterEnum.Ignore };
+            val.AddThemeFontSizeOverride("font_size", 12);
+            val.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
+            _abilityPage.AddChild(val);
+            _abilityValues[i] = val;
+        }
+
+        // 左侧上下键热区 (IDA 0x4843f7/0x484417: Prguse_0373/0372 @ (7,128)/(7,187) 24x23),用于在状态页与能力页间翻页
+        foreach (var (y, name) in new[] { (128f, "BtnStatusPageUp"), (187f, "BtnStatusPageDown") })
+        {
+            var b = new TextureButton { Name = name, Position = new Vector2(7, y), Size = new Vector2(24, 23), FocusMode = FocusModeEnum.None };
+            b.Pressed += () => SetAbilityPage(_abilityPage != null && !_abilityPage.Visible);
+            AddChild(b);
+        }
+    }
+
+    public void SetAbilityPage(bool show)
+    {
+        if (_abilityPage == null) return;
+        _abilityPage.Visible = show;
+        foreach (var n in _statusPageNodes) n.Visible = !show;
+    }
+
+    public void UpdateAbilityValue(int row, string text)
+    {
+        if (row >= 0 && row < _abilityValues.Length && _abilityValues[row] != null) _abilityValues[row].Text = text;
     }
 
     public void UpdateStat(string statName, string val)
