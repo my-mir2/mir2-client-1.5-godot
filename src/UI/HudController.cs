@@ -1040,6 +1040,8 @@ public partial class HudController : CanvasLayer
         }
     }
 
+    private Vector2 _bagPosBeforeStorage;
+
     public void ToggleStorage()
     {
         // 官方仓库流程(服务端注释 + IDA sub_46DAE8): 复用 DSellDlg(Prguse_0392) 置 " 托管物品" 模式于 (260,176),
@@ -1050,7 +1052,8 @@ public partial class HudController : CanvasLayer
         _stackManager.ToggleWindow(_repairPanelView);
         if (_bagPanel != null)
         {
-            if (open) { _bagPanel.Position = new Vector2(475, 0); _bagPanel.Visible = true; }
+            if (open) { _bagPosBeforeStorage = _bagPanel.Position; _bagPanel.Position = new Vector2(475, 0); _bagPanel.Visible = true; }
+            else { _bagPanel.Position = _bagPosBeforeStorage; }
         }
         GD.Print($"[HudController] 切换仓库(DSellDlg 托管模式)显示状态: {_repairPanelView.Visible}");
     }

@@ -53,7 +53,7 @@ public partial class TradePanelView : Control, IManagedWindow
         _remotePanel = new Panel
         {
             Name = "RemoteTradePanel",
-            Position = new Vector2(0, 0),
+            Position = new Vector2(16, 0), // IDA 0x48590f: left=屏宽-220=580 相对容器(564)+16
             Size = new Vector2(RemoteWidth, PanelHeight),
             MouseFilter = MouseFilterEnum.Stop
         };
@@ -150,7 +150,7 @@ public partial class TradePanelView : Control, IManagedWindow
         _myPanel = new Panel
         {
             Name = "MyTradePanel",
-            Position = new Vector2(0, PanelHeight),
+            Position = new Vector2(0, PanelHeight - 15), // IDA sub_4915EC 0x491643: 我方 top=对方高度-15
             Size = new Vector2(MyWidth, PanelHeight),
             MouseFilter = MouseFilterEnum.Stop
         };
