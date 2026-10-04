@@ -241,26 +241,39 @@ namespace Mir2Client.UI
             if (PlayerInstance != null && HudInstance?.Minimap != null && HudInstance.Minimap.Visible)
             {
                 HudInstance.Minimap.UpdatePlayerPosition(CurrentMapName == "0" ? "比奇省" : CurrentMapName, PlayerInstance.TileX, PlayerInstance.TileY);
-                var entities = new (int tx, int ty, MinimapView.RadarEntityType type)[]
+                
+                var radarList = new List<(int tx, int ty, MinimapView.RadarEntityType type)>();
+                if (EntityManagerInstance.Count > 0)
                 {
-                    (330, 266, MinimapView.RadarEntityType.Npc),
-                    (325, 275, MinimapView.RadarEntityType.Npc),
-                    (345, 280, MinimapView.RadarEntityType.Monster),
-                    (350, 260, MinimapView.RadarEntityType.Monster),
-                    (332, 271, MinimapView.RadarEntityType.GroupMember)
-                };
-                HudInstance.Minimap.UpdateRadarEntities(entities);
+                    foreach (var ent in EntityManagerInstance.AllEntities)
+                    {
+                        var rType = ent.Type switch
+                        {
+                            EntityManager.EntityType.Monster => MinimapView.RadarEntityType.Monster,
+                            EntityManager.EntityType.Npc => MinimapView.RadarEntityType.Npc,
+                            _ => MinimapView.RadarEntityType.GroupMember
+                        };
+                        radarList.Add((ent.TileX, ent.TileY, rType));
+                    }
+                }
+                else
+                {
+                    // 沙盒或初始状态下的默认演示实体点
+                    radarList.Add((330, 266, MinimapView.RadarEntityType.Npc));
+                    radarList.Add((325, 275, MinimapView.RadarEntityType.Npc));
+                    radarList.Add((345, 280, MinimapView.RadarEntityType.Monster));
+                    radarList.Add((350, 260, MinimapView.RadarEntityType.Monster));
+                    radarList.Add((332, 271, MinimapView.RadarEntityType.GroupMember));
+                }
+                HudInstance.Minimap.UpdateRadarEntities(radarList.ToArray());
             }
         }
 
         public void SetNet(NetManager net, int sId, string uname, int ulevel = 35)
         {
             _net = net;
-            if (HudInstance != null)
-            {
-                var router = new ServerMessageRouter(HudInstance);
-                _net.PacketReceived += router.OnPacket;
-            }
+            var router = new ServerMessageRouter(HudInstance, EntityManagerInstance, this);
+            _net.PacketReceived += router.OnPacket;
             SessionId = sId;
             Username = uname;
             if (PlayerInstance != null)

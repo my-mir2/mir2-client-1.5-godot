@@ -9,7 +9,7 @@ namespace Mir2Client.Game;
 /// 严格 1:1 对齐官方 IDA sub_495EBC & sub_496120
 /// 管理怪物/NPC/其他玩家状态、朝向、视野与生命周期
 /// </summary>
-public partial class EntityManager : Node
+public class EntityManager
 {
     public enum EntityType
     {

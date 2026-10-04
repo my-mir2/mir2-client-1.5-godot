@@ -82,6 +82,9 @@ public static class ProtocolConsts
     public const short CM_GUILD_UPDATE_RANK      = 1042; // 调整行会职位封号
 
     // ============ 官方 1.5 权威 SM 协议号 (下行) ============
+    public const short SM_PASSOK                 = 500;  // 账号密码验证成功
+    public const short SM_SERVERINDEX            = 114;  // 服务器分区列表下发
+    public const short SM_CHARLIST               = 120;  // 官方桥接角色列表下发
     public const short SM_NEWID_SUCCESS          = 504;  // 账号注册成功
     public const short SM_NEWID_FAIL             = 505;  // 账号注册失败
     public const short SM_CHGPASSWD_SUCCESS      = 506;  // 修改密码成功

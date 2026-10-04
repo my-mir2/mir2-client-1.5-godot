@@ -480,4 +480,51 @@ public class TestProtocolMatrix
         Assert.Equal(1, int.Parse(char2[2]));
         Assert.Equal(40, int.Parse(char2[3]));
     }
+
+    [Fact]
+    public void TestServerMessageRouter_Entities_And_WorldDataFlow()
+    {
+        var em = new Mir2Client.Game.EntityManager();
+        var router = new ServerMessageRouter(null, em, null);
+
+        // 1. 模拟怪物生成 SM_MONSPAWN (220)
+        byte[] monPkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_MONSPAWN, 1001, 0, 0,
+            System.Text.Encoding.UTF8.GetBytes("白野猪\t330\t280\t2\t15\t500\t500\t12"));
+        router.OnPacket(ServerMessageRouter.SM_MONSPAWN, monPkt.AsSpan(1..^1).ToArray());
+
+        Assert.Equal(1, em.Count);
+        var mon = em.GetEntity(1001);
+        Assert.NotNull(mon);
+        Assert.Equal("白野猪", mon.Name);
+        Assert.Equal(330, mon.TileX);
+        Assert.Equal(280, mon.TileY);
+        Assert.Equal(Mir2Client.Game.EntityManager.EntityType.Monster, mon.Type);
+
+        // 2. 模拟 NPC 生成 SM_NPCSPAWN (230)
+        byte[] npcPkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_NPCSPAWN, 2001, 0, 0,
+            System.Text.Encoding.UTF8.GetBytes("老兵\t335\t270\t3\t5"));
+        router.OnPacket(ServerMessageRouter.SM_NPCSPAWN, npcPkt.AsSpan(1..^1).ToArray());
+
+        Assert.Equal(2, em.Count);
+        var npc = em.GetEntity(2001);
+        Assert.NotNull(npc);
+        Assert.Equal("老兵", npc.Name);
+        Assert.Equal(Mir2Client.Game.EntityManager.EntityType.Npc, npc.Type);
+
+        // 3. 模拟实体转向 SM_TURNDIRECTION_DELPHI (204)
+        byte[] turnPkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_TURNDIRECTION_DELPHI, 1001, 5, 0);
+        router.OnPacket(ServerMessageRouter.SM_TURNDIRECTION_DELPHI, turnPkt.AsSpan(1..^1).ToArray());
+        Assert.Equal(5, mon.Direction);
+
+        // 4. 模拟实体离开视野 SM_MONDELETE (221)
+        byte[] delPkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_MONDELETE, 1001, 0, 0);
+        router.OnPacket(ServerMessageRouter.SM_MONDELETE, delPkt.AsSpan(1..^1).ToArray());
+        Assert.Equal(1, em.Count);
+        Assert.Null(em.GetEntity(1001));
+
+        // 5. 模拟清空视野 SM_CLEAROBJECTS (810)
+        byte[] clrPkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_CLEAROBJECTS, 0, 0, 0);
+        router.OnPacket(ServerMessageRouter.SM_CLEAROBJECTS, clrPkt.AsSpan(1..^1).ToArray());
+        Assert.Equal(0, em.Count);
+    }
 }

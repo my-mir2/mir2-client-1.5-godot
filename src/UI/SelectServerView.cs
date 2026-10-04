@@ -84,53 +84,73 @@ public partial class SelectServerView : Control
 
         _lblInfo = GetNodeOrNull<Label>("Panel/LblInfo");
 
-        // 3. 按照官方 IDA 公式动态渲染服务器按钮槽位 (sub_481DD4 line 864)
-        if (_panel != null)
+        RebuildServerButtons();
+
+        GD.Print("[SelectServerView] 官方 1.5 双龙石碑与 Prguse2[2..4] 槽位贴图全量绑定就绪");
+    }
+
+    public void SetServers(IList<string> servers)
+    {
+        if (servers == null || servers.Count == 0) return;
+        _servers.Clear();
+        _servers.AddRange(servers);
+        RebuildServerButtons();
+    }
+
+    private void RebuildServerButtons()
+    {
+        if (_panel == null) return;
+
+        // 移除旧按钮
+        foreach (Node child in _panel.GetChildren())
         {
-            int numServers = _servers.Count;
-            int startY = CalculateServerStartY(numServers);
-            int startX = (OfficialTabletWidth - OfficialSlotWidth) / 2; // 118
-
-            var texNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse2/Prguse2_0002.png");
-            var texHover = ResPath.LoadImageTexture("resources/wil/png/Prguse2/Prguse2_0003.png");
-
-            for (int i = 0; i < numServers; i++)
+            if (child.Name.ToString().StartsWith("BtnServer_"))
             {
-                int idx = i;
-                int slotY = startY + i * OfficialSlotSpacing;
-
-                var btn = new TextureButton
-                {
-                    Name = $"BtnServer_{idx}",
-                    Position = new Vector2(startX, slotY),
-                    Size = new Vector2(OfficialSlotWidth, OfficialSlotHeight),
-                    TextureNormal = texNormal,
-                    TextureHover = texHover,
-                    TexturePressed = texHover
-                };
-
-                var lbl = new Label
-                {
-                    Name = "Title",
-                    Text = _servers[i],
-                    Size = new Vector2(OfficialSlotWidth, OfficialSlotHeight),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    MouseFilter = MouseFilterEnum.Ignore
-                };
-                lbl.AddThemeColorOverride("font_color", new Color(1, 1, 1, 1));
-                lbl.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 1));
-                lbl.AddThemeConstantOverride("shadow_offset_x", 1);
-                lbl.AddThemeConstantOverride("shadow_offset_y", 1);
-                lbl.AddThemeFontSizeOverride("font_size", 12);
-
-                btn.AddChild(lbl);
-                btn.Pressed += () => OnServerClicked(idx);
-                _panel.AddChild(btn);
+                child.QueueFree();
             }
         }
 
-        GD.Print("[SelectServerView] 官方 1.5 双龙石碑与 Prguse2[2..4] 槽位贴图全量绑定就绪");
+        int numServers = _servers.Count;
+        int startY = CalculateServerStartY(numServers);
+        int startX = (OfficialTabletWidth - OfficialSlotWidth) / 2; // 118
+
+        var texNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse2/Prguse2_0002.png");
+        var texHover = ResPath.LoadImageTexture("resources/wil/png/Prguse2/Prguse2_0003.png");
+
+        for (int i = 0; i < numServers; i++)
+        {
+            int idx = i;
+            int slotY = startY + i * OfficialSlotSpacing;
+
+            var btn = new TextureButton
+            {
+                Name = $"BtnServer_{idx}",
+                Position = new Vector2(startX, slotY),
+                Size = new Vector2(OfficialSlotWidth, OfficialSlotHeight),
+                TextureNormal = texNormal,
+                TextureHover = texHover,
+                TexturePressed = texHover
+            };
+
+            var lbl = new Label
+            {
+                Name = "Title",
+                Text = _servers[i],
+                Size = new Vector2(OfficialSlotWidth, OfficialSlotHeight),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                MouseFilter = MouseFilterEnum.Ignore
+            };
+            lbl.AddThemeColorOverride("font_color", new Color(1, 1, 1, 1));
+            lbl.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 1));
+            lbl.AddThemeConstantOverride("shadow_offset_x", 1);
+            lbl.AddThemeConstantOverride("shadow_offset_y", 1);
+            lbl.AddThemeFontSizeOverride("font_size", 12);
+
+            btn.AddChild(lbl);
+            btn.Pressed += () => OnServerClicked(idx);
+            _panel.AddChild(btn);
+        }
     }
 
     /// <summary>

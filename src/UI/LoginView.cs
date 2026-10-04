@@ -21,7 +21,7 @@ public partial class LoginView : Control
     public delegate void ChangePasswordRequestedEventHandler(string username, string oldPassword, string newPassword);
 
     public string ServerHost { get; set; } = "127.0.0.1";
-    public int ServerPort { get; set; } = 7100;
+    public int ServerPort { get; set; } = 7001;
 
     // 官方 1.5 IDA 逆向实证常量 (sub_47D6CC / sub_47D864)
     public const int OfficialDoorStartFrame = 23; // ChrSel.wil[23] 开门首帧

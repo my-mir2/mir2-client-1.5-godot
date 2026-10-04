@@ -23,7 +23,7 @@ public partial class Main : Node
     }
 
     public const string DefaultHost = "127.0.0.1";
-    public const int DefaultPort = 7100;
+    public const int DefaultPort = 7001;
 
     private Phase _currentPhase = Phase.Login;
     private NetManager? _net;
@@ -34,6 +34,9 @@ public partial class Main : Node
     private string _selectedCharName = "热血战士";
     private int _selectedCharLevel = 35;
     private int _sessionId = 1;
+
+    private readonly List<string> _serverList = new();
+    private readonly List<UI.SelectCharView.CharEntry> _serverCharList = new();
 
     public Phase CurrentPhase => _currentPhase;
 
@@ -47,6 +50,7 @@ public partial class Main : Node
         if (_net != null)
         {
             _net.PacketReceived += OnGlobalPacketReceived;
+            _net.Connected += OnNetworkConnected;
         }
 
         SetupCustomCursor();
@@ -62,8 +66,8 @@ public partial class Main : Node
         if (args != null) allArgs.AddRange(args);
         if (userArgs != null) allArgs.AddRange(userArgs);
 
-        // 满足人工与自动化机器审计：启动 1 像素高对比度细线框审计层（当携带 --debug-grid 或 --autotest 时自动启用）
-        if (allArgs.Contains("--debug-grid") || allArgs.Contains("--autotest"))
+        // 满足人工与自动化机器审计：启动 1 像素高对比度细线框审计层（当携带 --debug-grid 时启用，避免 --autotest 残留调试辅助线）
+        if (allArgs.Contains("--debug-grid"))
         {
             AddChild(new DebugGridOverlay());
         }
@@ -131,7 +135,19 @@ public partial class Main : Node
                 if (srvScene != null)
                 {
                     var node = srvScene.Instantiate<UI.SelectServerView>();
-                    node.ServerSelected += (idx) => SwitchPhase(Phase.SelectChar);
+                    if (_serverList.Count > 0)
+                    {
+                        node.SetServers(_serverList);
+                    }
+                    node.ServerSelected += (idx) =>
+                    {
+                        if (_net != null && _net.IsConnectedToServer)
+                        {
+                            _net.SendPacket(PacketEncoder.SelectServer(idx));
+                            _net.SendPacket(PacketEncoder.MakePacket(119, 0, 0, 0, System.Text.Encoding.UTF8.GetBytes(_account)));
+                        }
+                        SwitchPhase(Phase.SelectChar);
+                    };
                     AddChild(node);
                     _currentSceneNode = node;
                 }
@@ -143,11 +159,18 @@ public partial class Main : Node
                 if (charScene != null)
                 {
                     var node = charScene.Instantiate<UI.SelectCharView>();
-                    node.SetCharacters(new[]
+                    if (_serverCharList.Count > 0)
                     {
-                        new UI.SelectCharView.CharEntry("热血战士", 0, 0, 35),
-                        new UI.SelectCharView.CharEntry("烈焰法师", 1, 1, 38)
-                    });
+                        node.SetCharacters(_serverCharList);
+                    }
+                    else
+                    {
+                        node.SetCharacters(new[]
+                        {
+                            new UI.SelectCharView.CharEntry("热血战士", 0, 0, 35),
+                            new UI.SelectCharView.CharEntry("烈焰法师", 1, 1, 38)
+                        });
+                    }
                     node.CharSelected += (idx, name, lvl) =>
                     {
                         _selectedCharName = name;
@@ -206,10 +229,13 @@ public partial class Main : Node
         _password = pass;
         if (_net != null)
         {
-            _net.ConnectTo(host, port, autoReconnect: false);
             if (_net.IsConnectedToServer)
             {
                 _net.SendPacket(PacketEncoder.Login(user, pass));
+            }
+            else
+            {
+                _net.ConnectTo(host, port, autoReconnect: false);
             }
         }
 
@@ -229,34 +255,73 @@ public partial class Main : Node
         }
     }
 
+    private void OnNetworkConnected()
+    {
+        GD.Print($"[Main] 网络成功连接到服务器，当前生命周期阶段: {_currentPhase}");
+        if (_currentPhase == Phase.Login && !string.IsNullOrEmpty(_account))
+        {
+            GD.Print($"[Main] 连接建立完毕，发送登录封包: account={_account}");
+            _net?.SendPacket(PacketEncoder.Login(_account, _password));
+        }
+    }
+
     private void OnGlobalPacketReceived(short smCode, byte[] data)
     {
         switch (smCode)
         {
-            case ProtocolConsts.SM_QUERYCHR:
+            case ProtocolConsts.SM_PASSOK: // 500
+            case 530: // SM_LOGINSUCCESS
             {
-                if (_currentSceneNode is UI.SelectCharView selView && data != null)
+                GD.Print($"[Main] 收到登录成功回执 SM_{smCode}");
+                break;
+            }
+            case 114: // SM_SERVERINDEX (服务端下发分区列表)
+            {
+                var parsed = PacketDecoder.Parse(data);
+                string text = parsed?.ExtraStr ?? string.Empty;
+                if (!string.IsNullOrEmpty(text))
                 {
-                    // 动态解析下发的角色列表
-                    var parsed = PacketDecoder.Parse(data);
-                    string text = parsed?.ExtraStr ?? string.Empty;
-                    if (!string.IsNullOrEmpty(text))
+                    var srvs = text.Split(new[] { '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (srvs.Length > 0)
                     {
-                        var list = new List<UI.SelectCharView.CharEntry>();
-                        var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (var l in lines)
+                        _serverList.Clear();
+                        _serverList.AddRange(srvs);
+                        if (_currentSceneNode is UI.SelectServerView srvView)
                         {
-                            var parts = l.Split(new[] { '\t', '/' }, StringSplitOptions.None);
-                            if (parts.Length >= 4)
-                            {
-                                string cname = parts[0];
-                                int job = int.TryParse(parts[1], out var j) ? j : 0;
-                                int gender = int.TryParse(parts[2], out var g) ? g : 0;
-                                int level = int.TryParse(parts[3], out var lvl) ? lvl : 1;
-                                list.Add(new UI.SelectCharView.CharEntry(cname, job, gender, level));
-                            }
+                            srvView.SetServers(_serverList);
                         }
-                        if (list.Count > 0)
+                    }
+                }
+                break;
+            }
+            case ProtocolConsts.SM_QUERYCHR: // 518
+            case 120: // SM_CHARLIST (官方 1.5 桥接网关下发角色列表)
+            {
+                var parsed = PacketDecoder.Parse(data);
+                string text = parsed?.ExtraStr ?? string.Empty;
+                if (!string.IsNullOrEmpty(text))
+                {
+                    var list = new List<UI.SelectCharView.CharEntry>();
+                    var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var l in lines)
+                    {
+                        var parts = l.Split(new[] { '\t', '/' }, StringSplitOptions.None);
+                        if (parts.Length >= 4)
+                        {
+                            string cname = parts[0];
+                            int job = int.TryParse(parts[1], out var j) ? j : 0;
+                            int f2 = int.TryParse(parts[2], out var v2) ? v2 : 0;
+                            int f3 = int.TryParse(parts[3], out var v3) ? v3 : 0;
+                            int level = (f2 > 1) ? f2 : f3;
+                            int gender = (f2 > 1) ? f3 : f2;
+                            list.Add(new UI.SelectCharView.CharEntry(cname, job, gender, level));
+                        }
+                    }
+                    if (list.Count > 0)
+                    {
+                        _serverCharList.Clear();
+                        _serverCharList.AddRange(list);
+                        if (_currentSceneNode is UI.SelectCharView selView)
                         {
                             selView.SetCharacters(list);
                         }

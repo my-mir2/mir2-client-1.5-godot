@@ -16,11 +16,25 @@ public sealed class ServerMessageRouter
 {
     // ============ 官方 1.5 权威下行 SM 协议号 (对齐 IDA 0x467920) ============
     public const short SM_GOLDCHANGED            = 40;   // 金币变动广播
+    public const short SM_GOLDCHANGED_DELPHI     = 653;  // Delphi 官方金币变动码 (653)
     public const short SM_LEVELUP                = 44;   // 角色升级
     public const short SM_EXPERIENCE             = 45;   // 经验增长
+    public const short SM_WINEXP                 = 619;  // Delphi 杀怪/任务获得经验 (619)
     public const short SM_SENDUSERSTATE          = 52;   // 角色基础四维属性 (攻魔道防)
     public const short SM_HEALTHSPELLCHANGED     = 53;   // HP/MP 血量魔法值变动
     public const short SM_NPCDIALOG              = 54;   // NPC 对话脚本页面
+    public const short SM_LOGICSTATE             = 208;  // 主角坐标与朝向设定 (208)
+    public const short SM_USERSPAWN              = 210;  // 玩家进入视野 (210)
+    public const short SM_USERDELETE             = 211;  // 玩家离开视野 (211)
+    public const short SM_MONSPAWN               = 220;  // 怪物进入视野 (220)
+    public const short SM_MONDELETE              = 221;  // 怪物离开视野 (221)
+    public const short SM_MONDEAD                = 222;  // 怪物倒地死亡 (222)
+    public const short SM_NPCSPAWN               = 230;  // NPC 进入视野 (230)
+    public const short SM_NPCDELETE              = 231;  // NPC 离开视野 (231)
+    public const short SM_OBJECT_DISAPPEAR       = 29;   // 实体消除 (Delphi 29)
+    public const short SM_TURNDIRECTION_DELPHI   = 204;  // 实体转向 (204)
+    public const short SM_NEWMAP_DELPHI          = 521;  // 地图切换/初始化黑屏转场 (521)
+    public const short SM_CLEAROBJECTS           = 810;  // 清空视野实体 (810)
     public const short SM_ADDITEM                = 200;  // 背包添加物品
     public const short SM_SENDUSERMAGIC          = 201;  // 角色已学技能列表批量下发
     public const short SM_DELITEM                = 202;  // 背包移除物品
@@ -39,11 +53,15 @@ public sealed class ServerMessageRouter
     public const short SM_GUILDMEMBERLIST_ALT    = 671;  // 行会成员列表 (ProtocolConsts)
     public const short SM_NEEDPASSWORD           = 2014; // 二级安全密码弹窗 (sub_486DF0)
 
-    private readonly HudController _hud;
+    private readonly HudController? _hud;
+    private readonly Mir2Client.Game.EntityManager? _entityManager;
+    private readonly GameView? _gameView;
 
-    public ServerMessageRouter(HudController hud)
+    public ServerMessageRouter(HudController? hud, Mir2Client.Game.EntityManager? em = null, GameView? gv = null)
     {
         _hud = hud;
+        _entityManager = em;
+        _gameView = gv;
     }
 
     /// <summary>
@@ -65,6 +83,7 @@ public sealed class ServerMessageRouter
         switch (smCode)
         {
             case SM_GOLDCHANGED:
+            case SM_GOLDCHANGED_DELPHI:
                 HandleGoldChanged(packet);
                 break;
             case SM_LEVELUP:
@@ -78,6 +97,29 @@ public sealed class ServerMessageRouter
                 break;
             case SM_WEIGHTCHANGED:
                 HandleWeightChanged(packet);
+                break;
+            case SM_LOGICSTATE:
+                HandleLogicState(packet);
+                break;
+            case SM_NEWMAP_DELPHI:
+                HandleNewMap(packet);
+                break;
+            case SM_USERSPAWN:
+            case SM_MONSPAWN:
+            case SM_NPCSPAWN:
+                HandleEntitySpawn(packet);
+                break;
+            case SM_USERDELETE:
+            case SM_MONDELETE:
+            case SM_NPCDELETE:
+            case SM_OBJECT_DISAPPEAR:
+                HandleEntityDelete(packet);
+                break;
+            case SM_TURNDIRECTION_DELPHI:
+                HandleTurnDirection(packet);
+                break;
+            case SM_CLEAROBJECTS:
+                _entityManager?.Clear();
                 break;
             case SM_ADDITEM:
                 HandleAddItem(packet);
@@ -97,8 +139,15 @@ public sealed class ServerMessageRouter
             case SM_TAKEON_OK:
                 HandleTakeOnOk(packet);
                 break;
-            case SM_TAKEOFF_OK:
-                HandleTakeOffOk(packet);
+            case SM_TAKEOFF_OK: // 619: 官方 Delphi 619 号多态处理 (脱装备或经验)
+                if (packet.Recog == 0 && packet.Param < 9)
+                {
+                    HandleTakeOffOk(packet);
+                }
+                else
+                {
+                    HandleExperience(packet);
+                }
                 break;
             case SM_NPCDIALOG:
                 HandleNpcDialog(packet);
@@ -108,16 +157,16 @@ public sealed class ServerMessageRouter
                 break;
             case SM_DEALMENU:
             case SM_DEALMENU_IDA:
-                _hud.ToggleTrade();
+                _hud?.ToggleTrade();
                 break;
             case SM_USERSTORAGE_DLG:
-                _hud.ToggleStorage();
+                _hud?.ToggleStorage();
                 break;
             case SM_OPENGUILDDLG:
                 HandleOpenGuildDlg(packet);
                 break;
             case SM_NEEDPASSWORD:
-                _hud.OnNeedPassword();
+                _hud?.OnNeedPassword();
                 break;
             case SM_SENDUSERSTATE:
             case SM_SENDUSERSTATE_INSPECT:
@@ -137,7 +186,7 @@ public sealed class ServerMessageRouter
         {
             gold = g;
         }
-        _hud.UpdateGold(gold);
+        _hud?.UpdateGold(gold);
     }
 
     private void HandleLevelUp(ServerPacket pkt)
@@ -145,7 +194,7 @@ public sealed class ServerMessageRouter
         int level = pkt.Param > 0 ? pkt.Param : pkt.Recog;
         if (level > 0)
         {
-            _hud.UpdateLevel(level);
+            _hud?.UpdateLevel(level);
         }
     }
 
@@ -153,7 +202,7 @@ public sealed class ServerMessageRouter
     {
         long curExp = (uint)pkt.Recog;
         long maxExp = pkt.Param > 0 ? (uint)pkt.Param : 100000;
-        _hud.UpdateExp(curExp, maxExp);
+        _hud?.UpdateExp(curExp, maxExp);
     }
 
     private void HandleHealthSpellChanged(ServerPacket pkt)
@@ -175,15 +224,15 @@ public sealed class ServerMessageRouter
             }
         }
 
-        _hud.UpdateHp(hp, maxHp);
-        _hud.UpdateMp(mp, maxMp);
+        _hud?.UpdateHp(hp, maxHp);
+        _hud?.UpdateMp(mp, maxMp);
     }
 
     private void HandleWeightChanged(ServerPacket pkt)
     {
         int curWeight = pkt.Recog;
         int maxWeight = pkt.Param > 0 ? pkt.Param : 50;
-        _hud.UpdateWeight(curWeight, maxWeight);
+        _hud?.UpdateWeight(curWeight, maxWeight);
     }
 
     private void HandleAddItem(ServerPacket pkt)
@@ -201,7 +250,7 @@ public sealed class ServerMessageRouter
             if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2])) desc = parts[2];
         }
 
-        _hud.SetBagItem(slot, itemName, iconFile, desc);
+        _hud?.SetBagItem(slot, itemName, iconFile, desc);
     }
 
     private void HandleDelItem(ServerPacket pkt)
@@ -209,7 +258,7 @@ public sealed class ServerMessageRouter
         int slot = pkt.Param >= 0 && pkt.Param < 40 ? pkt.Param : pkt.Recog;
         if (slot >= 0 && slot < 40)
         {
-            _hud.ClearBagItem(slot);
+            _hud?.ClearBagItem(slot);
         }
     }
 
@@ -236,9 +285,9 @@ public sealed class ServerMessageRouter
             }
         }
 
-        if (skills.Count > 0 && _hud.SkillPanel != null)
+        if (skills.Count > 0 && _hud?.SkillPanel != null)
         {
-            _hud.SkillPanel.SetSkills(skills);
+            _hud?.SkillPanel.SetSkills(skills);
         }
     }
 
@@ -252,7 +301,7 @@ public sealed class ServerMessageRouter
         {
             maxTrain = max;
         }
-        _hud.SkillPanel?.UpdateSkillExp(magicId, level, curTrain, maxTrain);
+        _hud?.SkillPanel?.UpdateSkillExp(magicId, level, curTrain, maxTrain);
     }
 
     private void HandleEquipInfo(ServerPacket pkt)
@@ -267,11 +316,11 @@ public sealed class ServerMessageRouter
                 string name = itemParts.Length > 1 ? itemParts[1] : $"装备 #{itemId}";
                 string icon = $"StateItem_{itemId:D4}.png";
                 string desc = itemParts.Length > 2 ? itemParts[2] : "[color=#ffff00]官方实证装备[/color]";
-                _hud.SetEquipSlot(i, name, icon, desc);
+                _hud?.SetEquipSlot(i, name, icon, desc);
             }
             else
             {
-                _hud.SetEquipSlot(i, null, null, null);
+                _hud?.SetEquipSlot(i, null, null, null);
             }
         }
     }
@@ -289,13 +338,13 @@ public sealed class ServerMessageRouter
             if (parts.Length >= 2) icon = parts[1];
             if (parts.Length >= 3) desc = parts[2];
         }
-        _hud.SetEquipSlot(slot, name, icon, desc);
+        _hud?.SetEquipSlot(slot, name, icon, desc);
     }
 
     private void HandleTakeOffOk(ServerPacket pkt)
     {
         int slot = pkt.Param >= 0 && pkt.Param < 9 ? pkt.Param : pkt.Recog;
-        _hud.SetEquipSlot(slot, null, null, null);
+        _hud?.SetEquipSlot(slot, null, null, null);
     }
 
     private void HandleNpcDialog(ServerPacket pkt)
@@ -307,7 +356,7 @@ public sealed class ServerMessageRouter
         }
         if (!string.IsNullOrEmpty(text))
         {
-            _hud.ShowNpcDialog(text);
+            _hud?.ShowNpcDialog(text);
         }
     }
 
@@ -315,7 +364,7 @@ public sealed class ServerMessageRouter
     {
         if (string.IsNullOrEmpty(pkt.ExtraStr))
         {
-            _hud.ToggleShop();
+            _hud?.ToggleShop();
             return;
         }
 
@@ -339,13 +388,13 @@ public sealed class ServerMessageRouter
             }
         }
 
-        _hud.ShowShop(npcName, items);
+        _hud?.ShowShop(npcName, items);
     }
 
     private void HandleOpenGuildDlg(ServerPacket pkt)
     {
         string text = pkt.ExtraStr;
-        if (!string.IsNullOrEmpty(text) && _hud.GuildPanel != null)
+        if (!string.IsNullOrEmpty(text) && _hud?.GuildPanel != null)
         {
             if (text.Contains("<Notice>") || text.Contains("公告"))
             {
@@ -370,10 +419,10 @@ public sealed class ServerMessageRouter
                         default: notices.Add(trimmed); break;
                     }
                 }
-                _hud.GuildPanel.SetHomeText(notices, killGuilds, allyGuilds);
+                _hud?.GuildPanel.SetHomeText(notices, killGuilds, allyGuilds);
             }
         }
-        _hud.ToggleGuild();
+        _hud?.ToggleGuild();
     }
 
     private void HandleSendUserState(ServerPacket pkt)
@@ -390,7 +439,7 @@ public sealed class ServerMessageRouter
             int job = infoParts.Length > 2 && int.TryParse(infoParts[2], out var j) ? j : 0;
             int gender = infoParts.Length > 3 && int.TryParse(infoParts[3], out var g) ? g : 0;
 
-            var inspect = _hud.InspectPanel;
+            var inspect = _hud?.InspectPanel;
             if (inspect != null)
             {
                 inspect.SetGender(gender);
@@ -433,7 +482,7 @@ public sealed class ServerMessageRouter
             }
         }
 
-        if (_hud.GuildPanel != null)
+        if (_hud?.GuildPanel != null)
         {
             _hud.GuildPanel.SetMemberList(members);
             _hud.GuildPanel.ShowMemberList();
@@ -441,6 +490,88 @@ public sealed class ServerMessageRouter
             {
                 _hud.ToggleGuild();
             }
+        }
+    }
+
+    private void HandleLogicState(ServerPacket pkt)
+    {
+        string text = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(text))
+        {
+            var parts = text.Split(new[] { '\t', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                int x = int.TryParse(parts[0], out var px) ? px : 300;
+                int y = int.TryParse(parts[1], out var py) ? py : 300;
+                byte dir = parts.Length > 2 && byte.TryParse(parts[2], out var pd) ? pd : (byte)2;
+
+                if (_gameView?.PlayerInstance != null)
+                {
+                    _gameView.PlayerInstance.SetTilePos(x, y);
+                    _gameView.PlayerInstance.Direction = dir;
+                    _gameView.UpdateEnvironmentLighting();
+                }
+            }
+        }
+    }
+
+    private void HandleNewMap(ServerPacket pkt)
+    {
+        string mapId = pkt.ExtraStr;
+        if (string.IsNullOrEmpty(mapId))
+        {
+            mapId = pkt.Recog.ToString();
+        }
+        if (!string.IsNullOrEmpty(mapId) && _gameView != null)
+        {
+            _gameView.CurrentMapName = mapId;
+            string mapPath = ResPath.Resolve($"resources/maps/Map/{mapId}.map");
+            _gameView.MapRendererInstance?.LoadMap(mapPath);
+            _gameView.UpdateEnvironmentLighting();
+        }
+    }
+
+    private void HandleEntitySpawn(ServerPacket pkt)
+    {
+        if (_entityManager == null) return;
+        int uid = pkt.Recog;
+        string text = pkt.ExtraStr;
+        if (string.IsNullOrEmpty(text)) return;
+
+        var parts = text.Split(new[] { '\t', '/' }, StringSplitOptions.None);
+        if (parts.Length < 3) return;
+
+        string name = parts[0];
+        int x = int.TryParse(parts[1], out var tx) ? tx : 300;
+        int y = int.TryParse(parts[2], out var ty) ? ty : 300;
+        byte dir = parts.Length > 3 && byte.TryParse(parts[3], out var td) ? td : (byte)2;
+
+        var type = pkt.Ident switch
+        {
+            SM_MONSPAWN => Mir2Client.Game.EntityManager.EntityType.Monster,
+            SM_NPCSPAWN => Mir2Client.Game.EntityManager.EntityType.Npc,
+            _ => Mir2Client.Game.EntityManager.EntityType.Player
+        };
+
+        _entityManager.AddEntity(uid, name, type, x, y, dir);
+    }
+
+    private void HandleEntityDelete(ServerPacket pkt)
+    {
+        if (_entityManager == null) return;
+        int uid = pkt.Recog;
+        _entityManager.RemoveEntity(uid);
+    }
+
+    private void HandleTurnDirection(ServerPacket pkt)
+    {
+        if (_entityManager == null) return;
+        int uid = pkt.Recog;
+        byte dir = (byte)(pkt.Param & 7);
+        var ent = _entityManager.GetEntity(uid);
+        if (ent != null)
+        {
+            ent.Direction = dir;
         }
     }
 }

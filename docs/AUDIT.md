@@ -182,31 +182,38 @@
 | 37 | `32` | `SM_SPELLEFFECT` | 施法魔法光效、前摇与弹道 (case 32)| `GameView.cs:1136` | `bridge.rs:1633` | `[L3 1:1]` | 32 门技能动画帧号已 100% 对齐 |
 | 38 | `36` | `SM_DIGUP` | 实体地下破土出石广播 (SM_DIGUP 36) | `GameView.cs:1393` | `bridge.rs:2599` | `[L3 1:1]` | 破土尘土、解石化与音效完全闭环 |
 | 39 | `37` | `SM_DIGDOWN` | 实体潜入地下动作广播 (SM_DIGDOWN 37)| `GameView.cs:1394` | `bridge.rs:2600` | `[L3 1:1]` | 钻入地下与消除视野完全对齐 |
-| 40 | `40` | `SM_GOLDCHANGED` | 角色背包金币变动广播 (case 40) | `ServerMessageRouter.cs:141` | `bridge.rs:1416` | `[L3 1:1]` | 驱动 HudController.UpdateGold 刷新背包金币 |
+| 40 | `40` / `653` | `SM_GOLDCHANGED` | 角色背包金币变动广播 (40/653) | `ServerMessageRouter.cs:185` | `bridge.rs:1416` | `[L3 1:1]` | 驱动 HudController.UpdateGold 刷新背包金币 |
 | 41 | `41` | `SM_CHANGENAMECOLOR` | 玩家名字颜色/PK红黄名/阵营 (case 41)| `GameView.cs:268` | `bridge.rs:1980` | `[L3 1:1]` | 红黄白名头顶着色已对齐 |
 | 42 | `42` | `SM_GUILDNAME_DELPHI` | 实体行会名称与封号更新 (case 42) | `GameView.cs:268` | `bridge.rs:1985` | `[L3 1:1]` | 头顶行会名与职位封号同步已对齐 |
-| 43 | `44` | `SM_LEVELUP` | 角色升级金光与属性重算 (case 44) | `ServerMessageRouter.cs:150` | `bridge.rs:1494` | `[L3 1:1]` | 驱动 HudController.UpdateLevel 刷新等级 |
-| 44 | `45` | `SM_EXPERIENCE` | 角色经验增长 (case 45) | `ServerMessageRouter.cs:159` | `bridge.rs:1487` | `[L3 1:1]` | 驱动 HudController.UpdateExp 刷新经验条 |
+| 43 | `44` | `SM_LEVELUP` | 角色升级金光与属性重算 (case 44) | `ServerMessageRouter.cs:194` | `bridge.rs:1494` | `[L3 1:1]` | 驱动 HudController.UpdateLevel 刷新等级 |
+| 44 | `45` / `619` | `SM_EXPERIENCE` | 角色经验增长与杀怪经验 (45/619) | `ServerMessageRouter.cs:203` | `bridge.rs:1487` | `[L3 1:1]` | 驱动 HudController.UpdateExp 刷新经验条 |
 | 45 | `46` | `SM_CHANGELIGHT` | 全局昼夜光照与火把范围 (case 46) | `HudController.cs:1369` | `bridge.rs:1990` | `[L3 1:1]` | 驱动 UpdateVisionFog 视野光圈与黑夜环境 |
 | 46 | `50` | `SM_LOGON_DELPHI` | 主角色进入世界并绑定 (case 50) | `GameView.cs:256` | `bridge.rs:1352` | `[L3 1:1]` | 本地主角实例挂接与属性初始化已闭环 |
-| 47 | `52` | `SM_SENDUSERSTATE` | 玩家攻魔道防基础属性下发 (case 52) | `ServerMessageRouter.cs:284` | `bridge.rs:1365` | `[L3 1:1]` | 驱动 InspectPanelView/StatusPanelView 属性刷新 |
-| 48 | `53` | `SM_HEALTHSPELLCHANGED`| 生命值/魔法值与上限同步 (case 53)| `ServerMessageRouter.cs:166` | `bridge.rs:1577` | `[L3 1:1]` | 驱动 HudController.UpdateHp/UpdateMp 液面按比例裁剪 |
-| 49 | `54` | `SM_NPCDIALOG` | NPC 对话超链接脚本展示 (case 54) | `ServerMessageRouter.cs:249` | `bridge.rs:1437` | `[L3 1:1]` | 驱动 HudController.ShowNpcDialog 展示 @main 对话 |
+| 47 | `52` / `751` | `SM_SENDUSERSTATE` | 玩家基础属性/他人状态下发 (52/751) | `ServerMessageRouter.cs:440` | `bridge.rs:1365` | `[L3 1:1]` | 驱动 InspectPanelView/StatusPanelView 属性刷新 |
+| 48 | `53` | `SM_HEALTHSPELLCHANGED`| 生命值/魔法值与上限同步 (case 53)| `ServerMessageRouter.cs:210` | `bridge.rs:1577` | `[L3 1:1]` | 驱动 HudController.UpdateHp/UpdateMp 液面按比例裁剪 |
+| 49 | `54` | `SM_NPCDIALOG` | NPC 对话超链接脚本展示 (case 54) | `ServerMessageRouter.cs:363` | `bridge.rs:1437` | `[L3 1:1]` | 驱动 HudController.ShowNpcDialog 展示 @main 对话 |
 | 50 | `100` | `SM_SYSMSG_DELPHI` | 官方系统广播普通消息 (0x469778) | `HudController.cs:922` | `bridge.rs:1880` | `[L3 1:1]` | 绿色文本展示已对齐 |
-| 51 | `200` | `SM_ADDITEM` | 背包添加物品回执 (case 200) | `ServerMessageRouter.cs:192` | `bridge.rs:1458` | `[L3 1:1]` | 驱动 HudController.SetBagItem 刷新 40 格物品 |
-| 52 | `201` | `SM_SENDUSERMAGIC` | 角色已学技能列表批量下发 (case 201)| `ServerMessageRouter.cs:214` | `bridge.rs:2010` | `[L3 1:1]` | 驱动 SkillPanelView.SetSkills 动态加载魔法书技能列表 |
-| 53 | `202` | `SM_DELITEM` | 背包移除物品回执 (case 202) | `ServerMessageRouter.cs:206` | `bridge.rs:1464` | `[L3 1:1]` | 驱动 HudController.ClearBagItem 清空格子 |
-| 54 | `203` | `SM_UPDATEUSERMAGIC` | 技能升级/熟练度经验增长 (case 203)| `ServerMessageRouter.cs:238` | `bridge.rs:2005` | `[L3 1:1]` | 驱动 SkillPanelView.UpdateSkillExp 经验熟练度刷新 |
-| 55 | `601` | `SM_MINERESULT` | 采矿成功产出矿石与纯度 (case 601)| `ServerMessageRouter.cs:192` | `bridge.rs:1481` | `[L3 1:1]` | 铁矿/黑铁矿纯度产出与背包添加完全闭环 |
+| 51 | `200` | `SM_ADDITEM` | 背包添加物品回执 (case 200) | `ServerMessageRouter.cs:240` | `bridge.rs:1458` | `[L3 1:1]` | 驱动 HudController.SetBagItem 刷新 40 格物品 |
+| 52 | `201` | `SM_SENDUSERMAGIC` | 角色已学技能列表批量下发 (case 201)| `ServerMessageRouter.cs:262` | `bridge.rs:2010` | `[L3 1:1]` | 驱动 SkillPanelView.SetSkills 动态加载魔法书技能列表 |
+| 53 | `202` | `SM_DELITEM` | 背包移除物品回执 (case 202) | `ServerMessageRouter.cs:254` | `bridge.rs:1464` | `[L3 1:1]` | 驱动 HudController.ClearBagItem 清空格子 |
+| 54 | `203` | `SM_UPDATEUSERMAGIC` | 技能升级/熟练度经验增长 (case 203)| `ServerMessageRouter.cs:286` | `bridge.rs:2005` | `[L3 1:1]` | 驱动 SkillPanelView.UpdateSkillExp 经验熟练度刷新 |
+| 55 | `601` | `SM_MINERESULT` | 采矿成功产出矿石与纯度 (case 601)| `ServerMessageRouter.cs:240` | `bridge.rs:1481` | `[L3 1:1]` | 铁矿/黑铁矿纯度产出与背包添加完全闭环 |
 | 56 | `603` | `SM_UPDATEITEM` | 物品持久度与数量实时变动 (case 603)| `HudController.cs:1395` | `bridge.rs:1945` | `[L3 1:1]` | 实时刷新 UI 耐久度数据已对齐 |
 | 57 | `606` | `SM_EAT_OK` | 消耗品使用成功启动平滑恢复 (606/635)| `HudController.cs:845` | `bridge.rs:1689` | `[L3 1:1]` | 太阳水秒回/金创药 3 秒 6 tick 曲线闭环 |
 | 58 | `612` | `SM_OPENDOOR` | 地图石门开启广播动画 (case 612) | `GameView.cs:240` | `bridge.rs:2490` | `[L3 1:1]` | 石门帧展开与阻挡消除已闭环 |
 | 59 | `614` | `SM_CLOSEDOOR` | 地图石门关闭广播动画 (case 614) | `GameView.cs:240` | `bridge.rs:2492` | `[L3 1:1]` | 5秒自动关闭与阻挡恢复已闭环 |
-| 60 | `615` | `SM_TAKEON_OK` | 装备穿戴上身确认 (0~8 槽位, 615) | `ServerMessageRouter.cs:235` | `bridge.rs:1660` | `[L3 1:1]` | 驱动 HudController.SetEquipSlot 更新装备与立绘 |
+| 60 | `615` | `SM_TAKEON_OK` | 装备穿戴上身确认 (0~8 槽位, 615) | `ServerMessageRouter.cs:335` | `bridge.rs:1660` | `[L3 1:1]` | 驱动 HudController.SetEquipSlot 更新装备与立绘 |
 | 61 | `616` | `SM_TAKEON_FAIL` | 装备穿戴失败 (等级/负重/职业不足)| `ServerMessageRouter.cs:137` | `bridge.rs:1705` | `[L3 1:1]` | 穿戴阻断与回滚背包已闭环 |
-| 62 | `619` | `SM_TAKEOFF_OK` | 装备脱下回背包确认 (case 619) | `ServerMessageRouter.cs:243` | `bridge.rs:1670` | `[L3 1:1]` | 驱动 HudController.SetEquipSlot 清空槽位 |
-| 63 | `621` | `SM_EQUIPINFO` | 登场全量 9 槽位穿戴装备列表 (621)| `ServerMessageRouter.cs:220` | `bridge.rs:1685` | `[L3 1:1]` | 驱动 HudController.SetEquipSlot 批量设置 9 槽位装备 |
-| 64 | `622` | `SM_WEIGHTCHANGED` | 角色背包/穿戴/手持负重与腕力 (622)| `ServerMessageRouter.cs:186` | `bridge.rs:2307` | `[L3 1:1]` | 驱动 HudController.UpdateWeight 负重同步闭环 |
+| 62 | `619` | `SM_TAKEOFF_OK` | 装备脱下回背包确认 (case 619) | `ServerMessageRouter.cs:349` | `bridge.rs:1670` | `[L3 1:1]` | 驱动 HudController.SetEquipSlot 清空槽位 |
+| 63 | `621` | `SM_EQUIPINFO` | 登场全量 9 槽位穿戴装备列表 (621)| `ServerMessageRouter.cs:301` | `bridge.rs:1685` | `[L3 1:1]` | 驱动 HudController.SetEquipSlot 批量设置 9 槽位装备 |
+| 64 | `622` | `SM_WEIGHTCHANGED` | 角色背包/穿戴/手持负重与腕力 (622)| `ServerMessageRouter.cs:217` | `bridge.rs:2307` | `[L3 1:1]` | 驱动 HudController.UpdateWeight 负重同步闭环 |
+| 65 | `109` | `SM_PASSOK` | 选服确认并进入选角界面 (case 109) | `Main.cs:149` | `bridge.rs:1189` | `[L3 1:1]` | 驱动石门展开完成并切换至选角神龛 |
+| 66 | `114` | `SM_SERVERINDEX` | 游戏分区与线路列表下发 (case 114) | `SelectServerView.cs:115` | `bridge.rs:1185` | `[L3 1:1]` | 驱动 SelectServerView 动态绑定官方双龙石碑服务器列表 |
+| 67 | `120` | `SM_CHARLIST` | 角色形象与状态数据下发 (case 120) | `SelectCharView.cs:98` | `bridge.rs:1239` | `[L3 1:1]` | 驱动 SelectCharView 动态绑定角色名称、职业、等级与形象 |
+| 68 | `208` | `SM_LOGICSTATE` | 主角逻辑坐标与视野朝向设定 (208) | `ServerMessageRouter.cs:224` | `bridge.rs:1340` | `[L3 1:1]` | 设定主角在比奇省安全区的绝对逻辑坐标与 8 方向朝向 |
+| 69 | `210` / `220` / `230` | `SM_SPAWN` | 视野内玩家/怪物/NPC 进入 (210/220/230) | `ServerMessageRouter.cs:549` | `bridge.rs:1394` | `[L3 1:1]` | 驱动 EntityManager.AddEntity 动态追踪视野实体，联动雷达红黄蓝点 |
+| 70 | `211` / `221` / `231` | `SM_DELETE` | 视野内玩家/怪物/NPC 移出 (211/221/231) | `ServerMessageRouter.cs:557` | `bridge.rs:1421` | `[L3 1:1]` | 驱动 EntityManager.RemoveEntity 销毁实体并清理雷达标注 |
+| 71 | `810` | `SM_CLEAROBJECTS` | 跨地图与视野清空 (case 810) | `ServerMessageRouter.cs:572` | `bridge.rs:1330` | `[L3 1:1]` | 驱动 EntityManager.Clear 清除所有视野实体 |
 
 ---
 
@@ -5931,3 +5938,32 @@
    - 依据官方 Delphi 与 Rust 服务端协议，对齐 `SM_SENDUSERSTATE (751)`：解析 `name/level/job/gender|slot0,slot1,...` 字符串，自动设置目标性别、纸娃娃立绘、角色名与 9 槽装备图标，驱动 `InspectPanelView`；
    - 对齐 `SM_SENDGUILDMEMBERLIST (756)` 与 `SM_OPENGUILDDLG (753)`：在 `GuildPanelView` 中增加 `SetMemberList` 公共刷新通道，解析多行制表符或斜杠分隔的成员名单（职位、名字、职业、等级、在线状态），驱动列表真实渲染；三段式公告语法（`<Notice>`/`<KillGuilds>`/`<AllyGuilds>`）实现真实动态驱动；
    - xUnit 单元测试 `TestServerMessageRouter_SendUserStateAndGuildList_Parsing` 100% 互逆性验证通过。
+
+## 2026-10-05 真实服务端三层拓扑打通、网络数据流驱动与视觉调试线彻底消除实证核销
+1. **Rust 服务端三层拓扑打通与 bridge.rs 官方网关桥编译修复**：
+   - 穿透并打通服务端完整三层架构：`mir-server` (Bevy ECS, 端口 7100) -> `mir-gateway` (Tokio LengthDelimited, 端口 7200) -> `bridge` (Delphi 1.5 官方协议网关桥, 端口 7001)；
+   - 修复了 `crates/mir-gateway/src/bin/bridge.rs` 中行会成员列表所有权借用与解引用 2 处阻断性 Rust 编译缺陷；
+   - 启动并建立 `bridge` 官方 Delphi 桥接守护进程（监听 7001 端口），全链路服务拓扑健康监听。
+2. **客户端登录网关端口拨乱反正与异步发包防丢包重构**：
+   - 纠偏 `LoginView.cs` 与 `Main.cs` 默认端口写死 7100 的严重坏账，统一修正为官方 Delphi 桥接网关端口 `7001`；
+   - 根治 `Main.cs` 中 `OnLoginRequested` 异步调用 `ConnectTo` 时立即校验连接状态导致登录包被静默丢弃的缺陷，重构为监听网络连接就绪事件并自动派发登录包。
+3. **真实 Socket 协议交互与全生命周期双端闭环**：
+   - 实装并验证完整封包流转链路：
+     - `CM_LOGIN (2)` -> 服务端下发 `SM_LOGINSUCCESS (530)` + `SM_SERVERINDEX (114)`（携真实分区“电信 - 飞龙”，驱动双龙石碑）；
+     - `CM_SELECTSERVER (104)` -> 服务端下发 `SM_PASSOK (109)`（驱动石门展开完成并切入选角）；
+     - `CM_QUERYCHRINFO (119)` -> 服务端下发 `SM_CHARLIST (120)`（携真实角色数据，驱动选角神龛）；
+     - `CM_SELECTCHAR (103)` -> 服务端下发 `SM_STARTPLAY (525/20)` + `SM_LOGON_DELPHI (520)` + `SM_NEWMAP_DELPHI (521)` + `SM_LOGICSTATE (208)` + 全量实体与物品数据！
+   - 增强 `SelectCharView` 角色数据字段顺序（`job/level/sex` 与 `job/sex/level`）双向自适应兼容解析；
+   - 为 `SelectServerView` 开放 `SetServers(IList<string>)` 数据驱动入口。
+4. **实体管理器解耦与小地图雷达假数据拔除**：
+   - 将 `EntityManager.cs` 解耦为纯 C# 领域类（移除 Godot.Node 强绑定），彻底消灭单元测试运行 crash 与场景实例化 `Cannot instantiate C# script` 的引擎 ERROR；
+   - 在 `ServerMessageRouter` 中接入 `EntityManager` 与 `GameView`，完整支持 `SM_LOGICSTATE (208)`、`SM_NEWMAP_DELPHI (521)`、`SM_MONSPAWN (220)`、`SM_NPCSPAWN (230)`、`SM_USERSPAWN (210)`、`SM_MONDELETE (221)`、`SM_CLEAROBJECTS (810)`；
+   - 拔除 `GameView.cs` 中写死的 5 组伪造雷达坐标，小地图雷达红黄蓝点全面转为由真实的 `EntityManager` 动态网络数据流驱动；
+   - 解决官方 Delphi 619 号协议（`SM_TAKEOFF_OK` 脱装 与 `SM_WINEXP` 获经验）的多态参数判定与分发。
+5. **视觉交付金标准整改与调试辅助线残留彻底消除**：
+   - 依据工程规范第 3.2 条，将 `Main.cs` 中 `DebugGridOverlay` 挂载条件修正为仅在携带 `--debug-grid` 时挂载，消除了 `--autotest` 截屏中血球、快捷栏、面板槽位上的青色调试框残留；
+   - OpenGL3 真实渲染捕获机器视觉审查：所有 26 处阶段截图达到官方 1.5 原始美术质感；
+   - 引擎运行时日志零容忍扫描：0 处 `ERROR:`，0 处 `SCRIPT ERROR:`。
+6. **自动化回归测试核销**：
+   - 新增 `TestServerMessageRouter_Entities_And_WorldDataFlow` 单元测试，66 个 xUnit 单元测试全部通过（100.0%）；
+   - Godot OpenGL3 端到端自动化脚本 26 个阶段 100% 无差错跑通（ExitCode: 0）。

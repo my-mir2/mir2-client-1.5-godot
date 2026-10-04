@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" path="res://src/UI/GameView.cs" id="1_game"]
 [ext_resource type="Script" path="res://src/Render/MapRenderer.cs" id="2_map"]
-[ext_resource type="Script" path="res://src/Game/EntityManager.cs" id="3_entity"]
 [ext_resource type="Script" path="res://src/Game/PlayerNode.cs" id="4_player"]
 [ext_resource type="Script" path="res://src/Game/InputPlugin.cs" id="5_input"]
 [ext_resource type="Script" path="res://src/UI/MinimapView.cs" id="7_minimap"]
@@ -23,9 +22,6 @@ script = ExtResource("1_game")
 
 [node name="MapRenderer" type="Node2D" parent="."]
 script = ExtResource("2_map")
-
-[node name="EntityManager" type="Node" parent="."]
-script = ExtResource("3_entity")
 
 [node name="Player" type="Node2D" parent="."]
 script = ExtResource("4_player")
