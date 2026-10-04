@@ -867,7 +867,6 @@ public partial class HudController : CanvasLayer
         if (_lblLevel != null)
         {
             _lblLevel.Text = $"{level}";
-            _lblLevel.Visible = true;
         }
     }
 
