@@ -90,6 +90,8 @@ public partial class GuildPanelView : Control, IManagedWindow
                 ShowMemberList();
             }
         };
+        // IDA sub_481dd4 无 (273,5)/(306,5) 控件,查找框为非官方,隐藏
+        btnSearch.Visible = false;
         _panel.AddChild(btnSearch);
 
         // 2. 搜索输入框 (306, 5, 146x14, 对应右侧黑色凹槽内胆)
@@ -109,6 +111,7 @@ public partial class GuildPanelView : Control, IManagedWindow
         {
             if (!string.IsNullOrWhiteSpace(text)) ShowMemberList();
         };
+        _searchEdit.Visible = false;
         _panel.AddChild(_searchEdit);
 
         // 中央内容区容器 (高光边框内胆 Left=15, Top=35, Width=570, Height=368)
@@ -127,7 +130,7 @@ public partial class GuildPanelView : Control, IManagedWindow
             Name = "LblGuildTitle",
             Position = new Vector2(12, 10),
             Size = new Vector2(546, 24),
-            Text = "【沙巴克行会】 掌门人：无涯   成员总数：88 人",
+            Text = "",
             VerticalAlignment = VerticalAlignment.Center
         };
         lblGuildTitle.AddThemeFontSizeOverride("font_size", 12);
@@ -140,11 +143,7 @@ public partial class GuildPanelView : Control, IManagedWindow
             Position = new Vector2(12, 42),
             Size = new Vector2(546, 315),
             BbcodeEnabled = true,
-            Text = "[color=#c0b090]行会公告：[/color]\n\n" +
-                   "[color=#ffff88]1. 本周六晚八点准时集结沙巴克攻城战，请所有兄弟备足疗伤药与随机传送卷！[/color]\n" +
-                   "[color=#a0d8ef]2. 掌门与各位堂主已在祖玛教主大厅布置伏击，行会成员享有优先补给权。[/color]\n" +
-                   "[color=#88ff88]3. 严禁在本会练级区域恶意抢怪PK，违者严惩不贷！[/color]\n\n" +
-                   "[color=#d0c0a0]行会同盟：邪风军团、昔日同盟\n敌对行会：不败神话[/color]"
+            Text = ""
         };
         _noticeText.AddThemeFontSizeOverride("normal_font_size", 11);
         _homeView.AddChild(_noticeText);
@@ -182,11 +181,12 @@ public partial class GuildPanelView : Control, IManagedWindow
         _memberListView.AddChild(_memberListContainer);
 
         // 初始填充默认成员
-        AddMemberRow("掌门", "无涯", "道士", 45, true);
-        AddMemberRow("副掌门", "风之影", "战士", 44, true);
-        AddMemberRow("堂主", "法神天下", "法师", 43, true);
-        AddMemberRow("精英", "烈火狂人", "战士", 42, false);
-        AddMemberRow("会员", "碧海潮生", "法师", 40, true);
+        // 默认成员为非官方演示数据,已移除
+        // 官方 sub_493F58 (0x49401d):灰色 0xC0C0C0 文本 @(18,291),取自窗体字段 +2484;默认提示串见 0x4937E4
+        var lblHint = new Label { Name = "LblGuildHint", Position = new Vector2(18, 291 - 3), Text = "请点击 [名单]按钮以调出行会成员信息。" };
+        lblHint.AddThemeFontSizeOverride("font_size", 12);
+        lblHint.AddThemeColorOverride("font_color", new Color(0.753f, 0.753f, 0.753f));
+        _panel.AddChild(lblHint);
 
         // 官方 1.5 行会底栏 6 大原生操作按钮 (Prguse_0182~0203 64x16 偶数Normal 奇数Pressed):
         // 列 1:
