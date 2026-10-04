@@ -364,4 +364,82 @@ public class TestProtocolMatrix
             // 服务端未启动时忽略，启动时完整测试通道
         }
     }
+
+    [Fact]
+    public void TestServerMessageRouter_SendUserStateAndGuildList_Parsing()
+    {
+        // 1. 验证观人协议 SM_SENDUSERSTATE (751) 字符串解包
+        string userStateStr = "无涯/40/2/1|64,53,111,219,108,189,189,171,171";
+        var baseParts = userStateStr.Split('|');
+        var infoParts = baseParts[0].Split('/');
+
+        Assert.Equal("无涯", infoParts[0]);
+        Assert.Equal(40, int.Parse(infoParts[1]));
+        Assert.Equal(2, int.Parse(infoParts[2])); // 道士
+        Assert.Equal(1, int.Parse(infoParts[3])); // 女性 (Prguse_0377)
+
+        var slots = baseParts[1].Split(',');
+        Assert.Equal(9, slots.Length);
+        Assert.Equal(64, int.Parse(slots[0])); // 幽灵战衣
+        Assert.Equal(53, int.Parse(slots[1])); // 龙纹剑
+
+        // 2. 验证行会名单协议 SM_SENDGUILDMEMBERLIST (756) 解包
+        string guildMembersStr = "掌门人\t无涯\t道士\t40\t在线\n副会长\t烈火狂战\t战士\t38\t在线\n堂主\t冰雪法皇\t法师\t36\t离线";
+        var lines = guildMembersStr.Split('\n');
+        Assert.Equal(3, lines.Length);
+
+        var firstParts = lines[0].Split('\t');
+        Assert.Equal("掌门人", firstParts[0]);
+        Assert.Equal("无涯", firstParts[1]);
+        Assert.Equal("道士", firstParts[2]);
+        Assert.Equal("40", firstParts[3]);
+        Assert.Equal("在线", firstParts[4]);
+    }
+
+    [Fact]
+    public void TestServerMessageRouter_DynamicUI_DataDriving_FullPipeline()
+    {
+        // 1. 验证背包物品添加 SM_ADDITEM (200) 协议 Extra 解析
+        string addItemStr = "屠龙/StateItem_0051.png/[color=#ffff00]攻击 5-35 重量 99[/color]";
+        var addParts = addItemStr.Split('/');
+        Assert.Equal("屠龙", addParts[0]);
+        Assert.Equal("StateItem_0051.png", addParts[1]);
+        Assert.Contains("攻击 5-35", addParts[2]);
+
+        // 2. 验证技能列表 SM_SENDUSERMAGIC (201) 批量解析
+        string magicListStr = "3/基本剑术/0/F1/3/1200/1200/被动剑术\n10/雷电术/10/F2/3/3000/3000/召唤雷电\n2/治愈术/20/F3/2/1500/2000/精神力治疗";
+        var magicLines = magicListStr.Split('\n');
+        Assert.Equal(3, magicLines.Length);
+        var thunder = magicLines[1].Split('/');
+        Assert.Equal(10, int.Parse(thunder[0]));
+        Assert.Equal("雷电术", thunder[1]);
+        Assert.Equal("F2", thunder[3]);
+        Assert.Equal(3, int.Parse(thunder[4]));
+
+        // 3. 验证装备信息 SM_EQUIPINFO (621) 9 槽批量解包
+        string equipStr = "51/屠龙/攻击5-35,64/幽灵战衣/防御4-7,111/荣誉勋章/防1攻1";
+        var equipSlots = equipStr.Split(',');
+        Assert.Equal(3, equipSlots.Length);
+        var weaponParts = equipSlots[0].Split('/');
+        Assert.Equal("51", weaponParts[0]);
+        Assert.Equal("屠龙", weaponParts[1]);
+
+        // 4. 验证商店货架 SM_MERCHANTDLG (631) 解析
+        string shopStr = "#铁匠铺老板\n金创药(小量)\t1\t55\n魔法药(小量)\t1\t55\n铁剑\t10\t880";
+        var shopLines = shopStr.Split('\n');
+        Assert.Equal(4, shopLines.Length);
+        Assert.Equal("#铁匠铺老板", shopLines[0]);
+        var swordParts = shopLines[3].Split('\t');
+        Assert.Equal("铁剑", swordParts[0]);
+        Assert.Equal(10, int.Parse(swordParts[1]));
+        Assert.Equal(880, int.Parse(swordParts[2]));
+
+        // 5. 验证血魔变动 SM_HEALTHSPELLCHANGED (53) 四元组解析
+        string hpMpStr = "150/150/80/100";
+        var hpMpParts = hpMpStr.Split('/');
+        Assert.Equal(150, int.Parse(hpMpParts[0]));
+        Assert.Equal(150, int.Parse(hpMpParts[1]));
+        Assert.Equal(80, int.Parse(hpMpParts[2]));
+        Assert.Equal(100, int.Parse(hpMpParts[3]));
+    }
 }

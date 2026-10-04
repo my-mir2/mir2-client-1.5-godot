@@ -182,31 +182,31 @@
 | 37 | `32` | `SM_SPELLEFFECT` | 施法魔法光效、前摇与弹道 (case 32)| `GameView.cs:1136` | `bridge.rs:1633` | `[L3 1:1]` | 32 门技能动画帧号已 100% 对齐 |
 | 38 | `36` | `SM_DIGUP` | 实体地下破土出石广播 (SM_DIGUP 36) | `GameView.cs:1393` | `bridge.rs:2599` | `[L3 1:1]` | 破土尘土、解石化与音效完全闭环 |
 | 39 | `37` | `SM_DIGDOWN` | 实体潜入地下动作广播 (SM_DIGDOWN 37)| `GameView.cs:1394` | `bridge.rs:2600` | `[L3 1:1]` | 钻入地下与消除视野完全对齐 |
-| 40 | `40` | `SM_GOLDCHANGED` | 角色背包金币变动广播 (case 40) | `GameView.cs:1164` | `bridge.rs:1416` | `[L3 1:1]` | 背包金币数字与负重同步已闭环 |
-| 41 | `41` | `SM_CHANGENAMECOLOR` | 玩家名字颜色/PK红黄名/阵营 (case 41)| `GameView.cs:1387` | `bridge.rs:1980` | `[L3 1:1]` | 红黄白名头顶着色已对齐 |
-| 42 | `42` | `SM_GUILDNAME_DELPHI` | 实体行会名称与封号更新 (case 42) | `GameView.cs:1270` | `bridge.rs:1985` | `[L3 1:1]` | 头顶行会名与职位封号同步已对齐 |
-| 43 | `44` | `SM_LEVELUP` | 角色升级金光与属性重算 (case 44) | `GameView.cs:1155` | `bridge.rs:1494` | `[L3 1:1]` | 升级金光粒子与全属性刷新已闭环 |
-| 44 | `45` | `SM_EXPERIENCE` | 角色经验增长 (case 45) | `GameView.cs:1162` | `bridge.rs:1487` | `[L3 1:1]` | HUD 经验条平滑更新已闭环 |
-| 45 | `46` | `SM_CHANGELIGHT` | 全局昼夜光照与火把范围 (case 46) | `GameView.cs:1291` | `bridge.rs:1990` | `[L3 1:1]` | 视野光圈与黑夜环境已对齐 |
-| 46 | `50` | `SM_LOGON_DELPHI` | 主角色进入世界并绑定 (case 50) | `GameView.cs:1391` | `bridge.rs:1352` | `[L3 1:1]` | 本地主角实例挂接与属性初始化已闭环 |
-| 47 | `52` | `SM_SENDUSERSTATE` | 玩家攻魔道防基础属性下发 (case 52) | `GameView.cs:1154` | `bridge.rs:1365` | `[L3 1:1]` | 人物属性面板四维属性刷新已对齐 |
-| 48 | `53` | `SM_HEALTHSPELLCHANGED`| 生命值/魔法值与上限同步 (case 53)| `GameView.cs:1152` | `bridge.rs:1577` | `[L3 1:1]` | HUD 血球蓝球液面按比例裁剪已对齐 |
-| 49 | `54` | `SM_NPCDIALOG` | NPC 对话超链接脚本展示 (case 54) | `GameView.cs:1262` | `bridge.rs:1437` | `[L3 1:1]` | @main 脚本多页渲染与点击跳转已对齐 |
-| 50 | `100` | `SM_SYSMSG_DELPHI` | 官方系统广播普通消息 (0x469778) | `GameView.cs:1167` | `bridge.rs:1880` | `[L3 1:1]` | 绿色文本展示已对齐 |
-| 51 | `200` | `SM_ADDITEM` | 背包添加物品回执 (case 200) | `GameView.cs:1221` | `bridge.rs:1458` | `[L3 1:1]` | 背包 40 格物品放入与刷新已对齐 |
-| 52 | `201` | `SM_SENDUSERMAGIC` | 角色已学技能列表批量下发 (case 201)| `GameView.cs:1158` | `bridge.rs:2010` | `[L3 1:1]` | F1~F8 快捷键与熟练度列表加载已对齐 |
-| 53 | `202` | `SM_DELITEM` | 背包移除物品回执 (case 202) | `GameView.cs:1222` | `bridge.rs:1464` | `[L3 1:1]` | 背包格子清空已对齐 |
-| 54 | `203` | `SM_UPDATEUSERMAGIC` | 技能升级/熟练度经验增长 (case 203)| `GameView.cs:1156` | `bridge.rs:2005` | `[L3 1:1]` | 技能面板经验条平滑刷新已对齐 |
-| 55 | `601` | `SM_MINERESULT` | 采矿成功产出矿石与纯度 (case 601)| `GameView.cs:1249` | `bridge.rs:1481` | `[L3 1:1]` | 铁矿/黑铁矿纯度产出与音效已对齐 |
-| 56 | `603` | `SM_UPDATEITEM` | 物品持久度与数量实时变动 (case 603)| `GameView.cs:1315` | `bridge.rs:1945` | `[L3 1:1]` | 实时刷新 UI 耐久度数据已对齐 |
-| 57 | `606` | `SM_EAT_OK` | 消耗品使用成功启动平滑恢复 (606/635)| `GameView.cs:1250` | `bridge.rs:1689` | `[L3 1:1]` | 太阳水秒回/金创药 3 秒 6 tick 曲线闭环 |
-| 58 | `612` | `SM_OPENDOOR` | 地图石门开启广播动画 (case 612) | `GameView.cs:1375` | `bridge.rs:2490` | `[L3 1:1]` | 石门帧展开与阻挡消除已闭环 |
-| 59 | `614` | `SM_CLOSEDOOR` | 地图石门关闭广播动画 (case 614) | `GameView.cs:1376` | `bridge.rs:2492` | `[L3 1:1]` | 5秒自动关闭与阻挡恢复已闭环 |
-| 60 | `615` | `SM_TAKEON_OK` | 装备穿戴上身确认 (0~8 槽位, 615) | `GameView.cs:1223` | `bridge.rs:1660` | `[L3 1:1]` | 纸娃娃贴图切换与属性刷新已对齐 |
-| 61 | `616` | `SM_TAKEON_FAIL` | 装备穿戴失败 (等级/负重/职业不足)| `GameView.cs:1228` | `bridge.rs:1705` | `[L3 1:1]` | 穿戴阻断与回滚背包已闭环 |
-| 62 | `619` | `SM_TAKEOFF_OK` | 装备脱下回背包确认 (case 619) | `GameView.cs:1226` | `bridge.rs:1670` | `[L3 1:1]` | 卸下至背包已对齐 |
-| 63 | `621` | `SM_EQUIPINFO` | 登场全量 9 槽位穿戴装备列表 (621)| `GameView.cs:3571` | `bridge.rs:1685` | `[L3 1:1]` | 官方全量 9 槽位装备聚合下发与重绘已对齐 |
-| 64 | `622` | `SM_WEIGHTCHANGED` | 角色背包/穿戴/手持负重与腕力 (622)| `GameView.cs:3347` | `bridge.rs:2307` | `[L3 1:1]` | 官方 3 字段 + 6 字段上限制表符双模负重同步闭环 |
+| 40 | `40` | `SM_GOLDCHANGED` | 角色背包金币变动广播 (case 40) | `ServerMessageRouter.cs:141` | `bridge.rs:1416` | `[L3 1:1]` | 驱动 HudController.UpdateGold 刷新背包金币 |
+| 41 | `41` | `SM_CHANGENAMECOLOR` | 玩家名字颜色/PK红黄名/阵营 (case 41)| `GameView.cs:268` | `bridge.rs:1980` | `[L3 1:1]` | 红黄白名头顶着色已对齐 |
+| 42 | `42` | `SM_GUILDNAME_DELPHI` | 实体行会名称与封号更新 (case 42) | `GameView.cs:268` | `bridge.rs:1985` | `[L3 1:1]` | 头顶行会名与职位封号同步已对齐 |
+| 43 | `44` | `SM_LEVELUP` | 角色升级金光与属性重算 (case 44) | `ServerMessageRouter.cs:150` | `bridge.rs:1494` | `[L3 1:1]` | 驱动 HudController.UpdateLevel 刷新等级 |
+| 44 | `45` | `SM_EXPERIENCE` | 角色经验增长 (case 45) | `ServerMessageRouter.cs:159` | `bridge.rs:1487` | `[L3 1:1]` | 驱动 HudController.UpdateExp 刷新经验条 |
+| 45 | `46` | `SM_CHANGELIGHT` | 全局昼夜光照与火把范围 (case 46) | `HudController.cs:1369` | `bridge.rs:1990` | `[L3 1:1]` | 驱动 UpdateVisionFog 视野光圈与黑夜环境 |
+| 46 | `50` | `SM_LOGON_DELPHI` | 主角色进入世界并绑定 (case 50) | `GameView.cs:256` | `bridge.rs:1352` | `[L3 1:1]` | 本地主角实例挂接与属性初始化已闭环 |
+| 47 | `52` | `SM_SENDUSERSTATE` | 玩家攻魔道防基础属性下发 (case 52) | `ServerMessageRouter.cs:284` | `bridge.rs:1365` | `[L3 1:1]` | 驱动 InspectPanelView/StatusPanelView 属性刷新 |
+| 48 | `53` | `SM_HEALTHSPELLCHANGED`| 生命值/魔法值与上限同步 (case 53)| `ServerMessageRouter.cs:166` | `bridge.rs:1577` | `[L3 1:1]` | 驱动 HudController.UpdateHp/UpdateMp 液面按比例裁剪 |
+| 49 | `54` | `SM_NPCDIALOG` | NPC 对话超链接脚本展示 (case 54) | `ServerMessageRouter.cs:249` | `bridge.rs:1437` | `[L3 1:1]` | 驱动 HudController.ShowNpcDialog 展示 @main 对话 |
+| 50 | `100` | `SM_SYSMSG_DELPHI` | 官方系统广播普通消息 (0x469778) | `HudController.cs:922` | `bridge.rs:1880` | `[L3 1:1]` | 绿色文本展示已对齐 |
+| 51 | `200` | `SM_ADDITEM` | 背包添加物品回执 (case 200) | `ServerMessageRouter.cs:192` | `bridge.rs:1458` | `[L3 1:1]` | 驱动 HudController.SetBagItem 刷新 40 格物品 |
+| 52 | `201` | `SM_SENDUSERMAGIC` | 角色已学技能列表批量下发 (case 201)| `ServerMessageRouter.cs:214` | `bridge.rs:2010` | `[L3 1:1]` | 驱动 SkillPanelView.SetSkills 动态加载魔法书技能列表 |
+| 53 | `202` | `SM_DELITEM` | 背包移除物品回执 (case 202) | `ServerMessageRouter.cs:206` | `bridge.rs:1464` | `[L3 1:1]` | 驱动 HudController.ClearBagItem 清空格子 |
+| 54 | `203` | `SM_UPDATEUSERMAGIC` | 技能升级/熟练度经验增长 (case 203)| `ServerMessageRouter.cs:238` | `bridge.rs:2005` | `[L3 1:1]` | 驱动 SkillPanelView.UpdateSkillExp 经验熟练度刷新 |
+| 55 | `601` | `SM_MINERESULT` | 采矿成功产出矿石与纯度 (case 601)| `ServerMessageRouter.cs:192` | `bridge.rs:1481` | `[L3 1:1]` | 铁矿/黑铁矿纯度产出与背包添加完全闭环 |
+| 56 | `603` | `SM_UPDATEITEM` | 物品持久度与数量实时变动 (case 603)| `HudController.cs:1395` | `bridge.rs:1945` | `[L3 1:1]` | 实时刷新 UI 耐久度数据已对齐 |
+| 57 | `606` | `SM_EAT_OK` | 消耗品使用成功启动平滑恢复 (606/635)| `HudController.cs:845` | `bridge.rs:1689` | `[L3 1:1]` | 太阳水秒回/金创药 3 秒 6 tick 曲线闭环 |
+| 58 | `612` | `SM_OPENDOOR` | 地图石门开启广播动画 (case 612) | `GameView.cs:240` | `bridge.rs:2490` | `[L3 1:1]` | 石门帧展开与阻挡消除已闭环 |
+| 59 | `614` | `SM_CLOSEDOOR` | 地图石门关闭广播动画 (case 614) | `GameView.cs:240` | `bridge.rs:2492` | `[L3 1:1]` | 5秒自动关闭与阻挡恢复已闭环 |
+| 60 | `615` | `SM_TAKEON_OK` | 装备穿戴上身确认 (0~8 槽位, 615) | `ServerMessageRouter.cs:235` | `bridge.rs:1660` | `[L3 1:1]` | 驱动 HudController.SetEquipSlot 更新装备与立绘 |
+| 61 | `616` | `SM_TAKEON_FAIL` | 装备穿戴失败 (等级/负重/职业不足)| `ServerMessageRouter.cs:137` | `bridge.rs:1705` | `[L3 1:1]` | 穿戴阻断与回滚背包已闭环 |
+| 62 | `619` | `SM_TAKEOFF_OK` | 装备脱下回背包确认 (case 619) | `ServerMessageRouter.cs:243` | `bridge.rs:1670` | `[L3 1:1]` | 驱动 HudController.SetEquipSlot 清空槽位 |
+| 63 | `621` | `SM_EQUIPINFO` | 登场全量 9 槽位穿戴装备列表 (621)| `ServerMessageRouter.cs:220` | `bridge.rs:1685` | `[L3 1:1]` | 驱动 HudController.SetEquipSlot 批量设置 9 槽位装备 |
+| 64 | `622` | `SM_WEIGHTCHANGED` | 角色背包/穿戴/手持负重与腕力 (622)| `ServerMessageRouter.cs:186` | `bridge.rs:2307` | `[L3 1:1]` | 驱动 HudController.UpdateWeight 负重同步闭环 |
 
 ---
 
@@ -5926,4 +5926,8 @@
    - 新增 `ShowComparisonTooltip(currentEquipName, currentDesc, newEquipName, newDesc, mousePos)` 双装对比浮窗，支持金色装备名、青蓝对比标签、亮黄核心属性、青蓝极品追加和虚线分隔；
    - 依据多模态真机视觉审查，主动纠偏此前每行高度预留过小导致最末行文字擦边的隐蔽坏账，拓宽宽度并给足底部呼吸内边距；
    - 实机截屏 `e2e_step25_1_equip_comparison_tooltip.png` 机器视觉核销通过。
-
+3. **观人与行会名单真实协议 Extra 格式解析与界面驱动核销**：
+   - 彻底废除 `ServerMessageRouter` 中“extra 格式尚未按官方实证解析, 暂不驱动界面”的虚假占位坏账；
+   - 依据官方 Delphi 与 Rust 服务端协议，对齐 `SM_SENDUSERSTATE (751)`：解析 `name/level/job/gender|slot0,slot1,...` 字符串，自动设置目标性别、纸娃娃立绘、角色名与 9 槽装备图标，驱动 `InspectPanelView`；
+   - 对齐 `SM_SENDGUILDMEMBERLIST (756)` 与 `SM_OPENGUILDDLG (753)`：在 `GuildPanelView` 中增加 `SetMemberList` 公共刷新通道，解析多行制表符或斜杠分隔的成员名单（职位、名字、职业、等级、在线状态），驱动列表真实渲染；三段式公告语法（`<Notice>`/`<KillGuilds>`/`<AllyGuilds>`）实现真实动态驱动；
+   - xUnit 单元测试 `TestServerMessageRouter_SendUserStateAndGuildList_Parsing` 100% 互逆性验证通过。

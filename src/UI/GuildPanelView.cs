@@ -269,6 +269,24 @@ public partial class GuildPanelView : Control, IManagedWindow
         _memberListContainer.AddChild(row);
     }
 
+    /// <summary>
+    /// 设置并刷新行会成员名单 (由 SM_SENDGUILDMEMBERLIST / SM_GUILDMEMBERLIST 驱动)
+    /// </summary>
+    public void SetMemberList(IEnumerable<(string role, string name, string job, int level, bool online)> members)
+    {
+        if (_memberListContainer != null)
+        {
+            foreach (Node child in _memberListContainer.GetChildren())
+            {
+                child.QueueFree();
+            }
+            foreach (var m in members)
+            {
+                AddMemberRow(m.role, m.name, m.job, m.level, m.online);
+            }
+        }
+    }
+
     public void ShowHome()
     {
         if (_homeView != null) _homeView.Visible = true;

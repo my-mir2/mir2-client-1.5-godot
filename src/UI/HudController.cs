@@ -49,6 +49,11 @@ public partial class HudController : CanvasLayer
     private RichTextLabel? _chatLog;
     private LineEdit? _chatInput;
 
+    private readonly SlotButton?[] _bagSlots = new SlotButton?[40];
+    private readonly (string Name, string Desc)?[] _bagItemDetails = new (string, string)?[40];
+    private readonly SlotButton?[] _equipSlots = new SlotButton?[9];
+    private readonly (string Name, string Desc)?[] _equipItemDetails = new (string, string)?[9];
+
     // 场景原生窗体控件与大世界原生面板
     private Panel? _bagPanel;
     private Panel? _equipPanel;
@@ -329,12 +334,16 @@ public partial class HudController : CanvasLayer
                             CustomMinimumSize = new Vector2(36f, 32f), // 严格对齐官方 IDA sub_457D88 (CellWidth=36, CellHeight=32)
                             Flat = true
                         };
+                        _bagSlots[slot] = btn;
                         btn.Pressed += () => EmitSignal(SignalName.UseItemRequested, slot);
                         btn.MouseEntered += () =>
                         {
                             if (btn.ItemTexture != null || btn.Icon != null)
                             {
-                                ShowSlotTooltip($"背包物品 #{slot + 1}", "[color=#c0c0c0]重量 1   持久力 10/10[/color]\n[color=#ffff00]攻击 0-1[/color]", btn.GlobalPosition, showFloating: false);
+                                var details = _bagItemDetails[slot];
+                                string name = details?.Name ?? $"背包物品 #{slot + 1}";
+                                string desc = details?.Desc ?? "[color=#c0c0c0]重量 1   持久力 10/10[/color]\n[color=#ffff00]攻击 0-1[/color]";
+                                ShowSlotTooltip(name, desc, btn.GlobalPosition, showFloating: false);
                             }
                         };
                         btn.MouseExited += HideSlotTooltip;
@@ -573,10 +582,11 @@ public partial class HudController : CanvasLayer
                     Flat = true,
                     ItemTexture = equipIcon
                 };
+                _equipSlots[equipSlot] = btn;
                 btn.Pressed += () => EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
                 btn.MouseEntered += () =>
                 {
-                    var (itemName, itemDesc) = equipSlot switch
+                    var (fallbackName, fallbackDesc) = equipSlot switch
                     {
                         0 => ("重盔甲(男)", "[color=#c0c0c0]重量 23   持久力 25/25[/color]\n[color=#ffff00]防御 4-7[/color] [color=#00ffff](+1)[/color]   [color=#ffff00]魔御 2-3[/color]\n[color=#c0c0c0]需要等级 22[/color]"),
                         1 => ("炼狱", "[color=#c0c0c0]重量 60   持久力 28/28[/color]\n[color=#ffff00]攻击 0-25[/color] [color=#00ffff](+1)[/color]\n[color=#c0c0c0]需要等级 26[/color]"),
@@ -589,6 +599,9 @@ public partial class HudController : CanvasLayer
                         8 => ("骷髅戒指(左)", "[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]攻击 0-3[/color]\n[color=#c0c0c0]需要等级 20[/color]"),
                         _ => ("装备", "[color=#c0c0c0]重量 1   持久力 10/10[/color]")
                     };
+                    var details = _equipItemDetails[equipSlot];
+                    string itemName = details?.Name ?? fallbackName;
+                    string itemDesc = details?.Desc ?? fallbackDesc;
                     ShowSlotTooltip(itemName, itemDesc, btn.GlobalPosition, showFloating: false);
                 };
                 btn.MouseExited += HideSlotTooltip;
@@ -1373,5 +1386,97 @@ public partial class HudController : CanvasLayer
         float outerPx = Math.Max(40.0f, radiusTiles * 52.0f);
         _fogShaderMat.SetShaderParameter("inner_radius", innerPx);
         _fogShaderMat.SetShaderParameter("outer_radius", outerPx);
+    }
+
+    /// <summary>
+    /// 设置背包指定槽位物品与属性 (由 SM_ADDITEM / SM_BAGITEMS 驱动)
+    /// </summary>
+    public void SetBagItem(int slot, string itemName, string iconFile, string desc)
+    {
+        if (slot < 0 || slot >= 40) return;
+        _bagItemDetails[slot] = (itemName, desc);
+        var btn = _bagSlots[slot];
+        if (btn != null)
+        {
+            btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}");
+        }
+    }
+
+    /// <summary>
+    /// 清空背包指定槽位 (由 SM_DELITEM 驱动)
+    /// </summary>
+    public void ClearBagItem(int slot)
+    {
+        if (slot < 0 || slot >= 40) return;
+        _bagItemDetails[slot] = null;
+        var btn = _bagSlots[slot];
+        if (btn != null)
+        {
+            btn.ItemTexture = null;
+        }
+    }
+
+    /// <summary>
+    /// 清空背包全部 40 格
+    /// </summary>
+    public void ClearAllBagItems()
+    {
+        for (int i = 0; i < 40; i++)
+        {
+            ClearBagItem(i);
+        }
+    }
+
+    /// <summary>
+    /// 设置已穿戴装备槽位 (由 SM_EQUIPINFO / SM_TAKEON_OK / SM_TAKEOFF_OK 驱动)
+    /// </summary>
+    public void SetEquipSlot(int equipSlot, string? itemName, string? iconFile, string? desc)
+    {
+        if (equipSlot < 0 || equipSlot >= 9) return;
+        if (string.IsNullOrEmpty(itemName))
+        {
+            _equipItemDetails[equipSlot] = null;
+            var btn = _equipSlots[equipSlot];
+            if (btn != null) btn.ItemTexture = null;
+        }
+        else
+        {
+            _equipItemDetails[equipSlot] = (itemName, desc ?? string.Empty);
+            var btn = _equipSlots[equipSlot];
+            if (btn != null)
+            {
+                btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 打开并显示 NPC 交互脚本对话 (由 SM_NPCDIALOG 驱动)
+    /// </summary>
+    public void ShowNpcDialog(string content)
+    {
+        if (_npcDialogView != null)
+        {
+            _npcDialogView.ShowDialog(content);
+            if (!_npcDialogView.Visible)
+            {
+                _stackManager.ToggleWindow(_npcDialogView);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 打开并展示商店货架 (由 SM_MERCHANTDLG / SM_SENDGOODSLIST 驱动)
+    /// </summary>
+    public void ShowShop(string npcName, IEnumerable<ShopPanelView.ShopItemEntry> items)
+    {
+        if (_shopPanelView != null)
+        {
+            _shopPanelView.SetItems(items);
+            if (!_shopPanelView.Visible)
+            {
+                _stackManager.ToggleWindow(_shopPanelView);
+            }
+        }
     }
 }

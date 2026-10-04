@@ -153,23 +153,69 @@ public partial class SkillPanelView : Control, IManagedWindow
         (208, 33)
     ];
 
+    public record SkillItemData(int MagicId, string Name, int IconIdx, string Key, int Level, int CurTrain, int MaxTrain, string Desc);
+
     // 全量技能列表定义 (支持战法道全套 1.5 原生技能库，每页 5 项)
     // 包含技能 ID, 名称, 贴图索引, 快捷键, 当前等级, 当前修炼点数, 升级所需修炼点数, 技能说明
-    private static readonly (int MagicId, string Name, int IconIdx, string Key, int Level, int CurTrain, int MaxTrain, string Desc)[] AllSkills =
+    private static readonly SkillItemData[] DefaultSkills =
     [
         // 第一页: 战士核心近战
-        (3, "基本剑术", 0, "F1", 3, 1200, 1200, "战士基本剑术，随修炼等级提升命中率与攻击稳定性。"),
-        (7, "攻杀剑术", 1, "F2", 3, 2400, 2400, "战士被动攻击剑术，攻击时有一定几率造成额外破坏力。"),
-        (12, "刺杀剑术", 2, "F3", 2, 1450, 3000, "战士隔位强攻技能，剑气可穿透目标防御与魔法盾。"),
-        (25, "半月弯刀", 3, "F4", 1, 680, 4000, "战士群体剑气技能，对扇形范围内的多个目标造成伤害。"),
-        (26, "烈火剑法", 4, "F5", 0, 120, 5000, "战士终极近战爆发技能，凝聚烈火精灵造成超强暴击。"),
+        new(3, "基本剑术", 0, "F1", 3, 1200, 1200, "战士基本剑术，随修炼等级提升命中率与攻击稳定性。"),
+        new(7, "攻杀剑术", 1, "F2", 3, 2400, 2400, "战士被动攻击剑术，攻击时有一定几率造成额外破坏力。"),
+        new(12, "刺杀剑术", 2, "F3", 2, 1450, 3000, "战士隔位强攻技能，剑气可穿透目标防御与魔法盾。"),
+        new(25, "半月弯刀", 3, "F4", 1, 680, 4000, "战士群体剑气技能，对扇形范围内的多个目标造成伤害。"),
+        new(26, "烈火剑法", 4, "F5", 0, 120, 5000, "战士终极近战爆发技能，凝聚烈火精灵造成超强暴击。"),
         // 第二页: 战士与法道进阶
-        (27, "野蛮冲撞", 5, "F6", 1, 350, 2000, "利用强健的体魄冲撞前方的敌人，使其陷入短暂僵直。"),
-        (1, "火球术", 6, "F7", 3, 1000, 1000, "法师基础攻击魔法，凝聚火焰对单个敌人造成魔法伤害。"),
-        (10, "雷电术", 10, "F8", 2, 1800, 3500, "召唤九天神雷劈击敌人，对亡灵不死系怪物有极高克制。"),
-        (2, "治愈术", 20, "", 3, 2000, 2000, "道士基础回血魔法，消耗精神力回复自身或队友的生命值。"),
-        (13, "灵魂火符", 23, "", 1, 420, 2500, "道士核心远程攻击符咒，消耗护身符与法力掷出爆破火符。")
+        new(27, "野蛮冲撞", 5, "F6", 1, 350, 2000, "利用强健的体魄冲撞前方的敌人，使其陷入短暂僵直。"),
+        new(1, "火球术", 6, "F7", 3, 1000, 1000, "法师基础攻击魔法，凝聚火焰对单个敌人造成魔法伤害。"),
+        new(10, "雷电术", 10, "F8", 2, 1800, 3500, "召唤九天神雷劈击敌人，对亡灵不死系怪物有极高克制。"),
+        new(2, "治愈术", 20, "", 3, 2000, 2000, "道士基础回血魔法，消耗精神力回复自身或队友的生命值。"),
+        new(13, "灵魂火符", 23, "", 1, 420, 2500, "道士核心远程攻击符咒，消耗护身符与法力掷出爆破火符。")
     ];
+
+    private readonly List<SkillItemData> _skills = new(DefaultSkills);
+
+    /// <summary>
+    /// 设置并刷新技能列表 (由 SM_SENDUSERMAGIC / SM_SENDMYMAGIC 驱动)
+    /// </summary>
+    public void SetSkills(IEnumerable<SkillItemData> skills)
+    {
+        _skills.Clear();
+        _skills.AddRange(skills);
+        _currentPage = 0;
+        RenderCurrentPage();
+    }
+
+    /// <summary>
+    /// 添加或更新单项技能 (由 SM_ADDMAGIC 驱动)
+    /// </summary>
+    public void AddOrUpdateSkill(SkillItemData skill)
+    {
+        int idx = _skills.FindIndex(s => s.MagicId == skill.MagicId);
+        if (idx >= 0)
+        {
+            _skills[idx] = skill;
+        }
+        else
+        {
+            _skills.Add(skill);
+        }
+        RenderCurrentPage();
+    }
+
+    /// <summary>
+    /// 更新技能经验与熟练度 (由 SM_UPDATEUSERMAGIC / SM_MAGICLVEXP 驱动)
+    /// </summary>
+    public void UpdateSkillExp(int magicId, int level, int curTrain, int maxTrain)
+    {
+        int idx = _skills.FindIndex(s => s.MagicId == magicId);
+        if (idx >= 0)
+        {
+            var old = _skills[idx];
+            _skills[idx] = old with { Level = level, CurTrain = curTrain, MaxTrain = maxTrain };
+            RenderCurrentPage();
+        }
+    }
 
     private void RenderCurrentPage()
     {
@@ -180,17 +226,17 @@ public partial class SkillPanelView : Control, IManagedWindow
         }
 
         int startIdx = _currentPage * 5;
-        if (startIdx < AllSkills.Length && _lblSkillDesc != null)
+        if (startIdx < _skills.Count && _lblSkillDesc != null)
         {
-            _lblSkillDesc.Text = AllSkills[startIdx].Desc;
+            _lblSkillDesc.Text = _skills[startIdx].Desc;
         }
 
         for (int i = 0; i < 5; i++)
         {
             int dataIdx = startIdx + i;
-            if (dataIdx >= AllSkills.Length) break;
+            if (dataIdx >= _skills.Count) break;
 
-            var skill = AllSkills[dataIdx];
+            var skill = _skills[dataIdx];
             var (rowY, rowH) = SlotRows[i];
 
             // 官方原生 MagIcon 技能贴图 (32x30)
@@ -322,7 +368,7 @@ public partial class SkillPanelView : Control, IManagedWindow
 
     public void NextPage()
     {
-        if ((_currentPage + 1) * 5 < AllSkills.Length)
+        if ((_currentPage + 1) * 5 < _skills.Count)
         {
             _currentPage++;
             RenderCurrentPage();
@@ -331,13 +377,13 @@ public partial class SkillPanelView : Control, IManagedWindow
 
     public void UpdateSkillKey(int magicId, int keyNum)
     {
-        for (int i = 0; i < AllSkills.Length; i++)
+        for (int i = 0; i < _skills.Count; i++)
         {
-            if (AllSkills[i].MagicId == magicId)
+            if (_skills[i].MagicId == magicId)
             {
                 string keyStr = keyNum > 0 ? $"F{keyNum}" : "";
-                var old = AllSkills[i];
-                AllSkills[i] = (old.MagicId, old.Name, old.IconIdx, keyStr, old.Level, old.CurTrain, old.MaxTrain, old.Desc);
+                var old = _skills[i];
+                _skills[i] = old with { Key = keyStr };
                 RenderCurrentPage();
                 break;
             }
