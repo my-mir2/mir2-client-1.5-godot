@@ -229,7 +229,6 @@ public partial class InspectPanelView : Control, IManagedWindow
 
         // 官方无默认描述: 仅在鼠标悬停槽位时显示该装备文本,默认保持为空
     }
-    }
 
     private RichTextLabel? _lblInspectDesc;
 
