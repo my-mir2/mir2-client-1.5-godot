@@ -629,6 +629,30 @@ public class TestUiSceneBindingArchitecture
         Assert.Equal("210", AdjustAbilPanelView.DefaultBaseStats[5]); // HP
         Assert.Equal("45", AdjustAbilPanelView.DefaultBaseStats[6]);  // MP
     }
+
+    [Fact]
+    public void TestNpcChebyshevDistanceAndStorageMode_GroundTruth()
+    {
+        // 1. 官方实证切比雪夫门限 <= 15 (M2Server sub_4DC2B8 / sub_4DC664)
+        Assert.Equal(15, HudController.MaxNpcInteractDistance);
+
+        // 验证切比雪夫距离判定: 临界值 15 合法，16 越界
+        var npcPos = (X: 330, Y: 270);
+        var playerInside = (X: 345, Y: 285);
+        int distInside = Math.Max(Math.Abs(playerInside.X - npcPos.X), Math.Abs(playerInside.Y - npcPos.Y));
+        Assert.Equal(15, distInside);
+        Assert.True(distInside <= HudController.MaxNpcInteractDistance);
+
+        var playerOutside = (X: 346, Y: 270);
+        int distOutside = Math.Max(Math.Abs(playerOutside.X - npcPos.X), Math.Abs(playerOutside.Y - npcPos.Y));
+        Assert.Equal(16, distOutside);
+        Assert.True(distOutside > HudController.MaxNpcInteractDistance);
+
+        // 2. 商店面板模式分化枚举测试 (Buy / Sell / Storage)
+        Assert.Equal(ShopPanelView.ShopMode.Buy, (ShopPanelView.ShopMode)0);
+        Assert.Equal(ShopPanelView.ShopMode.Sell, (ShopPanelView.ShopMode)1);
+        Assert.Equal(ShopPanelView.ShopMode.Storage, (ShopPanelView.ShopMode)2);
+    }
 }
 
 

@@ -1236,6 +1236,12 @@ namespace Mir2Client.UI
                     HudInstance?.AddChat("施毒", $"【绿毒侵蚀】目标【{ent.Name}】受到 {dmg} 点持续剧毒伤害！", new Color(0.2f, 1f, 0.3f));
                 }
             });
+
+            // 驱动官方 15 格切比雪夫距离监控 (超距自动关闭 NPC 交互窗口)
+            if (PlayerInstance != null)
+            {
+                HudInstance?.OnPlayerPositionChanged(PlayerInstance.TileX, PlayerInstance.TileY);
+            }
         }
 
         public void SetNet(NetManager net, int sId, string uname, int ulevel = 35)

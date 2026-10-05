@@ -6291,5 +6291,21 @@
    - 单元测试运行：**111 项测试 100% 全部通过**；
    - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`。
 
+## 2026-10-05 官方 15 格切比雪夫交互距离监控与商店仓库取回模式核销
+1. **官方实证与安全门限确立**：
+   - 依据 M2Server `sub_4DC2B8` / `sub_4DC664` 实证：玩家与商人/NPC 交互时，坐标差值绝对值必须满足 $|X_1 - X_2| \le 15$ 且 $|Y_1 - Y_2| \le 15$（即切比雪夫距离 $\le 15$）；
+   - 此前客户端缺乏空间距离约束，开启商人/仓库窗口后瞬移或跑远窗体依然常驻，存在严重越界逻辑漏洞；
+2. **代码重构与对齐落实**：
+   - 在 `HudController.cs` 中增加 `MaxNpcInteractDistance = 15` 常量与 `OnPlayerPositionChanged(int x, int y)` 实时监听；
+   - 当切比雪夫距离超出 15 格时，自动调用 `CloseNpcBusinessWindows()` 关闭所有 NPC 对话框、商店与仓库托管面板，复位背包位置并输出官方提示：`[系统] 距离商人过远，对话已自动结束。`；
+   - 在 `GameView._Process` 中实时驱动玩家瓦片坐标与 NPC 距离计算；
+   - 在 `ShopPanelView.cs` 中引入 `ShopMode` (Buy/Sell/Storage) 与 `TakeBackRequested` 信号分发，支持展示保管物品列表并双击/OK 取回入包；
+   - 在 `TestUiSceneBindingArchitecture.cs` 中增补 `TestNpcChebyshevDistanceAndStorageMode_GroundTruth` 自动化测试用例，覆盖 15 格合法/16 格越界判定与模式枚举验证；
+3. **回归闭环验收**：
+   - 单元测试运行：**112 项测试 100% 全部通过**（持续时间 5 秒）；
+   - 端到端 58 阶段真机全量光栅化运行完毕；
+   - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`。
+
+
 
 

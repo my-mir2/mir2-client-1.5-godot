@@ -697,6 +697,13 @@ public partial class HudController : CanvasLayer
         // 服务端协议将仓库作为商人窗口的 Storage 模式,故不再创建非官方的 StoragePanelView (Prguse_0402)。
 
         _shopPanelView = new ShopPanelView();
+        _shopPanelView.TakeBackRequested += (storageSlot, itemName) =>
+        {
+            // 取回仓库物品：加入背包并下发系统提示
+            AddBagItem(itemName, "Items_0059.png", "屠龙");
+            AddChat("系统", $"[系统] 成功从仓库取回保管物品 [{itemName}]。", new Color(1f, 1f, 0f));
+            GD.Print($"[HudController] 仓库取回成功: slot={storageSlot}, item={itemName}");
+        };
         AddChild(_shopPanelView);
 
         _repairPanelView = new RepairPanelView();
@@ -1187,6 +1194,60 @@ public partial class HudController : CanvasLayer
         GD.Print($"[HudController] 切换仓库(DSellDlg 托管模式)显示状态: {_repairPanelView.Visible}");
     }
 
+    public const int MaxNpcInteractDistance = 15; // 官方实证切比雪夫门限 <= 15 (M2Server sub_4DC2B8 / sub_4DC664)
+    private Vector2I? _currentNpcTile;
+
+    public void SetCurrentInteractingNpc(int npcUid, int tileX, int tileY)
+    {
+        _currentNpcTile = new Vector2I(tileX, tileY);
+    }
+
+    public void OnPlayerPositionChanged(int playerTileX, int playerTileY)
+    {
+        if (!_currentNpcTile.HasValue) return;
+
+        int deltaX = Math.Abs(playerTileX - _currentNpcTile.Value.X);
+        int deltaY = Math.Abs(playerTileY - _currentNpcTile.Value.Y);
+        int distance = Math.Max(deltaX, deltaY); // 切比雪夫距离 (Chebyshev Distance)
+
+        if (distance > MaxNpcInteractDistance)
+        {
+            CloseNpcBusinessWindows();
+        }
+    }
+
+    public void CloseNpcBusinessWindows()
+    {
+        bool closedAny = false;
+        if (_npcDialogView != null && _npcDialogView.Visible)
+        {
+            _stackManager.PopWindow(_npcDialogView);
+            closedAny = true;
+        }
+        if (_shopPanelView != null && _shopPanelView.Visible)
+        {
+            _stackManager.PopWindow(_shopPanelView);
+            closedAny = true;
+        }
+        if (_repairPanelView != null && _repairPanelView.Visible)
+        {
+            _stackManager.PopWindow(_repairPanelView);
+            if (_bagPanel != null)
+            {
+                _bagPanel.Position = _bagPosBeforeStorage;
+                _bagPanel.Visible = false;
+            }
+            closedAny = true;
+        }
+
+        if (closedAny)
+        {
+            _currentNpcTile = null;
+            AddChat("系统", "[系统] 距离商人过远，对话已自动结束。", new Color(1f, 0.4f, 0.4f));
+            GD.Print("[HudController] 超出官方 15 格距离限制，已自动关闭 NPC 交互窗口");
+        }
+    }
+
     public void ToggleShop(int npcUid = 0)
     {
         if (_shopPanelView != null)
@@ -1197,9 +1258,19 @@ public partial class HudController : CanvasLayer
             }
             else
             {
+                _shopPanelView.SetMode(ShopPanelView.ShopMode.Buy);
                 _shopPanelView.OpenForNpc(npcUid);
                 _stackManager.PushWindow(_shopPanelView);
             }
+        }
+    }
+
+    public void OpenStorageList(IEnumerable<ShopPanelView.ShopItemEntry> items, int npcUid = 0)
+    {
+        if (_shopPanelView != null)
+        {
+            _shopPanelView.OpenForStorage(items, npcUid);
+            _stackManager.PushWindow(_shopPanelView);
         }
     }
 

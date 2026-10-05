@@ -11,8 +11,18 @@ namespace Mir2Client.UI;
 /// </summary>
 public partial class ShopPanelView : Control, IManagedWindow
 {
+    public enum ShopMode
+    {
+        Buy = 0,
+        Sell = 1,
+        Storage = 2
+    }
+
     [Signal]
     public delegate void BuyRequestedEventHandler(int npcUid, int itemIdx, int count);
+
+    [Signal]
+    public delegate void TakeBackRequestedEventHandler(int storageSlot, string itemName);
 
     [Signal]
     public delegate void SellRequestedEventHandler(int npcUid, int itemUid);
@@ -31,11 +41,17 @@ public partial class ShopPanelView : Control, IManagedWindow
     public const int PageSize = 10; // 官方固定每页 10 行 (IDA sub_48F020 / sub_48FC14)
 
     private int _npcUid = 0;
+    private ShopMode _currentMode = ShopMode.Buy;
     private Panel? _panel;
+    private Label? _lblHeaderList;
+    private Label? _lblHeaderPrice;
+    private Label? _lblHeaderDura;
     private VBoxContainer? _itemListContainer;
     private int _selectedIndex = -1;
     private int _pageIndex = 0;
     private readonly List<Panel> _itemRowPanels = new();
+
+    public ShopMode CurrentMode => _currentMode;
 
     public string WindowName => "ShopPanelView";
     public new bool IsVisible
@@ -95,13 +111,20 @@ public partial class ShopPanelView : Control, IManagedWindow
         _panel.AddChild(btnClose);
 
         // 官方表头 sub_48F020 0x48f10b..0x48f181: 物品列表(19,8)/价格(156,8)/持久(245,8)
-        foreach (var (txt, hx) in new[] { ("物品列表", 19), ("价格", 156), ("持久", 245) })
-        {
-            var hl = new Label { Text = txt, Position = new Vector2(hx, 8) };
-            hl.AddThemeFontSizeOverride("font_size", 12);
-            hl.AddThemeColorOverride("font_color", Colors.White);
-            _panel.AddChild(hl);
-        }
+        _lblHeaderList = new Label { Text = "物品列表", Position = new Vector2(19, 8) };
+        _lblHeaderList.AddThemeFontSizeOverride("font_size", 12);
+        _lblHeaderList.AddThemeColorOverride("font_color", Colors.White);
+        _panel.AddChild(_lblHeaderList);
+
+        _lblHeaderPrice = new Label { Text = "价格", Position = new Vector2(156, 8) };
+        _lblHeaderPrice.AddThemeFontSizeOverride("font_size", 12);
+        _lblHeaderPrice.AddThemeColorOverride("font_color", Colors.White);
+        _panel.AddChild(_lblHeaderPrice);
+
+        _lblHeaderDura = new Label { Text = "持久", Position = new Vector2(245, 8) };
+        _lblHeaderDura.AddThemeFontSizeOverride("font_size", 12);
+        _lblHeaderDura.AddThemeColorOverride("font_color", Colors.White);
+        _panel.AddChild(_lblHeaderDura);
 
         // 官方原生商品列表展示区域 (Left: 0, Top: 32, Width: 307, Height: 130，10 行 x 13px)
         _itemListContainer = new VBoxContainer
@@ -191,8 +214,36 @@ public partial class ShopPanelView : Control, IManagedWindow
     {
         if (_selectedIndex >= 0 && _selectedIndex < _items.Count)
         {
-            EmitSignal(SignalName.BuyRequested, _npcUid, _selectedIndex, 1);
+            if (_currentMode == ShopMode.Storage)
+            {
+                EmitSignal(SignalName.TakeBackRequested, _selectedIndex, _items[_selectedIndex].Name);
+            }
+            else
+            {
+                EmitSignal(SignalName.BuyRequested, _npcUid, _selectedIndex, 1);
+            }
         }
+    }
+
+    public void SetMode(ShopMode mode)
+    {
+        _currentMode = mode;
+        if (_lblHeaderList != null)
+        {
+            _lblHeaderList.Text = mode == ShopMode.Storage ? "保管物品列表" : "物品列表";
+        }
+        if (_lblHeaderPrice != null)
+        {
+            _lblHeaderPrice.Text = mode == ShopMode.Storage ? "数量" : "价格";
+        }
+    }
+
+    public void OpenForStorage(IEnumerable<ShopItemEntry> items, int npcUid = 0)
+    {
+        _npcUid = npcUid;
+        SetMode(ShopMode.Storage);
+        SetItems(items);
+        Visible = true;
     }
 
     /// <summary>
