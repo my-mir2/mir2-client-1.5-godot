@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using Mir2Client.Audio;
+using Mir2Client.Core;
 using Mir2Client.Game;
 using Mir2Client.Net;
 using Mir2Client.Render;
@@ -98,9 +99,20 @@ namespace Mir2Client.UI
         {
             if (InputPluginInstance != null && PlayerInstance != null)
             {
+                PlayerInstance.StepStarted += (tx, ty, dir, isRun) =>
+                {
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        byte[] pkt = isRun
+                            ? PacketEncoder.Run((short)tx, (short)ty, (short)dir)
+                            : PacketEncoder.Walk((short)tx, (short)ty, (short)dir);
+                        _net.SendPacket(pkt);
+                    }
+                };
+
                 InputPluginInstance.WalkRequested += (dir) =>
                 {
-                    if (PlayerInstance.IsDead) return;
+                    if (PlayerInstance.IsDead || PlayerInstance.IsMoving) return;
                     var offset = PlayerAuditEngine.DirOffsets[dir & 7];
                     int tx = PlayerInstance.TileX + offset.X;
                     int ty = PlayerInstance.TileY + offset.Y;
@@ -110,15 +122,32 @@ namespace Mir2Client.UI
 
                 InputPluginInstance.RunRequested += (dir) =>
                 {
-                    if (PlayerInstance.IsDead) return;
+                    if (PlayerInstance.IsDead || PlayerInstance.IsMoving) return;
                     var offset = PlayerAuditEngine.DirOffsets[dir & 7];
                     int tx = PlayerInstance.TileX + offset.X * 2;
                     int ty = PlayerInstance.TileY + offset.Y * 2;
                     int midX = PlayerInstance.TileX + offset.X;
                     int midY = PlayerInstance.TileY + offset.Y;
                     if (MapRendererInstance != null && (!MapRendererInstance.IsPassable(midX, midY) || !MapRendererInstance.IsPassable(tx, ty)))
+                    {
+                        if (MapRendererInstance != null && MapRendererInstance.IsPassable(midX, midY))
+                        {
+                            PlayerInstance.StartStepMovement(midX, midY, 1, ActionType.Walk, dir);
+                        }
                         return;
+                    }
                     PlayerInstance.StartStepMovement(tx, ty, 2, ActionType.Run, dir);
+                };
+
+                InputPluginInstance.NavigateRequested += (targetTile) =>
+                {
+                    if (PlayerInstance.IsDead) return;
+                    var startTile = new Vector2I(PlayerInstance.TileX, PlayerInstance.TileY);
+                    var path = FastPathFinder.FindPath(startTile, targetTile, (x, y) => MapRendererInstance?.IsPassable(x, y) ?? true);
+                    if (path != null && path.Count > 0)
+                    {
+                        PlayerInstance.SetPath(path, run: true);
+                    }
                 };
 
                 InputPluginInstance.HitRequested += (dir) =>
@@ -127,6 +156,28 @@ namespace Mir2Client.UI
                     PlayerInstance.Direction = dir & 7;
                     PlayerInstance.Anim.SetAction(ActionType.Hit, dir);
                     AudioManager.Instance?.PlaySoundId(1);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        var offset = PlayerAuditEngine.DirOffsets[dir & 7];
+                        short targetX = (short)(PlayerInstance.TileX + offset.X);
+                        short targetY = (short)(PlayerInstance.TileY + offset.Y);
+                        _net.SendPacket(PacketEncoder.Hit((short)(dir & 7), targetX, targetY));
+                    }
+                };
+
+                InputPluginInstance.PickupRequested += () =>
+                {
+                    if (PlayerInstance.IsDead) return;
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        int posRecog = (PlayerInstance.TileX << 16) | (PlayerInstance.TileY & 0xFFFF);
+                        _net.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_PICKUP, posRecog));
+                    }
+                };
+
+                InputPluginInstance.PkModeToggleRequested += () =>
+                {
+                    HudInstance?.CycleNextAttackMode();
                 };
 
                 InputPluginInstance.QuickItemKeyPressed += (slot) =>

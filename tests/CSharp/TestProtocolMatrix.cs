@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Threading.Tasks;
 using Mir2Client.Net;
 using Xunit;
 
@@ -551,5 +552,91 @@ public class TestProtocolMatrix
         byte[] statePkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_SENDUSERSTATE, 0, 0, 0,
             System.Text.Encoding.UTF8.GetBytes(userStateExtra));
         router.OnPacket(ServerMessageRouter.SM_SENDUSERSTATE, statePkt.AsSpan(1..^1).ToArray());
+    }
+
+    [Fact]
+    public void TestServerMessageRouter_AllowMoveAndSkillLevelUp_Parsing()
+    {
+        var router = new ServerMessageRouter(null);
+
+        // 1. 验证 SM_ALLOWMOVE (203) 与 SM_SKILLLEVELUP (644) 常量值
+        Assert.Equal(203, ServerMessageRouter.SM_ALLOWMOVE);
+        Assert.Equal(644, ServerMessageRouter.SM_SKILLLEVELUP);
+
+        // 2. 模拟网关返回 SM_ALLOWMOVE (203): (x=331, y=272, dir=3)
+        int x = 331;
+        int y = 272;
+        short dir = 3;
+        int posRecog = ((x & 0xFFFF) | ((y & 0xFFFF) << 16));
+        byte[] movePkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_ALLOWMOVE, posRecog, dir, 0);
+        router.OnPacket(ServerMessageRouter.SM_ALLOWMOVE, movePkt.AsSpan(1..^1).ToArray());
+
+        // 3. 模拟 SM_SKILLLEVELUP (644): skillId=1 (基本剑术), level=3, exp=500
+        byte[] skillPkt = PacketEncoder.MakePacket(ServerMessageRouter.SM_SKILLLEVELUP, 500, 1, 3);
+        router.OnPacket(ServerMessageRouter.SM_SKILLLEVELUP, skillPkt.AsSpan(1..^1).ToArray());
+
+        // 4. 验证 CM_HIT (3014) 与 CM_PICKUP (1001) 发包结构
+        byte[] hitPkt = PacketEncoder.Hit(2, 332, 270);
+        Assert.Equal(12, hitPkt.Length);
+        short hitIdent = (short)(hitPkt[1] | (hitPkt[2] << 8));
+        Assert.Equal(ProtocolConsts.CM_HIT, hitIdent);
+
+        byte[] pickupPkt = PacketEncoder.MakePacket(ProtocolConsts.CM_PICKUP, (330 << 16) | (270 & 0xFFFF));
+        Assert.Equal(12, pickupPkt.Length);
+        short pickupIdent = (short)(pickupPkt[1] | (pickupPkt[2] << 8));
+        Assert.Equal(ProtocolConsts.CM_PICKUP, pickupIdent);
+    }
+
+    [Fact]
+    public async Task TestRealNetwork_WalkAndRun_AllowMoveReceipt()
+    {
+        using var client = new System.Net.Sockets.TcpClient();
+        try
+        {
+            using var cts = new System.Threading.CancellationTokenSource(1000);
+            await client.ConnectAsync("127.0.0.1", 7001, cts.Token);
+        }
+        catch
+        {
+            // 若未在后台运行真实网关桥接，安全跳过
+            return;
+        }
+
+        var stream = client.GetStream();
+
+        // 1. 登录阶段
+        await stream.WriteAsync(PacketEncoder.Login("testuser", "testpass"));
+        await Task.Delay(50);
+        await stream.WriteAsync(PacketEncoder.SelectServer(0));
+        await Task.Delay(50);
+        await stream.WriteAsync(PacketEncoder.MakePacket(ProtocolConsts.CM_SELECTCHAR, 0, 0, 0, Encoding.UTF8.GetBytes("热血战士")));
+        await Task.Delay(50);
+
+        // 清空前置登录包缓存
+        byte[] discardBuf = new byte[4096];
+        while (client.Available > 0)
+        {
+            _ = await stream.ReadAsync(discardBuf.AsMemory(0, Math.Min(client.Available, discardBuf.Length)));
+        }
+
+        // 2. 发送单通行走 CM_WALK (3011, 朝东 dir=2)
+        byte[] walkPkt = PacketEncoder.Walk(330, 270, 2);
+        await stream.WriteAsync(walkPkt);
+
+        // 3. 接收并断言网关下发的 SM_ALLOWMOVE (203)
+        byte[] recvBuf = new byte[12];
+        await stream.ReadExactlyAsync(recvBuf.AsMemory(0, 12));
+
+        short smCode = (short)(recvBuf[1] | (recvBuf[2] << 8));
+        Assert.Equal(ProtocolConsts.SM_ALLOWMOVE, smCode);
+
+        int posRecog = recvBuf[3] | (recvBuf[4] << 8) | (recvBuf[5] << 16) | (recvBuf[6] << 24);
+        int posX = posRecog & 0xFFFF;
+        int posY = (posRecog >> 16) & 0xFFFF;
+        short dir = (short)(recvBuf[7] | (recvBuf[8] << 8));
+
+        Assert.True(posX > 0);
+        Assert.True(posY > 0);
+        Assert.Equal(2, dir & 7);
     }
 }

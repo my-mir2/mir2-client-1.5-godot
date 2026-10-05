@@ -40,6 +40,8 @@ public sealed class ServerMessageRouter
     public const short SM_SENDUSERMAGIC          = 201;  // 角色已学技能列表批量下发
     public const short SM_DELITEM                = 202;  // 背包移除物品
     public const short SM_UPDATEUSERMAGIC        = 203;  // 技能经验熟练度更新
+    public const short SM_ALLOWMOVE              = 203;  // 盛大官方/网关位移确认与拉回校准 (bridge.rs)
+    public const short SM_SKILLLEVELUP           = 644;  // 盛大官方/网关技能熟练度升级 (bridge.rs)
     public const short SM_TAKEON_OK              = 615;  // 穿戴装备成功
     public const short SM_TAKEOFF_OK             = 619;  // 脱下装备成功
     public const short SM_EQUIPINFO              = 621;  // 全量 9 槽位装备下发
@@ -134,7 +136,10 @@ public sealed class ServerMessageRouter
             case SM_SENDUSERMAGIC:
                 HandleSendUserMagic(packet);
                 break;
-            case SM_UPDATEUSERMAGIC:
+            case SM_ALLOWMOVE:
+                HandleAllowMove(packet);
+                break;
+            case SM_SKILLLEVELUP:
                 HandleUpdateUserMagic(packet);
                 break;
             case SM_EQUIPINFO:
@@ -324,6 +329,45 @@ public sealed class ServerMessageRouter
         if (skills.Count > 0 && _hud?.SkillPanel != null)
         {
             _hud?.SkillPanel.SetSkills(skills);
+        }
+    }
+
+    /// <summary>
+    /// 处理服务端移动允许/位移校准 (SM_ALLOWMOVE 203)
+    /// Recog 编码 (x & 0xFFFF) | ((y & 0xFFFF) << 16)，Param 为朝向 (0~7)
+    /// </summary>
+    private void HandleAllowMove(ServerPacket pkt)
+    {
+        int x = pkt.Recog & 0xFFFF;
+        int y = (pkt.Recog >> 16) & 0xFFFF;
+        int dir = pkt.Param & 7;
+
+        if (_gameView?.PlayerInstance != null && x > 0 && y > 0)
+        {
+            int curX = _gameView.PlayerInstance.TileX;
+            int curY = _gameView.PlayerInstance.TileY;
+            int dist = Math.Max(Math.Abs(curX - x), Math.Abs(curY - y));
+            if (dist > 2)
+            {
+                // 客户端与服务端判定偏差过大（反外挂拉回或地图坐标突变），强制校准坐标
+                _gameView.PlayerInstance.SetTilePos(x, y);
+                _gameView.PlayerInstance.Direction = dir;
+                _gameView.UpdateEnvironmentLighting();
+            }
+            else
+            {
+                _gameView.PlayerInstance.Direction = dir;
+            }
+        }
+        else if (_gameView?.PlayerInstance != null && pkt.Param >= 0 && pkt.Param <= 7)
+        {
+            _gameView.PlayerInstance.Direction = dir;
+        }
+
+        // 多态兼顾：若包含 Extra 文本或者 Tag > 0 且非坐标，作为技能经验更新处理
+        if (!string.IsNullOrEmpty(pkt.ExtraStr) || (pkt.Tag > 0 && x == 0 && y == 0))
+        {
+            HandleUpdateUserMagic(pkt);
         }
     }
 

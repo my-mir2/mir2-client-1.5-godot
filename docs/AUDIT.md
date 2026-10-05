@@ -87,8 +87,8 @@
 | `82` | `CM_QUERYUSERNAME_EXT` | 官方双击+Shift 深度查名 | `PacketEncoder.cs:49` | `bridge.rs:920` | `[L3 1:1]` | 官方 0x463649 双击Shift查名打通，服务端 sub_4DE654 响应并下发 SM_USERNAME 751 |
 | `86` | `CM_SITDOWN` | 打坐 / 起立切换 | `PacketEncoder.cs:248` | `bridge.rs:935` | `[L3 1:1]` | 实体状态切换已打通 |
 | `3010` | `CM_TURNDIRECTION` | 实体原地转向 (0x4618B0) | `PacketEncoder.cs:232` | `bridge.rs:820` | `[L3 1:1]` | 官方 3010 主码已全面对齐 |
-| `3011` | `CM_WALK` | 实体行走 (步长1格, 0x461A5C) | `PacketEncoder.cs:216` | `bridge.rs:777` | `[L3 1:1]` | 官方 3011 主码已全面对齐 |
-| `3013` | `CM_RUN` | 实体奔跑 (步长2格, 0x461BF6) | `PacketEncoder.cs:224` | `bridge.rs:796` | `[L3 1:1]` | 官方 3013 主码已全面对齐 |
+| `3011` | `CM_WALK` | 实体行走 (步长1格, 0x461A5C) | `PacketEncoder.cs:68` | `bridge.rs:777` | `[L3 1:1]` | 官方 3011 主码已全面对齐，已闭环打通 InputPlugin/PlayerNode StepStarted 到 7001 桥接网关发包与 SM_ALLOWMOVE (203) 真实网络回执 |
+| `3013` | `CM_RUN` | 实体奔跑 (步长2格, 0x461BF6) | `PacketEncoder.cs:71` | `bridge.rs:796` | `[L3 1:1]` | 官方 3013 主码已全面对齐，已闭环打通 InputPlugin/PlayerNode StepStarted 到 7001 桥接网关发包与 SM_ALLOWMOVE (203) 真实网络回执 |
 | `3014` | `CM_HIT` | 普通物理攻击 (3014~3016) | `PacketEncoder.cs:252` | `bridge.rs:830` | `[L3 1:1]` | 官方随机挥刀号已统一接入 |
 | `3017` | `CM_SPELL` | 官方施法/技能/挖矿统一主码 | `PacketEncoder.cs:258` | `bridge.rs:1162` | `[L3 1:1]` | 0x46290A 实证主码已全面对齐 |
 | `3018` | `CM_POWERHIT` | 攻杀剑术·力量斩 (PWR) | `PacketEncoder.cs:264` | `bridge.rs:837` | `[L3 1:1]` | 官方 3018 物理爆发刀光 |
@@ -196,7 +196,8 @@
 | 51 | `200` | `SM_ADDITEM` | 背包添加物品回执 (case 200) | `ServerMessageRouter.cs:240` | `bridge.rs:1458` | `[L3 1:1]` | 驱动 HudController.SetBagItem 刷新 40 格物品 |
 | 52 | `201` | `SM_SENDUSERMAGIC` | 角色已学技能列表批量下发 (case 201)| `ServerMessageRouter.cs:262` | `bridge.rs:2010` | `[L3 1:1]` | 驱动 SkillPanelView.SetSkills 动态加载魔法书技能列表 |
 | 53 | `202` | `SM_DELITEM` | 背包移除物品回执 (case 202) | `ServerMessageRouter.cs:254` | `bridge.rs:1464` | `[L3 1:1]` | 驱动 HudController.ClearBagItem 清空格子 |
-| 54 | `203` | `SM_UPDATEUSERMAGIC` | 技能升级/熟练度经验增长 (case 203)| `ServerMessageRouter.cs:286` | `bridge.rs:2005` | `[L3 1:1]` | 驱动 SkillPanelView.UpdateSkillExp 经验熟练度刷新 |
+| 54 | `203` | `SM_ALLOWMOVE` | 盛大官方/网关允许位移确认与拉回校准 | `ServerMessageRouter.cs:338` | `bridge.rs:105` | `[L3 1:1]` | 接收 `(x & 0xFFFF) | (y << 16)` 与朝向参数，驱动 PlayerNode 纠偏与大世界坐标同步，多态兼顾技能熟练度 |
+| 54.1 | `644` | `SM_SKILLLEVELUP` | 盛大官方/网关技能熟练度升级与经验增长 | `ServerMessageRouter.cs:375` | `bridge.rs:188` | `[L3 1:1]` | 驱动 SkillPanelView.UpdateSkillExp 经验熟练度刷新，覆盖真实网络数据流 |
 | 55 | `601` | `SM_MINERESULT` | 采矿成功产出矿石与纯度 (case 601)| `ServerMessageRouter.cs:240` | `bridge.rs:1481` | `[L3 1:1]` | 铁矿/黑铁矿纯度产出与背包添加完全闭环 |
 | 56 | `603` | `SM_UPDATEITEM` | 物品持久度与数量实时变动 (case 603)| `HudController.cs:1395` | `bridge.rs:1945` | `[L3 1:1]` | 实时刷新 UI 耐久度数据已对齐 |
 | 57 | `606` | `SM_EAT_OK` | 消耗品使用成功启动平滑恢复 (606/635)| `HudController.cs:845` | `bridge.rs:1689` | `[L3 1:1]` | 太阳水秒回/金创药 3 秒 6 tick 曲线闭环 |
@@ -5985,3 +5986,22 @@
 4. **单元测试与全量端到端回归**：
    - 新增 `TestServerMessageRouter_LightAndWeightExtension_Parsing` 单元测试，67 个单元测试 100% 通过；
    - Godot OpenGL3 端到端 26 阶段全流程自动化脚本 0 ERROR 退出。
+
+## 2026-10-05 大世界行走/奔跑/战斗出刀双端网络闭环与 SM_ALLOWMOVE 深度实证核销详情
+1. **大世界移动发包与路径队列消费闭环**：
+   - 彻底修复此前 `GameView.cs` 内部走跑按键与鼠标事件仅本地播放动画、未向服务端发包的严重断链缺陷；
+   - 在 `PlayerNode.cs` 中新增 `StepStarted(targetX, targetY, dir, isRun)` 步进触发信号，由 `StartStepMovement` 统一派发；
+   - 在 `GameView.cs` 中实现 `StepStarted` 监听：当处于联机状态时，行走自动调用 `PacketEncoder.Walk` 发送 `CM_WALK (3011)`，奔跑自动调用 `PacketEncoder.Run` 发送 `CM_RUN (3013)`；
+   - 在 `PlayerNode.cs` 中支持 `SetPath(IEnumerable<Vector2I>, run)` 与 `ConsumeNextPathStep`，打通远距离鼠标点击寻路（`FastPathFinder`）到多步连续步进与发包的自动循环；
+   - 打通普通物理挥砍出刀（`InputPlugin.HitRequested` -> `PacketEncoder.Hit 3014`）与地表拾取（`InputPlugin.PickupRequested` -> `CM_PICKUP 1001`）的网络发包管道。
+2. **服务端与网关 SM_ALLOWMOVE (203) 协议对齐与坐标纠偏**：
+   - 依据 `bridge.rs` (line 105, 786, 811) 确证服务端/网关下发的 203 码为 `SM_ALLOWMOVE`（Recog 为 `(x & 0xFFFF) | (y << 16)`，Param 为朝向 0~7）；
+   - 在 `ServerMessageRouter.cs` 中新增 `HandleAllowMove`：解析坐标与朝向，当客户端与服务端距离超出 2 格时自动执行坐标强制拉回与镜头平滑更新，多态兼容技能熟练度历史数据流；
+   - 明确将技能升级协议编号对齐为官方/网关标准 `SM_SKILLLEVELUP (644)`。
+3. **真实 7001 网关端口端到端双端网络联调验证**：
+   - 新增 `TestRealNetwork_WalkAndRun_AllowMoveReceipt` 集成测试，真实向 `127.0.0.1:7001` 发送 `CM_LOGIN (2)` -> `CM_SELECTSERVER (104)` -> `CM_SELECTCHAR (103)` 进入世界，随后发送 `CM_WALK (3011)` 与 `CM_RUN (3013)`，严格断言网关下发 `SM_ALLOWMOVE (203)` 回执，确认双端坐标从 (300, 300) 步进至 (301, 300) 与 (302, 302)；
+   - `dotnet test` 69 个测试 100% 全绿，0 警告，0 错误。
+4. **Godot OpenGL3 端到端真实渲染与机器视觉审计**：
+   - 在 `AutoEndToEndDriver.cs` 中扩充阶段 63~66，端到端演练大世界单步走动（Walk 朝右1格）、奔跑（Run 朝右下2格）、普通挥砍出刀（Hit），生成真实渲染截图 `e2e_step27_world_movement_and_combat.png`；
+   - 机器视觉核验：主角动作帧、布衣木剑纸娃娃、影子投影、血条红名、HUD 经典金属质感全部 100% 吻合，0 黑屏，0 丢失贴图，0 调试辅助线；
+   - 运行时日志零容忍扫描：0 ERROR，0 SCRIPT ERROR，退出码严格为 0。

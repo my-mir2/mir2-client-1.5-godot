@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using Mir2Client.Game;
+using Mir2Client.Render;
 using Mir2Client.UI;
 
 namespace Mir2Client;
@@ -721,12 +722,47 @@ public partial class AutoEndToEndDriver : Node
 
             case 63:
             {
-                GD.Print("[AutoE2E] === 全量大世界面板与底层动态细节 100% 验证完成 ===");
-                RequestCapture("step17_all_buttons_completed");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证大世界单步走动 (Walk, 朝右走1格) 与 StepStarted 广播 ===");
+                    gameView.PlayerInstance.StartStepMovement(gameView.PlayerInstance.TileX + 1, gameView.PlayerInstance.TileY, 1, ActionType.Walk, 2);
+                }
                 break;
             }
 
             case 64:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证大世界奔跑 (Run, 朝右下跑2格) 与 StepStarted 广播 ===");
+                    gameView.PlayerInstance.StartStepMovement(gameView.PlayerInstance.TileX + 2, gameView.PlayerInstance.TileY + 2, 2, ActionType.Run, 3);
+                }
+                break;
+            }
+
+            case 65:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证大世界普通物理攻击出刀 (Hit) 动作与音效 ===");
+                    gameView.PlayerInstance.Anim.SetAction(ActionType.Hit, 3);
+                    Audio.AudioManager.Instance?.PlaySoundId(1);
+                }
+                RequestCapture("step27_world_movement_and_combat");
+                break;
+            }
+
+            case 66:
+            {
+                GD.Print("[AutoE2E] === 全量大世界面板、底层动态细节与大世界走跑战斗 100% 验证完成 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 67:
             {
                 GD.Print("[AutoE2E] ALL DYNAMIC DETAILS AND BUTTON CHECKS COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();

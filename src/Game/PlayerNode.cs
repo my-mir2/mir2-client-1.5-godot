@@ -21,6 +21,7 @@ namespace Mir2Client.Game
         [Signal] public delegate void PlayerDiedEventHandler();
         [Signal] public delegate void RevivedEventHandler();
         [Signal] public delegate void TileSteppedEventHandler(Vector2I newTile);
+        [Signal] public delegate void StepStartedEventHandler(int targetX, int targetY, int dir, bool isRun);
 
         public int Uid { get; set; } = 0;
         public string CharacterName { get; set; } = "玩家";
@@ -71,6 +72,9 @@ namespace Mir2Client.Game
         private int _targetTileY = 0;
 
         private readonly List<Vector2I> _pathQueue = new();
+        private bool _isPathRun = true;
+
+        public bool IsMoving => _isMoving;
 
         public override void _Ready()
         {
@@ -204,8 +208,48 @@ namespace Mir2Client.Game
             _targetTileY = ty;
             Direction = dir & 7;
             _moveTimer = 0f;
-            _moveDuration = stepTiles == 1 ? 0.78f : 0.66f;
+            _moveDuration = stepTiles == 1 ? 0.60f : 0.50f;
             Anim.SetAction(action, dir);
+            EmitSignal(SignalName.StepStarted, tx, ty, Direction, action == ActionType.Run);
+        }
+
+        public void SetPath(IEnumerable<Vector2I> path, bool run = true)
+        {
+            _pathQueue.Clear();
+            _isPathRun = run;
+            foreach (var p in path)
+            {
+                if (p.X == TileX && p.Y == TileY) continue;
+                _pathQueue.Add(p);
+            }
+
+            if (!_isMoving && _pathQueue.Count > 0)
+            {
+                ConsumeNextPathStep();
+            }
+        }
+
+        private void ConsumeNextPathStep()
+        {
+            if (_pathQueue.Count == 0) return;
+
+            var nextTile = _pathQueue[0];
+            _pathQueue.RemoveAt(0);
+            int ndx = nextTile.X - TileX;
+            int ndy = nextTile.Y - TileY;
+            int ndir = InputPlugin.CalcDirection(new Vector2(ndx, ndy));
+
+            // 判断是否可跑步进 (路径中下个节点也是相同方向且连续走2格)
+            if (_isPathRun && _pathQueue.Count > 0 && (_pathQueue[0].X - nextTile.X) == ndx && (_pathQueue[0].Y - nextTile.Y) == ndy)
+            {
+                var runTile = _pathQueue[0];
+                _pathQueue.RemoveAt(0);
+                StartStepMovement(runTile.X, runTile.Y, 2, ActionType.Run, ndir);
+            }
+            else
+            {
+                StartStepMovement(nextTile.X, nextTile.Y, 1, ActionType.Walk, ndir);
+            }
         }
 
         public void SyncCameraAndPlayer(Vector2 worldPos)
@@ -254,7 +298,11 @@ namespace Mir2Client.Game
                     TileY = _targetTileY;
                     _mapRenderer?.SetPlayerTile(TileX, TileY);
                     EmitSignal(SignalName.TileStepped, new Vector2I(TileX, TileY));
-                    if (_pathQueue.Count == 0 && !Anim.IsBusy())
+                    if (_pathQueue.Count > 0)
+                    {
+                        ConsumeNextPathStep();
+                    }
+                    else if (!Anim.IsBusy())
                     {
                         Anim.SetAction(ActionType.Stand, Direction);
                     }
