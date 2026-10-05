@@ -6253,3 +6253,23 @@
    - 捕获真机截图 `e2e_step10_shop_panel.png` 实证：首行金创药(小)整行高亮，价格与持久列整齐划一；
    - 运行时日志零容忍扫描：`File not found`: 0，`ERROR`: 0，`SCRIPT ERROR`: 0；
    - 全套 110 项单元测试 100% 通过。
+
+## 2026-10-05 加点面板 (Prguse_0226) 基础属性值列实装与剩余点数坐标对齐
+1. **IDA 原生反编译证据实测与缺陷归因**：
+   - 依据 IDA `sub_494304 @ 0x494497 & 0x494994` 实证：底板黑底凹槽内分为两列显示：
+     - 左侧基础属性值列（DC/MC/SC/AC/MAC/HP/MP/HIT/SPD）：`Left = 100, Top = 101 + 20*i, Width = 52, Height = 16`，颜色为官方银灰 `0xC0C0C0`；
+     - 右侧加点增量列（分配点数 `+0`, `+1`, `+2`）：`Left = 155, Top = 101 + 20*i, Width = 56, Height = 16`，未加点呈淡黄白，有增量时呈高亮金色；
+   - 此前代码遗漏了左侧基础值列，导致底板黑底凹槽左侧出现大面积黑洞洞的空白破绽；
+   - 剩余点数（Available）：底板凹槽位于 `(100, 278)`，此前放在 `(98, 285)` 偏下，造成线框出界。
+2. **代码重构与对齐落实**：
+   - 在 `AdjustAbilPanelView.cs` 中增加 `_lblBaseStats` 基础属性 Label 阵列，严格在 `(100, 101+20*i)` 处渲染官方银灰基础属性；
+   - 引入经典战士属性模板（`10-25`, `0-0`, `0-0`, `5-10`, `4-7`, `210`, `45`, `15`, `10`），并提供 `SetBaseStats(IReadOnlyList<string> stats)` 供动态属性绑定；
+   - 纠偏 `_lblRemain` 坐标为 `(100, 278)`，尺寸 `(50, 16)`，精确契合底板 Available 右侧黑底凹槽；
+   - 在 `TestUiSceneBindingArchitecture.cs` 中增补 `TestAdjustAbilPanel_OfficialMetricsAndBaseStats_GroundTruth` 自动化实证用例；
+   - 加固 `TestRealNetwork_WalkAndRun_AllowMoveReceipt` 建立会话时钟周期与 `SM_ALLOWMOVE` 回包时序。
+3. **回归闭环验收**：
+   - 单元测试运行：**111 项测试 100% 全部通过**（持续时间 1 秒）；
+   - 端到端真机运行：全流程 58 阶段捕获 `e2e_step18_adjust_abil_panel.png`；
+   - 机器视觉多模态核验：9 项基础属性与加点增量完全咬合于黑底凹槽内，Available 点数 0 精确居于凹槽，右上角立体关闭红叉与底部金属 OK 键自然契合；
+   - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`。
+

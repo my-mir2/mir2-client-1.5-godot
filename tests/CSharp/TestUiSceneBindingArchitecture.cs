@@ -598,6 +598,35 @@ public class TestUiSceneBindingArchitecture
         Assert.Equal(58, radarCenter.X);
         Assert.Equal(58, radarCenter.Y);
     }
+
+    [Fact]
+    public void TestAdjustAbilPanel_OfficialMetricsAndBaseStats_GroundTruth()
+    {
+        // 盛大官方 1.5 加点面板实证测试 (IDA sub_485eeb ~ 0x486241 / sub_494304 @ 0x494497 & 0x494994)
+        // 1. 底板尺寸与默认停靠位置
+        Assert.Equal(332, AdjustAbilPanelView.PanelSize.X);
+        Assert.Equal(347, AdjustAbilPanelView.PanelSize.Y);
+        Assert.Equal(234, AdjustAbilPanelView.DefaultPos.X);
+        Assert.Equal(126, AdjustAbilPanelView.DefaultPos.Y);
+
+        // 2. 官方 9 大属性命名与行索引严格对齐 Prguse_0226
+        Assert.Equal(9, AdjustAbilPanelView.StatNames.Length);
+        Assert.Equal("DC", AdjustAbilPanelView.StatNames[0]);
+        Assert.Equal("MC", AdjustAbilPanelView.StatNames[1]);
+        Assert.Equal("SC", AdjustAbilPanelView.StatNames[2]);
+        Assert.Equal("AC", AdjustAbilPanelView.StatNames[3]);
+        Assert.Equal("MAC", AdjustAbilPanelView.StatNames[4]);
+        Assert.Equal("HP", AdjustAbilPanelView.StatNames[5]);
+        Assert.Equal("MP", AdjustAbilPanelView.StatNames[6]);
+        Assert.Equal("HIT", AdjustAbilPanelView.StatNames[7]);
+        Assert.Equal("SPD", AdjustAbilPanelView.StatNames[8]);
+
+        // 3. 基础属性参考值严格对齐战士典型模板
+        Assert.Equal(9, AdjustAbilPanelView.DefaultBaseStats.Length);
+        Assert.Equal("10-25", AdjustAbilPanelView.DefaultBaseStats[0]);
+        Assert.Equal("210", AdjustAbilPanelView.DefaultBaseStats[5]); // HP
+        Assert.Equal("45", AdjustAbilPanelView.DefaultBaseStats[6]);  // MP
+    }
 }
 
 

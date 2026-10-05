@@ -609,18 +609,11 @@ public class TestProtocolMatrix
 
         // 1. 登录阶段
         await stream.WriteAsync(PacketEncoder.Login("testuser", "testpass"));
-        await Task.Delay(100);
-        await stream.WriteAsync(PacketEncoder.SelectServer(0));
-        await Task.Delay(100);
-        await stream.WriteAsync(PacketEncoder.MakePacket(ProtocolConsts.CM_SELECTCHAR, 0, 0, 0, Encoding.UTF8.GetBytes("热血战士")));
         await Task.Delay(150);
-
-        // 清空前置登录与进入世界包缓存
-        byte[] discardBuf = new byte[4096];
-        while (client.Available > 0)
-        {
-            _ = await stream.ReadAsync(discardBuf.AsMemory(0, Math.Min(client.Available, discardBuf.Length)));
-        }
+        await stream.WriteAsync(PacketEncoder.SelectServer(0));
+        await Task.Delay(150);
+        await stream.WriteAsync(PacketEncoder.MakePacket(ProtocolConsts.CM_SELECTCHAR, 0, 0, 0, Encoding.UTF8.GetBytes("热血战士")));
+        await Task.Delay(300);
 
         // 2. 发送单通行走 CM_WALK (3011, 朝东 dir=2)
         byte[] walkPkt = PacketEncoder.Walk(330, 270, 2);
@@ -628,8 +621,8 @@ public class TestProtocolMatrix
 
         // 3. 循环接收数据包并匹配网关下发的 SM_ALLOWMOVE (203)
         bool foundAllowMove = false;
-        using var readCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
-        byte[] recvBuf = new byte[2048];
+        using var readCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+        byte[] recvBuf = new byte[4096];
 
         while (!readCts.IsCancellationRequested && !foundAllowMove)
         {

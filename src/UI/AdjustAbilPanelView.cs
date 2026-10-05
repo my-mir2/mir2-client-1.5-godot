@@ -34,11 +34,18 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
     private Label? _lblRemain;
     private readonly int[] _statAllocations = new int[9];
     private readonly Label[] _lblStatAllocations = new Label[9];
+    private readonly Label[] _lblBaseStats = new Label[9];
 
     // 官方 9 大属性名称与行索引 (严格对齐底板 Prguse_0226 真实印制顺序与 IDA sub_494304)
     public static readonly string[] StatNames =
     [
         "DC", "MC", "SC", "AC", "MAC", "HP", "MP", "HIT", "SPD"
+    ];
+
+    // 官方 1.5 默认角色基础属性参考值 (战士典型模板: 攻击/魔法/道术/防御/魔御/生命/魔法/命中/敏捷)
+    public static readonly string[] DefaultBaseStats =
+    [
+        "10-25", "0-0", "0-0", "5-10", "4-7", "210", "45", "15", "10"
     ];
 
     // IDA sub_481dd4 0x485fb8~0x486471: 加/减按钮 Top 逐项 101,121,140,160,181,201,220,240,261 (非等距)
@@ -83,12 +90,12 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         btnClose.Pressed += OnClose;
         panel.AddChild(btnClose);
 
-        // 剩余点数标签 (底板 Available 文字右侧: Left 98, Top 285)
+        // 剩余点数标签 (底板 Available 文字右侧黑底凹槽: Left 100, Top 278, W 50, H 16, IDA sub_494304 0x494497)
         _lblRemain = new Label
         {
             Name = "LblRemainPoints",
-            Position = new Vector2(98, 285),
-            Size = new Vector2(60, 18),
+            Position = new Vector2(100, 278),
+            Size = new Vector2(50, 16),
             Text = _remainingPoints.ToString(),
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -129,7 +136,22 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
             int statIdx = i;
             float top = 101f + 20f * i; // IDA sub_494304 0x4949b4: y0=窗体+101,行距 20 (偏移 0,14h,28h,3Ch,50h,64h,78h,8Ch,A0h)
 
-            // 属性分配当前数值显示 (精准咬合于黑底凹槽 151..214, W=64, H=16)
+            // 1. 官方属性基础当前数值 (IDA sub_494304 0x494497: x=窗体+100, W=52, H=16, 颜色 0xC0C0C0 银灰)
+            var lblBase = new Label
+            {
+                Name = $"LblBaseStat_{statIdx}",
+                Position = new Vector2(100, top),
+                Size = new Vector2(52, 16),
+                Text = DefaultBaseStats[statIdx],
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            lblBase.AddThemeFontSizeOverride("font_size", 11);
+            lblBase.AddThemeColorOverride("font_color", new Color(0xC0 / 255f, 0xC0 / 255f, 0xC0 / 255f));
+            panel.AddChild(lblBase);
+            _lblBaseStats[statIdx] = lblBase;
+
+            // 2. 属性分配增量数值显示 (精准咬合于黑底凹槽右侧 155..214, W=56, H=16)
             var lblVal = new Label
             {
                 Name = $"LblStat_{statIdx}",
@@ -219,6 +241,21 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         if (statIdx >= 0 && statIdx < 9)
         {
             OnModifyStat(statIdx, delta);
+        }
+    }
+
+    /// <summary>
+    /// 设置 9 大基础属性值 (DC, MC, SC, AC, MAC, HP, MP, HIT, SPD)
+    /// </summary>
+    public void SetBaseStats(IReadOnlyList<string> stats)
+    {
+        if (stats == null) return;
+        for (int i = 0; i < Math.Min(stats.Count, 9); i++)
+        {
+            if (_lblBaseStats[i] != null)
+            {
+                _lblBaseStats[i].Text = stats[i];
+            }
         }
     }
 
