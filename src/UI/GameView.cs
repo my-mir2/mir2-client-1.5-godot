@@ -1157,6 +1157,12 @@ namespace Mir2Client.UI
                 HudInstance.UpdateGold(100000);
                 HudInstance.UpdateExp(35000, 100000);
                 HudInstance.UpdateWeight(25, 60);
+                HudInstance.UpdateFullAbilities(
+                    wearWeight: 15, maxWearWeight: 30,
+                    handWeight: 12, maxHandWeight: 25,
+                    accuracy: 15, agility: 18,
+                    magicDef: "0-0", poisonDef: "0%",
+                    poisonRecover: "+10%", hpRecover: "+15%", mpRecover: "+20%");
                 HudInstance.AddChat("系统", "【官方 1.50 虎卫传说】纯 C# 单轨化大世界沙盒引擎已启动！", new Color(1f, 0.8f, 0.2f));
                 HudInstance.AddChat("系统", "已为您自动装配布衣与木剑，置身比奇省安全区中心(330, 270)。", new Color(0.4f, 1f, 0.4f));
             }

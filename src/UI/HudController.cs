@@ -949,6 +949,28 @@ public partial class HudController : CanvasLayer
         _statusPanelView?.UpdateAbilityValue(1, $"{curWeight}/{maxWeight}", curWeight > maxWeight);
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 角色能力页 (IDA sub_488AF4 @ 0x4892c2..0x489869) 全量 11 行属性更新接口
+    /// </summary>
+    public void UpdateFullAbilities(
+        int wearWeight, int maxWearWeight,
+        int handWeight, int maxHandWeight,
+        int accuracy, int agility,
+        string magicDef, string poisonDef,
+        string poisonRecover, string hpRecover, string mpRecover)
+    {
+        if (_statusPanelView == null) return;
+        _statusPanelView.UpdateAbilityValue(2, $"{wearWeight}/{maxWearWeight}", wearWeight > maxWearWeight);
+        _statusPanelView.UpdateAbilityValue(3, $"{handWeight}/{maxHandWeight}", handWeight > maxHandWeight);
+        _statusPanelView.UpdateAbilityValue(4, $"{accuracy}");
+        _statusPanelView.UpdateAbilityValue(5, $"{agility}");
+        _statusPanelView.UpdateAbilityValue(6, magicDef);
+        _statusPanelView.UpdateAbilityValue(7, poisonDef);
+        _statusPanelView.UpdateAbilityValue(8, poisonRecover);
+        _statusPanelView.UpdateAbilityValue(9, hpRecover);
+        _statusPanelView.UpdateAbilityValue(10, mpRecover);
+    }
+
     public void UpdateLevel(int level)
     {
         // 盛大原版官方 HUD 嵌入 Lv 徽章右侧黑槽 (636, 484)

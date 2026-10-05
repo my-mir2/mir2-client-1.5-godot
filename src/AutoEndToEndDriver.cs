@@ -291,10 +291,13 @@ public partial class AutoEndToEndDriver : Node
                     // 官方能力页 (IDA sub_488AF4 0x4892c2) 截图,随后回退一步让本 case 再执行一次以关闭面板
                     _abilityPageCaptured = true;
                     gameView.HudInstance.StatusPanel.SetAbilityPage(true);
-                    // MOCK 数据(非官方取值格式,仅验证第 2~10 行布局): 负重量/腕力/精确/敏捷/魔防/毒防/毒恢复/体恢复/魔恢复
-                    string[] mockRows = { "12/50", "45/60", "9", "9", "0", "0", "0", "10%", "10%" };
-                    for (int mr = 0; mr < mockRows.Length; mr++)
-                        gameView.HudInstance.StatusPanel.UpdateAbilityValue(2 + mr, mockRows[mr]);
+                    // 官方标准取值: 经验%、背包重量、负重量、腕力、精确、敏捷、魔防、毒防、毒恢复、体恢复、魔恢复
+                    gameView.HudInstance.UpdateFullAbilities(
+                        wearWeight: 15, maxWearWeight: 30,
+                        handWeight: 12, maxHandWeight: 25,
+                        accuracy: 15, agility: 18,
+                        magicDef: "0-0", poisonDef: "0%",
+                        poisonRecover: "+10%", hpRecover: "+15%", mpRecover: "+20%");
                     RequestCapture("step5_2_status_ability_page");
                     _step--;
                     break;
@@ -1262,12 +1265,28 @@ public partial class AutoEndToEndDriver : Node
 
             case 89:
             {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 HUD 攻击模式循环切换 (Ctrl+H) 与黑夜日相切换 ===");
+                    // 循环切换攻击模式: 全体(1, Prguse_0016) -> 和平(2, Prguse_0017)
+                    gameView.HudInstance.CycleNextAttackMode();
+                    // 切换为黑夜模式 (Prguse_0014 @ 748, 428) 并开启火把迷雾
+                    gameView.HudInstance.SetDayNightState(2);
+                    gameView.HudInstance.UpdateVisionFog(true, 8, new Vector2(400, 225));
+                }
+                RequestCapture("step49_hud_attack_mode_and_night_phase");
+                break;
+            }
+
+            case 90:
+            {
                 GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、弱网航位推测、16位抖动滤镜、沙巴克破门与多实体动态池 100% 验证完工 ===");
                 RequestCapture("step17_all_buttons_completed");
                 break;
             }
 
-            case 90:
+            case 91:
             {
                 GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, RETRO DITHER & SABUK WAR COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();
