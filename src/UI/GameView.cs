@@ -466,6 +466,28 @@ namespace Mir2Client.UI
 
                 HudInstance.ChatSent += OnChatSent;
                 HudInstance.ItemDropToGroundRequested += OnItemDropToGroundRequested;
+
+                // 官方面对面安全交易网络发包打通 (CM_ADDDEALITEM / CM_DELDEALITEM / CM_DEALCHGGOLD / CM_DEALEND / CM_TRADECANCEL)
+                HudInstance.TradeAddItemRequested += (slot, name) =>
+                {
+                    _net?.SendPacket(PacketEncoder.DealAddItem((short)slot, name));
+                };
+                HudInstance.TradeDelItemRequested += (slot) =>
+                {
+                    _net?.SendPacket(PacketEncoder.DealDelItem((short)slot));
+                };
+                HudInstance.TradeChangeGoldRequested += (gold) =>
+                {
+                    _net?.SendPacket(PacketEncoder.DealChangeGold(gold));
+                };
+                HudInstance.TradeConfirmRequested += () =>
+                {
+                    _net?.SendPacket(PacketEncoder.DealConfirm());
+                };
+                HudInstance.TradeCancelRequested += () =>
+                {
+                    _net?.SendPacket(PacketEncoder.DealCancel());
+                };
             }
         }
 

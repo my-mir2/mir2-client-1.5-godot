@@ -29,6 +29,21 @@ public partial class HudController : CanvasLayer
     [Signal]
     public delegate void ItemDropToGroundRequestedEventHandler(int bagSlot, string itemName, Vector2 dropScreenPos);
 
+    [Signal]
+    public delegate void TradeAddItemRequestedEventHandler(int slot, string itemName);
+
+    [Signal]
+    public delegate void TradeDelItemRequestedEventHandler(int slot);
+
+    [Signal]
+    public delegate void TradeChangeGoldRequestedEventHandler(int gold);
+
+    [Signal]
+    public delegate void TradeConfirmRequestedEventHandler();
+
+    [Signal]
+    public delegate void TradeCancelRequestedEventHandler();
+
     public enum ChatChannel
     {
         Near = 0,
@@ -56,6 +71,7 @@ public partial class HudController : CanvasLayer
     private readonly (string Name, string Desc)?[] _bagItemDetails = new (string, string)?[40];
     private readonly SlotButton?[] _equipSlots = new SlotButton?[9];
     private readonly (string Name, string Desc)?[] _equipItemDetails = new (string, string)?[9];
+    private readonly (string Name, string Desc, int OriginBagSlot)?[] _tradeItemOrigins = new (string, string, int)?[10];
 
     // 场景原生窗体控件与大世界原生面板
     private Panel? _bagPanel;
@@ -699,6 +715,30 @@ public partial class HudController : CanvasLayer
         AddChild(_guildPanelView);
 
         _tradePanelView = new TradePanelView();
+        _tradePanelView.EndDealConfirmed += () =>
+        {
+            EmitSignal(SignalName.TradeConfirmRequested);
+            AddChat("系统", "[交易] 你锁定了本次交易，等待对方确认。", new Color(1f, 0.9f, 0.3f));
+        };
+        _tradePanelView.TradeCancelled += () =>
+        {
+            RollbackTradeItemsToBag();
+            EmitSignal(SignalName.TradeCancelRequested);
+            AddChat("系统", "[交易] 交易已取消，物品原路退回背包。", new Color(1f, 0.4f, 0.4f));
+        };
+        _tradePanelView.ChangeDealGoldRequested += (gold) =>
+        {
+            EmitSignal(SignalName.TradeChangeGoldRequested, gold);
+            AddChat("系统", $"[交易] 修改出资交易金币为 {gold:N0}。", new Color(1f, 0.9f, 0.3f));
+        };
+        _tradePanelView.AddDealItemRequested += (slot, name) =>
+        {
+            EmitSignal(SignalName.TradeAddItemRequested, slot, name);
+        };
+        _tradePanelView.DelDealItemRequested += (slot) =>
+        {
+            EmitSignal(SignalName.TradeDelItemRequested, slot);
+        };
         AddChild(_tradePanelView);
 
         // 官方无独立仓库窗体 (IDA: sub_4579F0 全量调用者仅 sub_481DD4/sub_486DF0,无仓库底板);
@@ -1803,6 +1843,251 @@ public partial class HudController : CanvasLayer
         {
             EquipBagItemToQuickSlot(fromSlot, toSlot);
             return;
+        }
+
+        // 6. 从背包放入交易栏 (Bag -> Trade)
+        if (fromType == SlotButton.SlotType.Bag && toType == SlotButton.SlotType.Trade)
+        {
+            PutBagItemToTradeSlot(fromSlot, toSlot);
+            return;
+        }
+
+        // 7. 从交易栏取回背包 (Trade -> Bag)
+        if (fromType == SlotButton.SlotType.Trade && toType == SlotButton.SlotType.Bag)
+        {
+            TakeTradeItemToBagSlot(fromSlot, toSlot);
+            return;
+        }
+    }
+
+    /// <summary>
+    /// 背包放入交易栏 (IDA sub_4DD79C: 交易栏 10 格硬上限，对方/己方锁定防作弊门禁)
+    /// </summary>
+    public void PutBagItemToTradeSlot(int bagSlot, int tradeSlot)
+    {
+        if (_tradePanelView == null || !_tradePanelView.Visible)
+        {
+            AddChat("系统", "[交易] 交易面板未打开，无法放置物品。", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
+
+        if (_tradePanelView.IsMyLocked)
+        {
+            AddChat("系统", "[交易] 交易已锁定，不可添加物品！", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
+
+        if (tradeSlot < 0 || tradeSlot >= 10) return;
+        if (bagSlot < 0 || bagSlot >= 40) return;
+
+        var bagItem = _bagItemDetails[bagSlot];
+        if (bagItem == null) return;
+
+        if (_tradeItemOrigins[tradeSlot] != null)
+        {
+            AddChat("系统", "[交易] 该交易栏槽位已有物品！", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
+
+        var btn = _bagSlots[bagSlot];
+        var tex = btn?.ItemTexture;
+
+        _tradeItemOrigins[tradeSlot] = (bagItem.Value.Name, bagItem.Value.Desc, bagSlot);
+        _tradePanelView.SetMyItem(tradeSlot, bagItem.Value.Name, tex);
+        ClearBagItem(bagSlot);
+
+        EmitSignal(SignalName.TradeAddItemRequested, tradeSlot, bagItem.Value.Name);
+        AddChat("系统", $"[交易] 放入物品 [{bagItem.Value.Name}] 到交易栏 #{tradeSlot + 1} 格。", new Color(0.8f, 1f, 0.8f));
+    }
+
+    /// <summary>
+    /// 交易栏物品取回背包 (IDA sub_4DD958: 锁定防作弊门禁与背包回退)
+    /// </summary>
+    public void TakeTradeItemToBagSlot(int tradeSlot, int targetBagSlot)
+    {
+        if (_tradePanelView == null || !_tradePanelView.Visible) return;
+
+        if (_tradePanelView.IsMyLocked)
+        {
+            AddChat("系统", "[交易] 交易已锁定，不可取下物品！", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
+
+        if (tradeSlot < 0 || tradeSlot >= 10) return;
+        var origin = _tradeItemOrigins[tradeSlot];
+        if (origin == null) return;
+
+        int bagSlot = (targetBagSlot >= 0 && targetBagSlot < 40 && _bagItemDetails[targetBagSlot] == null)
+            ? targetBagSlot
+            : (_bagItemDetails[origin.Value.OriginBagSlot] == null ? origin.Value.OriginBagSlot : FindFirstEmptyBagSlot());
+
+        if (bagSlot < 0)
+        {
+            AddChat("系统", "[交易] 背包已满，无法取回物品！", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
+
+        string itemName = origin.Value.Name;
+        SetBagItem(bagSlot, itemName, "", origin.Value.Desc);
+        _tradeItemOrigins[tradeSlot] = null;
+        _tradePanelView.ClearMyItem(tradeSlot);
+
+        EmitSignal(SignalName.TradeDelItemRequested, tradeSlot);
+        AddChat("系统", $"[交易] 取回交易物品 [{itemName}] 到背包 #{bagSlot + 1} 格。", new Color(0.8f, 0.8f, 1f));
+    }
+
+    /// <summary>
+    /// 官方交易取消闭环 (IDA sub_467920 @ 0x46A5E3 与 sub_49FE38 实证: 遍历 10 格交易栏退回背包)
+    /// </summary>
+    public void RollbackTradeItemsToBag()
+    {
+        if (_tradePanelView == null) return;
+        for (int i = 0; i < 10; i++)
+        {
+            if (_tradeItemOrigins[i] != null)
+            {
+                var origin = _tradeItemOrigins[i]!.Value;
+                int bagSlot = (_bagItemDetails[origin.OriginBagSlot] == null) ? origin.OriginBagSlot : FindFirstEmptyBagSlot();
+                if (bagSlot >= 0)
+                {
+                    SetBagItem(bagSlot, origin.Name, "", origin.Desc);
+                }
+                _tradeItemOrigins[i] = null;
+                _tradePanelView.ClearMyItem(i);
+            }
+        }
+        _tradePanelView.ResetTrade();
+    }
+
+    /// <summary>
+    /// 寻找背包首个空闲槽位
+    /// </summary>
+    public int FindFirstEmptyBagSlot()
+    {
+        for (int i = 0; i < 40; i++)
+        {
+            if (_bagItemDetails[i] == null) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// 打开面对面交易窗体 (由 SM_DEALMENU 673 驱动)
+    /// </summary>
+    public void OpenTrade(string targetName)
+    {
+        if (_tradePanelView != null)
+        {
+            _tradePanelView.OpenTrade(targetName);
+            if (!_tradePanelView.Visible)
+            {
+                _stackManager.ToggleWindow(_tradePanelView);
+            }
+            AddChat("系统", $"[交易] 与 [{targetName}] 开启面对面安全交易。", new Color(1f, 0.9f, 0.5f));
+        }
+    }
+
+    /// <summary>
+    /// 关闭交易窗体
+    /// </summary>
+    public void CloseTrade()
+    {
+        if (_tradePanelView != null && _tradePanelView.Visible)
+        {
+            _tradePanelView.CloseTrade();
+        }
+    }
+
+    /// <summary>
+    /// 服务端交易成功交割 (由 SM_DEALSUCCESS 687 / SM_DEALCOMPLETE 678 驱动)
+    /// </summary>
+    public void OnServerTradeSuccess()
+    {
+        if (_tradePanelView != null)
+        {
+            // 清空本地待取回暂存，因为物品已原子转移给对方
+            for (int i = 0; i < 10; i++)
+            {
+                _tradeItemOrigins[i] = null;
+            }
+            _tradePanelView.Visible = false;
+            _tradePanelView.ResetTrade();
+            AddChat("系统", "[交易] 交易成功完成！", new Color(0.2f, 1f, 0.2f));
+        }
+    }
+
+    /// <summary>
+    /// 服务端交易取消回退 (由 SM_DEALCANCEL 688 / 674 / 681 驱动)
+    /// </summary>
+    public void OnServerTradeCancel(string reason)
+    {
+        RollbackTradeItemsToBag();
+        if (_tradePanelView != null)
+        {
+            _tradePanelView.Visible = false;
+        }
+        string reasonStr = string.IsNullOrEmpty(reason) ? "交易已取消。" : $"交易取消: {reason}";
+        AddChat("系统", $"[交易] {reasonStr}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    /// <summary>
+    /// 服务端确认己方放入物品成功 (由 SM_DEALADDITEM_OK 675 驱动)
+    /// </summary>
+    public void OnServerTradeAddItemOk(int slot, string itemName)
+    {
+        AddChat("交易", $"[交易] 确认放入物品 [{itemName}] 到交易栏 #{slot + 1} 格。", new Color(0.8f, 1f, 0.8f));
+    }
+
+    /// <summary>
+    /// 服务端确认己方取下物品成功 (由 SM_DEALDELITEM_OK 677 驱动)
+    /// </summary>
+    public void OnServerTradeDelItemOk(int slot)
+    {
+        AddChat("交易", $"[交易] 确认从交易栏 #{slot + 1} 格取下物品。", new Color(0.8f, 0.8f, 1f));
+    }
+
+    /// <summary>
+    /// 对方放入交易物品 (由 SM_DEALREMOTEADDITEM 682 驱动)
+    /// </summary>
+    public void OnServerTradeRemoteAddItem(int slot, string itemName)
+    {
+        if (_tradePanelView != null)
+        {
+            var tex = ResPath.LoadImageTexture("resources/wil/png/Items/Items_0002.png");
+            _tradePanelView.SetRemoteItem(slot, itemName, tex);
+            AddChat("系统", $"[交易] 对方放入了物品 [{itemName}]。", new Color(1f, 0.9f, 0.6f));
+        }
+    }
+
+    /// <summary>
+    /// 对方取回交易物品 (由 SM_DEALREMOTEDELITEM 683 驱动)
+    /// </summary>
+    public void OnServerTradeRemoteDelItem(int slot)
+    {
+        if (_tradePanelView != null)
+        {
+            string? name = _tradePanelView.GetRemoteItem(slot);
+            _tradePanelView.ClearRemoteItem(slot);
+            AddChat("系统", $"[交易] 对方取回了物品 [{name ?? $"槽位#{slot + 1}"}]。", new Color(1f, 0.7f, 0.5f));
+        }
+    }
+
+    /// <summary>
+    /// 交易金币变更同步 (由 SM_DEALCHGGOLD_OK 684 / SM_DEALREMOTECHGGOLD 686 驱动)
+    /// </summary>
+    public void OnServerTradeChgGold(int gold, bool isMine)
+    {
+        if (_tradePanelView != null)
+        {
+            if (isMine)
+            {
+                _tradePanelView.SetMyGold(gold);
+            }
+            else
+            {
+                _tradePanelView.SetRemoteGold(gold);
+                AddChat("系统", $"[交易] 对方修改出资交易金币为 {gold:N0}。", new Color(1f, 0.9f, 0.5f));
+            }
         }
     }
 

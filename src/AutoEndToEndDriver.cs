@@ -1309,12 +1309,38 @@ public partial class AutoEndToEndDriver : Node
 
             case 91:
             {
+                GD.Print("[AutoE2E] Step 51: 官方 1.5 双人面对面交易系统 (TradePanelView) 实机验证");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView != null && gameView.HudInstance != null)
+                {
+                    // 1. 打开面对面交易窗体并设置对方玩家名
+                    gameView.HudInstance.OpenTrade("无敌战神");
+
+                    // 2. 模拟从背包拖拽物品放入交易栏第 1 格 (Slot 0)
+                    gameView.HudInstance.PutBagItemToTradeSlot(0, 0);
+
+                    // 3. 模拟对方放入物品
+                    gameView.HudInstance.OnServerTradeRemoteAddItem(0, "骨玉权杖");
+
+                    // 4. 模拟双方修改交易金币
+                    gameView.HudInstance.OnServerTradeChgGold(88888, true);
+                    gameView.HudInstance.OnServerTradeChgGold(66666, false);
+
+                    // 5. 模拟我方锁定交易
+                    gameView.HudInstance.TradePanel?.SetLocked(true, true);
+                }
+                RequestCapture("step51_face_to_face_trade_panel");
+                break;
+            }
+
+            case 92:
+            {
                 GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、弱网航位推测、16位抖动滤镜、沙巴克破门与多实体动态池 100% 验证完工 ===");
                 RequestCapture("step17_all_buttons_completed");
                 break;
             }
 
-            case 92:
+            case 93:
             {
                 GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, RETRO DITHER & SABUK WAR COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();

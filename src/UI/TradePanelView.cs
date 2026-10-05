@@ -7,11 +7,15 @@ namespace Mir2Client.UI;
 /// <summary>
 /// 盛大热血传奇 1.5 官方玩家交易系统 (DDealDlg & DDealRemoteDlg, 纯 C# 实现)
 /// 严格 1:1 对齐官方双面板并列防大世界假死模型 (IDA sub_4857C7 / sub_485905)
+/// 严格遵循防作弊防偷换锁定状态机 (IDA sub_4DDC8C / sub_4DD79C)
 /// </summary>
 public partial class TradePanelView : Control, IManagedWindow
 {
     [Signal]
     public delegate void AddDealItemRequestedEventHandler(int slot, string itemName);
+
+    [Signal]
+    public delegate void DelDealItemRequestedEventHandler(int slot);
 
     [Signal]
     public delegate void ChangeDealGoldRequestedEventHandler(int gold);
@@ -29,12 +33,38 @@ public partial class TradePanelView : Control, IManagedWindow
     private Panel? _remotePanel;
     private Panel? _myPanel;
 
+    private Label? _lblRemoteName;
+    private Label? _lblMyName;
+    private Label? _lblRemoteGold;
+    private Label? _lblMyGold;
+    private TextureButton? _btnConfirm;
+    private TextureButton? _btnCancel;
+
+    private readonly SlotButton[] _remoteSlots = new SlotButton[10];
+    private readonly SlotButton[] _mySlots = new SlotButton[10];
+
+    private readonly string?[] _myItems = new string?[10];
+    private readonly string?[] _remoteItems = new string?[10];
+
+    private int _myGold = 0;
+    private int _remoteGold = 0;
+    private bool _isMyLocked = false;
+    private bool _isRemoteLocked = false;
+
+    private Texture2D? _texConfirmNormal;
+    private Texture2D? _texConfirmPressed;
+
     public string WindowName => "TradePanelView";
     public new bool IsVisible
     {
         get => Visible;
         set => Visible = value;
     }
+
+    public bool IsMyLocked => _isMyLocked;
+    public bool IsRemoteLocked => _isRemoteLocked;
+    public int MyGold => _myGold;
+    public int RemoteGold => _remoteGold;
 
     // 独立包围盒: 官方原生左右并列停靠模型 (IDA sub_481dd4 [0x485795/0x48592c])
     // 对方在左 (344, 0)，我方在右 (564, 0)，总尺寸 456x175
@@ -49,7 +79,7 @@ public partial class TradePanelView : Control, IManagedWindow
         Position = new Vector2(800 - MyWidth, 0); // 创建期 IDA: left=屏宽-面板宽, top=0; 上下堆叠: 对方在上,我方在下
         MouseFilter = MouseFilterEnum.Pass;
 
-        // 1. 左侧面板：对方面板 (Prguse_0390 220x175, IDA sub_481dd4 [0x48590f..0x485947])
+        // 1. 左侧/上方对方面板：对方面板 (Prguse_0390 220x175, IDA sub_481dd4 [0x48590f..0x485947])
         _remotePanel = new Panel
         {
             Name = "RemoteTradePanel",
@@ -75,7 +105,7 @@ public partial class TradePanelView : Control, IManagedWindow
         remoteNameBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
         _remotePanel.AddChild(remoteNameBox);
 
-        var lblRemoteName = new Label
+        _lblRemoteName = new Label
         {
             Name = "LblRemoteName",
             Text = "交易对方",
@@ -84,9 +114,9 @@ public partial class TradePanelView : Control, IManagedWindow
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        lblRemoteName.AddThemeFontSizeOverride("font_size", 10);
-        lblRemoteName.AddThemeColorOverride("font_color", new Color(0.95f, 0.9f, 0.6f));
-        remoteNameBox.AddChild(lblRemoteName);
+        _lblRemoteName.AddThemeFontSizeOverride("font_size", 10);
+        _lblRemoteName.AddThemeColorOverride("font_color", new Color(0.95f, 0.9f, 0.6f));
+        remoteNameBox.AddChild(_lblRemoteName);
 
         // 对方 10 格物品表格网格 (Left=21, Top=56, Width=180, Height=66, 2行5列，单格36x33无缝咬合独立线框表格)
         var remoteGrid = new GridContainer
@@ -104,12 +134,13 @@ public partial class TradePanelView : Control, IManagedWindow
             var slot = new SlotButton
             {
                 Name = $"RemoteSlot_{i}",
-                CurrentSlotType = SlotButton.SlotType.Bag,
+                CurrentSlotType = SlotButton.SlotType.Trade,
                 SlotIndex = i,
                 CustomMinimumSize = new Vector2(36, 33),
                 Flat = true,
-                Icon = (i == 0) ? ResPath.LoadImageTexture("resources/wil/png/Items/Items_0003.png") : null
+                Icon = null
             };
+            _remoteSlots[i] = slot;
             remoteGrid.AddChild(slot);
         }
 
@@ -134,19 +165,19 @@ public partial class TradePanelView : Control, IManagedWindow
         remoteGoldBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
         _remotePanel.AddChild(remoteGoldBox);
 
-        var lblRemoteGold = new Label
+        _lblRemoteGold = new Label
         {
             Name = "LblRemoteGold",
             Position = new Vector2(4, 0),
             Size = new Vector2(75, 17),
-            Text = "50,000",
+            Text = "0",
             VerticalAlignment = VerticalAlignment.Center
         };
-        lblRemoteGold.AddThemeFontSizeOverride("font_size", 10);
-        lblRemoteGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
-        remoteGoldBox.AddChild(lblRemoteGold);
+        _lblRemoteGold.AddThemeFontSizeOverride("font_size", 10);
+        _lblRemoteGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
+        remoteGoldBox.AddChild(_lblRemoteGold);
 
-        // 2. 右侧面板：我方面板 (Prguse_0389 236x175, IDA sub_481dd4 [0x485784..0x4857b5])
+        // 2. 右侧/下方我方面板：我方面板 (Prguse_0389 236x175, IDA sub_481dd4 [0x485784..0x4857b5])
         _myPanel = new Panel
         {
             Name = "MyTradePanel",
@@ -172,7 +203,7 @@ public partial class TradePanelView : Control, IManagedWindow
         myNameBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
         _myPanel.AddChild(myNameBox);
 
-        var lblMyName = new Label
+        _lblMyName = new Label
         {
             Name = "LblMyName",
             Text = "我",
@@ -181,9 +212,9 @@ public partial class TradePanelView : Control, IManagedWindow
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        lblMyName.AddThemeFontSizeOverride("font_size", 10);
-        lblMyName.AddThemeColorOverride("font_color", new Color(0.95f, 0.9f, 0.6f));
-        myNameBox.AddChild(lblMyName);
+        _lblMyName.AddThemeFontSizeOverride("font_size", 10);
+        _lblMyName.AddThemeColorOverride("font_color", new Color(0.95f, 0.9f, 0.6f));
+        myNameBox.AddChild(_lblMyName);
 
         // 我方 10 格物品表格网格 (Left=21, Top=56, Width=180, Height=66, 2行5列，单格36x33无缝咬合独立线框表格)
         var myGrid = new GridContainer
@@ -201,12 +232,13 @@ public partial class TradePanelView : Control, IManagedWindow
             var slot = new SlotButton
             {
                 Name = $"MySlot_{i}",
-                CurrentSlotType = SlotButton.SlotType.Bag,
+                CurrentSlotType = SlotButton.SlotType.Trade,
                 SlotIndex = i,
                 CustomMinimumSize = new Vector2(36, 33),
                 Flat = true,
-                Icon = (i == 0) ? ResPath.LoadImageTexture("resources/wil/png/Items/Items_0002.png") : null
+                Icon = null
             };
+            _mySlots[i] = slot;
             myGrid.AddChild(slot);
         }
 
@@ -230,7 +262,7 @@ public partial class TradePanelView : Control, IManagedWindow
         myGoldBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
         _myPanel.AddChild(myGoldBox);
 
-        var lblMyGold = new Label
+        _lblMyGold = new Label
         {
             Name = "LblMyGold",
             Position = new Vector2(4, 0),
@@ -238,29 +270,29 @@ public partial class TradePanelView : Control, IManagedWindow
             Text = "0",
             VerticalAlignment = VerticalAlignment.Center
         };
-        lblMyGold.AddThemeFontSizeOverride("font_size", 10);
-        lblMyGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
-        myGoldBox.AddChild(lblMyGold);
+        _lblMyGold.AddThemeFontSizeOverride("font_size", 10);
+        _lblMyGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
+        myGoldBox.AddChild(_lblMyGold);
 
         // 官方原生交易锁定按钮 (Prguse_0391 @ 155, 128, 44x16, IDA sub_481dd4 [0x485846..0x485867]: Left=155 (0x9B), Top=128 (0x80))
         // 未按下显示立体凸起 trade_btn_raised，按下或锁定态显示凹陷 Prguse_0391，消除凹陷黑斑感
-        var texConfirmNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/trade_btn_raised.png");
-        var texConfirmPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0391.png");
-        var btnConfirm = new TextureButton
+        _texConfirmNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/trade_btn_raised.png");
+        _texConfirmPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0391.png");
+        _btnConfirm = new TextureButton
         {
             Name = "BtnTradeLock",
             Position = new Vector2(155, 128),
             Size = new Vector2(44, 16),
-            TextureNormal = texConfirmNormal,
-            TexturePressed = texConfirmPressed
+            TextureNormal = _texConfirmNormal,
+            TexturePressed = _texConfirmPressed
         };
-        btnConfirm.Pressed += OnConfirm;
-        _myPanel.AddChild(btnConfirm);
+        _btnConfirm.Pressed += OnConfirm;
+        _myPanel.AddChild(_btnConfirm);
 
         // 官方原生交易取消/关闭按钮 (Prguse_0064 @ 220, 42, 16x23, IDA sub_481dd4 [0x48589a..0x4858cd])
         // Prguse_0389 底板在 (220, 42) 处已自带烘焙凸起红叉，TextureNormal 必须为 null，按下态显示凹陷 Prguse_0064
         var texCancel = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0064.png");
-        var btnCancel = new TextureButton
+        _btnCancel = new TextureButton
         {
             Name = "BtnTradeClose",
             Position = new Vector2(220, 42),
@@ -268,12 +300,14 @@ public partial class TradePanelView : Control, IManagedWindow
             TextureNormal = null,
             TexturePressed = texCancel
         };
-        btnCancel.Pressed += OnCancel;
-        _myPanel.AddChild(btnCancel);
+        _btnCancel.Pressed += OnCancel;
+        _myPanel.AddChild(_btnCancel);
     }
 
     public void OpenTrade(string targetName)
     {
+        ResetTrade();
+        SetRemoteName(targetName);
         Visible = true;
     }
 
@@ -282,14 +316,137 @@ public partial class TradePanelView : Control, IManagedWindow
         OnCancel();
     }
 
+    public void ResetTrade()
+    {
+        _myGold = 0;
+        _remoteGold = 0;
+        _isMyLocked = false;
+        _isRemoteLocked = false;
+
+        if (_lblMyGold != null) _lblMyGold.Text = "0";
+        if (_lblRemoteGold != null) _lblRemoteGold.Text = "0";
+
+        for (int i = 0; i < 10; i++)
+        {
+            _myItems[i] = null;
+            _remoteItems[i] = null;
+            if (_mySlots[i] != null) _mySlots[i].ItemTexture = null;
+            if (_remoteSlots[i] != null) _remoteSlots[i].ItemTexture = null;
+        }
+
+        UpdateLockVisual();
+    }
+
+    public void SetRemoteName(string targetName)
+    {
+        if (_lblRemoteName != null)
+        {
+            _lblRemoteName.Text = string.IsNullOrEmpty(targetName) ? "交易对方" : targetName;
+        }
+    }
+
+    public void SetMyName(string myName)
+    {
+        if (_lblMyName != null)
+        {
+            _lblMyName.Text = string.IsNullOrEmpty(myName) ? "我" : myName;
+        }
+    }
+
+    public void SetMyGold(int gold)
+    {
+        _myGold = Math.Max(0, gold);
+        if (_lblMyGold != null)
+        {
+            _lblMyGold.Text = $"{_myGold:N0}";
+        }
+    }
+
+    public void SetRemoteGold(int gold)
+    {
+        _remoteGold = Math.Max(0, gold);
+        if (_lblRemoteGold != null)
+        {
+            _lblRemoteGold.Text = $"{_remoteGold:N0}";
+        }
+    }
+
+    public void SetMyItem(int slot, string? itemName, Texture2D? icon = null)
+    {
+        if (slot < 0 || slot >= 10) return;
+        _myItems[slot] = itemName;
+        if (_mySlots[slot] != null)
+        {
+            _mySlots[slot].ItemTexture = icon;
+        }
+    }
+
+    public string? GetMyItem(int slot)
+    {
+        if (slot < 0 || slot >= 10) return null;
+        return _myItems[slot];
+    }
+
+    public void ClearMyItem(int slot)
+    {
+        SetMyItem(slot, null, null);
+    }
+
+    public void SetRemoteItem(int slot, string? itemName, Texture2D? icon = null)
+    {
+        if (slot < 0 || slot >= 10) return;
+        _remoteItems[slot] = itemName;
+        if (_remoteSlots[slot] != null)
+        {
+            _remoteSlots[slot].ItemTexture = icon;
+        }
+    }
+
+    public string? GetRemoteItem(int slot)
+    {
+        if (slot < 0 || slot >= 10) return null;
+        return _remoteItems[slot];
+    }
+
+    public void ClearRemoteItem(int slot)
+    {
+        SetRemoteItem(slot, null, null);
+    }
+
+    public void SetLocked(bool isMine, bool locked)
+    {
+        if (isMine)
+        {
+            _isMyLocked = locked;
+        }
+        else
+        {
+            _isRemoteLocked = locked;
+        }
+        UpdateLockVisual();
+    }
+
+    private void UpdateLockVisual()
+    {
+        if (_btnConfirm != null)
+        {
+            // 锁定态：显示凹陷图标且禁止重复点击
+            _btnConfirm.TextureNormal = _isMyLocked ? _texConfirmPressed : _texConfirmNormal;
+            _btnConfirm.Disabled = _isMyLocked;
+        }
+    }
+
     private void OnConfirm()
     {
+        if (_isMyLocked) return;
+        SetLocked(true, true);
         EmitSignal(SignalName.EndDealConfirmed);
     }
 
     private void OnCancel()
     {
         Visible = false;
+        ResetTrade();
         EmitSignal(SignalName.TradeCancelled);
     }
 }

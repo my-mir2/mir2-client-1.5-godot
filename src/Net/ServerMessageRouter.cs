@@ -51,6 +51,19 @@ public sealed class ServerMessageRouter
     public const short SM_MERCHANTDLG            = 631;  // 商店货架界面下发
     public const short SM_DEALMENU               = 670;  // 交易界面弹出 (ProtocolConsts)
     public const short SM_DEALMENU_IDA           = 673;  // 交易界面弹出 (IDA 0x46A5AA)
+    public const short SM_DEALTRY_FAIL          = 674;  // 交易发起失败/熔断取消
+    public const short SM_DEALADDITEM_OK        = 675;  // 己方放入物品成功
+    public const short SM_DEALADDITEM_FAIL      = 676;  // 己方放入物品失败
+    public const short SM_DEALDELITEM_OK        = 677;  // 己方取下物品成功
+    public const short SM_DEALDELITEM_FAIL      = 678;  // 己方取下物品失败
+    public const short SM_DEALREMOTEADDITEM     = 682;  // 对方放入物品广播
+    public const short SM_DEALREMOTEDELITEM     = 683;  // 对方取下物品广播
+    public const short SM_DEALCHGGOLD_OK        = 684;  // 己方修改交易金币成功
+    public const short SM_DEALCHGGOLD_FAIL      = 685;  // 己方修改交易金币失败
+    public const short SM_DEALREMOTECHGGOLD     = 686;  // 对方修改交易金币广播
+    public const short SM_DEALSUCCESS           = 687;  // 交易完成交割
+    public const short SM_DEALCANCEL            = 688;  // 交易取消退回
+    public const short SM_DEALCANCEL_DELPHI     = 681;  // 交易取消 (Delphi 变体 681)
     public const short SM_USERSTORAGE_DLG        = 700;  // 仓库保管箱托管界面弹出
     public const short SM_SENDUSERSTATE_INSPECT  = 751;  // 观人/他人状态下发 (IDA 0x46A857)
     public const short SM_OPENGUILDDLG           = 753;  // 打开行会主页 (IDA 0x46A528)
@@ -186,7 +199,42 @@ public sealed class ServerMessageRouter
                 break;
             case SM_DEALMENU:
             case SM_DEALMENU_IDA:
-                _hud?.ToggleTrade();
+                HandleDealMenu(packet);
+                break;
+            case SM_DEALTRY_FAIL:
+            case SM_DEALCANCEL:
+            case SM_DEALCANCEL_DELPHI:
+                HandleDealCancel(packet);
+                break;
+            case SM_DEALADDITEM_OK:
+                HandleDealAddItemOk(packet);
+                break;
+            case SM_DEALADDITEM_FAIL:
+                _hud?.AddChat("交易", $"[交易] 放入物品失败: {DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
+                break;
+            case SM_DEALDELITEM_OK:
+                _hud?.OnServerTradeDelItemOk(packet.Param);
+                break;
+            case SM_DEALDELITEM_FAIL:
+                _hud?.AddChat("交易", $"[交易] 取下物品失败: {DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
+                break;
+            case SM_DEALREMOTEADDITEM:
+                _hud?.OnServerTradeRemoteAddItem(packet.Param, DecodeExtraText(packet.Extra));
+                break;
+            case SM_DEALREMOTEDELITEM:
+                _hud?.OnServerTradeRemoteDelItem(packet.Param);
+                break;
+            case SM_DEALCHGGOLD_OK:
+                _hud?.OnServerTradeChgGold(packet.Recog, true);
+                break;
+            case SM_DEALCHGGOLD_FAIL:
+                _hud?.AddChat("交易", $"[交易] 修改金币失败: {DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
+                break;
+            case SM_DEALREMOTECHGGOLD:
+                _hud?.OnServerTradeChgGold(packet.Recog, false);
+                break;
+            case SM_DEALSUCCESS:
+                _hud?.OnServerTradeSuccess();
                 break;
             case SM_USERSTORAGE_DLG:
                 _hud?.ToggleStorage();
@@ -854,5 +902,38 @@ public sealed class ServerMessageRouter
 
         int itemId = pkt.Recog;
         gm.RemoveItem(itemId);
+    }
+
+    private void HandleDealMenu(ServerPacket pkt)
+    {
+        string partner = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(partner)) partner = "对方";
+        _hud?.OpenTrade(partner);
+    }
+
+    private void HandleDealCancel(ServerPacket pkt)
+    {
+        string reason = DecodeExtraText(pkt.Extra);
+        _hud?.OnServerTradeCancel(reason);
+    }
+
+    private void HandleDealAddItemOk(ServerPacket pkt)
+    {
+        string itemName = DecodeExtraText(pkt.Extra);
+        // 如果己方已经通过拖拽放置，此处确认即可
+        _hud?.AddChat("交易", $"[交易] 确认放入物品 [{itemName}] 到交易栏 #{pkt.Param + 1} 格。", new Color(0.8f, 1f, 0.8f));
+    }
+
+    private static string DecodeExtraText(byte[]? extra)
+    {
+        if (extra == null || extra.Length == 0) return string.Empty;
+        try
+        {
+            return Encoding.UTF8.GetString(extra).TrimEnd('\0');
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 }

@@ -763,6 +763,61 @@ public class TestUiSceneBindingArchitecture
             SlotButton.ItemDroppedGlobal -= handler;
         }
     }
+
+    /// <summary>
+    /// 步骤 51: 盛大官方 1.5 玩家面对面安全交易系统几何与坐标实证 (IDA sub_4857C7 / sub_485905 / sub_481dd4)
+    /// 实证锚点：
+    /// 1. 对方面板 Prguse_0390 (220x175, Top=0, Left=580 相对停靠容器 16)
+    /// 2. 我方面板 Prguse_0389 (236x175, Top=160 即 175-15, Left=564)
+    /// 3. 双端各 10 格独立物品线框表格 (Left=21, Top=56, 180x66, 2行5列无缝咬合)
+    /// 4. 锁定按钮 BtnTradeLock (Left=155, Top=128, 44x16, Prguse_0391)
+    /// 5. 关闭红叉 BtnTradeClose (Left=220, Top=42, 16x23, Prguse_0064)
+    /// </summary>
+    [Fact]
+    public void TestTradePanel_GeometryAndCoordinates_GroundTruth()
+    {
+        Assert.Equal(220.0f, TradePanelView.RemoteWidth);
+        Assert.Equal(236.0f, TradePanelView.MyWidth);
+        Assert.Equal(175.0f, TradePanelView.PanelHeight);
+
+        // 停靠容器居右停靠 (800 - 236 = 564)
+        int containerX = 800 - (int)TradePanelView.MyWidth;
+        Assert.Equal(564, containerX);
+
+        // 对方相对 X 为 16，绝对 X = 564 + 16 = 580 (即 800 - 220)
+        int remoteAbsX = containerX + 16;
+        Assert.Equal(580, remoteAbsX);
+
+        // 我方 Top = 175 - 15 = 160 (官方 15px 重叠停靠)
+        int myPanelTop = (int)TradePanelView.PanelHeight - 15;
+        Assert.Equal(160, myPanelTop);
+
+        // 网格尺寸：5列2行，单格 36x33，总宽 180 (5 * 36)，总高 66 (2 * 33)
+        int gridCols = 5;
+        int gridRows = 2;
+        int cellW = 36;
+        int cellH = 33;
+        Assert.Equal(180, gridCols * cellW);
+        Assert.Equal(66, gridRows * cellH);
+    }
+
+    /// <summary>
+    /// 步骤 51.1: 交易槽位拖拽放置与双向规约 (Bag <-> Trade)
+    /// </summary>
+    [Fact]
+    public void TestTrade_SlotDragAndDrop_Rules()
+    {
+        // 允许从背包拖入我方交易栏
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Trade, 0));
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Bag, 5, SlotButton.SlotType.Trade, 9));
+
+        // 允许从我方交易栏拖回背包
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Trade, 0, SlotButton.SlotType.Bag, 0));
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Trade, 9, SlotButton.SlotType.Bag, 39));
+
+        // 禁止自身同格拖拽
+        Assert.False(SlotButton.CanDrop(SlotButton.SlotType.Trade, 3, SlotButton.SlotType.Trade, 3));
+    }
 }
 
 

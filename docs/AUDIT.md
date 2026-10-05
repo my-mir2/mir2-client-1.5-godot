@@ -6349,4 +6349,36 @@
      - `File not found`: **0**；
      - `ERROR:`: **0**；
      - `SCRIPT ERROR:`: **0**。
-
+## 2026-10-05 双人面对面安全交易系统 (TradePanelView & DDealDlg/DDealRemoteDlg) 实证核销
+1. **交互断链与状态机坏账归因**：
+   - 审查发现：此前 `TradePanelView.cs` 虽有静态 UI 骨架，但所有 20 个交易槽位（对方 10 格与我方 10 格）均为固定 mock 图标，`CurrentSlotType` 错误声明为 `Bag`，无法响应任何外部数据绑定与槽位拖拽；
+   - 交易面板名字固定硬编码为“交易对方”，对方金币固定死写 50,000，我方金币固定死写 0；
+   - `HudController.HandleSlotItemDrop` 缺少 `Bag -> Trade` 与 `Trade -> Bag` 分发分支；
+   - 缺少锁定防作弊状态机（IDA `sub_4DDC8C / sub_4DD79C`），缺少交易取消时的原子物品退回回滚闭环（IDA `sub_467920 / sub_49FE38`）；
+   - `GameView.cs` 与 `ServerMessageRouter.cs` 完全断开交易协议分发，未向服务端发送 `CM_ADDDEALITEM` / `CM_DELDEALITEM` / `CM_DEALCHGGOLD` / `CM_DEALEND` / `CM_TRADECANCEL`，且未处理 12 个下行交易 SM 协议。
+2. **代码重构与对齐落实**：
+   - **双面板几何与控件 1:1 对齐**：严格对齐 IDA `sub_4857C7 / sub_485905 / sub_481dd4`：
+     - 对方面板 `Prguse_0390` (220x175 @ 580, 0)，我方面板 `Prguse_0389` (236x175 @ 564, 160，官方 15px 重叠停靠)；
+     - 双方各 10 格独立线框网格（2行5列，单格 36x33，总尺寸 180x66 @ 21, 56），槽位类型统一规约为 `SlotButton.SlotType.Trade`；
+     - 金币框咬合（60, 127），锁定按钮 `BtnTradeLock`（155, 128, 44x16），取消红叉 `BtnTradeClose`（220, 42, 16x23）；
+   - **交易拖拽与防作弊锁定**：
+     - 在 `HudController.HandleSlotItemDrop` 中实装 `Bag -> Trade` 与 `Trade -> Bag`；
+     - 锁定态检定：若已锁定（`IsMyLocked == true`），严禁放入或取下物品，红字告警拦截；
+     - 交易取消回退：实装 `RollbackTradeItemsToBag`，交易关闭或被对端取消时，遍历 10 格交易栏全部原子退回背包原位；
+   - **双端网络协议全面打通**：
+     - 在 `GameView.cs` 中监听 `TradeAddItemRequested`, `TradeDelItemRequested`, `TradeChangeGoldRequested`, `TradeConfirmRequested`, `TradeCancelRequested`，通过 `_net.SendPacket` 下发官方协议；
+     - 在 `ServerMessageRouter.cs` 中增加全套 DEAL 消息路由：`SM_DEALMENU` (670/673), `SM_DEALTRY_FAIL` (674), `SM_DEALADDITEM_OK` (675), `SM_DEALADDITEM_FAIL` (676), `SM_DEALDELITEM_OK` (677), `SM_DEALDELITEM_FAIL` (678), `SM_DEALREMOTEADDITEM` (682), `SM_DEALREMOTEDELITEM` (683), `SM_DEALCHGGOLD_OK` (684), `SM_DEALCHGGOLD_FAIL` (685), `SM_DEALREMOTECHGGOLD` (686), `SM_DEALSUCCESS` (687), `SM_DEALCANCEL` (688/681)；
+   - 在 `TestUiSceneBindingArchitecture.cs` 中增补 `TestTradePanel_GeometryAndCoordinates_GroundTruth` 与 `TestTrade_SlotDragAndDrop_Rules` 自动化单元测试；
+   - 在 `AutoEndToEndDriver.cs` 中增补 Step 51 实机演练阶段。
+3. **全流程回归闭环验收**：
+   - 单元测试运行：**115 项测试 100% 全部通过**（持续时间 2 秒）；
+   - 端到端 60 阶段真机全量 OpenGL3 光栅化运行完毕，退出码 0；
+   - 机器视觉审计 (`e2e_step51_face_to_face_trade_panel.png`)：
+     - 屏幕右上角精准渲染双面板堆叠，对方名字“无敌战神”，我方名字“我”；
+     - 对方交易栏第一格成功展示“骨玉权杖”，金币框显示 `66,666`；
+     - 我方交易栏第一格成功展示从背包拖入的“布衣(男)”，金币框显示 `88,888`，锁定按钮呈现凹陷已锁定态；
+     - 聊天框清晰回显双端交易事件；
+   - 运行时日志零容忍扫描：
+     - `File not found`: **0**；
+     - `ERROR:`: **0**；
+     - `SCRIPT ERROR:`: **0**。
