@@ -213,12 +213,7 @@ namespace Mir2Client.UI
 
                 WilLoader? loader = data.Type == EntityManager.EntityType.Npc
                     ? _wilNpc
-                    : (data.Appr switch
-                    {
-                        >= 20 => _wilMon3 ?? _wilMon1,
-                        >= 10 => _wilMon2 ?? _wilMon1,
-                        _ => _wilMon1
-                    });
+                    : MonsterWilPool.Instance.GetLoaderForAppr(data.Appr);
 
                 node.SetLoader(loader);
                 if (MapRendererInstance != null) node.SetMapRenderer(MapRendererInstance);

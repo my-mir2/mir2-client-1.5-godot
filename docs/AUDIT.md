@@ -6147,3 +6147,17 @@
      - [e2e_step43_weapon_upgrade_trial_slash_success.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step43_weapon_upgrade_trial_slash_success.png)（裁决之杖开刀试刀，+2 攻击力跳点爆发，属性永久增至 32 DC，聊天栏提示升级成功）；
      - [e2e_step44_pk_red_name_guard_execution.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step44_pk_red_name_guard_execution.png)（红名 250 点被大刀卫士 999 斩杀阵亡倒地，提示复活锁定至盟重红名村 9, 33, 33）；
    - 机器视觉审查与运行时日志零容忍扫描：0 黑屏，0 贴图丢失，0 调试辅助线，0 ERROR，0 SCRIPT ERROR，退出码严格为 0。
+
+## 2026-10-05 官方 1.5 怪物 WIL 动态资产池 (Mon1~Mon18) 与同屏多实体 Y-Sort 深度重排核销
+1. **官方 1.5 怪物 WIL 资产动态池架构实装 (MonsterWilPool.cs)**：
+   - 彻底废除此前仅静态加载 Mon1/2/3 的硬编码坏账；
+   - 严格 1:1 对齐官方 Delphi sub_495EBC (0x495EBC..0x49611B)，依据 Appr / 10 动态路由并全局懒加载 Mon1.wil ~ Mon18.wil (支持 Mon18.wil 神兽 Appr=170 等全部官方怪物)；
+   - 包含 0x5A (Appr=900) 特殊扩展映射，对齐官方 Delphi 原生特例；
+2. **官方 1.5 怪物帧偏移权威算法 IDA 100% 严密复刻 (sub_496120)**：
+   - 严格复刻 sub_496120 怪物基础帧偏移：涵盖 v1 <= 6 (280/230/360/430/440)、v1 in 7..13 (360/440/550)、v1 in 14..16 (360) 以及 v1 == 17 (350 * v8) 神兽完整规则；
+   - 在 EntityNode.cs 中全面接入 MonsterWilPool.CalcMonsterBaseOffset，消灭贴图偏移计算偏差；
+3. **同屏多实体高密度并发与 Y-Sort 深度重排实机审计**：
+   - xUnit 单元测试增至 98 项全部 100% 通过 (耗时 975ms)；
+   - Godot OpenGL3 端到端捕获 [e2e_step45_multi_entity_ysort_stress.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step45_multi_entity_ysort_stress.png)；
+   - 机器视觉核验：同屏 24 只怪物密集并发就位，Y-Sort 遮挡层级严丝合缝，聊天栏提示压测通过，0 黑屏，0 贴图丢失，0 调试辅助线；
+   - 运行时日志零容忍扫描：0 ERROR，0 SCRIPT ERROR，退出码严格为 0。

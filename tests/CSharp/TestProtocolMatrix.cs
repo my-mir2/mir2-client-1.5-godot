@@ -1820,7 +1820,49 @@ public class TestProtocolMatrix
         Assert.Equal(330, normalRespawn.spawnX);
         Assert.Equal(330, normalRespawn.spawnY);
     }
+
+    [Fact]
+    public void TestMonsterWilPool_OfficialSub495EBCAndSub496120GroundTruth()
+    {
+        // 1. 官方 sub_495EBC 怪物文件路由映射测试 (Appr / 10 -> Mon1..18)
+        Assert.Equal(1, Mir2Client.Render.MonsterWilPool.GetMonFileIndex(0));   // 0 -> Mon1
+        Assert.Equal(1, Mir2Client.Render.MonsterWilPool.GetMonFileIndex(9));   // 9 -> Mon1
+        Assert.Equal(2, Mir2Client.Render.MonsterWilPool.GetMonFileIndex(10));  // 10 -> Mon2
+        Assert.Equal(3, Mir2Client.Render.MonsterWilPool.GetMonFileIndex(20));  // 20 (变异骷髅) -> Mon3
+        Assert.Equal(18, Mir2Client.Render.MonsterWilPool.GetMonFileIndex(170)); // 170 (神兽) -> Mon18
+        Assert.Equal(6, Mir2Client.Render.MonsterWilPool.GetMonFileIndex(900)); // 90 (0x5A) -> Mon6 特例
+
+        // 2. 官方 sub_496120 怪物帧偏移算法测试
+        // v1 = 0: 280 * v8
+        Assert.Equal(0, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(0));
+        Assert.Equal(280, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(1));
+        Assert.Equal(280 * 5, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(5));
+
+        // v1 = 1: 230 * v8
+        Assert.Equal(0, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(10));
+        Assert.Equal(230, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(11));
+
+        // v1 = 2: 360 * v8 (变异骷髅 Appr=20)
+        Assert.Equal(0, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(20));
+
+        // v1 = 4: 360 * v8 (v8==1 则 600)
+        Assert.Equal(600, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(41));
+        Assert.Equal(360 * 2, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(42));
+
+        // v1 = 6: 440 * v8
+        Assert.Equal(440 * 3, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(63));
+
+        // v1 = 13: 360 / 440 / 550 / 360*v8
+        Assert.Equal(360, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(131));
+        Assert.Equal(440, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(132));
+        Assert.Equal(550, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(133));
+
+        // v1 = 17: 350 * v8 (神兽 Appr=170)
+        Assert.Equal(0, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(170));
+        Assert.Equal(350, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(171));
+    }
 }
+
 
 
 

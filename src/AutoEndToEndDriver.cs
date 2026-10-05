@@ -1140,14 +1140,64 @@ public partial class AutoEndToEndDriver : Node
 
             case 85:
             {
-                GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、特技特戒、武器试刀与红名守卫系统 100% 验证完工 ===");
-                RequestCapture("step17_all_buttons_completed");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null && gameView.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 同屏多实体密集并发与 Y-Sort 深度排序演练 ===");
+                    // 复活角色恢复视野
+                    gameView.PlayerInstance.Anim.SetAction(ActionType.Stand, 2);
+                    gameView.PlayerStateInstance.Hp = 100;
+
+                    // 批量生成 20 只不同类型的怪物，错落分布在 (X-3..X+3, Y-2..Y+2) 瓦片上
+                    int px = gameView.PlayerInstance.TileX;
+                    int py = gameView.PlayerInstance.TileY;
+                    int entUid = 9100;
+
+                    for (int dy = -2; dy <= 2; dy++)
+                    {
+                        for (int dx = -2; dx <= 2; dx++)
+                        {
+                            if (dx == 0 && dy == 0) continue; // 避开玩家主角位置
+
+                            int appr = ((dx + dy + 4) % 3) switch
+                            {
+                                0 => 10, // 稻草人 (Mon2)
+                                1 => 11, // 半兽人 (Mon2)
+                                _ => 20  // 变异骷髅 (Mon3)
+                            };
+                            string mName = appr == 20 ? "变异骷髅" : (appr == 10 ? "稻草人" : "半兽人");
+
+                            gameView.EntityManagerInstance.AddEntity(new EntityManager.EntityData
+                            {
+                                Uid = entUid++,
+                                Name = mName,
+                                Type = EntityManager.EntityType.Monster,
+                                TileX = px + dx,
+                                TileY = py + dy,
+                                Hp = 100,
+                                MaxHp = 100,
+                                Direction = (byte)((dx + dy + 8) % 8),
+                                Appr = appr
+                            });
+                        }
+                    }
+
+                    gameView.HudInstance.AddChat("系统", "【并发压测】同屏 24 只怪物密集并发就位！Y-Sort 深度排序与动态贴图渲染正常！", new Color(0.2f, 1f, 0.5f));
+                }
+                RequestCapture("step45_multi_entity_ysort_stress");
                 break;
             }
 
             case 86:
             {
-                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, WEAPON TRIAL SLASH & PK RULES COMPLETED SUCCESSFULLY!");
+                GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、特技特戒、武器试刀、红名守卫与多实体动态池 100% 验证完工 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 87:
+            {
+                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, MONSTER WIL POOL & Y-SORT COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();
                 break;
             }

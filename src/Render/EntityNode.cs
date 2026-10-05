@@ -359,18 +359,7 @@ namespace Mir2Client.Render
             }
 
             // 官方传奇 1.5 怪物帧偏移权威算法 (sub_496120)
-            int v8 = Appr % 10;
-            int v1 = Appr / 10;
-            int baseOffset = v1 switch
-            {
-                0 => 280 * v8,
-                1 => 230 * v8,
-                2 or 3 => 360 * v8,
-                4 => (v8 == 1 ? 600 : 360 * v8),
-                5 => 430 * v8,
-                6 => 440 * v8,
-                _ => 360 * v8
-            };
+            int baseOffset = MonsterWilPool.CalcMonsterBaseOffset(Appr);
 
             int dir = Direction & 7;
             return CurrentAction switch
