@@ -957,20 +957,20 @@ namespace Mir2Client.UI
             if (monName.Contains("稻草人"))
             {
                 // 掉落 88 枚金币与强效金创药
-                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 0, 88);
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 1, 88);
                 GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "强效金创药", x + 1, y, 2, 1);
                 HudInstance?.AddChat("掉落", "【稻草人】倒地爆出了金币与药水！", new Color(1f, 0.95f, 0.4f));
             }
-            else if (monName.Contains("半兽人"))
+            else if (monName.Contains("半兽人") || monName.Contains("骷髅"))
             {
                 // 掉落 188 枚金币与轻型盔甲
                 GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 1, 188);
                 GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "轻型盔甲", x, y + 1, 13, 1);
-                HudInstance?.AddChat("掉落", "【半兽人】倒地爆出了金币与战利品！", new Color(1f, 0.95f, 0.4f));
+                HudInstance?.AddChat("掉落", $"【{monName}】倒地爆出了金币与战利品！", new Color(1f, 0.95f, 0.4f));
             }
             else
             {
-                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 0, 50);
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 1, 50);
             }
         }
 
@@ -1101,7 +1101,7 @@ namespace Mir2Client.UI
                 Uid = 1001,
                 Name = "稻草人",
                 Type = EntityManager.EntityType.Monster,
-                Appr = 1,
+                Appr = 10,
                 TileX = 333,
                 TileY = 270,
                 Direction = 6,
@@ -1111,9 +1111,9 @@ namespace Mir2Client.UI
             EntityManagerInstance.AddEntity(new EntityManager.EntityData
             {
                 Uid = 1002,
-                Name = "半兽人",
+                Name = "骷髅战士",
                 Type = EntityManager.EntityType.Monster,
-                Appr = 3,
+                Appr = 21,
                 TileX = 328,
                 TileY = 268,
                 Direction = 2,

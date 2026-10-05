@@ -58,6 +58,9 @@ public partial class HudController : CanvasLayer
     private Panel? _bagPanel;
     private Panel? _equipPanel;
     private TextureRect? _dollBackground;
+    private TextureRect? _dollCloth;
+    private TextureRect? _dollWeapon;
+    private TextureRect? _dollHelm;
     private Control? _equipSlotsContainer;
     private MinimapView? _minimapView;
     private NpcDialogView? _npcDialogView;
@@ -96,6 +99,7 @@ public partial class HudController : CanvasLayer
     public ItemTooltipView? ItemTooltip => _itemTooltipView;
 
     // 官方 1.5 血球魔球控件 (Prguse_0004 @ (39, 440) 相对屏幕，相对 HUD @ (39, 91))
+    private TextureRect? _orbBgTextureRect;
     private TextureRect? _orbTextureRect;
     private ShaderMaterial? _orbShaderMat;
 
@@ -200,7 +204,23 @@ public partial class HudController : CanvasLayer
             MoveChild(tr, 0);
         }
 
-        // 挂载官方 1.5 血球魔球 (Prguse_0004.png 92x90 @ HUD(39, 91)，即屏幕坐标 (39, 440))
+        // 挂载官方 1.5 血球魔球底座 (IDA sub_48B2A0: Prguse_0005.png 96x92 @ (38, 439) 空槽金属暗底)
+        var orbBgTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0005.png");
+        if (orbBgTex != null)
+        {
+            _orbBgTextureRect = new TextureRect
+            {
+                Name = "HudOrbBg",
+                Texture = orbBgTex,
+                Position = new Vector2(38, 439),
+                Size = new Vector2(96, 92),
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+                ZIndex = 0
+            };
+            AddChild(_orbBgTextureRect);
+        }
+
+        // 挂载官方 1.5 血球魔球 (Prguse_0004.png 92x90 @ HUD(40, 91)，即屏幕坐标 (40, 440))
         var orbTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0004.png");
         if (orbTex != null)
         {
@@ -217,11 +237,11 @@ public partial class HudController : CanvasLayer
             {
                 Name = "HudOrb",
                 Texture = orbTex,
-                Position = new Vector2(39, 440),
+                Position = new Vector2(40, 440),
                 Size = new Vector2(92, 90),
                 Material = _orbShaderMat,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
-                ZIndex = 0 // 位于 HUD 顶层且在底图上方，完美严丝合缝嵌入金属圆环
+                ZIndex = 1 // 位于底座上方，裁切透明部分自然显露金属空槽
             };
             AddChild(_orbTextureRect);
         }
@@ -478,52 +498,51 @@ public partial class HudController : CanvasLayer
             }
 
             // 盛大官方 1.5 角色纸娃娃核心立绘层 (挂在 _dollBackground 下，与男角色裸身立绘 100% 严丝合缝对齐)
-            // 1. 衣服立绘层: StateItem_0060 (重盔甲男 80x128 @ 39, 63)
-            var texCloth = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0060.png");
-            if (texCloth != null && _dollBackground != null)
+            // 1. 衣服立绘层: 初始为布衣男 StateItem_0080 (80x127 @ 39, 63)
+            var texCloth = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0080.png");
+            if (_dollBackground != null)
             {
-                var clothRect = new TextureRect
+                _dollCloth = new TextureRect
                 {
                     Name = "DollCloth",
                     Texture = texCloth,
                     Position = new Vector2(39, 63),
-                    Size = new Vector2(80, 128),
+                    Size = new Vector2(80, 127),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                     ZIndex = 1
                 };
-                _dollBackground.AddChild(clothRect);
+                _dollBackground.AddChild(_dollCloth);
             }
 
-            // 2. 武器立绘层: StateItem_0041 (炼狱双刃斧 60x101 @ 10, 28，置于衣服上方手部咬合处)
-            var texWeapon = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0041.png");
-            if (texWeapon != null && _dollBackground != null)
+            // 2. 武器立绘层: 初始为木剑 StateItem_0030 (28x57 @ 26, 45)
+            var texWeapon = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0030.png");
+            if (_dollBackground != null)
             {
-                var weaponRect = new TextureRect
+                _dollWeapon = new TextureRect
                 {
                     Name = "DollWeapon",
                     Texture = texWeapon,
-                    Position = new Vector2(10, 28),
-                    Size = new Vector2(60, 101),
+                    Position = new Vector2(26, 45),
+                    Size = new Vector2(28, 57),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                     ZIndex = 2
                 };
-                _dollBackground.AddChild(weaponRect);
+                _dollBackground.AddChild(_dollWeapon);
             }
 
-            // 3. 头盔立绘层: StateItem_0108 (道士头盔 20x23 @ 74, 42，严丝合缝罩在头部)
-            var texHelm = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0108.png");
-            if (texHelm != null && _dollBackground != null)
+            // 3. 头盔立绘层: 初始无头盔 (隐藏状态)
+            if (_dollBackground != null)
             {
-                var helmRect = new TextureRect
+                _dollHelm = new TextureRect
                 {
                     Name = "DollHelm",
-                    Texture = texHelm,
                     Position = new Vector2(74, 42),
                     Size = new Vector2(20, 23),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
+                    Visible = false,
                     ZIndex = 3
                 };
-                _dollBackground.AddChild(helmRect);
+                _dollBackground.AddChild(_dollHelm);
             }
 
             // 装备槽位容器 (放置 9 大可交互装备槽位，ZIndex = 5 高于纸娃娃层)
@@ -1427,7 +1446,8 @@ public partial class HudController : CanvasLayer
         var btn = _bagSlots[slot];
         if (btn != null)
         {
-            btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}");
+            string folder = iconFile.StartsWith("Items") ? "Items" : "StateItem";
+            btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/{folder}/{iconFile}");
         }
     }
 
@@ -1483,6 +1503,10 @@ public partial class HudController : CanvasLayer
             _equipItemDetails[equipSlot] = null;
             var btn = _equipSlots[equipSlot];
             if (btn != null) btn.ItemTexture = null;
+
+            if (equipSlot == 0) UpdateDollVisuals("", null, null);
+            else if (equipSlot == 1) UpdateDollVisuals(null, "", null);
+            else if (equipSlot == 4) UpdateDollVisuals(null, null, "");
         }
         else
         {
@@ -1491,6 +1515,71 @@ public partial class HudController : CanvasLayer
             if (btn != null)
             {
                 btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}");
+            }
+
+            if (equipSlot == 0 && !string.IsNullOrEmpty(iconFile)) UpdateDollVisuals(iconFile, null, null);
+            else if (equipSlot == 1 && !string.IsNullOrEmpty(iconFile)) UpdateDollVisuals(null, iconFile, null);
+            else if (equipSlot == 4 && !string.IsNullOrEmpty(iconFile)) UpdateDollVisuals(null, null, iconFile);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 角色纸娃娃立绘图层动态更新接口
+    /// </summary>
+    public void UpdateDollVisuals(string? clothFile, string? weaponFile, string? helmFile)
+    {
+        if (_dollCloth != null && clothFile != null)
+        {
+            if (string.IsNullOrEmpty(clothFile))
+            {
+                _dollCloth.Visible = false;
+            }
+            else
+            {
+                var tex = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{clothFile}");
+                if (tex != null)
+                {
+                    _dollCloth.Texture = tex;
+                    _dollCloth.Size = tex.GetSize();
+                    _dollCloth.Visible = true;
+                }
+            }
+        }
+
+        if (_dollWeapon != null && weaponFile != null)
+        {
+            if (string.IsNullOrEmpty(weaponFile))
+            {
+                _dollWeapon.Visible = false;
+            }
+            else
+            {
+                var tex = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{weaponFile}");
+                if (tex != null)
+                {
+                    _dollWeapon.Texture = tex;
+                    _dollWeapon.Size = tex.GetSize();
+                    _dollWeapon.Position = weaponFile.Contains("0030") ? new Vector2(26, 45) : new Vector2(10, 28);
+                    _dollWeapon.Visible = true;
+                }
+            }
+        }
+
+        if (_dollHelm != null && helmFile != null)
+        {
+            if (string.IsNullOrEmpty(helmFile))
+            {
+                _dollHelm.Visible = false;
+            }
+            else
+            {
+                var tex = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{helmFile}");
+                if (tex != null)
+                {
+                    _dollHelm.Texture = tex;
+                    _dollHelm.Size = tex.GetSize();
+                    _dollHelm.Visible = true;
+                }
             }
         }
     }

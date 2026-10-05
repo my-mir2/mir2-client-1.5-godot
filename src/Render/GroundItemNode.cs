@@ -94,7 +94,7 @@ namespace Mir2Client.Render
             int frameIdx = Looks;
             if (ItemName.Contains("金币"))
             {
-                frameIdx = Amount >= 100 ? 1 : 0;
+                frameIdx = 1; // 统一为显目的大金币堆 (DnItems_0001.png)，彻底杜绝足球误判
             }
 
             Texture2D? tex = _loader.GetFrame(frameIdx);

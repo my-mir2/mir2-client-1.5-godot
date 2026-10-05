@@ -225,6 +225,7 @@ public partial class AutoEndToEndDriver : Node
                     {
                         GD.Print("[AutoE2E] 验证快捷键呼出包裹面板 (F9) 与底部官方金属内胆属性回显");
                         hud.ToggleBag();
+                        hud.SetBagItem(0, "屠龙刀", "Items_0059.png", "重量 99  持久力 33/33\n攻击 5-35  强度+1  幸运+7\n需要等级 35");
                         hud.ShowSlotTooltip("屠龙刀", "[color=#c0c0c0]重量 99  持久力 33/33[/color]\n[color=#ffff00]攻击 5-35  强度+1[/color]  [color=#00ffff]幸运+7[/color]\n[color=#c0c0c0]需要等级 35[/color]", new Vector2(400, 100), showFloating: false);
                     }
                 }
@@ -911,18 +912,18 @@ public partial class AutoEndToEndDriver : Node
                 if (gameView != null && gameView.PlayerInstance != null)
                 {
                     GD.Print("[AutoE2E] === 验证官方 1.5 战士核心特技：隔位刺杀 (MagicId=12) 剑气穿透防御与魔法盾 ===");
-                    // 在正前方第 2 格 (X+2) 生成带有护盾的测试靶标半兽人
+                    // 在正前方第 2 格 (X+2) 生成带有护盾的测试靶标骷髅战士
                     gameView.EntityManagerInstance.AddEntity(new EntityManager.EntityData
                     {
                         Uid = 8802,
-                        Name = "远端靶标半兽人",
+                        Name = "远端靶标骷髅战士",
                         Type = EntityManager.EntityType.Monster,
                         TileX = gameView.PlayerInstance.TileX + 2,
                         TileY = gameView.PlayerInstance.TileY,
                         Hp = 150,
                         MaxHp = 150,
                         Direction = 6,
-                        Appr = 11
+                        Appr = 21
                     });
                     // 施展刺杀剑术 (打出隔位剑气)
                     gameView.TriggerSkill(12, new Vector2I(gameView.PlayerInstance.TileX + 2, gameView.PlayerInstance.TileY));
@@ -1162,11 +1163,11 @@ public partial class AutoEndToEndDriver : Node
 
                             int appr = ((dx + dy + 4) % 3) switch
                             {
-                                0 => 10, // 稻草人 (Mon2)
-                                1 => 11, // 半兽人 (Mon2)
-                                _ => 20  // 变异骷髅 (Mon3)
+                                0 => 10, // 稻草人 (Mon2，0 偏移，230 帧完好)
+                                1 => 21, // 骷髅战士 (Mon3，360 偏移，资源充沛)
+                                _ => 20  // 变异骷髅 (Mon3，0 偏移，360 帧完好)
                             };
-                            string mName = appr == 20 ? "变异骷髅" : (appr == 10 ? "稻草人" : "半兽人");
+                            string mName = appr == 20 ? "变异骷髅" : (appr == 10 ? "稻草人" : "骷髅战士");
 
                             gameView.EntityManagerInstance.AddEntity(new EntityManager.EntityData
                             {

@@ -38,6 +38,10 @@ public partial class SlotButton : Button
             {
                 _iconRect.Texture = value;
                 _iconRect.Visible = value != null;
+                if (Size.X > 0 && Size.Y > 0)
+                {
+                    _iconRect.Size = Size;
+                }
             }
         }
     }
@@ -46,25 +50,31 @@ public partial class SlotButton : Button
     {
         base._Ready();
         // 关键：采用独立的居中 TextureRect 渲染槽位物品图标，绝对禁用 Button.Icon！
-        // 从而彻底杜绝 Godot Button 在设置 Icon 时由于贴图大于按钮尺寸而强行把按钮物理 Bounds 和调试框拉大的严重缺陷！
         Icon = null;
-        ClipContents = true; // 官方 1:1 实证：槽位按钮硬裁剪，严禁贴图溢出槽位边框
+        ClipContents = true;
 
+        Vector2 initialSize = Size.X > 0 && Size.Y > 0 ? Size : (CustomMinimumSize.X > 0 ? CustomMinimumSize : new Vector2(32, 32));
         _iconRect = new TextureRect
         {
             Name = "__SlotIcon__",
             Texture = _itemTexture,
             Visible = _itemTexture != null,
             MouseFilter = MouseFilterEnum.Ignore,
-            // 官方 1:1 实证：装备槽位图标严格不超出槽位矩形。
-            // KeepAspectCentered = 保持宽高比居中缩放；ClipContents = 超出部分硬裁剪。
-            // 官方 WIL 贴图（如死神手套 36x35）可能大于槽位框（34x31），必须裁剪。
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             ClipContents = true,
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            Size = initialSize
         };
         _iconRect.SetAnchorsPreset(LayoutPreset.FullRect);
         AddChild(_iconRect);
+
+        Resized += () =>
+        {
+            if (_iconRect != null && Size.X > 0 && Size.Y > 0)
+            {
+                _iconRect.Size = Size;
+            }
+        };
     }
 
     public override Variant _GetDragData(Vector2 atPosition)
