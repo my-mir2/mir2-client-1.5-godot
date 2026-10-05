@@ -38,6 +38,8 @@ public sealed class EquipItem
     public int Sc { get; set; }
     public int Luck { get; set; }
     public int Curse { get; set; }
+    public int UpgradeState { get; set; } // 官方 bt_value[10] 升级结果试刀码 (1=碎刀, 10..12=DC, 20..22=MC, 30..32=SC)
+    public int UpgradeCount { get; set; } // 累计升级成功次数 (达到25次必碎)
 }
 
 /// <summary>
@@ -90,7 +92,14 @@ public sealed class PlayerState
 
     // PK 与红名机制 (PK >= 200 为红名)
     public int PkPoints { get; set; }
-    public bool IsRedName => PkPoints >= 200;
+    public int PkPoint
+    {
+        get => PkPoints;
+        set => PkPoints = value;
+    }
+    public int PkLevel => PkRuleEngine.GetPkLevel(PkPoints);
+    public bool IsRedName => PkRuleEngine.GetPkStatus(PkPoints) >= PkRuleEngine.PkStatus.Red;
+    public bool IsYellowName => PkRuleEngine.GetPkStatus(PkPoints) == PkRuleEngine.PkStatus.Yellow;
     public bool IsGrayName { get; set; }
     public long GrayNameExpireTick { get; set; }
 
@@ -471,5 +480,41 @@ public sealed class PlayerState
         }
 
         return (0, Mp, true, false, absorbed, shieldBroken);
+    }
+
+    public void AddPkMurder()
+    {
+        PkPoint += PkRuleEngine.KillHumanAddPkPoint;
+    }
+
+    /// <summary>
+    /// 第一刀挥砍攻击时执行武器开刀试刀判定
+    /// </summary>
+    public WeaponUpgradeEngine.TrialResult TrialSlashEquippedWeapon()
+    {
+        var weapon = Equipment[(int)OfficialEquipSlot.Weapon];
+        if (weapon == null || weapon.UpgradeState == 0)
+        {
+            return new WeaponUpgradeEngine.TrialResult(
+                WeaponUpgradeEngine.TrialSlashOutcome.None,
+                WeaponUpgradeEngine.StatUpgradeType.Dc,
+                0,
+                "未装备待试刀武器。"
+            );
+        }
+
+        var res = WeaponUpgradeEngine.ExecuteTrialSlash(weapon, weapon.UpgradeCount);
+        if (res.Outcome == WeaponUpgradeEngine.TrialSlashOutcome.Broken)
+        {
+            // 碎刀：从装备槽卸下并彻底销毁武器
+            Equipment[(int)OfficialEquipSlot.Weapon] = null;
+            RecalculateAttributes();
+        }
+        else if (res.Outcome == WeaponUpgradeEngine.TrialSlashOutcome.Success)
+        {
+            weapon.UpgradeCount++;
+            RecalculateAttributes();
+        }
+        return res;
     }
 }

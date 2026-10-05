@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using Mir2Client.Audio;
 using Mir2Client.Game;
 using Mir2Client.Render;
 using Mir2Client.UI;
@@ -1071,14 +1072,82 @@ public partial class AutoEndToEndDriver : Node
 
             case 83:
             {
-                GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、道士双毒神兽与法师魔法盾 100% 验证完工 ===");
-                RequestCapture("step17_all_buttons_completed");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null && gameView.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 武器升级与第一刀开刀试刀（+2 暴击跳点成功）演练 ===");
+                    // 装备待试刀裁决之杖
+                    var weapon = new EquipItem
+                    {
+                        Uid = 9002,
+                        Name = "裁决之杖",
+                        Dc = 30,
+                        UpgradeState = 11 // 待试刀结果码 11 (攻击力 +2)
+                    };
+                    gameView.PlayerStateInstance.Equipment[(int)OfficialEquipSlot.Weapon] = weapon;
+                    gameView.PlayerStateInstance.RecalculateAttributes();
+
+                    // 挥出第一刀试刀
+                    gameView.PlayerInstance.Anim.SetAction(ActionType.Hit, gameView.PlayerInstance.Direction);
+                    var trialRes = gameView.PlayerStateInstance.TrialSlashEquippedWeapon();
+                    gameView.HudInstance.AddChat("铁匠", trialRes.Message, new Color(1f, 0.85f, 0.2f));
+                    AudioManager.Instance?.PlaySoundId(1);
+                }
+                RequestCapture("step43_weapon_upgrade_trial_slash_success");
                 break;
             }
 
             case 84:
             {
-                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, TAOIST & MAGE COMBAT MECHANICS COMPLETED SUCCESSFULLY!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null && gameView.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 PK 红名惩罚与大刀卫士 999 斩杀秒杀演练 ===");
+                    // 恶意谋杀增加 PK 点数至 250 点 (红名)
+                    gameView.PlayerStateInstance.PkPoint = 250;
+
+                    // 在身边生成大刀卫士 (Appr 104)
+                    int guardX = gameView.PlayerInstance.TileX + 1;
+                    int guardY = gameView.PlayerInstance.TileY;
+                    gameView.EntityManagerInstance.AddEntity(new EntityManager.EntityData
+                    {
+                        Uid = 8805,
+                        Name = "大刀卫士",
+                        Type = EntityManager.EntityType.Monster,
+                        TileX = guardX,
+                        TileY = guardY,
+                        Hp = 9999,
+                        MaxHp = 9999,
+                        Direction = 6,
+                        Appr = 10
+                    });
+
+                    // 大刀卫士感知红名仇恨并执行 999 真实伤害一刀斩杀
+                    var execRes = PkRuleEngine.ExecuteGuardSlash(gameView.PlayerStateInstance);
+                    gameView.HudInstance.AddChat("警告", execRes.broadcastMsg, new Color(1f, 0.2f, 0.2f));
+
+                    // 判定红名复活流转
+                    var respawn = PkRuleEngine.GetRespawnLocation(gameView.PlayerStateInstance.PkPoint);
+                    gameView.HudInstance.AddChat("复活", $"【惩罚】红名恶徒死亡！复活出生点已被强制锁定至【{respawn.locationName} ({respawn.mapId}, {respawn.spawnX}, {respawn.spawnY})】！", new Color(1f, 0.4f, 0.4f));
+
+                    // 播放倒地死亡动作与音效
+                    gameView.PlayerInstance.Anim.SetAction(ActionType.Die, gameView.PlayerInstance.Direction);
+                    AudioManager.Instance?.PlaySoundId(2);
+                }
+                RequestCapture("step44_pk_red_name_guard_execution");
+                break;
+            }
+
+            case 85:
+            {
+                GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、特技特戒、武器试刀与红名守卫系统 100% 验证完工 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 86:
+            {
+                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, WEAPON TRIAL SLASH & PK RULES COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();
                 break;
             }

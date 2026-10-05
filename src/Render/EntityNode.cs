@@ -71,10 +71,17 @@ namespace Mir2Client.Render
         }
 
         private int _poisonMask = 0;
+        private int _pkPoint = 0;
 
         public void UpdatePoison(int poisonMask)
         {
             _poisonMask = poisonMask;
+            UpdateNameColor();
+        }
+
+        public void UpdatePk(int pkPoint)
+        {
+            _pkPoint = pkPoint;
             UpdateNameColor();
         }
 
@@ -98,6 +105,14 @@ namespace Mir2Client.Render
             else if ((_poisonMask & 2) != 0) // 红毒
             {
                 _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.25f, 0.25f)); // 暗红
+            }
+            else if (_pkPoint >= 200) // 官方红名恶徒
+            {
+                _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.15f, 0.15f)); // 鲜红色
+            }
+            else if (_pkPoint >= 100) // 官方黄名警告
+            {
+                _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.2f)); // 亮黄色
             }
             else
             {

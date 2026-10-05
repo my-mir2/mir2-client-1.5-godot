@@ -222,6 +222,8 @@ namespace Mir2Client.UI
 
                 node.SetLoader(loader);
                 if (MapRendererInstance != null) node.SetMapRenderer(MapRendererInstance);
+                if (data.PkPoint != 0) node.UpdatePk(data.PkPoint);
+                if (data.PoisonMask != 0) node.UpdatePoison(data.PoisonMask);
 
                 EntityContainer.AddChild(node);
                 _entityNodes[data.Uid] = node;
@@ -277,6 +279,14 @@ namespace Mir2Client.UI
                 if (_entityNodes.TryGetValue(uid, out var node))
                 {
                     node.UpdatePoison(mask);
+                }
+            };
+
+            EntityManagerInstance.EntityPkChanged += (uid, pk) =>
+            {
+                if (_entityNodes.TryGetValue(uid, out var node))
+                {
+                    node.UpdatePk(pk);
                 }
             };
         }

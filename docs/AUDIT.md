@@ -6123,3 +6123,27 @@
      - [e2e_step41_taoist_summon_shinsu_pet.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step41_taoist_summon_shinsu_pet.png)（道士召唤神兽/骷髅守护身旁，地表真实阴影与光照特效）；
      - [e2e_step42_mage_magic_shield_absorb.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step42_mage_magic_shield_absorb.png)（法师激活 3 级魔法盾，受到 50 点打击化解吸收 30 点，实际承伤 20 点，生命保持健康）；
    - 机器视觉审查与运行时日志零容忍扫描：0 黑屏，0 贴图丢失，0 调试辅助线，0 ERROR，0 SCRIPT ERROR，退出码严格为 0。
+
+## 2026-10-05 官方 1.5 武器升级黑铁矿持久/首饰跳点与PK红名守卫秒杀红名村复活闭环核销
+1. **官方 1.5 武器升级黑铁矿与首饰算法 IDA 权威实证 (sub_4A0218 / sub_4A0CB8 / sub_4A0F48)**：
+   - **黑铁矿纯度因子**：dura_factor = sum(purity) / count + (count >= 5 ? 1 : 0)；
+   - **持久升降精算**：factor < 9 必掉 3 点最大持久 (-3000 dura)；9..15 几率掉 1~2 点；16..17 绝对保平；>= 18 几率增加 1~3 点最大持久；
+   - **首饰极值与主属性推导**：项链/手镯前2最高按 v57 + v56/3 + v57/5 加权，戒指额外各 +1；比较 DC/MC/SC 决定主属性；
+   - **成功率公式**：Rate = Min(85, userLuck + upgradeCount + 7 * Min(11, statScore) + 10 - pkValue)；
+   - **暴击跳点判定**：基础成功加点 +1 (代码 10/20/30)；Rate > 63 且 roll30 == 0 暴击跳点 +2 (代码 11/21/31)；Rate > 79 且 roll200 == 0 天选跳点 +3 (代码 12/22/32)；roll100 >= Rate 判定为 1 (碎刀)。
+2. **官方 1.5 武器第一刀开刀试刀与碎刀判定 IDA 权威实证 (sub_4C27C0 / sub_4C2854)**：
+   - 取回武器处于待试刀状态 (UpgradeState > 0)；
+   - 角色出刀命中第一刀时结算：
+     - 若累积升级达到 25 次或结果码为 1：武器当场粉碎破碎并彻底销毁 (Broken)，聊天栏提示“刀身崩裂！你的武器已经碎了！”；
+     - 成功状态：对应 DC/MC/SC 永久增加 1~3 点，升级次数 +1，试刀状态核销，聊天栏提示“刀光闪烁！攻击力永久提升 2 点！武器升级成功！”。
+3. **官方 1.5 PK 红黄名与大刀卫士秒杀红名村复活 IDA 权威实证 (sub_4BF0A0 / sub_4BF180 / sub_4D7C20 / sub_4BD1BC)**：
+   - **PK 点数与善恶等级**：恶意击杀白名玩家每次增加 100 点 PKPoint；PKLevel = PKPoint / 100；
+   - **红黄名状态**：PKPoint < 100 为白名守法市民；100 <= PKPoint < 200 为黄名恶徒；PKPoint >= 200 为红名通缉犯 (名字变鲜红色 #FF2020)；
+   - **大刀卫士与弓箭手秒杀仇恨**：视野内出现红名玩家触发极限仇恨，出刀造成 999 点真实伤害秒杀，红名玩家当场阵亡；
+   - **红名村死亡复活强制流转**：红名阵亡后禁止在普通主城安全区复活，强制遣送至盟重红名村 (地图 9，坐标 33, 33) 重生。
+4. **自动化测试与端到端真实渲染验证**：
+   - 单元测试增至 97 项，100% 全部通过 (耗时 863ms)；
+   - Godot OpenGL3 端到端实机演练捕获真实截屏：
+     - [e2e_step43_weapon_upgrade_trial_slash_success.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step43_weapon_upgrade_trial_slash_success.png)（裁决之杖开刀试刀，+2 攻击力跳点爆发，属性永久增至 32 DC，聊天栏提示升级成功）；
+     - [e2e_step44_pk_red_name_guard_execution.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step44_pk_red_name_guard_execution.png)（红名 250 点被大刀卫士 999 斩杀阵亡倒地，提示复活锁定至盟重红名村 9, 33, 33）；
+   - 机器视觉审查与运行时日志零容忍扫描：0 黑屏，0 贴图丢失，0 调试辅助线，0 ERROR，0 SCRIPT ERROR，退出码严格为 0。

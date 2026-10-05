@@ -42,6 +42,7 @@ public class EntityManager
         public int PoisonStrength { get; set; } = 0;
         public int MasterUid { get; set; } = 0;  // 随从主人 UID
         public int PetLevel { get; set; } = 0;   // 随从等级 (0~7)
+        public int PkPoint { get; set; } = 0;    // PK 善恶点数 (>=200 为红名)
     }
 
     public event Action<EntityData>? EntityAdded;
@@ -51,6 +52,7 @@ public class EntityManager
     public event Action<int, int, int>? EntityStruck;
     public event Action<int>? EntityDied;
     public event Action<int, int>? EntityPoisonChanged; // uid, poisonMask
+    public event Action<int, int>? EntityPkChanged;     // uid, pkPoint
 
     private readonly Dictionary<int, EntityData> _entities = new();
 
@@ -228,6 +230,18 @@ public class EntityManager
                 ent.NextPoisonTick = 0;
                 EntityPoisonChanged?.Invoke(uid, 0);
             }
+        }
+    }
+
+    /// <summary>
+    /// 更新实体的 PK 善恶点数 (触发红名/黄名名字变色)
+    /// </summary>
+    public void UpdatePkPoint(int uid, int pkPoint)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.PkPoint = pkPoint;
+            EntityPkChanged?.Invoke(uid, pkPoint);
         }
     }
 }

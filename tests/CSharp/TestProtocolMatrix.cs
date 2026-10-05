@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Mir2Client.Game;
 using Mir2Client.Net;
 using Xunit;
 
@@ -1711,7 +1713,115 @@ public class TestProtocolMatrix
         Assert.True(breakRes.shieldBroken);
         Assert.False(ps.HasMagicShield);
     }
+
+    [Fact]
+    public void TestWeaponUpgrade_BlackIronPurityAndTrialSlashFlow()
+    {
+        // 1. 黑铁矿纯度因子计算 (sub_4A0218)
+        var lowOres = new List<WeaponUpgradeEngine.BlackIronOre>
+        {
+            new(5), new(6), new(4) // avg = 5, count < 5 => factor = 5 (< 9 必掉持久)
+        };
+        int lowFactor = WeaponUpgradeEngine.CalcBlackIronDuraFactor(lowOres.Select(o => o.Purity).ToList());
+        Assert.Equal(5, lowFactor);
+        Assert.Equal(-3000, WeaponUpgradeEngine.CalcWeaponDuraChange(lowFactor, 0));
+
+        var perfectOres = new List<WeaponUpgradeEngine.BlackIronOre>
+        {
+            new(16), new(16), new(16), new(16), new(16) // avg = 16, count >= 5 => 16 + 1 = 17 (16..17 绝对保平)
+        };
+        int perfectFactor = WeaponUpgradeEngine.CalcBlackIronDuraFactor(perfectOres.Select(o => o.Purity).ToList());
+        Assert.Equal(17, perfectFactor);
+        Assert.Equal(0, WeaponUpgradeEngine.CalcWeaponDuraChange(perfectFactor, 0));
+
+        // 2. 首饰加权与主属性推导 (sub_4A0CB8)
+        var accessories = new List<WeaponUpgradeEngine.AccessoryInfo>
+        {
+            new(StdMode: 22, Dc: 4, Mc: 0, Sc: 0), // 幽灵项链
+            new(StdMode: 24, Dc: 3, Mc: 0, Sc: 0), // 龙之戒指 (戒指额外 +1 => 4)
+            new(StdMode: 26, Dc: 2, Mc: 0, Sc: 0)  // 力量戒指 (戒指额外 +1 => 3)
+        };
+        var p = WeaponUpgradeEngine.CalcWeaponUpgradeParams(perfectOres, accessories);
+        Assert.Equal(WeaponUpgradeEngine.StatUpgradeType.Dc, p.StatType);
+        Assert.True(p.StatVal > 0);
+
+        // 3. 成功率与结果码 (sub_4A0F48)
+        int rate = WeaponUpgradeEngine.CalcWeaponUpgradeRate(userLuck: 0, upgradeCount: 0, statScore: p.StatVal, pkValue: 0);
+        Assert.True(rate is >= 30 and <= 85);
+
+        // 模拟成功升级并跳点 +2 (rate > 63, roll30 == 0)
+        int jumpCode = WeaponUpgradeEngine.DetermineUpgradeResultCode(rate: 70, roll100: 10, roll30: 0, roll200: 50, WeaponUpgradeEngine.StatUpgradeType.Dc);
+        Assert.Equal(11, jumpCode); // DC +2 代码
+
+        // 4. 试刀开刀测试 (sub_4C27C0)
+        var ps = new Mir2Client.Game.PlayerState();
+        var weapon = new EquipItem
+        {
+            Uid = 9001,
+            Name = "裁决之杖",
+            Dc = 30,
+            UpgradeState = 11 // 待试刀：成功 +2
+        };
+        ps.Equipment[(int)OfficialEquipSlot.Weapon] = weapon;
+
+        // 执行开刀试刀
+        var trialRes = ps.TrialSlashEquippedWeapon();
+        Assert.Equal(WeaponUpgradeEngine.TrialSlashOutcome.Success, trialRes.Outcome);
+        Assert.Equal(2, trialRes.Bonus);
+        Assert.Equal(32, weapon.Dc); // 30 + 2 = 32
+        Assert.Equal(1, weapon.UpgradeCount);
+        Assert.Equal(0, weapon.UpgradeState); // 试刀状态核销
+
+        // 5. 试刀碎刀销毁测试
+        weapon.UpgradeState = 1; // 碎刀标志码
+        var breakRes = ps.TrialSlashEquippedWeapon();
+        Assert.Equal(WeaponUpgradeEngine.TrialSlashOutcome.Broken, breakRes.Outcome);
+        Assert.Null(ps.Equipment[(int)OfficialEquipSlot.Weapon]); // 武器已化为乌有彻底销毁
+    }
+
+    [Fact]
+    public void TestPkRule_MurderLevelGuardExecutionAndRedVillageRespawn()
+    {
+        var ps = new Mir2Client.Game.PlayerState { Name = "红名狂魔", Hp = 100, MaxHp = 100 };
+        Assert.False(ps.IsRedName);
+        Assert.False(ps.IsYellowName);
+        Assert.Equal(0, ps.PkLevel);
+
+        // 1. 恶意谋杀两名白名玩家 (每次 +100 PK 点数)
+        ps.AddPkMurder();
+        Assert.Equal(100, ps.PkPoint);
+        Assert.True(ps.IsYellowName);
+        Assert.False(ps.IsRedName);
+        Assert.Equal(1, ps.PkLevel);
+
+        ps.AddPkMurder();
+        Assert.Equal(200, ps.PkPoint);
+        Assert.False(ps.IsYellowName);
+        Assert.True(ps.IsRedName);
+        Assert.Equal(2, ps.PkLevel);
+
+        // 2. 大刀卫士仇恨检测与 999 真实伤害秒杀 (sub_4D7C20)
+        Assert.True(PkRuleEngine.IsHostileToGuard(ps.PkPoint));
+        var execRes = PkRuleEngine.ExecuteGuardSlash(ps);
+        Assert.Equal(999, execRes.damage);
+        Assert.True(execRes.isDead);
+        Assert.Equal(0, ps.Hp); // 当场阵亡
+
+        // 3. 红名村死亡强制重生地图流转 (sub_4BD1BC case 3)
+        var respawn = PkRuleEngine.GetRespawnLocation(ps.PkPoint);
+        Assert.Equal(9, respawn.mapId);   // 红名村地图 9
+        Assert.Equal(33, respawn.spawnX); // (33, 33)
+        Assert.Equal(33, respawn.spawnY);
+        Assert.Equal("盟重红名村", respawn.locationName);
+
+        // 白名玩家阵亡回盟重土城安全区
+        var normalRespawn = PkRuleEngine.GetRespawnLocation(0);
+        Assert.Equal(3, normalRespawn.mapId);
+        Assert.Equal(330, normalRespawn.spawnX);
+        Assert.Equal(330, normalRespawn.spawnY);
+    }
 }
+
 
 
 
