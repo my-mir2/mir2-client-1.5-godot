@@ -507,6 +507,8 @@ public class TestUiSceneBindingArchitecture
         var npcClose = (X: 399, Y: 1, W: 16, H: 23);
         Assert.Equal(399, npcClose.X);
         Assert.Equal(1, npcClose.Y);
+        Assert.Equal(16, npcClose.W);
+        Assert.Equal(23, npcClose.H);
 
         // 观人面板 (Prguse_0370 232x325 @ 336, 0, IDA sub_481dd4 [0x48447f..0x4847ce])
         Assert.Equal(232.0f, InspectPanelView.PanelWidth);

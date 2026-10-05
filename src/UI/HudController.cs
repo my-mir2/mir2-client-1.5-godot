@@ -650,6 +650,26 @@ public partial class HudController : CanvasLayer
 
         _minimapView = GetNodeOrNull<MinimapView>("Minimap");
         _npcDialogView = GetNodeOrNull<NpcDialogView>("NpcDialog");
+        if (_npcDialogView != null)
+        {
+            _npcDialogView.ActionTriggered += (actionTag) =>
+            {
+                GD.Print($"[HudController] NPC 对话点击 Action: {actionTag}");
+                string lower = actionTag.ToLowerInvariant();
+                if (lower.Contains("storage") || lower.Contains("deposit") || lower.Contains("保管"))
+                {
+                    ToggleStorage();
+                }
+                else if (lower.Contains("buy") || lower.Contains("sell") || lower.Contains("shop") || lower.Contains("买") || lower.Contains("卖"))
+                {
+                    ToggleShop();
+                }
+                else if (lower.Contains("repair") || lower.Contains("修理"))
+                {
+                    ToggleRepair();
+                }
+            };
+        }
         _deathScreenView = GetNodeOrNull<DeathScreenView>("DeathScreen");
 
         // 官方 1.5 HUD 底栏 6 大原生功能按钮 (Prguse_0001 对应包裹/装备/技能/组队/行会/交易)

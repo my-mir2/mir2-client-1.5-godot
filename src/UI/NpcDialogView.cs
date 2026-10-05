@@ -16,6 +16,9 @@ public partial class NpcDialogView : Control, IManagedWindow
     public delegate void OptionSelectedEventHandler(int index);
 
     [Signal]
+    public delegate void ActionTriggeredEventHandler(string actionTag);
+
+    [Signal]
     public delegate void DialogClosedEventHandler();
 
     public const float PanelWidth = 416.0f;
@@ -203,11 +206,16 @@ public partial class NpcDialogView : Control, IManagedWindow
         if (int.TryParse(metaStr, out int idx))
         {
             EmitSignal(SignalName.OptionSelected, idx);
+            if (idx >= 0 && idx < _optionActions.Count)
+            {
+                EmitSignal(SignalName.ActionTriggered, _optionActions[idx]);
+            }
         }
         else
         {
             int foundIdx = _optionActions.IndexOf(metaStr);
             EmitSignal(SignalName.OptionSelected, foundIdx >= 0 ? foundIdx : 0);
+            EmitSignal(SignalName.ActionTriggered, metaStr);
         }
     }
 

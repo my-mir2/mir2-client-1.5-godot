@@ -6279,9 +6279,17 @@
      - 增加 `SetStorageMode(bool storage)` 动态切换：普通修理展示待修凝霜剑 (`Items_0001.png`)，托管模式展示待存屠龙刀 (`Items_0059.png`)；
      - 增加 `StorageDepositConfirmed` 信号分发与 `HudController` 存入联动，自动清空对应背包格并输出系统提示；
      - 在 `TestUiSceneBindingArchitecture.cs` 中增补 `RepairPanelView` 托管模式尺寸 (140x181) 与停靠坐标 (260, 176) 实锤测试；
-3. **回归验证与多模态审计**：
-   - 捕获真机截图 `e2e_step9_storage_panel.png`：铁砧圆环槽位中心清晰居中渲染出原版屠龙刀，与右上角背包屠龙刀完美呼应，彻底消灭漆黑死区坏账；
-   - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`；
-   - 单元测试 111 项 100% 通过。
+## 2026-10-05 NPC 对话框 (Prguse_0384) 超链接 Action 标签与全业务窗体联动核销
+1. **NPC 脚本超链接交互断链归因**：
+   - 经审查：此前 `NpcDialogView.ShowDialog` 正确解析了官方 `<展示文本/ActionTag>` 超链接语法并渲染黄色下划线，但点击时仅发出整数 `OptionSelected(int idx)`，未分发字符串 `ActionTag`，导致 `HudController` 无法识别 `@storage`、`@buy`、`@repair` 等业务指令；
+2. **代码重构与对齐落实**：
+   - 在 `NpcDialogView.cs` 中增加 `ActionTriggered(string actionTag)` 信号并在 `OnMetaClicked` 中实时派发；
+   - 在 `HudController.cs` 中监听 `_npcDialogView.ActionTriggered`，当检测到 `@storage/@deposit` 时自动激活托管仓库（`ToggleStorage`），检测到 `@buy/@sell/@shop` 时激活商店（`ToggleShop`），检测到 `@repair` 时激活铁匠铺修理（`ToggleRepair`）；
+   - 在 `TestUiSceneBindingArchitecture.cs` 中增补 `NpcDialogView` 尺寸 (416x176) 与原生右上角关闭按钮 (399, 1, 16x23) 完整实锤断言；
+3. **回归验证**：
+   - 捕获真机截图 `e2e_step14_npc_dialog.png` 实证：正文排版严格从 (30, 20) 展开，黄色下划线超链接排布整洁，关闭红叉立体凸起；
+   - 单元测试运行：**111 项测试 100% 全部通过**；
+   - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`。
+
 
 
