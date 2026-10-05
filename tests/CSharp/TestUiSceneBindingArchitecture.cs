@@ -717,6 +717,18 @@ public class TestUiSceneBindingArchitecture
         Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Equip, 1, SlotButton.SlotType.Bag, 5));
         Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Repair, 0));
         Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Storage, 0));
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Quick, 0));
+        Assert.Equal(7, (int)SlotButton.SlotType.Quick);
+
+        // 4. 消耗品快捷装配判据 (药水/卷轴/油)
+        Assert.True(HudController.IsConsumableQuickItem("强效金创药"));
+        Assert.True(HudController.IsConsumableQuickItem("太阳水"));
+        Assert.True(HudController.IsConsumableQuickItem("回城卷"));
+        Assert.True(HudController.IsConsumableQuickItem("祝福油"));
+        Assert.False(HudController.IsConsumableQuickItem("木剑"));
+        Assert.False(HudController.IsConsumableQuickItem("裁决之杖"));
+        Assert.False(HudController.IsConsumableQuickItem("重盔甲(男)"));
+        Assert.False(HudController.IsConsumableQuickItem("珊瑚戒指"));
 
         // 4. 全局拖拽事件回调触发验证
         bool eventFired = false;

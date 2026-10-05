@@ -465,7 +465,28 @@ namespace Mir2Client.UI
                 };
 
                 HudInstance.ChatSent += OnChatSent;
+                HudInstance.ItemDropToGroundRequested += OnItemDropToGroundRequested;
             }
+        }
+
+        private void OnItemDropToGroundRequested(int bagSlot, string itemName, Vector2 dropScreenPos)
+        {
+            if (PlayerInstance == null) return;
+
+            // 1. 计算地表瓦片坐标 (默认在主角当前脚下)
+            int dropTileX = PlayerInstance.TileX;
+            int dropTileY = PlayerInstance.TileY;
+
+            // 2. 生成地表战利品掉落物
+            int look = itemName.Contains("金币") ? 1 : (itemName.Contains("药") ? 2 : 13);
+            GroundItemManagerInstance.AddItem(_dropItemIdSeed++, itemName, dropTileX, dropTileY, look, 1);
+
+            // 3. 播放官方经典物品落地声效 (金币为 401，装备道具为 2)
+            int sfxId = itemName.Contains("金币") ? 401 : 2;
+            AudioManager.Instance?.PlaySoundId(sfxId);
+
+            // 4. 发送网络协议包 CM_DROPITEM (1000)
+            _net?.SendPacket(PacketEncoder.DropItem(bagSlot, 1));
         }
 
         private void OnChatSent(string msg)

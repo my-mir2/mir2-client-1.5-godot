@@ -16,7 +16,8 @@ public partial class SlotButton : Button
         Repair = 3,
         Storage = 4,
         Shop = 5,
-        Skill = 6
+        Skill = 6,
+        Quick = 7
     }
 
     [Export]

@@ -6324,3 +6324,29 @@
    - 端到端 59 阶段全量真机光栅化截屏完成；
    - 机器视觉审计：底栏聊天框清晰回显“物品已调整至背包 #2 格”与“成功穿戴装备 [裁决之杖]”，贴图与文字 0 畸变；
    - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`。
+
+## 2026-10-05 快捷药水栏 (1~6格) 拖拽装配与大世界地面丢弃 (CM_DROPITEM) 实证核销
+1. **交互死区与断链归因**：
+   - 审查发现：此前底栏快捷栏 1~6 格采用原生普通 `Button` 渲染，未接入 `SlotButton` 拖放通道，玩家无法通过将背包药水或卷轴拖入快捷栏进行装配；
+   - 此前大世界游戏视口缺乏拖拽释放拦截器，玩家将背包物品拖出包裹窗体后事件被直接丢弃，无法触发地表丢弃（CM_DROPITEM）机制。
+2. **代码重构与对齐落实**：
+   - 将 `_quickSlotButtons` 全量重构为 `SlotButton`（`CurrentSlotType = SlotButton.SlotType.Quick`）；
+   - 在 `HudController.cs` 中增加 `IsConsumableQuickItem` 消耗品严格判定（药水、卷轴、油类放行，非消耗品拦截并提示 `[系统] 快捷栏只能放置药水或卷轴。`）；
+   - 实装 `EquipBagItemToQuickSlot`：拖入快捷槽自动装配并刷新数量角标，背包对应物品即时扣除；
+   - 增加全屏 `GroundDropCatcher : Control` 底层事件拦截器，捕获从背包拖出至游戏大世界的拖拽释放，触发 `DropBagItemToGround`；
+   - 在 `GameView.cs` 中监听 `ItemDropToGroundRequested`：在主角脚下生成地表战利品掉落物，触发官方掉落音效（金币 401.wav，道具 2.wav），并向服务端下发官方原版 `CM_DROPITEM` (1000) 协议包；
+   - 加固 `SetBagItem` 贴图路径映射，支持 `DnItems` 目录容错，彻底消除此前因目录匹配引发的 `File not found` 隐患；
+   - 在 `TestUiSceneBindingArchitecture.cs` 中增补快捷栏类型与消耗品判据测试。
+3. **回归闭环验收**：
+   - 单元测试运行：**113 项测试 100% 全部通过**；
+   - 端到端 59 阶段真机全量光栅化运行完毕；
+   - 真机截屏机器视觉审计 (`e2e_step50_drag_drop_equip_and_bag_swap.png`)：底栏聊天框清晰回显：
+     - `[系统] 物品已调整至背包 #2 格。`
+     - `[系统] 成功穿戴装备 [裁决之杖]。`
+     - `[系统] 物品 [强效太阳水] 已装配至快捷栏 #4 格。`（快捷槽位 4 清晰显露黄色药水瓶）
+     - `[系统] 物品 [金币] 已丢弃至地面。`
+   - 运行时日志零容忍扫描：
+     - `File not found`: **0**；
+     - `ERROR:`: **0**；
+     - `SCRIPT ERROR:`: **0**。
+

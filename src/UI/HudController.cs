@@ -26,6 +26,9 @@ public partial class HudController : CanvasLayer
     [Signal]
     public delegate void ResurrectRequestedEventHandler(int reviveType);
 
+    [Signal]
+    public delegate void ItemDropToGroundRequestedEventHandler(int bagSlot, string itemName, Vector2 dropScreenPos);
+
     public enum ChatChannel
     {
         Near = 0,
@@ -108,7 +111,7 @@ public partial class HudController : CanvasLayer
     private TextureProgressBar? _weightBar;
 
     // 官方 1.5 快捷药水栏 1~6 格 (IDA sub_481DD4 [0x484a0f..0x484b80], sub_48C188, sub_48C02C)
-    private readonly Button[] _quickSlotButtons = new Button[6];
+    private readonly SlotButton[] _quickSlotButtons = new SlotButton[6];
     private readonly TextureRect[] _quickSlotIcons = new TextureRect[6];
     private readonly Label[] _quickSlotCounts = new Label[6];
     private readonly string[] _quickSlotItems = new string[6];
@@ -186,6 +189,11 @@ public partial class HudController : CanvasLayer
         {
             _chatInput.TextSubmitted += OnChatInputSubmitted;
         }
+
+        // 挂载大世界地面拖拽放置捕获层 (接收从背包拖出到游戏视野的丢弃事件)
+        var dropCatcher = new GroundDropCatcher(this);
+        AddChild(dropCatcher);
+        MoveChild(dropCatcher, 0);
 
         // 挂载官方 1.5 HUD 底栏大背景 (Prguse_0001.png 800x251 @ (0, 349))
         var hudBgTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0001.png");
@@ -851,9 +859,11 @@ public partial class HudController : CanvasLayer
         for (int i = 0; i < 6; i++)
         {
             int slotIdx = i;
-            var btn = new Button
+            var btn = new SlotButton
             {
                 Name = $"QuickSlot_{slotIdx + 1}",
+                CurrentSlotType = SlotButton.SlotType.Quick,
+                SlotIndex = slotIdx,
                 Position = new Vector2(slotXs[i], 408f),
                 Size = new Vector2(32f, 29f),
                 Flat = true,
@@ -1578,7 +1588,7 @@ public partial class HudController : CanvasLayer
         var btn = _bagSlots[slot];
         if (btn != null)
         {
-            string folder = iconFile.StartsWith("Items") ? "Items" : "StateItem";
+            string folder = iconFile.StartsWith("Items") ? "Items" : (iconFile.StartsWith("DnItems") ? "DnItems" : "StateItem");
             btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/{folder}/{iconFile}");
         }
     }
@@ -1787,6 +1797,13 @@ public partial class HudController : CanvasLayer
             }
             return;
         }
+
+        // 5. 从背包拖入快捷药水栏 1~6 格 (Bag -> Quick)
+        if (fromType == SlotButton.SlotType.Bag && toType == SlotButton.SlotType.Quick)
+        {
+            EquipBagItemToQuickSlot(fromSlot, toSlot);
+            return;
+        }
     }
 
     /// <summary>
@@ -1944,5 +1961,102 @@ public partial class HudController : CanvasLayer
         else if (equipSlot == 4) UpdateDollVisuals(null, null, "");
 
         AddChat("系统", $"[系统] 卸下装备 [{equipItem.Value.Name}] 至背包 #{destSlot + 1} 格。", new Color(1f, 0.9f, 0.4f));
+    }
+
+    /// <summary>
+    /// 判断物品是否属于可快捷使用的消耗品 (药水、卷轴、油类)
+    /// </summary>
+    public static bool IsConsumableQuickItem(string itemName)
+    {
+        if (string.IsNullOrEmpty(itemName)) return false;
+        return itemName.Contains("药") || itemName.Contains("水") || 
+               itemName.Contains("卷") || itemName.Contains("油");
+    }
+
+    /// <summary>
+    /// 从背包拖拽药水或消耗品装配至快捷栏 1~6 格
+    /// </summary>
+    public void EquipBagItemToQuickSlot(int bagSlot, int quickSlot)
+    {
+        if (bagSlot < 0 || bagSlot >= 40 || quickSlot < 0 || quickSlot >= 6) return;
+        var item = _bagItemDetails[bagSlot];
+        if (item == null) return;
+
+        if (!IsConsumableQuickItem(item.Value.Name))
+        {
+            AddChat("系统", "[系统] 快捷栏只能放置药水或卷轴。", new Color(1f, 0.3f, 0.3f));
+            return;
+        }
+
+        var btn = _bagSlots[bagSlot];
+        var tex = btn?.ItemTexture;
+
+        // 设置到快捷栏 (默认数量 1，若已存在同名物品则累加)
+        int newCount = 1;
+        if (_quickSlotItems[quickSlot] == item.Value.Name)
+        {
+            newCount = _quickSlotAmounts[quickSlot] + 1;
+        }
+        SetQuickSlot(quickSlot, item.Value.Name, newCount, tex);
+
+        // 从背包扣除物品
+        ClearBagItem(bagSlot);
+
+        AddChat("系统", $"[系统] 物品 [{item.Value.Name}] 已装配至快捷栏 #{quickSlot + 1} 格。", new Color(0.4f, 1f, 0.4f));
+    }
+
+    public sealed partial class GroundDropCatcher : Control
+    {
+        private readonly HudController _owner;
+        public GroundDropCatcher(HudController owner)
+        {
+            _owner = owner;
+            Name = "GroundDropCatcher";
+            Size = new Vector2(800, 600);
+            Position = Vector2.Zero;
+            MouseFilter = MouseFilterEnum.Pass;
+            ZIndex = -2;
+        }
+
+        public override bool _CanDropData(Vector2 atPosition, Variant data)
+        {
+            if (data.VariantType != Variant.Type.Dictionary) return false;
+            var dict = data.AsGodotDictionary();
+            if (!dict.ContainsKey("type") || dict["type"].AsString() != "item_drag") return false;
+            int fromType = dict["from_type"].AsInt32();
+            return fromType == (int)SlotButton.SlotType.Bag;
+        }
+
+        public override void _DropData(Vector2 atPosition, Variant data)
+        {
+            if (!_CanDropData(atPosition, data)) return;
+            var dict = data.AsGodotDictionary();
+            int fromType = dict["from_type"].AsInt32();
+            int fromSlot = dict["from_slot"].AsInt32();
+            if (fromType == (int)SlotButton.SlotType.Bag)
+            {
+                _owner.DropBagItemToGround(fromSlot, atPosition);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 将背包物品拖拽至大世界地面丢弃
+    /// </summary>
+    public void DropBagItemToGround(int bagSlot, Vector2 screenPos)
+    {
+        if (bagSlot < 0 || bagSlot >= 40) return;
+        var item = _bagItemDetails[bagSlot];
+        if (item == null) return;
+
+        string itemName = item.Value.Name;
+
+        // 扣减清空背包槽位
+        ClearBagItem(bagSlot);
+
+        // 派发信号通知大世界场景生成战利品
+        EmitSignal(SignalName.ItemDropToGroundRequested, bagSlot, itemName, screenPos);
+
+        AddChat("系统", $"[系统] 物品 [{itemName}] 已丢弃至地面。", new Color(1f, 0.8f, 0.4f));
     }
 }
