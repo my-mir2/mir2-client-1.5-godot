@@ -864,5 +864,90 @@ public class TestProtocolMatrix
         router.OnPacket(ProtocolConsts.SM_NPCDELETE, rawDel);
         Assert.Null(em.GetEntity(2000));
     }
+
+    [Fact]
+    public void TestGroundItem_SpawnAndRemoveFlow()
+    {
+        var gm = new Mir2Client.Game.GroundItemManager();
+
+        // 1. 添加掉落物测试
+        gm.AddItem(7001, "裁决之杖", 330, 270, 10, 1);
+        gm.AddItem(7002, "金币", 330, 270, 1, 1000);
+
+        Assert.Equal(2, gm.Count);
+        var item7001 = gm.GetItem(7001);
+        Assert.NotNull(item7001);
+        Assert.Equal("裁决之杖", item7001.Name);
+        Assert.Equal(330, item7001.TileX);
+        Assert.Equal(270, item7001.TileY);
+        Assert.Equal(10, item7001.Looks);
+
+        // 2. 按瓦片位置查找
+        var tileItems = gm.GetItemsAt(330, 270);
+        Assert.Equal(2, tileItems.Count);
+
+        // 3. 拾取归属保护期测试
+        item7001.OwnerName = "热血战士";
+        item7001.ProtectionTime = 60.0f;
+        Assert.False(gm.CanPickup(7001, "抢包者"));
+        Assert.True(gm.CanPickup(7001, "热血战士"));
+
+        // 4. 保护期过期
+        item7001.ProtectionTime = 0.0f;
+        Assert.True(gm.CanPickup(7001, "抢包者"));
+
+        // 5. 移除物品
+        Assert.True(gm.RemoveItem(7001));
+        Assert.Equal(1, gm.Count);
+        Assert.Null(gm.GetItem(7001));
+    }
+
+    [Fact]
+    public void TestGroundItem_NetworkProtocolFlow()
+    {
+        var gm = new Mir2Client.Game.GroundItemManager();
+        var router = new ServerMessageRouter(null, null, null, gm);
+
+        // 1. 模拟地表掉落 SM_GROUNDITEM (314)
+        // Extra: "强效太阳水\t332\t271\t3"
+        byte[] encExtra = PacketCodec.EncodePlus60(Encoding.UTF8.GetBytes("强效太阳水\t332\t271\t3"));
+        byte[] rawDrop = new byte[10 + encExtra.Length + 1];
+        rawDrop[0] = (byte)(ProtocolConsts.SM_GROUNDITEM & 0xFF);
+        rawDrop[1] = (byte)((ProtocolConsts.SM_GROUNDITEM >> 8) & 0xFF);
+        rawDrop[2] = 0x39; rawDrop[3] = 0x05; rawDrop[4] = 0x00; rawDrop[5] = 0x00; // Recog 1337
+        rawDrop[6] = 0x4C; rawDrop[7] = 0x01; // Param X=332
+        rawDrop[8] = 0x0F; rawDrop[9] = 0x01; // Tag Y=271
+        Array.Copy(encExtra, 0, rawDrop, 10, encExtra.Length);
+        rawDrop[^1] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_GROUNDITEM, rawDrop);
+
+        var item = gm.GetItem(1337);
+        Assert.NotNull(item);
+        Assert.Equal("强效太阳水", item.Name);
+        Assert.Equal(332, item.TileX);
+        Assert.Equal(271, item.TileY);
+        Assert.Equal(3, item.Looks);
+
+        // 2. 模拟拾取消除 SM_DELGROUNDITEM (315)
+        byte[] rawDel = new byte[11];
+        rawDel[0] = (byte)(ProtocolConsts.SM_DELGROUNDITEM & 0xFF);
+        rawDel[1] = (byte)((ProtocolConsts.SM_DELGROUNDITEM >> 8) & 0xFF);
+        rawDel[2] = 0x39; rawDel[3] = 0x05; rawDel[4] = 0x00; rawDel[5] = 0x00; // Recog 1337
+        rawDel[10] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_DELGROUNDITEM, rawDel);
+
+        Assert.Null(gm.GetItem(1337));
+        Assert.Equal(0, gm.Count);
+
+        // 3. 验证客户端拾取发包 CM_PICKUP (1001)
+        int px = 332;
+        int py = 271;
+        int posRecog = (px << 16) | (py & 0xFFFF);
+        byte[] pickupPkt = PacketEncoder.MakePacket(ProtocolConsts.CM_PICKUP, posRecog);
+        Assert.Equal(12, pickupPkt.Length);
+        short ident = (short)(pickupPkt[1] | (pickupPkt[2] << 8));
+        Assert.Equal(ProtocolConsts.CM_PICKUP, ident);
+    }
 }
+
 

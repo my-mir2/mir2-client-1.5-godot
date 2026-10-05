@@ -35,7 +35,6 @@ namespace Mir2Client.UI
         public HudController? HudInstance { get; private set; }
         public EntityManager EntityManagerInstance { get; } = new();
         public MagicManager? MagicManagerInstance { get; private set; }
-        public GroundItemManager? GroundItemManagerInstance { get; private set; }
         public EffectManager? EffectManagerInstance { get; private set; }
 
         public TeamManager TeamManagerInstance { get; } = new();
@@ -56,9 +55,14 @@ namespace Mir2Client.UI
         private WilLoader? _wilMon2;
         private WilLoader? _wilMon3;
         private WilLoader? _wilNpc;
+        private WilLoader? _wilDnItems;
 
         public Node2D EntityContainer { get; private set; } = null!;
         private readonly Dictionary<int, EntityNode> _entityNodes = new();
+
+        public Node2D ItemContainer { get; private set; } = null!;
+        public GroundItemManager GroundItemManagerInstance { get; } = new();
+        private readonly Dictionary<int, GroundItemNode> _itemNodes = new();
 
         private ulong _lastSpellTick = 0;
         public const ulong SpellCooldownMs = 600;
@@ -75,6 +79,10 @@ namespace Mir2Client.UI
 
             MagicManagerInstance = new MagicManager();
             AddChild(MagicManagerInstance);
+
+            ItemContainer = new Node2D { Name = "ItemContainer", YSortEnabled = true };
+            AddChild(ItemContainer);
+            SetupGroundItemEvents();
 
             EntityContainer = new Node2D { Name = "EntityContainer", YSortEnabled = true };
             AddChild(EntityContainer);
@@ -126,6 +134,9 @@ namespace Mir2Client.UI
             _wilMon3.Load(ResPath.Resolve("resources/wil/Data/Mon3.wil"), ResPath.Resolve("resources/wil/Data/Mon3.WIX"));
             _wilNpc.Load(ResPath.Resolve("resources/wil/Data/npc.wil"), ResPath.Resolve("resources/wil/Data/npc.WIX"));
 
+            _wilDnItems = new WilLoader();
+            _wilDnItems.Load(ResPath.Resolve("resources/wil/Data/DnItems.wil"), ResPath.Resolve("resources/wil/Data/DnItems.WIX"));
+
             MapRendererInstance?.SetLoaders(_wilFloor, _wilObj, _wilSmTiles);
             PlayerInstance?.SetWilLoaders(_wilHum, _wilWeapon, _wilHair);
             MagicManagerInstance?.SetWilLoaders(_wilMagic, _wilMagic2, _wilEffect);
@@ -133,6 +144,48 @@ namespace Mir2Client.UI
             {
                 MagicManagerInstance?.SetMapRenderer(MapRendererInstance);
             }
+        }
+
+        private void SetupGroundItemEvents()
+        {
+            GroundItemManagerInstance.ItemAdded += (data) =>
+            {
+                if (_itemNodes.ContainsKey(data.ItemId)) return;
+
+                var node = new GroundItemNode
+                {
+                    Name = $"Item_{data.ItemId}",
+                    ItemId = data.ItemId,
+                    ItemName = data.Name,
+                    TileX = data.TileX,
+                    TileY = data.TileY,
+                    Looks = data.Looks,
+                    Amount = data.Amount
+                };
+
+                node.SetLoader(_wilDnItems);
+                if (MapRendererInstance != null) node.SetMapRenderer(MapRendererInstance);
+
+                ItemContainer.AddChild(node);
+                _itemNodes[data.ItemId] = node;
+            };
+
+            GroundItemManagerInstance.ItemRemoved += (itemId) =>
+            {
+                if (_itemNodes.Remove(itemId, out var node))
+                {
+                    if (IsInstanceValid(node)) node.QueueFree();
+                }
+            };
+
+            GroundItemManagerInstance.ItemsCleared += () =>
+            {
+                foreach (var node in _itemNodes.Values)
+                {
+                    if (IsInstanceValid(node)) node.QueueFree();
+                }
+                _itemNodes.Clear();
+            };
         }
 
         private void SetupEntityManagerEvents()
@@ -209,6 +262,10 @@ namespace Mir2Client.UI
                 if (_entityNodes.TryGetValue(uid, out var node))
                 {
                     node.TriggerDeath();
+                    if (_isSandbox)
+                    {
+                        SpawnMonsterLoot(node.EntityName, node.TileX, node.TileY);
+                    }
                 }
             };
         }
@@ -290,11 +347,13 @@ namespace Mir2Client.UI
                 InputPluginInstance.PickupRequested += () =>
                 {
                     if (PlayerInstance.IsDead) return;
-                    if (_net != null && _net.IsConnectedToServer)
-                    {
-                        int posRecog = (PlayerInstance.TileX << 16) | (PlayerInstance.TileY & 0xFFFF);
-                        _net.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_PICKUP, posRecog));
-                    }
+                    PerformPickup();
+                };
+
+                PlayerInstance.TileStepped += (tile) =>
+                {
+                    if (PlayerInstance.IsDead) return;
+                    PerformPickup();
                 };
 
                 InputPluginInstance.PkModeToggleRequested += () =>
@@ -505,6 +564,66 @@ namespace Mir2Client.UI
             }
         }
 
+        public void PerformPickup()
+        {
+            if (PlayerInstance == null || PlayerInstance.IsDead) return;
+
+            int px = PlayerInstance.TileX;
+            int py = PlayerInstance.TileY;
+
+            if (_net != null && _net.IsConnectedToServer)
+            {
+                int posRecog = (px << 16) | (py & 0xFFFF);
+                _net.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_PICKUP, posRecog));
+            }
+            else if (_isSandbox)
+            {
+                var items = GroundItemManagerInstance.GetItemsAt(px, py);
+                if (items.Count > 0)
+                {
+                    var picked = items[0];
+                    GroundItemManagerInstance.RemoveItem(picked.ItemId);
+                    if (picked.Name.Contains("金币"))
+                    {
+                        PlayerInstance.Gold += Math.Max(1, picked.Amount);
+                        HudInstance?.UpdateGold(PlayerInstance.Gold);
+                        HudInstance?.AddChat("拾取", $"捡起金币：{picked.Amount} 金币。", new Color(1f, 0.9f, 0.3f));
+                        AudioManager.Instance?.PlaySoundId(2);
+                    }
+                    else
+                    {
+                        HudInstance?.AddBagItem(picked.Name);
+                        HudInstance?.AddChat("拾取", $"捡起物品：【{picked.Name}】。", new Color(0.4f, 1f, 0.4f));
+                        AudioManager.Instance?.PlaySoundId(11);
+                    }
+                }
+            }
+        }
+
+        private int _dropItemIdSeed = 9000;
+
+        public void SpawnMonsterLoot(string monName, int x, int y)
+        {
+            if (monName.Contains("稻草人"))
+            {
+                // 掉落 88 枚金币与强效金创药
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 0, 88);
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "强效金创药", x + 1, y, 2, 1);
+                HudInstance?.AddChat("掉落", "【稻草人】倒地爆出了金币与药水！", new Color(1f, 0.95f, 0.4f));
+            }
+            else if (monName.Contains("半兽人"))
+            {
+                // 掉落 188 枚金币与轻型盔甲
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 1, 188);
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "轻型盔甲", x, y + 1, 13, 1);
+                HudInstance?.AddChat("掉落", "【半兽人】倒地爆出了金币与战利品！", new Color(1f, 0.95f, 0.4f));
+            }
+            else
+            {
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 0, 50);
+            }
+        }
+
         private void CheckSandboxMeleeHit(int dir, int damage)
         {
             if (PlayerInstance == null) return;
@@ -696,7 +815,7 @@ namespace Mir2Client.UI
         public void SetNet(NetManager net, int sId, string uname, int ulevel = 35)
         {
             _net = net;
-            var router = new ServerMessageRouter(HudInstance, EntityManagerInstance, this);
+            var router = new ServerMessageRouter(HudInstance, EntityManagerInstance, this, GroundItemManagerInstance);
             _net.PacketReceived += router.OnPacket;
             SessionId = sId;
             Username = uname;

@@ -818,12 +818,32 @@ public partial class AutoEndToEndDriver : Node
 
             case 72:
             {
-                GD.Print("[AutoE2E] === 全量大世界面板、底层走跑位移、全门类技能光效与怪物/NPC实体渲染 100% 验证完成 ===");
-                RequestCapture("step17_all_buttons_completed");
+                GD.Print("[AutoE2E] === 验证大世界地表掉落物可视化渲染 (DnItems.wil 战利品爆装) ===");
+                RequestCapture("step32_monster_loot_drop");
                 break;
             }
 
             case 73:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证玩家移动踩瓦片自动拾取地表战利品 (CM_PICKUP / PerformPickup) ===");
+                    gameView.PlayerInstance.SetTilePos(333, 270);
+                    gameView.PerformPickup();
+                }
+                RequestCapture("step33_item_pickup_success");
+                break;
+            }
+
+            case 74:
+            {
+                GD.Print("[AutoE2E] === 全量大世界面板、底层走跑位移、全门类技能光效、怪物/NPC渲染与掉落拾取 100% 验证完成 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 75:
             {
                 GD.Print("[AutoE2E] ALL DYNAMIC DETAILS AND SKILL MAGIC CHECKS COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();

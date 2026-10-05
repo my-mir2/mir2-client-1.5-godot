@@ -123,6 +123,8 @@ public static class ProtocolConsts
     public const short SM_MONDEAD                = 222;  // 怪物倒地死亡 (bridge.rs 权威实证)
     public const short SM_NPCSPAWN               = 230;  // NPC 进入视野 (bridge.rs 权威实证)
     public const short SM_NPCDELETE              = 231;  // NPC 离开视野 (bridge.rs 权威实证)
+    public const short SM_GROUNDITEM             = 314;  // 地表掉落物品出现 (bridge.rs 权威实证)
+    public const short SM_DELGROUNDITEM          = 315;  // 地表掉落物品消失/拾取 (bridge.rs 权威实证)
     public const short SM_ACTION_PARAM_SYNC      = 22;   // 动作参数三元组同步
     public const short SM_MAPMOVE                = 23;   // 地图传送坐标突变
     public const short SM_SITDOWN                = 27;   // 打坐/起立切换

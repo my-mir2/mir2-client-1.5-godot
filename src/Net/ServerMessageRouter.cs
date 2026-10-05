@@ -67,12 +67,14 @@ public sealed class ServerMessageRouter
     private readonly HudController? _hud;
     private readonly Mir2Client.Game.EntityManager? _entityManager;
     private readonly GameView? _gameView;
+    private readonly Mir2Client.Game.GroundItemManager? _groundItemManager;
 
-    public ServerMessageRouter(HudController? hud, Mir2Client.Game.EntityManager? em = null, GameView? gv = null)
+    public ServerMessageRouter(HudController? hud, Mir2Client.Game.EntityManager? em = null, GameView? gv = null, Mir2Client.Game.GroundItemManager? gm = null)
     {
         _hud = hud;
         _entityManager = em;
         _gameView = gv;
+        _groundItemManager = gm;
     }
 
     /// <summary>
@@ -144,6 +146,12 @@ public sealed class ServerMessageRouter
                 break;
             case SM_DELITEM:
                 HandleDelItem(packet);
+                break;
+            case ProtocolConsts.SM_GROUNDITEM:
+                HandleGroundItem(packet);
+                break;
+            case ProtocolConsts.SM_DELGROUNDITEM:
+                HandleDelGroundItem(packet);
                 break;
             case SM_SENDUSERMAGIC:
                 HandleSendUserMagic(packet);
@@ -813,5 +821,38 @@ public sealed class ServerMessageRouter
                 _hud?.AddChat("战斗", $"命中目标 {targetEnt.Name}，造成 {damage} 点伤害！", new Color(1f, 0.9f, 0.3f));
             }
         }
+    }
+
+    private void HandleGroundItem(ServerPacket pkt)
+    {
+        var gm = _groundItemManager ?? _gameView?.GroundItemManagerInstance;
+        if (gm == null) return;
+
+        int itemId = pkt.Recog;
+        int x = pkt.Param;
+        int y = pkt.Tag;
+        int looks = 0;
+        string name = "掉落物";
+
+        if (pkt.Extra.Length > 0)
+        {
+            string extraStr = System.Text.Encoding.UTF8.GetString(pkt.Extra);
+            string[] parts = extraStr.Split('\t');
+            if (parts.Length > 0 && !string.IsNullOrEmpty(parts[0])) name = parts[0];
+            if (parts.Length > 1 && int.TryParse(parts[1], out var tx)) x = tx;
+            if (parts.Length > 2 && int.TryParse(parts[2], out var ty)) y = ty;
+            if (parts.Length > 3 && int.TryParse(parts[3], out var lk)) looks = lk;
+        }
+
+        gm.AddItem(itemId, name, x, y, looks);
+    }
+
+    private void HandleDelGroundItem(ServerPacket pkt)
+    {
+        var gm = _groundItemManager ?? _gameView?.GroundItemManagerInstance;
+        if (gm == null) return;
+
+        int itemId = pkt.Recog;
+        gm.RemoveItem(itemId);
     }
 }

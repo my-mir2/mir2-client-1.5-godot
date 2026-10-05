@@ -6027,3 +6027,22 @@
    - 真实捕获截屏 `e2e_step30_monster_spawn_and_struck.png`（稻草人受击、微型血条扣减、-45 飘字、半兽人站立）与 `e2e_step31_monster_death_corpse.png`（稻草人倒地尸体、比奇老兵站立）；
    - 机器视觉核验：0 黑屏，0 贴图丢失，0 调试辅助线，怪物与 NPC 外形 1:1 符合原版盛大 1.5 美术表现；
    - 运行时日志零容忍扫描：0 ERROR，0 SCRIPT ERROR，退出码严格为 0。
+
+## 2026-10-05 大世界地表战利品爆装 (DnItems.wil) 与 CM_PICKUP 拾取闭环核销
+1. **地表掉落物可视化渲染与 IDA 贴图锚点实装**：
+   - 依据官方二进制 `MIR_final_v3_p.exe` IDA `sub_46AEF0` 与 `resources/wil/Data/DnItems.wil` (513 帧掉落贴图)，建立 [`src/Render/GroundItemNode.cs`](file:///Users/mac/Documents/github/mir2-client1.5-delphi/src/Render/GroundItemNode.cs)；
+   - 实证官方瓦片中心底部地表定位 `(24 + ox - 10, 32 + oy + 14)`，地表微型名字标签（金币为浅黄、神器装备为橙红、普通物品为亮白，带 1px 黑色描边）；
+   - 在 [`src/UI/GameView.cs`](file:///Users/mac/Documents/github/mir2-client1.5-delphi/src/UI/GameView.cs) 挂载 `ItemContainer` (YSortEnabled) 并加载 `DnItems.wil` 资源；
+2. **纯 C# 地表物品生命周期与归属保护管理**：
+   - 创建 [`src/Game/GroundItemManager.cs`](file:///Users/mac/Documents/github/mir2-client1.5-delphi/src/Game/GroundItemManager.cs) 领域模型（解耦纯 C#，避免 Node2D 引擎依赖），支持 `AddItem`, `RemoveItem`, `GetItemsAt`, `CanPickup`；
+   - 实装官方 120 秒自然消散老化机制（`RemainingLife`）与 60 秒拾取归属保护期（`ProtectionTime`）；
+3. **网络下行与主动/自动拾取双端闭环**：
+   - 在 [`src/Net/ProtocolConsts.cs`](file:///Users/mac/Documents/github/mir2-client1.5-delphi/src/Net/ProtocolConsts.cs) 与 [`src/Net/ServerMessageRouter.cs`](file:///Users/mac/Documents/github/mir2-client1.5-delphi/src/Net/ServerMessageRouter.cs) 补齐 `SM_GROUNDITEM (314)` 与 `SM_DELGROUNDITEM (315)`；
+   - 支持主角主动按键拾取（`PickupRequested`）与踩格子自动拾取（`PlayerInstance.TileStepped`），自动发送 `CM_PICKUP (1001)` 或在沙盒模式下拾取入袋并增加 Gold/背包物品；
+   - 实装怪物死亡倒地自动爆装机制（`SpawnMonsterLoot`：稻草人爆出 88 金币与强效金创药，半兽人爆出 188 金币与轻型盔甲）；
+4. **自动化单元测试全绿**：
+   - 新增 `TestGroundItem_SpawnAndRemoveFlow` 与 `TestGroundItem_NetworkProtocolFlow` 单元测试，76 项 xUnit 单元测试 100% 全部通过 (耗时 698ms)；
+5. **Godot OpenGL3 端到端真实渲染与机器视觉审计**：
+   - 在 `AutoEndToEndDriver.cs` 扩充 step 72~75，端到端验证怪物死亡爆装与踩瓦片自动拾取；
+   - 真实捕获截屏 [`e2e_step32_monster_loot_drop.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step32_monster_loot_drop.png)（地表清晰展现金币与红色药水贴图及文字标签）与 [`e2e_step33_item_pickup_success.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step33_item_pickup_success.png)（金币被成功捡起入袋、聊天框提示捡起 88 金币、地表贴图消除）；
+   - 运行时日志零容忍扫描：0 ERROR，0 SCRIPT ERROR，退出码严格为 0。

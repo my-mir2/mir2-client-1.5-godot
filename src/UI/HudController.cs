@@ -1432,6 +1432,22 @@ public partial class HudController : CanvasLayer
     }
 
     /// <summary>
+    /// 添加物品到背包首个空闲槽位
+    /// </summary>
+    public bool AddBagItem(string itemName, string iconFile = "", string desc = "")
+    {
+        for (int i = 0; i < 40; i++)
+        {
+            if (_bagItemDetails[i] == null)
+            {
+                SetBagItem(i, itemName, iconFile, desc);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// 清空背包指定槽位 (由 SM_DELITEM 驱动)
     /// </summary>
     public void ClearBagItem(int slot)
