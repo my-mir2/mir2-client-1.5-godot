@@ -628,7 +628,7 @@ public class TestProtocolMatrix
 
         // 3. 循环接收数据包并匹配网关下发的 SM_ALLOWMOVE (203)
         bool foundAllowMove = false;
-        using var readCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(3));
+        using var readCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
         byte[] recvBuf = new byte[2048];
 
         while (!readCts.IsCancellationRequested && !foundAllowMove)

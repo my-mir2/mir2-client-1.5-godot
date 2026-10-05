@@ -202,7 +202,7 @@ public partial class ShopPanelView : Control, IManagedWindow
     {
         _items.Clear();
         _items.AddRange(items);
-        _selectedIndex = -1;
+        _selectedIndex = _items.Count > 0 ? 0 : -1;
         _pageIndex = 0;
         RefreshPageDisplay();
     }
@@ -245,24 +245,26 @@ public partial class ShopPanelView : Control, IManagedWindow
             lblName.AddThemeColorOverride("font_color", isSelected ? new Color(1.0f, 1.0f, 0.4f) : new Color(0.9f, 0.9f, 0.9f));
             row.AddChild(lblName);
 
-            // 2. 价格 (Left=156, Width=80)
+            // 2. 价格 (Left=146, Width=60, 靠右对齐表头)
             var lblPrice = new Label
             {
-                Position = new Vector2(156, -2),
-                Size = new Vector2(80, 16),
+                Position = new Vector2(146, -2),
+                Size = new Vector2(60, 16),
                 Text = item.Price.ToString(),
+                HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblPrice.AddThemeFontSizeOverride("font_size", 11);
             lblPrice.AddThemeColorOverride("font_color", new Color(1.0f, 0.85f, 0.3f));
             row.AddChild(lblPrice);
 
-            // 3. 重量/持久 (Left=245, Width=40)
+            // 3. 重量/持久 (Left=235, Width=40, 居中对齐表头)
             var lblWeight = new Label
             {
-                Position = new Vector2(245, -2),
+                Position = new Vector2(235, -2),
                 Size = new Vector2(40, 16),
                 Text = item.Weight.ToString(),
+                HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblWeight.AddThemeFontSizeOverride("font_size", 11);
@@ -335,7 +337,7 @@ public partial class ShopPanelView : Control, IManagedWindow
     public void OpenForNpc(int npcUid)
     {
         _npcUid = npcUid;
-        _selectedIndex = -1;
+        _selectedIndex = _items.Count > 0 ? 0 : -1;
         _pageIndex = 0;
         RefreshPageDisplay();
         Visible = true;
