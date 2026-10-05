@@ -830,6 +830,15 @@ public partial class HudController : CanvasLayer
 
         // 挂载官方 1.5 快捷药水栏 1~6 格 (IDA sub_481DD4 [0x484be6..0x484da1], left: 285, 328, 371, 415, 459, 503, top: 408, 32x29)
         SetupQuickItemBar(bottomBarContainer);
+
+        // 注册全生命周期槽位拖拽放置响应 (Bag, Equip, Repair, Storage)
+        SlotButton.ItemDroppedGlobal += HandleSlotItemDrop;
+    }
+
+    public override void _ExitTree()
+    {
+        base._ExitTree();
+        SlotButton.ItemDroppedGlobal -= HandleSlotItemDrop;
     }
 
     private void SetupQuickItemBar(Control parent)
@@ -1725,7 +1734,7 @@ public partial class HudController : CanvasLayer
     /// <summary>
     /// 打开并展示商店货架 (由 SM_MERCHANTDLG / SM_SENDGOODSLIST 驱动)
     /// </summary>
-    public void ShowShop(string npcName, IEnumerable<ShopPanelView.ShopItemEntry> items)
+    public void ShowShop(string npcName, System.Collections.Generic.IEnumerable<ShopPanelView.ShopItemEntry> items)
     {
         if (_shopPanelView != null)
         {
@@ -1735,5 +1744,205 @@ public partial class HudController : CanvasLayer
                 _stackManager.ToggleWindow(_shopPanelView);
             }
         }
+    }
+
+    /// <summary>
+    /// 全局槽位拖拽放置响应分发 (支持 Bag->Bag, Bag->Equip, Equip->Bag, Bag->Repair, Bag->Storage)
+    /// </summary>
+    public void HandleSlotItemDrop(SlotButton.SlotType fromType, int fromSlot, SlotButton.SlotType toType, int toSlot)
+    {
+        // 1. 背包内部调换格子 (Bag -> Bag)
+        if (fromType == SlotButton.SlotType.Bag && toType == SlotButton.SlotType.Bag)
+        {
+            SwapBagItems(fromSlot, toSlot);
+            return;
+        }
+
+        // 2. 从背包穿戴装备到身上 (Bag -> Equip)
+        if (fromType == SlotButton.SlotType.Bag && toType == SlotButton.SlotType.Equip)
+        {
+            WearBagItemToEquipSlot(fromSlot, toSlot);
+            return;
+        }
+
+        // 3. 从装备脱下放回背包 (Equip -> Bag)
+        if (fromType == SlotButton.SlotType.Equip && toType == SlotButton.SlotType.Bag)
+        {
+            TakeoffEquipSlotToBag(fromSlot, toSlot);
+            return;
+        }
+
+        // 4. 从背包放入特修/托管面板 (Bag -> Repair / Storage)
+        if (fromType == SlotButton.SlotType.Bag && (toType == SlotButton.SlotType.Repair || toType == SlotButton.SlotType.Storage))
+        {
+            if (_repairPanelView != null && _repairPanelView.Visible)
+            {
+                var item = _bagItemDetails[fromSlot];
+                if (item != null)
+                {
+                    _repairPanelView.SetSlotItem(_bagSlots[fromSlot]?.ItemTexture, fromSlot, item.Value.Name);
+                    string actionDesc = toType == SlotButton.SlotType.Storage ? "准备交付仓库保管" : "放置于铁匠修理台";
+                    AddChat("系统", $"[系统] 物品 [{item.Value.Name}] 已{actionDesc}。", new Color(0.8f, 0.8f, 1f));
+                }
+            }
+            return;
+        }
+    }
+
+    /// <summary>
+    /// 背包物品内部交换或移动
+    /// </summary>
+    public void SwapBagItems(int slotA, int slotB)
+    {
+        if (slotA < 0 || slotA >= 40 || slotB < 0 || slotB >= 40 || slotA == slotB) return;
+        var tempDetails = _bagItemDetails[slotA];
+        _bagItemDetails[slotA] = _bagItemDetails[slotB];
+        _bagItemDetails[slotB] = tempDetails;
+
+        var btnA = _bagSlots[slotA];
+        var btnB = _bagSlots[slotB];
+        if (btnA != null && btnB != null)
+        {
+            var tempTex = btnA.ItemTexture;
+            btnA.ItemTexture = btnB.ItemTexture;
+            btnB.ItemTexture = tempTex;
+        }
+        AddChat("系统", $"[系统] 物品已调整至背包 #{slotB + 1} 格。", new Color(0.8f, 0.8f, 0.8f));
+    }
+
+    /// <summary>
+    /// 判断物品是否符合指定装备槽位规约 (IDA sub_488AF4 槽位合法性验证)
+    /// 0: 衣服, 1: 武器, 2: 勋章/饰品, 3: 项链, 4: 头盔, 5/6: 手镯, 7/8: 戒指
+    /// </summary>
+    public static bool IsItemCompatibleWithEquipSlot(string itemName, int equipSlot)
+    {
+        if (string.IsNullOrEmpty(itemName)) return false;
+
+        return equipSlot switch
+        {
+            0 => itemName.Contains("甲") || itemName.Contains("袍") || itemName.Contains("衣") || itemName.Contains("布衣"),
+            1 => itemName.Contains("剑") || itemName.Contains("刀") || itemName.Contains("斧") ||
+                 itemName.Contains("杖") || itemName.Contains("棍") || itemName.Contains("扇") ||
+                 itemName.Contains("枪") || itemName.Contains("匕首") || itemName.Contains("镐") ||
+                 itemName.Contains("锤") || itemName.Contains("裁决") || itemName.Contains("屠龙") ||
+                 itemName.Contains("骨玉") || itemName.Contains("龙纹") || itemName.Contains("凝霜") ||
+                 itemName.Contains("炼狱") || itemName.Contains("降魔") || itemName.Contains("银蛇") ||
+                 itemName.Contains("井中月") || itemName.Contains("海魂") || itemName.Contains("修罗") ||
+                 itemName.Contains("偃月"),
+            2 => itemName.Contains("勋章") || itemName.Contains("火把") || itemName.Contains("蜡烛") ||
+                 itemName.Contains("护身符") || itemName.Contains("药粉") || itemName.Contains("毒药"),
+            3 => itemName.Contains("项链") || itemName.Contains("铃铛"),
+            4 => itemName.Contains("头盔") || itemName.Contains("头巾") || itemName.Contains("冠"),
+            5 or 6 => itemName.Contains("手镯") || itemName.Contains("手套"),
+            7 or 8 => itemName.Contains("戒指") || itemName.Contains("指环"),
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// 背包穿戴装备到装备槽位
+    /// </summary>
+    public void WearBagItemToEquipSlot(int bagSlot, int equipSlot)
+    {
+        if (bagSlot < 0 || bagSlot >= 40 || equipSlot < 0 || equipSlot >= 9) return;
+        var bagItem = _bagItemDetails[bagSlot];
+        if (bagItem == null) return;
+
+        if (!IsItemCompatibleWithEquipSlot(bagItem.Value.Name, equipSlot))
+        {
+            AddChat("系统", "[系统] 该物品无法装备到此位置。", new Color(1f, 0.3f, 0.3f));
+            return;
+        }
+
+        // 派发穿戴请求信号
+        EmitSignal(SignalName.WearItemRequested, bagSlot, equipSlot);
+
+        var curEquip = _equipItemDetails[equipSlot];
+        var btnBag = _bagSlots[bagSlot];
+        var btnEquip = _equipSlots[equipSlot];
+
+        var bagTex = btnBag?.ItemTexture;
+        var equipTex = btnEquip?.ItemTexture;
+
+        // 互换或装上
+        _equipItemDetails[equipSlot] = bagItem;
+        if (btnEquip != null) btnEquip.ItemTexture = bagTex;
+
+        if (curEquip != null)
+        {
+            _bagItemDetails[bagSlot] = curEquip;
+            if (btnBag != null) btnBag.ItemTexture = equipTex;
+        }
+        else
+        {
+            _bagItemDetails[bagSlot] = null;
+            if (btnBag != null) btnBag.ItemTexture = null;
+        }
+
+        // 纸娃娃立绘图层同步
+        if (equipSlot == 0)
+        {
+            _dollCloth?.SetVisible(true);
+        }
+        else if (equipSlot == 1)
+        {
+            _dollWeapon?.SetVisible(true);
+        }
+        else if (equipSlot == 4)
+        {
+            _dollHelm?.SetVisible(true);
+        }
+
+        AddChat("系统", $"[系统] 成功穿戴装备 [{bagItem.Value.Name}]。", new Color(0.3f, 1f, 0.3f));
+    }
+
+    /// <summary>
+    /// 从身上脱下装备放回背包
+    /// </summary>
+    public void TakeoffEquipSlotToBag(int equipSlot, int targetBagSlot)
+    {
+        if (equipSlot < 0 || equipSlot >= 9) return;
+        var equipItem = _equipItemDetails[equipSlot];
+        if (equipItem == null) return;
+
+        // 如果指定的 targetBagSlot 已经被占，寻找首个空格
+        int destSlot = targetBagSlot;
+        if (destSlot < 0 || destSlot >= 40 || _bagItemDetails[destSlot] != null)
+        {
+            destSlot = -1;
+            for (int i = 0; i < 40; i++)
+            {
+                if (_bagItemDetails[i] == null)
+                {
+                    destSlot = i;
+                    break;
+                }
+            }
+        }
+
+        if (destSlot == -1)
+        {
+            AddChat("系统", "[系统] 背包已满，无法卸下装备。", new Color(1f, 0.3f, 0.3f));
+            return;
+        }
+
+        // 派发脱装请求信号
+        EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
+
+        var btnEquip = _equipSlots[equipSlot];
+        var btnBag = _bagSlots[destSlot];
+
+        _bagItemDetails[destSlot] = equipItem;
+        if (btnBag != null) btnBag.ItemTexture = btnEquip?.ItemTexture;
+
+        _equipItemDetails[equipSlot] = null;
+        if (btnEquip != null) btnEquip.ItemTexture = null;
+
+        // 纸娃娃立绘清除
+        if (equipSlot == 0) UpdateDollVisuals("", null, null);
+        else if (equipSlot == 1) UpdateDollVisuals(null, "", null);
+        else if (equipSlot == 4) UpdateDollVisuals(null, null, "");
+
+        AddChat("系统", $"[系统] 卸下装备 [{equipItem.Value.Name}] 至背包 #{destSlot + 1} 格。", new Color(1f, 0.9f, 0.4f));
     }
 }

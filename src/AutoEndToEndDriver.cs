@@ -1281,12 +1281,32 @@ public partial class AutoEndToEndDriver : Node
 
             case 90:
             {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 物品槽位拖拽调位 (Bag->Bag) 与装备穿戴脱下 (Bag<->Equip) ===");
+                    // 1. 设置背包第 0 格为裁决之杖，第 1 格为布衣(男)
+                    gameView.HudInstance.SetBagItem(0, "裁决之杖", "Items_0059.png", "[color=#ffff00]攻击 0-30[/color]");
+                    gameView.HudInstance.SetBagItem(1, "布衣(男)", "StateItem_0080.png", "[color=#ffff00]防御 1-2[/color]");
+
+                    // 2. 模拟拖拽调换背包 0 和 1
+                    gameView.HudInstance.SwapBagItems(0, 1);
+
+                    // 3. 模拟拖拽背包物品到装备武器槽位 (Slot 1)
+                    gameView.HudInstance.WearBagItemToEquipSlot(1, 1);
+                }
+                RequestCapture("step50_drag_drop_equip_and_bag_swap");
+                break;
+            }
+
+            case 91:
+            {
                 GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、弱网航位推测、16位抖动滤镜、沙巴克破门与多实体动态池 100% 验证完工 ===");
                 RequestCapture("step17_all_buttons_completed");
                 break;
             }
 
-            case 91:
+            case 92:
             {
                 GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, RETRO DITHER & SABUK WAR COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();

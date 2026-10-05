@@ -6306,6 +6306,21 @@
    - 端到端 58 阶段真机全量光栅化运行完毕；
    - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`。
 
-
-
-
+## 2026-10-05 原生 Drag & Drop 槽位拖拽放置与 9 大装备槽位合法性规约核销
+1. **槽位拖拽放置断链根因与空壳坏账归因**：
+   - 审查发现：此前 `SlotButton` 仅在 `_DropData` 中执行 `GD.Print`，未声明任何信号，未向宿主容器分发放置事件，导致无论是背包内部整理调位、背包向装备面板穿戴、装备脱下放回背包、还是物品拖入铁砧修理/托管，实质终局全为空壳；
+   - 且 `_CanDropData` 缺乏防呆与规约约束，允许将物品拖给自己；缺乏装备槽位合法性验证，允许将药水直接塞入衣服或武器槽。
+2. **代码重构与对齐落实**：
+   - 在 `SlotButton.cs` 中增加 `ItemDropped` 实例信号与 `ItemDroppedGlobal` 强类型静态事件，并提炼 `CanDrop` 纯逻辑判据（彻底拦截自拖自放）；
+   - 在 `HudController.cs` 中实装全局拖拽放置分发 `HandleSlotItemDrop`，覆盖四大业务分支：
+     - **Bag -> Bag**（背包内部调换）：实装 `SwapBagItems` 互换格子数据与贴图，输出系统灰字提示；
+     - **Bag -> Equip**（装备穿戴）：依据 IDA `sub_488AF4 / sub_488B70` 实装 `IsItemCompatibleWithEquipSlot`，精准校验 0衣服、1武器、2勋章/饰品、3项链、4头盔、5/6手镯、7/8戒指合法性；非法放置拦截并红字告警，合法穿戴派发 `WearItemRequested` 信号并联动纸娃娃图层；
+     - **Equip -> Bag**（脱下装备）：派发 `TakeoffItemRequested`，自动寻址放入背包首个空格，同步清空装备槽并清除纸娃娃立绘；
+     - **Bag -> Repair / Storage**（特修与托管）：联动 `RepairPanelView` 动态更新工作台槽位；
+   - 在 `AutoEndToEndDriver.cs` 中新增阶段 90，实机驱动背包互换与裁决之杖拖拽穿戴，成功捕获真机截图 `e2e_step50_drag_drop_equip_and_bag_swap.png`；
+   - 在 `TestUiSceneBindingArchitecture.cs` 中增补 `TestSlotDragAndDrop_OfficialRulesAndEquipCompatibility_GroundTruth` 实证测试用例。
+3. **全流程回归闭环验收**：
+   - 单元测试运行：**113 项测试 100% 全部通过**；
+   - 端到端 59 阶段全量真机光栅化截屏完成；
+   - 机器视觉审计：底栏聊天框清晰回显“物品已调整至背包 #2 格”与“成功穿戴装备 [裁决之杖]”，贴图与文字 0 畸变；
+   - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`。

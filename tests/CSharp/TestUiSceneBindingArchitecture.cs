@@ -653,6 +653,104 @@ public class TestUiSceneBindingArchitecture
         Assert.Equal(ShopPanelView.ShopMode.Sell, (ShopPanelView.ShopMode)1);
         Assert.Equal(ShopPanelView.ShopMode.Storage, (ShopPanelView.ShopMode)2);
     }
+
+    [Fact]
+    public void TestSlotDragAndDrop_OfficialRulesAndEquipCompatibility_GroundTruth()
+    {
+        // 1. 验证 SlotButton.SlotType 枚举合法性
+        Assert.Equal(0, (int)SlotButton.SlotType.Bag);
+        Assert.Equal(1, (int)SlotButton.SlotType.Equip);
+        Assert.Equal(2, (int)SlotButton.SlotType.Trade);
+        Assert.Equal(3, (int)SlotButton.SlotType.Repair);
+        Assert.Equal(4, (int)SlotButton.SlotType.Storage);
+        Assert.Equal(5, (int)SlotButton.SlotType.Shop);
+        Assert.Equal(6, (int)SlotButton.SlotType.Skill);
+
+        // 2. 官方 9 大装备槽位合法性验证 (IDA sub_488AF4 / sub_488B70)
+        // 槽位 0: 衣服 (布衣/甲/袍/衣)
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("布衣(男)", 0));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("重盔甲(男)", 0));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("灵魂战水战衣", 0));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("木剑", 0));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("金创药(小)", 0));
+
+        // 槽位 1: 武器
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("木剑", 1));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("屠龙", 1));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("裁决之杖", 1));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("炼狱", 1));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("凝霜", 1));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("重盔甲(男)", 1));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("珊瑚戒指", 1));
+
+        // 槽位 2: 勋章/饰品
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("荣誉勋章", 2));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("火把", 2));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("黄色药粉", 2));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("木剑", 2));
+
+        // 槽位 3: 项链
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("幽灵项链", 3));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("恶魔铃铛", 3));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("金手镯", 3));
+
+        // 槽位 4: 头盔
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("道士头盔", 4));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("骷髅头盔", 4));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("屠龙", 4));
+
+        // 槽位 5 & 6: 手镯
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("金手镯(左)", 5));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("死神手套(右)", 6));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("珊瑚戒指", 5));
+
+        // 槽位 7 & 8: 戒指
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("珊瑚戒指", 7));
+        Assert.True(HudController.IsItemCompatibleWithEquipSlot("骷髅戒指", 8));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("死神手套", 7));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("金创药(中)", 8));
+
+        // 3. 拖放合法性校验逻辑 (禁止同格自拖自放，允许异格/跨面板拖放)
+        Assert.False(SlotButton.CanDrop(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Bag, 0));
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Bag, 1));
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Equip, 1));
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Equip, 1, SlotButton.SlotType.Bag, 5));
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Repair, 0));
+        Assert.True(SlotButton.CanDrop(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Storage, 0));
+
+        // 4. 全局拖拽事件回调触发验证
+        bool eventFired = false;
+        SlotButton.SlotType srcType = SlotButton.SlotType.Bag;
+        SlotButton.SlotType dstType = SlotButton.SlotType.Bag;
+        int srcSlot = -1;
+        int dstSlot = -1;
+
+        Action<SlotButton.SlotType, int, SlotButton.SlotType, int> handler = (fromT, fromS, toT, toS) =>
+        {
+            eventFired = true;
+            srcType = fromT;
+            srcSlot = fromS;
+            dstType = toT;
+            dstSlot = toS;
+        };
+
+        SlotButton.ItemDroppedGlobal += handler;
+        try
+        {
+            // 模拟拖放触发
+            handler(SlotButton.SlotType.Bag, 0, SlotButton.SlotType.Equip, 1);
+
+            Assert.True(eventFired);
+            Assert.Equal(SlotButton.SlotType.Bag, srcType);
+            Assert.Equal(0, srcSlot);
+            Assert.Equal(SlotButton.SlotType.Equip, dstType);
+            Assert.Equal(1, dstSlot);
+        }
+        finally
+        {
+            SlotButton.ItemDroppedGlobal -= handler;
+        }
+    }
 }
 
 

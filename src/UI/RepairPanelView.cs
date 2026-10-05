@@ -59,6 +59,7 @@ public partial class RepairPanelView : Control, IManagedWindow
         }
         if (_repairSlotBtn != null)
         {
+            _repairSlotBtn.CurrentSlotType = storage ? SlotButton.SlotType.Storage : SlotButton.SlotType.Repair;
             // 托管模式下展示待存物品(例如背包第0格屠龙刀 Items_0059)，修理模式下展示待修凝霜剑 Items_0001
             _repairSlotBtn.ItemTexture = ResPath.LoadImageTexture(
                 storage ? "resources/wil/png/Items/Items_0059.png" : "resources/wil/png/Items/Items_0001.png");
@@ -138,7 +139,7 @@ public partial class RepairPanelView : Control, IManagedWindow
         _repairSlotBtn = new SlotButton
         {
             Name = "RepairSlotBtn",
-            CurrentSlotType = SlotButton.SlotType.Equip,
+            CurrentSlotType = SlotButton.SlotType.Repair,
             SlotIndex = 0,
             Position = new Vector2(12, 8),
             CustomMinimumSize = new Vector2(36, 36),

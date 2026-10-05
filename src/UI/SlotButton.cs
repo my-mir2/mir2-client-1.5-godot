@@ -77,6 +77,11 @@ public partial class SlotButton : Button
         };
     }
 
+    [Signal]
+    public delegate void ItemDroppedEventHandler(int fromType, int fromSlot, int toType, int toSlot);
+
+    public static event Action<SlotType, int, SlotType, int>? ItemDroppedGlobal;
+
     public override Variant _GetDragData(Vector2 atPosition)
     {
         var currentTex = _itemTexture ?? Icon;
@@ -107,7 +112,26 @@ public partial class SlotButton : Button
     {
         if (data.VariantType != Variant.Type.Dictionary) return false;
         var dict = data.AsGodotDictionary();
-        return dict.ContainsKey("type") && dict["type"].AsString() == "item_drag";
+        if (!dict.ContainsKey("type") || dict["type"].AsString() != "item_drag") return false;
+
+        int fromType = dict["from_type"].AsInt32();
+        int fromSlot = dict["from_slot"].AsInt32();
+
+        return CanDrop((SlotType)fromType, fromSlot, CurrentSlotType, SlotIndex);
+    }
+
+    /// <summary>
+    /// 纯逻辑判断是否允许拖拽放置 (供单元测试与运行时双轨复用，避免纯 .NET 单测 native 崩溃)
+    /// </summary>
+    public static bool CanDrop(SlotType fromType, int fromSlot, SlotType toType, int toSlot)
+    {
+        // 避免自己拖给自己
+        if (fromType == toType && fromSlot == toSlot)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     public override void _DropData(Vector2 atPosition, Variant data)
@@ -117,6 +141,8 @@ public partial class SlotButton : Button
         int fromType = dict["from_type"].AsInt32();
         int fromSlot = dict["from_slot"].AsInt32();
 
+        EmitSignal(SignalName.ItemDropped, fromType, fromSlot, (int)CurrentSlotType, SlotIndex);
+        ItemDroppedGlobal?.Invoke((SlotType)fromType, fromSlot, CurrentSlotType, SlotIndex);
         GD.Print($"[SlotButton] Drop item from ({fromType}:{fromSlot}) to ({(int)CurrentSlotType}:{SlotIndex})");
     }
 }
