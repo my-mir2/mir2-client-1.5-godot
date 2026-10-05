@@ -271,6 +271,14 @@ namespace Mir2Client.UI
                     }
                 }
             };
+
+            EntityManagerInstance.EntityPoisonChanged += (uid, mask) =>
+            {
+                if (_entityNodes.TryGetValue(uid, out var node))
+                {
+                    node.UpdatePoison(mask);
+                }
+            };
         }
 
         private void ConnectInputAndSignals()
@@ -471,13 +479,23 @@ namespace Mir2Client.UI
         }
 
         /// <summary>
-        /// 受到物理或魔法攻击扣血结算 (集成护身戒指蓝量抵扣与复活戒指)
+        /// 受到物理或魔法攻击扣血结算 (集成法师魔法盾吸收、护身戒指蓝量抵扣与复活戒指)
         /// </summary>
-        public void TakeDamage(int rawDamage)
+        public void TakeDamage(int rawDamage, bool isArmorPiercing = false)
         {
-            var res = PlayerStateInstance.TakeCombatDamage(rawDamage, nowTick: (long)Time.GetTicksMsec());
+            var res = PlayerStateInstance.TakeCombatDamageFull(rawDamage, nowTick: (long)Time.GetTicksMsec(), isArmorPiercing: isArmorPiercing);
             HudInstance?.UpdateHp(PlayerStateInstance.Hp, PlayerStateInstance.MaxHp);
             HudInstance?.UpdateMp(PlayerStateInstance.Mp, PlayerStateInstance.MaxMp);
+
+            if (res.shieldAbsorbed > 0)
+            {
+                HudInstance?.AddChat("法术", $"【魔法盾】吸收化解了 {res.shieldAbsorbed} 点攻击伤害！", new Color(0.4f, 0.9f, 1f));
+            }
+            if (res.shieldBroken)
+            {
+                HudInstance?.AddChat("法术", "【魔法盾】抵御极限破裂消散！", new Color(1f, 0.4f, 0.4f));
+                AudioManager.Instance?.PlaySoundId(138);
+            }
 
             if (res.revived)
             {
@@ -491,7 +509,7 @@ namespace Mir2Client.UI
             }
             else
             {
-                HudInstance?.AddChat("承伤", $"受到 {rawDamage} 点攻击，剩余生命 {PlayerStateInstance.Hp}，魔法 {PlayerStateInstance.Mp}", new Color(1f, 0.6f, 0.6f));
+                HudInstance?.AddChat("承伤", $"受到攻击，剩余生命 {PlayerStateInstance.Hp}，魔法 {PlayerStateInstance.Mp}", new Color(1f, 0.6f, 0.6f));
             }
         }
 
@@ -574,6 +592,48 @@ namespace Mir2Client.UI
             {
                 case 3: // 基本剑术 (被动)
                     HudInstance?.AddChat("技能", "基本剑术为被动技能，攻击时自动提升精准。", new Color(1f, 0.9f, 0.5f));
+                    break;
+
+                case 6: // 施毒术 (Poisoning, MagicId = 6)
+                    PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+                    MagicManagerInstance?.PlayMagic(magicId, playerTile, targetTile);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Spell(6, (short)targetTile.X, (short)targetTile.Y));
+                    }
+                    else if (_isSandbox)
+                    {
+                        EntityManager.EntityData? poisonTarget = null;
+                        foreach (var ent in EntityManagerInstance.AllEntities)
+                        {
+                            if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead)
+                            {
+                                if (Math.Abs(ent.TileX - targetTile.X) <= 1 && Math.Abs(ent.TileY - targetTile.Y) <= 1)
+                                {
+                                    poisonTarget = ent;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (poisonTarget != null)
+                        {
+                            bool hit = TaoistCombatEngine.CheckPoisonHit(poisonTarget.AntiPoison);
+                            if (hit)
+                            {
+                                var pType = (poisonTarget.PoisonMask & 1) == 0 ? TaoistCombatEngine.PoisonType.Green : TaoistCombatEngine.PoisonType.Red;
+                                int duration = TaoistCombatEngine.CalculatePoisonDurationSec(pType, taoistSc: 25);
+                                EntityManagerInstance.ApplyPoison(poisonTarget.Uid, pType, duration, sc: 25, (long)now);
+                                string pName = pType == TaoistCombatEngine.PoisonType.Green ? "【绿毒】持续侵蚀" : "【红毒】防御削弱 20% 并承受 1.2 倍增伤";
+                                HudInstance?.AddChat("施毒", $"施毒术命中【{poisonTarget.Name}】！附着 {pName}（持续 {duration} 秒）！", new Color(0.2f, 1f, 0.4f));
+                                AudioManager.Instance?.PlaySoundId(14);
+                            }
+                            else
+                            {
+                                HudInstance?.AddChat("战斗", $"【{poisonTarget.Name}】凭借高抗毒属性成功抵抗了毒粉侵袭！", new Color(0.8f, 0.8f, 0.8f));
+                            }
+                        }
+                    }
                     break;
 
                 case 7: // 攻杀剑术
@@ -689,7 +749,81 @@ namespace Mir2Client.UI
                     }
                     break;
 
-                default: // 全量官方远程与法术 (火球术、雷电术、治愈术、火符、冰咆哮、魔法盾等)
+                case 17: // 召唤骷髅 (Summon Skeleton)
+                    PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+                    AudioManager.Instance?.PlaySoundId(15);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Spell(17, (short)targetTile.X, (short)targetTile.Y));
+                    }
+                    else if (_isSandbox)
+                    {
+                        var stats = TaoistCombatEngine.GetSkeletonStats(3);
+                        var offsetSummon = PlayerAuditEngine.DirOffsets[(dir + 2) & 7];
+                        int petX = PlayerInstance.TileX + offsetSummon.X;
+                        int petY = PlayerInstance.TileY + offsetSummon.Y;
+                        EntityManagerInstance.AddEntity(new EntityManager.EntityData
+                        {
+                            Uid = 7001,
+                            Name = stats.Name,
+                            Type = EntityManager.EntityType.Monster,
+                            Appr = stats.Appr,
+                            TileX = petX,
+                            TileY = petY,
+                            Hp = stats.MaxHp,
+                            MaxHp = stats.MaxHp,
+                            Direction = (byte)dir,
+                            MasterUid = PlayerInstance.Uid,
+                            PetLevel = stats.Level
+                        });
+                        HudInstance?.AddChat("召唤", $"消耗 1 张护身符，从地底召唤出了【{stats.Name}】守护在身旁！", new Color(0.3f, 1f, 0.6f));
+                    }
+                    break;
+
+                case 30: // 召唤神兽 (Summon Shinsu)
+                    PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+                    AudioManager.Instance?.PlaySoundId(16);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Spell(30, (short)targetTile.X, (short)targetTile.Y));
+                    }
+                    else if (_isSandbox)
+                    {
+                        var stats = TaoistCombatEngine.GetShinsuStats(7);
+                        var offsetSummon = PlayerAuditEngine.DirOffsets[(dir + 6) & 7];
+                        int petX = PlayerInstance.TileX + offsetSummon.X;
+                        int petY = PlayerInstance.TileY + offsetSummon.Y;
+                        EntityManagerInstance.AddEntity(new EntityManager.EntityData
+                        {
+                            Uid = 7002,
+                            Name = stats.Name,
+                            Type = EntityManager.EntityType.Monster,
+                            Appr = stats.Appr,
+                            TileX = petX,
+                            TileY = petY,
+                            Hp = stats.MaxHp,
+                            MaxHp = stats.MaxHp,
+                            Direction = (byte)dir,
+                            MasterUid = PlayerInstance.Uid,
+                            PetLevel = stats.Level
+                        });
+                        HudInstance?.AddChat("召唤", $"消耗 5 张护身符，召唤出了威严强悍的【{stats.Name}】降临人间！", new Color(1f, 0.8f, 0.2f));
+                    }
+                    break;
+
+                case 31: // 魔法盾 (Magic Shield)
+                    PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+                    MagicManagerInstance?.PlayMagic(31, playerTile, playerTile);
+                    PlayerStateInstance.ActivateMagicShield(level: 3, durationSec: 30);
+                    AudioManager.Instance?.PlaySoundId(137);
+                    HudInstance?.AddChat("法术", "【魔法盾】神力激活！化解 70% 伤害，坚固屏障笼罩全身！", new Color(0.4f, 0.9f, 1f));
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Spell(31, (short)playerTile.X, (short)playerTile.Y));
+                    }
+                    break;
+
+                default: // 全量官方远程与法术 (火球术、雷电术、治愈术、火符、冰咆哮等)
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     MagicManagerInstance?.PlayMagic(magicId, playerTile, targetTile);
                     if (_net != null && _net.IsConnectedToServer)
@@ -815,9 +949,12 @@ namespace Mir2Client.UI
 
             if (targetStep1 != null)
             {
-                int newHp = Math.Max(0, targetStep1.Hp - damage);
-                EntityManagerInstance.TriggerStruck(targetStep1.Uid, damage, newHp);
-                HudInstance?.AddChat("战斗", $"近身命中【{targetStep1.Name}】，造成 {damage} 点物理伤害！", new Color(1f, 0.8f, 0.2f));
+                bool hasRed = (targetStep1.PoisonMask & 2) != 0;
+                int realDmg = TaoistCombatEngine.ApplyRedPoisonVulnerability(damage, hasRed);
+                int newHp = Math.Max(0, targetStep1.Hp - realDmg);
+                EntityManagerInstance.TriggerStruck(targetStep1.Uid, realDmg, newHp);
+                string redDesc = hasRed ? "【红毒破防 1.2 倍增伤】" : "";
+                HudInstance?.AddChat("战斗", $"{redDesc}近身命中【{targetStep1.Name}】，造成 {realDmg} 点物理伤害！", new Color(1f, 0.8f, 0.2f));
                 return;
             }
 
@@ -831,9 +968,12 @@ namespace Mir2Client.UI
                     targetAc: 15,
                     targetShieldReduction: 0.6);
 
-                int newHp = Math.Max(0, targetStep2.Hp - finalDmg);
-                EntityManagerInstance.TriggerStruck(targetStep2.Uid, finalDmg, newHp);
-                HudInstance?.AddChat("刺杀", $"【隔位刺杀】剑气穿透！命中【{targetStep2.Name}】，无视防御与魔法盾造成 {finalDmg} 点穿透伤害！", new Color(0.3f, 0.9f, 1f));
+                bool hasRed = (targetStep2.PoisonMask & 2) != 0;
+                int realDmg = TaoistCombatEngine.ApplyRedPoisonVulnerability(finalDmg, hasRed);
+                int newHp = Math.Max(0, targetStep2.Hp - realDmg);
+                EntityManagerInstance.TriggerStruck(targetStep2.Uid, realDmg, newHp);
+                string redDesc = hasRed ? "【红毒 1.2 倍】" : "";
+                HudInstance?.AddChat("刺杀", $"【隔位刺杀】{redDesc}剑气穿透！命中【{targetStep2.Name}】，无视防御与魔法盾造成 {realDmg} 点穿透伤害！", new Color(0.3f, 0.9f, 1f));
                 AudioManager.Instance?.PlaySoundId(1);
             }
         }
@@ -857,9 +997,12 @@ namespace Mir2Client.UI
                 {
                     if (Math.Abs(ent.TileX - targetTile.X) <= 1 && Math.Abs(ent.TileY - targetTile.Y) <= 1)
                     {
-                        int newHp = Math.Max(0, ent.Hp - damage);
-                        EntityManagerInstance.TriggerStruck(ent.Uid, damage, newHp);
-                        HudInstance?.AddChat("战斗", $"法术命中【{ent.Name}】，造成 {damage} 点魔法伤害！", new Color(0.4f, 0.9f, 1f));
+                        bool hasRed = (ent.PoisonMask & 2) != 0;
+                        int realDmg = TaoistCombatEngine.ApplyRedPoisonVulnerability(damage, hasRed);
+                        int newHp = Math.Max(0, ent.Hp - realDmg);
+                        EntityManagerInstance.TriggerStruck(ent.Uid, realDmg, newHp);
+                        string redDesc = hasRed ? "【红毒 1.2 倍增伤】" : "";
+                        HudInstance?.AddChat("战斗", $"{redDesc}法术命中【{ent.Name}】，造成 {realDmg} 点魔法伤害！", new Color(0.4f, 0.9f, 1f));
                     }
                 }
             }
@@ -1006,6 +1149,17 @@ namespace Mir2Client.UI
                 }
                 HudInstance.Minimap.UpdateRadarEntities(radarList.ToArray());
             }
+
+            // 驱动全图实体绿毒掉血与到期清除
+            long nowTick = (long)Time.GetTicksMsec();
+            EntityManagerInstance.ProcessPoisonTicks(nowTick, (uid, dmg, newHp) =>
+            {
+                var ent = EntityManagerInstance.GetEntity(uid);
+                if (ent != null)
+                {
+                    HudInstance?.AddChat("施毒", $"【绿毒侵蚀】目标【{ent.Name}】受到 {dmg} 点持续剧毒伤害！", new Color(0.2f, 1f, 0.3f));
+                }
+            });
         }
 
         public void SetNet(NetManager net, int sId, string uname, int ulevel = 35)

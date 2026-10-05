@@ -1572,6 +1572,146 @@ public class TestProtocolMatrix
         Assert.DoesNotContain(ps.BagItems, item => item.Uid == 101);
         Assert.Contains(ps.BagItems, item => item.Uid == 202 && item.Name == "骨玉权杖");
     }
+
+    [Fact]
+    public void TestTaoist_Poison_HitAlgorithmAndDualSlots()
+    {
+        // 1. 目标 0 抗毒时必中 (RandInt(7) 范围 0~6，恒 <= 6)
+        for (int i = 0; i < 50; i++)
+        {
+            Assert.True(Mir2Client.Game.TaoistCombatEngine.CheckPoisonHit(targetAntiPoison: 0));
+        }
+
+        // 2. 持续时长计算: SC=20 时，绿毒 30 + 40 = 70s, 红毒 40 + 40 = 80s
+        int greenSec = Mir2Client.Game.TaoistCombatEngine.CalculatePoisonDurationSec(Mir2Client.Game.TaoistCombatEngine.PoisonType.Green, 20);
+        int redSec = Mir2Client.Game.TaoistCombatEngine.CalculatePoisonDurationSec(Mir2Client.Game.TaoistCombatEngine.PoisonType.Red, 20);
+        Assert.Equal(70, greenSec);
+        Assert.Equal(80, redSec);
+
+        // 3. 红毒 1.2 倍增伤 (tbyte_4BE3CC)
+        int normalDmg = 50;
+        int vulDmg = Mir2Client.Game.TaoistCombatEngine.ApplyRedPoisonVulnerability(normalDmg, hasRedPoison: true);
+        Assert.Equal(60, vulDmg); // 50 * 1.2 = 60
+
+        // 4. 双毒独立槽位与 EntityManager 周期掉血
+        var em = new Mir2Client.Game.EntityManager();
+        em.AddEntity(new Mir2Client.Game.EntityManager.EntityData
+        {
+            Uid = 3001,
+            Name = "双毒靶标稻草人",
+            Type = Mir2Client.Game.EntityManager.EntityType.Monster,
+            TileX = 330,
+            TileY = 270,
+            Hp = 100,
+            MaxHp = 100
+        });
+
+        // 施加绿毒 (SC=15, 每跳扣 Math.Max(1, 15/3)+1 = 6 点)
+        long t0 = 10000;
+        em.ApplyPoison(3001, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green, 30, sc: 15, t0);
+        var target = em.GetEntity(3001)!;
+        Assert.Equal(1, target.PoisonMask); // Bit 0 置位
+
+        // 施加红毒 (并发施加，形成双毒)
+        em.ApplyPoison(3001, Mir2Client.Game.TaoistCombatEngine.PoisonType.Red, 40, sc: 15, t0);
+        Assert.Equal(3, target.PoisonMask); // Bit 0 与 Bit 1 同时置位
+
+        // T0 + 2500ms: 驱动绿毒第一跳掉血
+        int poisonDmgTaken = 0;
+        em.ProcessPoisonTicks(t0 + 2500, (uid, dmg, newHp) =>
+        {
+            poisonDmgTaken = dmg;
+        });
+        Assert.Equal(6, poisonDmgTaken);
+        Assert.Equal(94, target.Hp);
+
+        // 清除中毒
+        em.ClearPoison(3001);
+        Assert.Equal(0, target.PoisonMask);
+    }
+
+    [Fact]
+    public void TestTaoist_PoisonBagAndTalisman_DurabilityConsumption()
+    {
+        // 1. 施毒药包耐久单次扣 100
+        var greenBag = new Mir2Client.Game.EquipItem { Name = "黄色毒粉(中)", Shape = 1, Dura = 250 };
+        var res1 = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        Assert.True(res1.success);
+        Assert.Equal(150, greenBag.Dura);
+        Assert.False(res1.destroyed);
+
+        // 药包类型不匹配
+        var misRes = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2Client.Game.TaoistCombatEngine.PoisonType.Red);
+        Assert.False(misRes.success);
+        Assert.Contains("类型不匹配", misRes.desc);
+
+        // 扣除至销毁
+        var res2 = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        Assert.True(res2.success);
+        Assert.Equal(50, greenBag.Dura);
+        var res3 = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        Assert.False(res3.success); // 剩余 50 < 100 无法施法
+
+        // 2. 护身符消耗: 召唤骷髅扣 100 (1张)，召唤神兽扣 500 (5张)
+        var talisman = new Mir2Client.Game.EquipItem { Name = "灵魂护身符(大)", Shape = 5, Dura = 600 };
+        var skelCost = Mir2Client.Game.TaoistCombatEngine.TryConsumeTalisman(talisman, Mir2Client.Game.TaoistCombatEngine.TalismanCostSkeleton);
+        Assert.True(skelCost.success);
+        Assert.Equal(500, talisman.Dura);
+
+        var shinsuCost = Mir2Client.Game.TaoistCombatEngine.TryConsumeTalisman(talisman, Mir2Client.Game.TaoistCombatEngine.TalismanCostShinsu);
+        Assert.True(shinsuCost.success);
+        Assert.Equal(0, talisman.Dura);
+        Assert.True(shinsuCost.destroyed);
+
+        // 3. 随从 0~7 级属性规格
+        var skel0 = Mir2Client.Game.TaoistCombatEngine.GetSkeletonStats(0);
+        var skel7 = Mir2Client.Game.TaoistCombatEngine.GetSkeletonStats(7);
+        Assert.Equal(100, skel0.MaxHp);
+        Assert.Equal(296, skel7.MaxHp);
+
+        var dog0 = Mir2Client.Game.TaoistCombatEngine.GetShinsuStats(0);
+        var dog7 = Mir2Client.Game.TaoistCombatEngine.GetShinsuStats(7);
+        Assert.Equal(200, dog0.MaxHp);
+        Assert.Equal(795, dog7.MaxHp);
+        Assert.Equal(14, dog7.Appr); // 7 级终极直立神兽外观
+    }
+
+    [Fact]
+    public void TestMage_MagicShield_DamageAbsorptionAndPiercingBreak()
+    {
+        var ps = new Mir2Client.Game.PlayerState { Hp = 100, MaxHp = 100, Mp = 100 };
+
+        // 1. 激活 3 级魔法盾 (减伤吸收)
+        ps.ActivateMagicShield(level: 3, durationSec: 30);
+        Assert.True(ps.HasMagicShield);
+
+        // 受到 50 点普通伤害:
+        // actual = ROUND( (50 / 100.0) * (3 + 2) * 8.0 ) = ROUND(0.5 * 40.0) = 20 点实际承伤
+        // absorbed = 50 - 20 = 30 点被吸收
+        var hitRes = ps.TakeCombatDamageFull(50, nowTick: 1000, isArmorPiercing: false);
+        Assert.Equal(30, hitRes.shieldAbsorbed);
+        Assert.Equal(80, ps.Hp); // 100 - 20 = 80
+        Assert.False(hitRes.shieldBroken);
+
+        // 2. 隔位刺杀破盾 (isArmorPiercing = true): 完全无视魔法盾，直接造成满额 50 伤害
+        var pierceRes = ps.TakeCombatDamageFull(50, nowTick: 2000, isArmorPiercing: true);
+        Assert.Equal(0, pierceRes.shieldAbsorbed);
+        Assert.Equal(30, ps.Hp); // 80 - 50 = 30
+
+        // 3. 破盾机制: 扣减护盾持续时间
+        ps.ActivateMagicShield(level: 1, durationSec: 3);
+        // 第一次受击：剩余 3 秒扣减进入 1 秒濒死喘息期
+        var nearBreakRes = ps.TakeCombatDamageFull(20, nowTick: 3000, isArmorPiercing: false);
+        Assert.False(nearBreakRes.shieldBroken);
+        Assert.True(ps.HasMagicShield);
+        Assert.Equal(1, ps.MagicShieldRemainingSec);
+
+        // 第二次受击：剩余 1 秒受击彻底破盾归零
+        var breakRes = ps.TakeCombatDamageFull(20, nowTick: 4000, isArmorPiercing: false);
+        Assert.True(breakRes.shieldBroken);
+        Assert.False(ps.HasMagicShield);
+    }
 }
+
 
 

@@ -376,17 +376,61 @@ public sealed class PlayerState
         return (0, Mp, true, false);
     }
 
+    // ==================== 法师魔法盾运行时状态 ====================
+    public bool HasMagicShield { get; private set; }
+    public int MagicShieldLevel { get; private set; } = 1;
+    public int MagicShieldRemainingSec { get; private set; } = 0;
+
+    public void ActivateMagicShield(int level, int durationSec = 30)
+    {
+        HasMagicShield = true;
+        MagicShieldLevel = Math.Clamp(level, 1, 3);
+        MagicShieldRemainingSec = durationSec;
+    }
+
+    public void DeactivateMagicShield()
+    {
+        HasMagicShield = false;
+        MagicShieldRemainingSec = 0;
+    }
+
     /// <summary>
-    /// 受到物理或魔法攻击扣血结算 (集成护身戒指 1:1.5 蓝量抵扣与复活戒指)
+    /// 受到物理或魔法攻击扣血结算 (向后兼容经典 4 元素元组)
     /// </summary>
     public (int finalHp, int finalMp, bool died, bool revived) TakeCombatDamage(int rawDamage, long nowTick = 0)
     {
-        int actualDamage = rawDamage;
+        var res = TakeCombatDamageFull(rawDamage, nowTick, false);
+        return (res.finalHp, res.finalMp, res.died, res.revived);
+    }
 
-        // 护身戒指
+    /// <summary>
+    /// 受到物理或魔法攻击扣血结算 (集成法师魔法盾减伤吸收、护身戒指 1:1.5 蓝量抵扣与复活戒指完整明细)
+    /// </summary>
+    public (int finalHp, int finalMp, bool died, bool revived, int shieldAbsorbed, bool shieldBroken) TakeCombatDamageFull(
+        int rawDamage, long nowTick = 0, bool isArmorPiercing = false)
+    {
+        int actualDamage = rawDamage;
+        int absorbed = 0;
+        bool shieldBroken = false;
+
+        // 1. 法师魔法盾判定 (若为隔位刺杀 isArmorPiercing 则直接无视击穿)
+        if (!isArmorPiercing && HasMagicShield && MagicShieldRemainingSec > 0)
+        {
+            var shieldRes = SkillFormulas.CalculateMagicShieldDamage(actualDamage, MagicShieldLevel, MagicShieldRemainingSec);
+            actualDamage = shieldRes.actualDamage;
+            absorbed = shieldRes.absorbedDamage;
+            MagicShieldRemainingSec = shieldRes.newRemainingSec;
+            if (shieldRes.isBroken)
+            {
+                shieldBroken = true;
+                DeactivateMagicShield();
+            }
+        }
+
+        // 2. 护身戒指
         if (HasProtectRing && Mp > 0)
         {
-            var res = SpecialRings.CalculateProtectRingDamage(true, rawDamage, Mp, Hp);
+            var res = SpecialRings.CalculateProtectRingDamage(true, actualDamage, Mp, Hp);
             Mp = res.remainingMp;
             actualDamage = res.remainingDamage;
         }
@@ -394,10 +438,10 @@ public sealed class PlayerState
         Hp = Math.Max(0, Hp - actualDamage);
         if (Hp > 0)
         {
-            return (Hp, Mp, false, false);
+            return (Hp, Mp, false, false, absorbed, shieldBroken);
         }
 
-        // 濒死判定复活戒指
+        // 3. 濒死判定复活戒指
         if (HasReviveRing)
         {
             var revRes = SpecialRings.TriggerReviveRing(true, Hp, MaxHp, ReviveRingDura, LastReviveTick, nowTick);
@@ -422,10 +466,10 @@ public sealed class PlayerState
                     }
                 }
 
-                return (Hp, Mp, false, true);
+                return (Hp, Mp, false, true, absorbed, shieldBroken);
             }
         }
 
-        return (0, Mp, true, false);
+        return (0, Mp, true, false, absorbed, shieldBroken);
     }
 }

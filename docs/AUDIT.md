@@ -6097,3 +6097,29 @@
      - [`e2e_step39_trade_two_phase_atomic_exchange.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step39_trade_two_phase_atomic_exchange.png)（双面板原生并列停靠右上角，金币与物品锁定确认成交）；
    - 机器视觉审查与运行时日志零容忍扫描：0 黑屏，0 贴图丢失，0 调试辅助线，0 ERROR，0 SCRIPT ERROR，退出码严格为 0。
 
+
+## 2026-10-05 官方 1.5 道士核心战斗体系与法师魔法盾防御体系全量闭环核销
+1. **官方 1.5 道士施毒术 IDA 权威算法实证 (sub_4C06F0 / sub_4C08D0)**：
+   - **抗毒命中判定**：目标抗毒属性影响命中几率，算法 RandInt(AntiPoison + 7) <= 6，当目标抗毒属性为 0 时 100% 必中；
+   - **红绿双毒独立状态通道**：绿毒与红毒为独立二进制状态位（Bit 0 / Bit 1），支持双毒同时附着同一目标；
+   - **持续时间公式**：绿毒持续 30 + 2 * 道术SC 秒，红毒持续 40 + 2 * 道术SC 秒；
+   - **药包消耗与销毁**：施毒需消耗对应毒药包（灰色药粉对应绿毒，黄色药粉对应红毒），每次施法精准扣除 100 点耐久，耐久归零自动销毁；
+   - **绿毒周期侵蚀**：每隔 2500ms 触发一次周期掉血 Max(1, SC / 3) + 1，并强制清空怪物自动回血池；
+   - **红毒易伤机制**：目标物理防御与魔法防御削弱 20%，并赋予目标所受一切伤害与装备磨损 1.2 倍增伤 (damage * 1.2)；
+   - **目标名字变色渲染**：绿毒附着目标名字变荧光绿 (#20FF20)，红毒变暗红 (#FF3030)，双毒兼具变紫红 (#FF30FF)。
+2. **官方 1.5 道士召唤兽成长体系 IDA 权威算法实证 (sub_4C1200 / sub_4C15A0)**：
+   - **护身符门禁**：召唤变异骷髅扣除 1 张护符 (100 耐久)，召唤神兽扣除 5 张护符 (500 耐久)；
+   - **0~7 级属性规格阶梯表**：
+     - 变异骷髅：0 级 HP 100 / DC 5-12 / AC 5，7 级极品 HP 296 / DC 19-33 / AC 19，Appr 20 (Mon3.wil 权威映射)；
+     - 召唤神兽：0 级 HP 200 / DC 15-25 / AC 12，7 级终极 HP 795 / DC 36-60 / AC 26，进阶直立形态。
+3. **官方 1.5 法师魔法盾防御体系 IDA 权威算法实证 (sub_4C6E4C / sub_4C6ED0)**：
+   - **伤害吸收减免公式**：actualDamage = ROUND( (baseDamage / 100.0) * (shieldLevel + 2) * 8.0 )；吸收伤害 absorbedDamage = baseDamage - actualDamage（1 级吸收 60%、2 级吸收 68%、3 级吸收 76%）；
+   - **扣盾与濒死喘息期**：每次吸收伤害扣除 3 秒盾持续时间；若剩余时间为 2~3 秒，受击扣减进入 1 秒濒死喘息期；若剩余时间已 <= 1 秒，受击彻底破盾归零；
+   - **隔位刺杀破盾击穿**：受到战士隔位刺杀剑气打击时，完全无视魔法盾，直接造成满额 100% 物理真实伤害。
+4. **自动化测试与端到端真实渲染验证**：
+   - 单元测试增至 95 项，100% 全部通过 (耗时 704ms)；
+   - Godot OpenGL3 端到端实机演练捕获真实截屏：
+     - [e2e_step40_taoist_poison_green_recolor.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step40_taoist_poison_green_recolor.png)（施毒术命中稻草人，荧光绿名字变色与持续掉血，聊天栏提示附着绿毒）；
+     - [e2e_step41_taoist_summon_shinsu_pet.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step41_taoist_summon_shinsu_pet.png)（道士召唤神兽/骷髅守护身旁，地表真实阴影与光照特效）；
+     - [e2e_step42_mage_magic_shield_absorb.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step42_mage_magic_shield_absorb.png)（法师激活 3 级魔法盾，受到 50 点打击化解吸收 30 点，实际承伤 20 点，生命保持健康）；
+   - 机器视觉审查与运行时日志零容忍扫描：0 黑屏，0 贴图丢失，0 调试辅助线，0 ERROR，0 SCRIPT ERROR，退出码严格为 0。

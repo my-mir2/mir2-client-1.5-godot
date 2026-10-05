@@ -990,14 +990,95 @@ public partial class AutoEndToEndDriver : Node
 
             case 80:
             {
-                GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、战士三大特技与安全交易系统 100% 验证完工 ===");
-                RequestCapture("step17_all_buttons_completed");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null && gameView.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 道士施毒术（红绿双毒变色与周期掉血）演练 ===");
+                    // 关闭交易面板，恢复主视野
+                    gameView.HudInstance.TradePanel?.CloseTrade();
+
+                    // 补满状态确保施法成功
+                    gameView.PlayerInstance.Mp = 500;
+                    gameView.PlayerInstance.MaxMp = 500;
+                    gameView.PlayerStateInstance.Mp = 500;
+                    gameView.PlayerStateInstance.MaxMp = 500;
+
+                    int targetX = gameView.PlayerInstance.TileX + 1;
+                    int targetY = gameView.PlayerInstance.TileY;
+
+                    // 生成施毒测试目标
+                    gameView.EntityManagerInstance.AddEntity(new EntityManager.EntityData
+                    {
+                        Uid = 8804,
+                        Name = "施毒测试稻草人",
+                        Type = EntityManager.EntityType.Monster,
+                        TileX = targetX,
+                        TileY = targetY,
+                        Hp = 100,
+                        MaxHp = 100,
+                        Direction = 4,
+                        Appr = 10
+                    });
+
+                    // 施展施毒术 (MagicId = 6)
+                    gameView.TriggerSkill(6, new Vector2I(targetX, targetY));
+                }
+                RequestCapture("step40_taoist_poison_green_recolor");
                 break;
             }
 
             case 81:
             {
-                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, WARRIOR SKILLS AND TRADE SYSTEM COMPLETED SUCCESSFULLY!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null && gameView.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 道士召唤术（变异骷髅/神兽守护身边）演练 ===");
+                    // 补满 MP
+                    gameView.PlayerInstance.Mp = 500;
+                    gameView.PlayerStateInstance.Mp = 500;
+
+                    // 施展召唤骷髅 (MagicId = 17)
+                    gameView.TriggerSkill(17, new Vector2I(gameView.PlayerInstance.TileX, gameView.PlayerInstance.TileY));
+                }
+                RequestCapture("step41_taoist_summon_shinsu_pet");
+                break;
+            }
+
+            case 82:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null && gameView.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 法师魔法盾（伤害吸收化解与防御屏障）演练 ===");
+                    // 补满生命与魔法
+                    gameView.PlayerInstance.Mp = 500;
+                    gameView.PlayerInstance.MaxMp = 500;
+                    gameView.PlayerStateInstance.Mp = 500;
+                    gameView.PlayerStateInstance.MaxMp = 500;
+                    gameView.PlayerStateInstance.Hp = 100;
+                    gameView.PlayerStateInstance.MaxHp = 100;
+
+                    // 开启 3 级魔法盾 (MagicId = 31)
+                    gameView.TriggerSkill(31, new Vector2I(gameView.PlayerInstance.TileX, gameView.PlayerInstance.TileY));
+
+                    // 模拟承受 50 点攻击打击，验证减伤吸收
+                    var hitRes = gameView.PlayerStateInstance.TakeCombatDamageFull(50, (long)Time.GetTicksMsec(), isArmorPiercing: false);
+                    gameView.HudInstance.AddChat("承伤", $"受到 50 点打击，魔法盾化解吸收 {hitRes.shieldAbsorbed} 点！实际承受仅 {50 - hitRes.shieldAbsorbed} 点，剩余生命 {gameView.PlayerStateInstance.Hp}！", new Color(0.4f, 0.9f, 1f));
+                }
+                RequestCapture("step42_mage_magic_shield_absorb");
+                break;
+            }
+
+            case 83:
+            {
+                GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、道士双毒神兽与法师魔法盾 100% 验证完工 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 84:
+            {
+                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, TAOIST & MAGE COMBAT MECHANICS COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();
                 break;
             }

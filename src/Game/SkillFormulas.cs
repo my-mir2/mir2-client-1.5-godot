@@ -89,7 +89,13 @@ public static class SkillFormulas
         int absorbed = Math.Max(0, baseDamage - actual);
 
         // 每次吸收伤害扣除 3 秒盾持续时间 (sub_4C6ED0 @ 0x4c6ee9)
-        int newRemainingSec = curRemainingSec <= 3 ? 1 : curRemainingSec - 3;
+        // 若剩余时间在 2~3 秒，降为 1 秒濒死喘息期；若剩余已 <= 1 秒，受击直接破盾归零
+        int newRemainingSec = curRemainingSec switch
+        {
+            <= 1 => 0,
+            <= 3 => 1,
+            _ => curRemainingSec - 3
+        };
         bool isBroken = newRemainingSec <= 0;
 
         return (actual, absorbed, newRemainingSec, isBroken);

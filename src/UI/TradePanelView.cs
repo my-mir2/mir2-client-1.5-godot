@@ -277,6 +277,11 @@ public partial class TradePanelView : Control, IManagedWindow
         Visible = true;
     }
 
+    public void CloseTrade()
+    {
+        OnCancel();
+    }
+
     private void OnConfirm()
     {
         EmitSignal(SignalName.EndDealConfirmed);

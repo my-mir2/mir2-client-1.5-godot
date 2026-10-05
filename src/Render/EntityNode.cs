@@ -63,17 +63,52 @@ namespace Mir2Client.Render
                 Size = new Vector2(128, 16)
             };
             _nameLabel.AddThemeFontSizeOverride("font_size", 10);
-            Color nameColor = Type switch
-            {
-                EntityManager.EntityType.Npc => new Color(0.45f, 1.0f, 0.45f),
-                EntityManager.EntityType.Monster => new Color(1.0f, 0.95f, 0.5f),
-                _ => new Color(1.0f, 1.0f, 1.0f)
-            };
-            _nameLabel.AddThemeColorOverride("font_color", nameColor);
             _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
             _nameLabel.AddThemeConstantOverride("outline_size", 2);
             _nameLabel.Text = EntityName;
+            UpdateNameColor();
             AddChild(_nameLabel);
+        }
+
+        private int _poisonMask = 0;
+
+        public void UpdatePoison(int poisonMask)
+        {
+            _poisonMask = poisonMask;
+            UpdateNameColor();
+        }
+
+        private void UpdateNameColor()
+        {
+            if (_nameLabel == null) return;
+            if (IsDead)
+            {
+                _nameLabel.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f));
+                return;
+            }
+
+            if (_poisonMask == 3) // 双毒兼具
+            {
+                _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.3f, 0.9f)); // 紫红色
+            }
+            else if ((_poisonMask & 1) != 0) // 绿毒
+            {
+                _nameLabel.AddThemeColorOverride("font_color", new Color(0.15f, 1.0f, 0.2f)); // 荧光绿
+            }
+            else if ((_poisonMask & 2) != 0) // 红毒
+            {
+                _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.25f, 0.25f)); // 暗红
+            }
+            else
+            {
+                Color nameColor = Type switch
+                {
+                    EntityManager.EntityType.Npc => new Color(0.45f, 1.0f, 0.45f),
+                    EntityManager.EntityType.Monster => new Color(1.0f, 0.95f, 0.5f),
+                    _ => new Color(1.0f, 1.0f, 1.0f)
+                };
+                _nameLabel.AddThemeColorOverride("font_color", nameColor);
+            }
 
             // 官方 1.5 怪物头顶微型血条 (36x4 像素)
             _hpBarBg = new ColorRect
