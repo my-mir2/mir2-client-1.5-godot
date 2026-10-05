@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Godot;
+using Mir2Client.Render;
 using Mir2Client.UI;
 using Mir2Client.Utils;
 
@@ -55,6 +56,12 @@ public sealed class ServerMessageRouter
     public const short SM_SENDGUILDMEMBERLIST    = 756;  // 行会成员列表 (IDA 0x46A542)
     public const short SM_GUILDMEMBERLIST_ALT    = 671;  // 行会成员列表 (ProtocolConsts)
     public const short SM_NEEDPASSWORD           = 2014; // 二级安全密码弹窗 (sub_486DF0)
+    public const short SM_OBJECTSPELL            = 243;  // 实体施法动作 (bridge.rs 权威实证)
+    public const short SM_OBJECTSTRUCK           = 244;  // 实体受击后仰 (bridge.rs 权威实证)
+    public const short SM_OBJECTSTRUCK_DELPHI    = 637;  // 实体受击伤害结算 (Delphi 变体)
+    public const short SM_MAGIC_FIRE             = 638;  // 施法特效下发广播 (bridge.rs 权威实证)
+    public const short SM_LIGHTING_DELPHI        = 17;   // 定向轰击闪电 (bridge.rs / Delphi)
+    public const short SM_SPELLRESULT            = 30;   // 施法伤害结算 (ProtocolConsts)
 
     private readonly HudController? _hud;
     private readonly Mir2Client.Game.EntityManager? _entityManager;
@@ -184,6 +191,18 @@ public sealed class ServerMessageRouter
             case SM_SENDGUILDMEMBERLIST:
             case SM_GUILDMEMBERLIST_ALT:
                 HandleSendGuildMemberList(packet);
+                break;
+            case SM_OBJECTSPELL:
+                HandleObjectSpell(packet);
+                break;
+            case SM_MAGIC_FIRE:
+            case SM_LIGHTING_DELPHI:
+                HandleMagicFire(packet);
+                break;
+            case SM_SPELLRESULT:
+            case SM_OBJECTSTRUCK:
+            case SM_OBJECTSTRUCK_DELPHI:
+                HandleSpellResult(packet);
                 break;
         }
     }
@@ -680,6 +699,102 @@ public sealed class ServerMessageRouter
         if (ent != null)
         {
             ent.Direction = dir;
+        }
+    }
+
+    private void HandleObjectSpell(ServerPacket pkt)
+    {
+        int casterId = pkt.Recog;
+        int magicId = pkt.Param;
+        int targetX = pkt.Tag;
+        int targetY = 0;
+        if (!string.IsNullOrEmpty(pkt.ExtraStr))
+        {
+            var parts = pkt.ExtraStr.Split(new[] { '\t', ' ', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0 && int.TryParse(parts[0], out var ty)) targetY = ty;
+            if (parts.Length > 1 && int.TryParse(parts[1], out var mid) && mid > 0) magicId = mid;
+        }
+
+        Vector2I fromTile = Vector2I.Zero;
+        if (_gameView?.PlayerInstance != null && (casterId == 0 || casterId == _gameView.SessionId))
+        {
+            fromTile = new Vector2I(_gameView.PlayerInstance.TileX, _gameView.PlayerInstance.TileY);
+            var delta = new Vector2I(targetX, targetY) - fromTile;
+            int dir = delta != Vector2I.Zero ? Mir2Client.Game.InputPlugin.CalcDirection(new Vector2(delta.X, delta.Y)) : _gameView.PlayerInstance.Direction;
+            _gameView.PlayerInstance.Direction = dir;
+            _gameView.PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+        }
+        else if (_entityManager?.GetEntity(casterId) is { } ent)
+        {
+            fromTile = new Vector2I(ent.TileX, ent.TileY);
+        }
+
+        _gameView?.MagicManagerInstance?.PlayMagicSfx(magicId, 0);
+    }
+
+    private void HandleMagicFire(ServerPacket pkt)
+    {
+        int casterId = pkt.Recog;
+        int magicId = pkt.Param;
+        int targetX = pkt.Tag;
+        int targetY = 0;
+
+        if (pkt.Ident == SM_LIGHTING_DELPHI)
+        {
+            magicId = 10; // 雷电术
+            targetX = pkt.Param;
+            targetY = pkt.Tag;
+        }
+        else if (!string.IsNullOrEmpty(pkt.ExtraStr))
+        {
+            var parts = pkt.ExtraStr.Split(new[] { '\t', ' ', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0 && int.TryParse(parts[0], out var ty)) targetY = ty;
+            if (parts.Length > 1 && int.TryParse(parts[1], out var mid) && mid > 0) magicId = mid;
+        }
+
+        Vector2I fromTile = new Vector2I(targetX, targetY);
+        if (_gameView?.PlayerInstance != null && (casterId == 0 || casterId == _gameView.SessionId))
+        {
+            fromTile = new Vector2I(_gameView.PlayerInstance.TileX, _gameView.PlayerInstance.TileY);
+        }
+        else if (_entityManager?.GetEntity(casterId) is { } ent)
+        {
+            fromTile = new Vector2I(ent.TileX, ent.TileY);
+        }
+
+        Vector2I toTile = new Vector2I(targetX, targetY);
+        _gameView?.MagicManagerInstance?.PlayMagic(magicId, fromTile, toTile, casterId);
+    }
+
+    private void HandleSpellResult(ServerPacket pkt)
+    {
+        int targetId = pkt.Recog;
+        int targetHp = pkt.Param;
+        int damage = pkt.Tag;
+
+        bool isPlayer = (_gameView?.PlayerInstance != null && (targetId == 0 || targetId == _gameView.SessionId));
+        if (isPlayer && _gameView?.PlayerInstance != null)
+        {
+            _gameView.PlayerInstance.Hp = Math.Max(0, targetHp);
+            _hud?.UpdateHp(_gameView.PlayerInstance.Hp, _gameView.PlayerInstance.MaxHp);
+            _gameView.PlayerInstance.Anim.SetAction(ActionType.Struck, _gameView.PlayerInstance.Direction);
+            Mir2Client.Audio.AudioManager.Instance?.PlaySoundId(2);
+            if (damage > 0)
+            {
+                _hud?.AddChat("战斗", $"受到伤害 {damage} 点，剩余生命 {targetHp}。", new Color(1f, 0.4f, 0.4f));
+            }
+        }
+        else if (_entityManager?.GetEntity(targetId) is { } targetEnt)
+        {
+            targetEnt.Hp = Math.Max(0, targetHp);
+            if (targetEnt.Hp <= 0)
+            {
+                targetEnt.IsDead = true;
+            }
+            if (damage > 0)
+            {
+                _hud?.AddChat("战斗", $"命中目标 {targetEnt.Name}，造成 {damage} 点伤害！", new Color(1f, 0.9f, 0.3f));
+            }
         }
     }
 }

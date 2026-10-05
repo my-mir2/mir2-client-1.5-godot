@@ -757,14 +757,50 @@ public partial class AutoEndToEndDriver : Node
 
             case 66:
             {
-                GD.Print("[AutoE2E] === 全量大世界面板、底层动态细节与大世界走跑战斗 100% 验证完成 ===");
-                RequestCapture("step17_all_buttons_completed");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView != null && gameView.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证技能施放：雷电术 (MagicId=10) 施法动作、光效动画与法术音效 ===");
+                    var targetTile = new Vector2I(gameView.PlayerInstance.TileX + 3, gameView.PlayerInstance.TileY);
+                    gameView.TriggerSkill(10, targetTile);
+                }
                 break;
             }
 
             case 67:
             {
-                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS AND BUTTON CHECKS COMPLETED SUCCESSFULLY!");
+                RequestCapture("step28_skill_lighting_cast");
+                break;
+            }
+
+            case 68:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView != null && gameView.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证技能施放：地面火墙 (MagicId=22) 烈焰特效与持续渲染 ===");
+                    var targetTile = new Vector2I(gameView.PlayerInstance.TileX + 2, gameView.PlayerInstance.TileY + 1);
+                    gameView.TriggerSkill(22, targetTile);
+                }
+                break;
+            }
+
+            case 69:
+            {
+                RequestCapture("step29_ground_magic_firewall");
+                break;
+            }
+
+            case 70:
+            {
+                GD.Print("[AutoE2E] === 全量大世界面板、底层走跑位移与全门类技能光效 100% 验证完成 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 71:
+            {
+                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS AND SKILL MAGIC CHECKS COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();
                 break;
             }

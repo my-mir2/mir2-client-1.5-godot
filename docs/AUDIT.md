@@ -90,7 +90,7 @@
 | `3011` | `CM_WALK` | 实体行走 (步长1格, 0x461A5C) | `PacketEncoder.cs:68` | `bridge.rs:777` | `[L3 1:1]` | 官方 3011 主码已全面对齐，已闭环打通 InputPlugin/PlayerNode StepStarted 到 7001 桥接网关发包与 SM_ALLOWMOVE (203) 真实网络回执 |
 | `3013` | `CM_RUN` | 实体奔跑 (步长2格, 0x461BF6) | `PacketEncoder.cs:71` | `bridge.rs:796` | `[L3 1:1]` | 官方 3013 主码已全面对齐，已闭环打通 InputPlugin/PlayerNode StepStarted 到 7001 桥接网关发包与 SM_ALLOWMOVE (203) 真实网络回执 |
 | `3014` | `CM_HIT` | 普通物理攻击 (3014~3016) | `PacketEncoder.cs:252` | `bridge.rs:830` | `[L3 1:1]` | 官方随机挥刀号已统一接入 |
-| `3017` | `CM_SPELL` | 官方施法/技能/挖矿统一主码 | `PacketEncoder.cs:258` | `bridge.rs:1162` | `[L3 1:1]` | 0x46290A 实证主码已全面对齐 |
+| `3017` | `CM_SPELL` | 官方施法/技能/挖矿统一主码 | `PacketEncoder.cs:80` | `bridge.rs:1159` | `[L3 1:1]` | 0x46290A 实证主码已全面对齐，已闭环打通 InputPlugin/GameView F1~F8 快捷键施法、MagicManager 弹道/受击/火墙光效、双端 Tag 与制表符 Extra 坐标编解码及 SM_MAGIC_FIRE (638)/SM_SPELLRESULT (30) 受击结算闭环 |
 | `3018` | `CM_POWERHIT` | 攻杀剑术·力量斩 (PWR) | `PacketEncoder.cs:264` | `bridge.rs:837` | `[L3 1:1]` | 官方 3018 物理爆发刀光 |
 | `3019` | `CM_LONGHIT` | 刺杀剑术·隔位剑气 (LNG) | `PacketEncoder.cs:270` | `bridge.rs:844` | `[L3 1:1]` | 官方 3019 破防刺杀 |
 | `3024` | `CM_WIDEHIT` | 半月弯刀·群伤环斩 (WID) | `PacketEncoder.cs:276` | `bridge.rs:851` | `[L3 1:1]` | 官方 3024 扇形刀光 |

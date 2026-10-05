@@ -49,6 +49,9 @@ namespace Mir2Client.UI
         private WilLoader? _wilHum;
         private WilLoader? _wilWeapon;
         private WilLoader? _wilHair;
+        private WilLoader? _wilMagic;
+        private WilLoader? _wilMagic2;
+        private WilLoader? _wilEffect;
 
         public override void _Ready()
         {
@@ -59,6 +62,9 @@ namespace Mir2Client.UI
                 InputPluginInstance = PlayerInstance.GetNodeOrNull<InputPlugin>("InputPlugin");
             }
             HudInstance = GetNodeOrNull<HudController>("HUD");
+
+            MagicManagerInstance = new MagicManager();
+            AddChild(MagicManagerInstance);
 
             LoadResources();
             ConnectInputAndSignals();
@@ -83,6 +89,9 @@ namespace Mir2Client.UI
             _wilHum = new WilLoader();
             _wilWeapon = new WilLoader();
             _wilHair = new WilLoader();
+            _wilMagic = new WilLoader();
+            _wilMagic2 = new WilLoader();
+            _wilEffect = new WilLoader();
 
             _wilFloor.Load(ResPath.Resolve("resources/wil/Data/Tiles.wil"), ResPath.Resolve("resources/wil/Data/Tiles.wix"));
             _wilSmTiles.Load(ResPath.Resolve("resources/wil/Data/SmTiles.wil"), ResPath.Resolve("resources/wil/Data/SmTiles.wix"));
@@ -90,9 +99,17 @@ namespace Mir2Client.UI
             _wilHum.Load(ResPath.Resolve("resources/wil/Data/Hum.wil"), ResPath.Resolve("resources/wil/Data/Hum.wix"));
             _wilWeapon.Load(ResPath.Resolve("resources/wil/Data/Weapon.wil"), ResPath.Resolve("resources/wil/Data/Weapon.wix"));
             _wilHair.Load(ResPath.Resolve("resources/wil/Data/Hair.wil"), ResPath.Resolve("resources/wil/Data/Hair.wix"));
+            _wilMagic.Load(ResPath.Resolve("resources/wil/Data/Magic.wil"), ResPath.Resolve("resources/wil/Data/Magic.WIX"));
+            _wilMagic2.Load(ResPath.Resolve("resources/wil/Data/Magic2.wil"), ResPath.Resolve("resources/wil/Data/Magic2.WIX"));
+            _wilEffect.Load(ResPath.Resolve("resources/wil/Data/Effect.wil"), ResPath.Resolve("resources/wil/Data/Effect.WIX"));
 
             MapRendererInstance?.SetLoaders(_wilFloor, _wilObj, _wilSmTiles);
             PlayerInstance?.SetWilLoaders(_wilHum, _wilWeapon, _wilHair);
+            MagicManagerInstance?.SetWilLoaders(_wilMagic, _wilMagic2, _wilEffect);
+            if (MapRendererInstance != null)
+            {
+                MagicManagerInstance?.SetMapRenderer(MapRendererInstance);
+            }
         }
 
         private void ConnectInputAndSignals()
@@ -184,6 +201,11 @@ namespace Mir2Client.UI
                 {
                     HudInstance?.UseQuickSlot(slot);
                 };
+
+                InputPluginInstance.SkillKeyPressed += (slot) =>
+                {
+                    OnSkillKeyPressed(slot);
+                };
             }
 
             if (HudInstance != null)
@@ -212,6 +234,142 @@ namespace Mir2Client.UI
                         HudInstance.AddChat("提示", $"使用了 {item}，生命与魔法恢复 50 点。", new Color(1f, 0.9f, 0.2f));
                     }
                 };
+            }
+        }
+
+        private void OnSkillKeyPressed(int slot)
+        {
+            if (PlayerInstance == null || PlayerInstance.IsDead) return;
+
+            // 1. 获取按键绑定的技能 ID (slot: 0..7 对应 F1..F8)
+            int keyNum = slot + 1;
+            int magicId = HudInstance?.SkillPanel?.GetMagicIdForKey(keyNum) ?? 0;
+            if (magicId == 0)
+            {
+                // 若未配置，根据默认槽位智能映射
+                magicId = slot switch
+                {
+                    0 => 3,  // F1: 基本剑术
+                    1 => 7,  // F2: 攻杀剑术
+                    2 => 12, // F3: 刺杀剑术
+                    3 => 25, // F4: 半月弯刀
+                    4 => 26, // F5: 烈火剑法
+                    5 => 27, // F6: 野蛮冲撞
+                    6 => 1,  // F7: 火球术
+                    7 => 10, // F8: 雷电术
+                    _ => 0
+                };
+            }
+            if (magicId == 0) return;
+
+            // 2. 计算目标世界瓦片坐标与朝向
+            var mousePos = GetViewport()?.GetMousePosition() ?? Vector2.Zero;
+            var playerTile = new Vector2I(PlayerInstance.TileX, PlayerInstance.TileY);
+            var targetTile = MapRendererInstance != null ? MapRendererInstance.ScreenToTile(mousePos) : playerTile;
+            if (targetTile.X < 0 || targetTile.Y < 0)
+            {
+                targetTile = playerTile;
+            }
+
+            TriggerSkill(magicId, targetTile);
+        }
+
+        /// <summary>
+        /// 触发特定技能施法，驱动角色动作、音效、魔法光效与网络协议闭环
+        /// </summary>
+        public void TriggerSkill(int magicId, Vector2I targetTile)
+        {
+            if (PlayerInstance == null || PlayerInstance.IsDead) return;
+
+            var playerTile = new Vector2I(PlayerInstance.TileX, PlayerInstance.TileY);
+            bool isSelfBuff = magicId is 2 or 14 or 15 or 18 or 31;
+            if (isSelfBuff && (targetTile.X < 0 || Math.Max(Math.Abs(targetTile.X - playerTile.X), Math.Abs(targetTile.Y - playerTile.Y)) > 5))
+            {
+                targetTile = playerTile;
+            }
+
+            int dir = PlayerInstance.Direction;
+            var delta = targetTile - playerTile;
+            if (delta != Vector2I.Zero)
+            {
+                dir = InputPlugin.CalcDirection(new Vector2(delta.X, delta.Y));
+                PlayerInstance.Direction = dir;
+            }
+
+            // 检查并扣减 MP
+            var meta = SkillFormulas.GetSkill((short)magicId);
+            int mpCost = meta?.MpCost ?? 0;
+            if (PlayerInstance.Mp < mpCost)
+            {
+                HudInstance?.AddChat("提示", "魔法值不足，无法施展技能！", new Color(1f, 0.4f, 0.4f));
+                return;
+            }
+
+            switch (magicId)
+            {
+                case 3: // 基本剑术 (被动)
+                    HudInstance?.AddChat("技能", "基本剑术为被动技能，攻击时自动提升精准。", new Color(1f, 0.9f, 0.5f));
+                    break;
+
+                case 7: // 攻杀剑术
+                    PlayerInstance.Anim.SetAction(ActionType.PowerHit, dir);
+                    AudioManager.Instance?.PlaySoundId(1);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.PowerHit((short)dir));
+                    }
+                    break;
+
+                case 12: // 刺杀剑术
+                    PlayerInstance.Anim.SetAction(ActionType.LongHit, dir);
+                    AudioManager.Instance?.PlaySoundId(1);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.LongHit((short)dir));
+                    }
+                    break;
+
+                case 25: // 半月弯刀
+                    PlayerInstance.Anim.SetAction(ActionType.Hit, dir);
+                    AudioManager.Instance?.PlaySoundId(133);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.WideHit((short)dir));
+                    }
+                    break;
+
+                case 26: // 烈火剑法
+                    PlayerInstance.Anim.SetAction(ActionType.FireHit, dir);
+                    AudioManager.Instance?.PlaySoundId(136);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.FireHit(0, (short)dir));
+                    }
+                    break;
+
+                case 27: // 野蛮冲撞
+                    PlayerInstance.Anim.SetAction(ActionType.Run, dir);
+                    AudioManager.Instance?.PlaySoundId(134);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Motaebo((short)dir));
+                    }
+                    break;
+
+                default: // 全量官方远程与法术 (火球术、雷电术、治愈术、火符、冰咆哮、魔法盾等)
+                    PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+                    MagicManagerInstance?.PlayMagic(magicId, playerTile, targetTile);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Spell((short)magicId, (short)targetTile.X, (short)targetTile.Y));
+                    }
+                    break;
+            }
+
+            if (mpCost > 0)
+            {
+                PlayerInstance.Mp = Math.Max(0, PlayerInstance.Mp - mpCost);
+                HudInstance?.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
             }
         }
 

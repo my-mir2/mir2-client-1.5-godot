@@ -78,7 +78,7 @@ public static class PacketEncoder
         MakePacket(ProtocolConsts.CM_HIT, (targetX << 16) | (targetY & 0xFFFF), dir, 0);
 
     public static byte[] Spell(short magicId, short targetX, short targetY, int targetUid = 0) =>
-        MakePacket(ProtocolConsts.CM_SPELL, targetUid, magicId, (short)((targetX << 8) | (targetY & 0xFF)));
+        MakePacket(ProtocolConsts.CM_SPELL, targetUid, magicId, (short)((targetX << 8) | (targetY & 0xFF)), Encoding.UTF8.GetBytes($"{targetX}\t{targetY}"));
 
     public static byte[] Say(string text) =>
         MakePacket(ProtocolConsts.CM_SAY, 0, 0, 0, Encoding.UTF8.GetBytes(text));

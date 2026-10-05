@@ -390,6 +390,23 @@ public partial class SkillPanelView : Control, IManagedWindow
         }
     }
 
+    /// <summary>
+    /// 根据快捷键编号 (1..8 对应 F1..F8) 查询当前绑定的技能 ID
+    /// </summary>
+    public int GetMagicIdForKey(int keyNum)
+    {
+        if (keyNum <= 0) return 0;
+        string targetKey = $"F{keyNum}";
+        for (int i = 0; i < _skills.Count; i++)
+        {
+            if (_skills[i].Key == targetKey)
+            {
+                return _skills[i].MagicId;
+            }
+        }
+        return 0;
+    }
+
     public void TogglePanel()
     {
         Visible = !Visible;

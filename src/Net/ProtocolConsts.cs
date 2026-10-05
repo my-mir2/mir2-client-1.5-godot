@@ -119,6 +119,10 @@ public static class ProtocolConsts
     public const short SM_SITDOWN                = 27;   // 打坐/起立切换
     public const short SM_SPELLRESULT            = 30;   // 施法伤害结算
     public const short SM_SPELLEFFECT            = 32;   // 施法魔法光效
+    public const short SM_OBJECTSPELL            = 243;  // 实体施法动作 (bridge.rs 权威实证)
+    public const short SM_OBJECTSTRUCK           = 244;  // 实体受击后仰 (bridge.rs 权威实证)
+    public const short SM_OBJECTSTRUCK_DELPHI    = 637;  // 实体受击伤害结算 (Delphi 变体)
+    public const short SM_MAGIC_FIRE             = 638;  // 施法特效下发广播 (bridge.rs 权威实证)
     public const short SM_DIGUP                  = 36;   // 地下破土
     public const short SM_DIGDOWN                = 37;   // 潜入地下
     public const short SM_GOLDCHANGED            = 40;   // 金币变动广播

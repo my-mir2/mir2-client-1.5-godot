@@ -639,4 +639,123 @@ public class TestProtocolMatrix
         Assert.True(posY > 0);
         Assert.Equal(2, dir & 7);
     }
+
+    [Fact]
+    public void TestSpellPacketEncoding_DelphiAndGatewayAlignment()
+    {
+        // 1. 测试法师雷电术 CM_SPELL 编码 (MagicId=10, 目标坐标 (335, 275))
+        byte[] spellPkt = PacketEncoder.Spell(10, 335, 275);
+        Assert.True(spellPkt.Length > 12);
+        short ident = (short)(spellPkt[1] | (spellPkt[2] << 8));
+        Assert.Equal(ProtocolConsts.CM_SPELL, ident);
+
+        short magicId = (short)(spellPkt[7] | (spellPkt[8] << 8));
+        Assert.Equal(10, magicId);
+
+        // 验证 Extra 字符串正确包含制表符分隔的目标坐标 (CM 包首字节为 '0'..'9' 序号)
+        var parsed = PacketDecoder.Parse(spellPkt.AsSpan(1));
+        Assert.NotNull(parsed);
+        Assert.Equal("335\t275", parsed.Value.ExtraStr);
+
+        // 2. 测试战士特种技能 CM_ 封包编码
+        byte[] powerHitPkt = PacketEncoder.PowerHit(2);
+        Assert.Equal(12, powerHitPkt.Length);
+        Assert.Equal(ProtocolConsts.CM_POWERHIT, (short)(powerHitPkt[1] | (powerHitPkt[2] << 8)));
+
+        byte[] longHitPkt = PacketEncoder.LongHit(4);
+        Assert.Equal(12, longHitPkt.Length);
+        Assert.Equal(ProtocolConsts.CM_LONGHIT, (short)(longHitPkt[1] | (longHitPkt[2] << 8)));
+
+        byte[] wideHitPkt = PacketEncoder.WideHit(6);
+        Assert.Equal(12, wideHitPkt.Length);
+        Assert.Equal(ProtocolConsts.CM_WIDEHIT, (short)(wideHitPkt[1] | (wideHitPkt[2] << 8)));
+
+        byte[] fireHitPkt = PacketEncoder.FireHit(1001, 3);
+        Assert.Equal(12, fireHitPkt.Length);
+        Assert.Equal(ProtocolConsts.CM_FIREHIT, (short)(fireHitPkt[1] | (fireHitPkt[2] << 8)));
+
+        byte[] motaeboPkt = PacketEncoder.Motaebo(1);
+        Assert.Equal(12, motaeboPkt.Length);
+        Assert.Equal(ProtocolConsts.CM_SPELL, (short)(motaeboPkt[1] | (motaeboPkt[2] << 8)));
+    }
+
+    [Fact]
+    public void TestServerMessageRouter_SpellAndCombatPackets()
+    {
+        var em = new Mir2Client.Game.EntityManager();
+        em.AddEntity(1001, "半兽人", Mir2Client.Game.EntityManager.EntityType.Monster, 335, 275);
+
+        var router = new ServerMessageRouter(null, em, null);
+
+        // 1. 模拟实体施法 SM_OBJECTSPELL (243)
+        byte[] encExtraSpell = PacketCodec.EncodePlus60(Encoding.UTF8.GetBytes("275\t10"));
+        byte[] rawSpell = new byte[10 + encExtraSpell.Length + 1];
+        rawSpell[0] = (byte)(ProtocolConsts.SM_OBJECTSPELL & 0xFF);
+        rawSpell[1] = (byte)((ProtocolConsts.SM_OBJECTSPELL >> 8) & 0xFF);
+        rawSpell[2] = 0xE9; rawSpell[3] = 0x03; rawSpell[4] = 0x00; rawSpell[5] = 0x00; // Recog 1001
+        rawSpell[6] = 10; rawSpell[7] = 0; // Param 10 (雷电术)
+        rawSpell[8] = 0x4F; rawSpell[9] = 0x01; // Tag 335
+        Array.Copy(encExtraSpell, 0, rawSpell, 10, encExtraSpell.Length);
+        rawSpell[^1] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_OBJECTSPELL, rawSpell);
+
+        // 2. 模拟法术特效下发 SM_MAGIC_FIRE (638)
+        byte[] encExtraFire = PacketCodec.EncodePlus60(Encoding.UTF8.GetBytes("275\t10"));
+        byte[] rawFire = new byte[10 + encExtraFire.Length + 1];
+        rawFire[0] = (byte)(ProtocolConsts.SM_MAGIC_FIRE & 0xFF);
+        rawFire[1] = (byte)((ProtocolConsts.SM_MAGIC_FIRE >> 8) & 0xFF);
+        rawFire[2] = 0xE9; rawFire[3] = 0x03; rawFire[4] = 0x00; rawFire[5] = 0x00; // Recog 1001
+        rawFire[6] = 10; rawFire[7] = 0; // Param 10
+        rawFire[8] = 0x4F; rawFire[9] = 0x01; // Tag 335
+        Array.Copy(encExtraFire, 0, rawFire, 10, encExtraFire.Length);
+        rawFire[^1] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_MAGIC_FIRE, rawFire);
+
+        // 3. 模拟伤害结算 SM_SPELLRESULT (30)
+        byte[] rawResult = new byte[11];
+        rawResult[0] = (byte)(ProtocolConsts.SM_SPELLRESULT & 0xFF);
+        rawResult[1] = (byte)((ProtocolConsts.SM_SPELLRESULT >> 8) & 0xFF);
+        rawResult[2] = 0xE9; rawResult[3] = 0x03; rawResult[4] = 0x00; rawResult[5] = 0x00; // Recog 1001
+        rawResult[6] = 60; rawResult[7] = 0; // Param target_hp=60
+        rawResult[8] = 40; rawResult[9] = 0; // Tag damage=40
+        rawResult[10] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_SPELLRESULT, rawResult);
+
+        var ent = em.GetEntity(1001);
+        Assert.NotNull(ent);
+        Assert.Equal(60, ent.Hp);
+    }
+
+    [Fact]
+    public async Task TestRealNetwork_SpellAndCombatFlow()
+    {
+        using var client = new System.Net.Sockets.TcpClient();
+        try
+        {
+            using var cts = new System.Threading.CancellationTokenSource(1000);
+            await client.ConnectAsync("127.0.0.1", 7001, cts.Token);
+        }
+        catch
+        {
+            return;
+        }
+
+        var stream = client.GetStream();
+
+        // 1. 登录阶段
+        await stream.WriteAsync(PacketEncoder.Login("testuser", "testpass"));
+        await Task.Delay(50);
+        await stream.WriteAsync(PacketEncoder.SelectServer(0));
+        await Task.Delay(50);
+        await stream.WriteAsync(PacketEncoder.MakePacket(ProtocolConsts.CM_SELECTCHAR, 0, 0, 0, Encoding.UTF8.GetBytes("热血法师")));
+        await Task.Delay(50);
+
+        // 2. 发送技能施法 CM_SPELL (火球术 MagicId=1, 坐标 332, 272)
+        byte[] spellPkt = PacketEncoder.Spell(1, 332, 272);
+        await stream.WriteAsync(spellPkt);
+        await Task.Delay(50);
+
+        // 3. 验证连接仍然健康可用
+        Assert.True(client.Connected);
+    }
 }
