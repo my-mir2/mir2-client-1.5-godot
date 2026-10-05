@@ -66,24 +66,27 @@ public partial class TradePanelView : Control, IManagedWindow
     public int MyGold => _myGold;
     public int RemoteGold => _remoteGold;
 
+    public const float TotalWidth = RemoteWidth + MyWidth; // 220 + 236 = 456
+
     // 独立包围盒: 官方原生左右并列停靠模型 (IDA sub_481dd4 [0x485795/0x48592c])
-    // 对方在左 (344, 0)，我方在右 (564, 0)，总尺寸 456x175
+    // 对方在左绝对坐标 (344, 0)，我方在右绝对坐标 (564, 0)，总尺寸 456x175
     public (int x, int y, int width, int height) Bounds =>
-        ((int)Position.X, (int)Position.Y, (int)MyWidth, (int)(PanelHeight * 2));
+        ((int)Position.X, (int)Position.Y, (int)TotalWidth, (int)PanelHeight);
 
     public override void _Ready()
     {
         Visible = false;
-        Size = new Vector2(MyWidth, PanelHeight * 2);
-        // 左右并列顶格停靠于屏幕右上角 (IDA 0x48592c: 564 - 220 = 344, Top = 0)
-        Position = new Vector2(800 - MyWidth, 0); // 创建期 IDA: left=屏宽-面板宽, top=0; 上下堆叠: 对方在上,我方在下
+        Size = new Vector2(TotalWidth, PanelHeight);
+        // 左右并列顶格停靠于屏幕右上角 (IDA 0x485795/0x48592c: Left = 800 - 456 = 344, Top = 0)
+        Position = new Vector2(800 - TotalWidth, 0);
         MouseFilter = MouseFilterEnum.Pass;
 
-        // 1. 左侧/上方对方面板：对方面板 (Prguse_0390 220x175, IDA sub_481dd4 [0x48590f..0x485947])
+        // 1. 左侧面板：对方面板 (Prguse_0390 220x175, IDA sub_481dd4 [0x48590f..0x485947])
+        // 相对容器 (0, 0)，绝对坐标 (344, 0)
         _remotePanel = new Panel
         {
             Name = "RemoteTradePanel",
-            Position = new Vector2(16, 0), // IDA 0x48590f: left=屏宽-220=580 相对容器(564)+16
+            Position = Vector2.Zero,
             Size = new Vector2(RemoteWidth, PanelHeight),
             MouseFilter = MouseFilterEnum.Stop
         };
@@ -177,11 +180,12 @@ public partial class TradePanelView : Control, IManagedWindow
         _lblRemoteGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
         remoteGoldBox.AddChild(_lblRemoteGold);
 
-        // 2. 右侧/下方我方面板：我方面板 (Prguse_0389 236x175, IDA sub_481dd4 [0x485784..0x4857b5])
+        // 2. 右侧面板：我方面板 (Prguse_0389 236x175, IDA sub_481dd4 [0x485784..0x4857b5])
+        // 相对容器 (220, 0)，绝对坐标 (564, 0)，与左侧对方面板齐平拼接
         _myPanel = new Panel
         {
             Name = "MyTradePanel",
-            Position = new Vector2(0, PanelHeight - 15), // IDA sub_4915EC 0x491643: 我方 top=对方高度-15
+            Position = new Vector2(RemoteWidth, 0),
             Size = new Vector2(MyWidth, PanelHeight),
             MouseFilter = MouseFilterEnum.Stop
         };

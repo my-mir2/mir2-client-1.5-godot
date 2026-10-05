@@ -767,8 +767,8 @@ public class TestUiSceneBindingArchitecture
     /// <summary>
     /// 步骤 51: 盛大官方 1.5 玩家面对面安全交易系统几何与坐标实证 (IDA sub_4857C7 / sub_485905 / sub_481dd4)
     /// 实证锚点：
-    /// 1. 对方面板 Prguse_0390 (220x175, Top=0, Left=580 相对停靠容器 16)
-    /// 2. 我方面板 Prguse_0389 (236x175, Top=160 即 175-15, Left=564)
+    /// 1. 对方面板 Prguse_0390 (220x175, Top=0, 绝对坐标 344, 0)
+    /// 2. 我方面板 Prguse_0389 (236x175, Top=0, 绝对坐标 564, 0)
     /// 3. 双端各 10 格独立物品线框表格 (Left=21, Top=56, 180x66, 2行5列无缝咬合)
     /// 4. 锁定按钮 BtnTradeLock (Left=155, Top=128, 44x16, Prguse_0391)
     /// 5. 关闭红叉 BtnTradeClose (Left=220, Top=42, 16x23, Prguse_0064)
@@ -779,18 +779,21 @@ public class TestUiSceneBindingArchitecture
         Assert.Equal(220.0f, TradePanelView.RemoteWidth);
         Assert.Equal(236.0f, TradePanelView.MyWidth);
         Assert.Equal(175.0f, TradePanelView.PanelHeight);
+        Assert.Equal(456.0f, TradePanelView.TotalWidth);
 
-        // 停靠容器居右停靠 (800 - 236 = 564)
-        int containerX = 800 - (int)TradePanelView.MyWidth;
-        Assert.Equal(564, containerX);
+        // 停靠容器居右停靠 (800 - 456 = 344)
+        int containerX = 800 - (int)TradePanelView.TotalWidth;
+        Assert.Equal(344, containerX);
 
-        // 对方相对 X 为 16，绝对 X = 564 + 16 = 580 (即 800 - 220)
-        int remoteAbsX = containerX + 16;
-        Assert.Equal(580, remoteAbsX);
+        // 对方面板绝对坐标 (344, 0)，我方面板绝对坐标 (564, 0)
+        int remoteAbsX = containerX + 0;
+        Assert.Equal(344, remoteAbsX);
 
-        // 我方 Top = 175 - 15 = 160 (官方 15px 重叠停靠)
-        int myPanelTop = (int)TradePanelView.PanelHeight - 15;
-        Assert.Equal(160, myPanelTop);
+        int myAbsX = containerX + (int)TradePanelView.RemoteWidth;
+        Assert.Equal(564, myAbsX);
+
+        // 两块面板高度均为 175，水平无缝并列
+        Assert.Equal(564, remoteAbsX + (int)TradePanelView.RemoteWidth);
 
         // 网格尺寸：5列2行，单格 36x33，总宽 180 (5 * 36)，总高 66 (2 * 33)
         int gridCols = 5;

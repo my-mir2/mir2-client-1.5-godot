@@ -1287,7 +1287,7 @@ public partial class AutoEndToEndDriver : Node
                     GD.Print("[AutoE2E] === 验证官方 1.5 物品槽位拖拽调位 (Bag->Bag) 与装备穿戴脱下 (Bag<->Equip) ===");
                     // 1. 设置背包第 0 格为裁决之杖，第 1 格为布衣(男)，第 2 格为强效太阳水，第 3 格为金币
                     gameView.HudInstance.SetBagItem(0, "裁决之杖", "Items_0059.png", "[color=#ffff00]攻击 0-30[/color]");
-                    gameView.HudInstance.SetBagItem(1, "布衣(男)", "StateItem_0080.png", "[color=#ffff00]防御 1-2[/color]");
+                    gameView.HudInstance.SetBagItem(1, "布衣(男)", "Items_0060.png", "[color=#ffff00]防御 1-2[/color]");
                     gameView.HudInstance.SetBagItem(2, "强效太阳水", "Items_0016.png", "[color=#c0c0c0]瞬回生命与魔法[/color]");
                     gameView.HudInstance.SetBagItem(3, "金币", "Items_0000.png", "[color=#ffff00]面值 5000[/color]");
 

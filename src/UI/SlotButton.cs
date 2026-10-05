@@ -39,10 +39,7 @@ public partial class SlotButton : Button
             {
                 _iconRect.Texture = value;
                 _iconRect.Visible = value != null;
-                if (Size.X > 0 && Size.Y > 0)
-                {
-                    _iconRect.Size = Size;
-                }
+                UpdateIconLayout();
             }
         }
     }
@@ -54,7 +51,6 @@ public partial class SlotButton : Button
         Icon = null;
         ClipContents = true;
 
-        Vector2 initialSize = Size.X > 0 && Size.Y > 0 ? Size : (CustomMinimumSize.X > 0 ? CustomMinimumSize : new Vector2(32, 32));
         _iconRect = new TextureRect
         {
             Name = "__SlotIcon__",
@@ -63,19 +59,22 @@ public partial class SlotButton : Button
             MouseFilter = MouseFilterEnum.Ignore,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             ClipContents = true,
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            Size = initialSize
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize
         };
-        _iconRect.SetAnchorsPreset(LayoutPreset.FullRect);
         AddChild(_iconRect);
+        UpdateIconLayout();
 
-        Resized += () =>
-        {
-            if (_iconRect != null && Size.X > 0 && Size.Y > 0)
-            {
-                _iconRect.Size = Size;
-            }
-        };
+        Resized += UpdateIconLayout;
+    }
+
+    private void UpdateIconLayout()
+    {
+        if (_iconRect == null) return;
+        Vector2 slotSize = Size.X > 0 && Size.Y > 0 ? Size : (CustomMinimumSize.X > 0 ? CustomMinimumSize : new Vector2(36, 33));
+        const float padX = 3.0f;
+        const float padY = 3.0f;
+        _iconRect.Position = new Vector2(padX, padY);
+        _iconRect.Size = new Vector2(Math.Max(10.0f, slotSize.X - padX * 2), Math.Max(10.0f, slotSize.Y - padY * 2));
     }
 
     [Signal]
