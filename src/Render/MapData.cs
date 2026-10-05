@@ -78,4 +78,25 @@ public sealed class MapData
         var cell = GetCell(x, y);
         return cell.HasValue && cell.Value.Passable;
     }
+
+    public bool SetPassable(int x, int y, bool passable)
+    {
+        if (x < 0 || y < 0 || x >= Width || y >= Height) return false;
+        int offset = (x * Height + y) * CellSize;
+        if (offset + CellSize > _cellData.Length) return false;
+
+        short floorRaw = (short)(_cellData[offset] | (_cellData[offset + 1] << 8));
+        if (passable)
+        {
+            floorRaw = (short)(floorRaw & 0x7FFF); // 清除 MSB，设为可通行
+        }
+        else
+        {
+            floorRaw = (short)(floorRaw | unchecked((short)0x8000)); // 设定 MSB，设为不可通行
+        }
+
+        _cellData[offset] = (byte)(floorRaw & 0xFF);
+        _cellData[offset + 1] = (byte)((floorRaw >> 8) & 0xFF);
+        return true;
+    }
 }

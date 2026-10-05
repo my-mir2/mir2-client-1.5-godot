@@ -49,6 +49,8 @@ public class EntityManager
     public event Action<int>? EntityRemoved;
     public event Action<int, byte>? EntityTurned;
     public event Action<int, int, int, byte>? EntityMoved;
+    public event Action<int, int, int, byte, bool>? EntityStepMoved; // uid, x, y, dir, isRun
+    public event Action<int, int, int, byte>? EntityReconciled;     // uid, serverX, serverY, dir
     public event Action<int, int, int>? EntityStruck;
     public event Action<int>? EntityDied;
     public event Action<int, int>? EntityPoisonChanged; // uid, poisonMask
@@ -113,6 +115,30 @@ public class EntityManager
             ent.TileY = y;
             ent.Direction = dir;
             EntityMoved?.Invoke(uid, x, y, dir);
+            EntityStepMoved?.Invoke(uid, x, y, dir, false);
+        }
+    }
+
+    public void UpdateStepMove(int uid, int x, int y, byte dir, bool isRun)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.TileX = x;
+            ent.TileY = y;
+            ent.Direction = dir;
+            EntityMoved?.Invoke(uid, x, y, dir);
+            EntityStepMoved?.Invoke(uid, x, y, dir, isRun);
+        }
+    }
+
+    public void UpdateReconcile(int uid, int x, int y, byte dir)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.TileX = x;
+            ent.TileY = y;
+            ent.Direction = dir;
+            EntityReconciled?.Invoke(uid, x, y, dir);
         }
     }
 

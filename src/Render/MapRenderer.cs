@@ -184,6 +184,38 @@ namespace Mir2Client.Render
         public void AddDynamicObstacle(Vector2I pos) => _dynamicObstacles.Add(pos);
         public void RemoveDynamicObstacle(Vector2I pos) => _dynamicObstacles.Remove(pos);
 
+        public void SetTileBlocked(int tx, int ty, bool blocked)
+        {
+            var p = new Vector2I(tx, ty);
+            if (blocked)
+            {
+                _dynamicObstacles.Add(p);
+            }
+            else
+            {
+                _dynamicObstacles.Remove(p);
+            }
+
+            if (_cells != null && tx >= 0 && ty >= 0 && tx < _mapW && ty < _mapH)
+            {
+                int offset = (tx * _mapH + ty) * CellSize;
+                if (offset + CellSize <= _cells.Length)
+                {
+                    ushort floorRaw = (ushort)(_cells[offset] | (_cells[offset + 1] << 8));
+                    if (blocked)
+                    {
+                        floorRaw = (ushort)(floorRaw | 0x8000);
+                    }
+                    else
+                    {
+                        floorRaw = (ushort)(floorRaw & 0x7FFF);
+                    }
+                    _cells[offset] = (byte)(floorRaw & 0xFF);
+                    _cells[offset + 1] = (byte)((floorRaw >> 8) & 0xFF);
+                }
+            }
+        }
+
         public bool IsPassable(int tx, int ty)
         {
             if (_dynamicObstacles.Contains(new Vector2I(tx, ty)))
@@ -367,6 +399,8 @@ namespace Mir2Client.Render
         }
 
         public Vector2 TileToScreen(int tx, int ty) => new(tx * TileW - _camX, ty * TileH - _camY);
+
+        public Vector2 WorldToScreen(Vector2 worldPos) => new(worldPos.X - _camX, worldPos.Y - _camY);
 
         public Vector2I ScreenToTile(Vector2 screenPos) =>
             new((int)((screenPos.X + _camX) / TileW), (int)((screenPos.Y + _camY) / TileH));

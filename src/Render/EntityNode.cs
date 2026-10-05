@@ -36,6 +36,8 @@ namespace Mir2Client.Render
         private WilLoader? _loader;
         private MapRenderer? _mapRenderer;
 
+        public DeadReckoningEngine.EntityState MovementState { get; } = new();
+
         public ActionType CurrentAction { get; private set; } = ActionType.Stand;
         private float _animTimer = 0f;
         private int _currentFrame = 0;
@@ -44,6 +46,7 @@ namespace Mir2Client.Render
 
         public override void _Ready()
         {
+            DeadReckoningEngine.InitializeEntity(MovementState, TileX, TileY, (byte)Direction);
             SetupVisuals();
             UpdatePosition();
             UpdateFrameGraphic();
@@ -179,21 +182,44 @@ namespace Mir2Client.Render
             TileX = tx;
             TileY = ty;
             if (dir >= 0) Direction = dir & 7;
+            DeadReckoningEngine.InitializeEntity(MovementState, TileX, TileY, (byte)Direction);
+            UpdatePosition();
+        }
+
+        public void StartStepMovement(int targetX, int targetY, int dir, bool isRun)
+        {
+            if (IsCorpse || IsDead) return;
+            Direction = dir & 7;
+            TileX = targetX;
+            TileY = targetY;
+            DeadReckoningEngine.StartMovement(MovementState, targetX, targetY, (byte)Direction, isRun);
+            PlayAction(isRun ? ActionType.Run : ActionType.Walk, Direction, MovementState.MoveDuration);
+            UpdatePosition();
+        }
+
+        public void ReconcilePosition(int serverX, int serverY, byte dir)
+        {
+            TileX = serverX;
+            TileY = serverY;
+            Direction = dir & 7;
+            DeadReckoningEngine.ReconcileServerPosition(MovementState, serverX, serverY, (byte)Direction);
             UpdatePosition();
         }
 
         private void UpdatePosition()
         {
+            var worldPos = DeadReckoningEngine.GetRenderPosition(MovementState);
             if (_mapRenderer != null)
             {
-                Position = _mapRenderer.TileToScreen(TileX, TileY);
+                Position = _mapRenderer.WorldToScreen(worldPos);
             }
             else
             {
-                Position = new Vector2(TileX * 48, TileY * 32);
+                Position = worldPos;
             }
-            // 依据 Y 坐标动态计算 ZIndex 确保透视深度排序
-            ZIndex = Math.Clamp(TileY, 1, 99);
+            // 依据视觉 Y 坐标动态计算 ZIndex 确保透视深度排序
+            int currentTileY = (int)MathF.Round(worldPos.Y / 32.0f);
+            ZIndex = Math.Clamp(currentTileY, 1, 99);
         }
 
         public void PlayAction(ActionType action, int dir = -1, float duration = 0.4f)
@@ -258,9 +284,10 @@ namespace Mir2Client.Render
 
         public override void _Process(double delta)
         {
+            float dt = (float)delta;
+            DeadReckoningEngine.Update(MovementState, dt);
             UpdatePosition();
 
-            float dt = (float)delta;
             _animTimer += dt;
 
             // 血条 3 秒倒计时自动隐退

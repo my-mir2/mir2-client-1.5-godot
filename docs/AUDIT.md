@@ -6161,3 +6161,24 @@
    - Godot OpenGL3 端到端捕获 [e2e_step45_multi_entity_ysort_stress.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step45_multi_entity_ysort_stress.png)；
    - 机器视觉核验：同屏 24 只怪物密集并发就位，Y-Sort 遮挡层级严丝合缝，聊天栏提示压测通过，0 黑屏，0 贴图丢失，0 调试辅助线；
    - 运行时日志零容忍扫描：0 ERROR，0 SCRIPT ERROR，退出码严格为 0。
+
+## 2026-10-05 官方 1.5 弱网航位推测、16位复古像素抖动与沙巴克攻城破门阻挡消除闭环核销
+1. **多人网络航位推测 (Dead Reckoning) 与弱网丢包阻尼平滑插值引擎 (DeadReckoningEngine.cs / EntityNode.cs)**：
+   - **官方 Delphi 移动步进实证 (sub_461A5C / sub_461BF6 / sub_461E80)**：行走 (步长1格 0.48s) 与奔跑 (步长2格 0.40s) 的 6 帧物理位移精确插值；
+   - **弱网航位推测外推**：网络偶发丢包与微小抖动时，客户端根据上一帧速度矢量启动短程航位推测匀速前行，消除突兀停顿顿挫；
+   - **权威纠偏平滑阻尼吸收 (Reconciliation)**：容差距离 (144 像素) 内，采用指数衰减阻尼平滑消除视觉残差 (ReconciliationDecayRate = 20.0f)，彻底消灭瞬移跳跃与橡皮筋 (Rubber-banding) 拉扯；大跨度距离触发瞬移硬对齐；
+   - **端到端演练截屏**：[e2e_step46_dead_reckoning_smooth_interp.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step46_dead_reckoning_smooth_interp.png) 实证。
+2. **盛大官方 1.5 原版 DirectDraw 16-bit (RGB 565) 复古有序抖动滤镜 (retro_dither_16bit.gdshader / RetroDitherMath.cs)**：
+   - **DirectDraw 7 16 位硬件色深量化**：5 位红 (31阶)、6 位绿 (63阶)、5 位蓝 (31阶)，真实重构 65536 色阶梯分布与 ushort 颜色转换；
+   - **4x4 Bayer Ordered Dithering 空间有序抖动**：消除夜间火把光晕阶梯色阶断层，原汁原味还原 2001 年原版传奇微观像素颗粒质感；
+   - **无缝控制开关**：支持全屏 CanvasItem 滤镜层、快捷指令 `@dither on/off` 与 API 热切换；
+   - **端到端演练截屏**：[e2e_step47_directdraw_16bit_dither_active.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step47_directdraw_16bit_dither_active.png) 实证。
+3. **沙巴克攻城战城门破碎动态消除阻挡与皇宫争夺裁决引擎 (SabukCastleEngine.cs / MapData.cs / MapRenderer.cs)**：
+   - **城门状态与碰撞实证 (sub_4C92B0 / sub_4C93A0)**：城门 2000 HP，`Intact` (完好阻挡) -> `Damaged` (半血裂开阻挡) -> `Broken` (倒塌粉碎)；
+   - **物理通行阻挡动态消除**：城门倒塌瞬间，遍历门洞瓦片 (672, 331 等)，动态清除 `MapData` 列优先 12 字节单元格的最高位 `0x8000` 阻挡位，并在 `MapRenderer` 中同步注销障碍，实现大部队自由通行穿透城门；城主修缮可随时恢复阻挡；
+   - **皇宫争夺裁决 (sub_4C9B80)**：2 小时攻城战倒计时期间，实时监控皇宫大殿成员，仅当某一合法行会彻底清空敌对势力时方可夺得控制权；战役鸣金收兵时最终加冕为沙巴克城主；
+   - **端到端演练截屏**：[e2e_step48_sabuk_gate_broken_block_removed.png](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step48_sabuk_gate_broken_block_removed.png) 实证。
+4. **自动化测试与端到端机器视觉审计总况**：
+   - 全套 xUnit 单元测试增至 **110 项全部 100% 通过** (耗时 790ms，0 失败，0 跳过)；
+   - 90 阶段端到端真机真实渲染捕获 48 组高保真截屏，全部通过机器视觉严格审计：0 黑屏，0 贴图丢失，0 调试辅助线；
+   - 运行时引擎与系统日志零容忍扫描：0 ERROR，0 SCRIPT ERROR，退出码严格为 0。

@@ -70,6 +70,17 @@ namespace Mir2Client.UI
         private ulong _lastSpellTick = 0;
         public const ulong SpellCooldownMs = 600;
 
+        private ColorRect? _retroDitherOverlay;
+        public bool IsRetroDitherEnabled => _retroDitherOverlay?.Visible ?? false;
+
+        public void SetRetroDither(bool enable)
+        {
+            if (_retroDitherOverlay != null)
+            {
+                _retroDitherOverlay.Visible = enable;
+            }
+        }
+
         public override void _Ready()
         {
             MapRendererInstance = GetNodeOrNull<MapRenderer>("MapRenderer");
@@ -103,7 +114,29 @@ namespace Mir2Client.UI
                 InputPluginInstance.SetMapRenderer(MapRendererInstance);
             }
 
+            SetupRetroDitherOverlay();
+
             Callable.From(CheckAutoSandbox).CallDeferred();
+        }
+
+        private void SetupRetroDitherOverlay()
+        {
+            var shader = GD.Load<Shader>("res://shaders/retro_dither_16bit.gdshader");
+            if (shader != null)
+            {
+                var mat = new ShaderMaterial { Shader = shader };
+                _retroDitherOverlay = new ColorRect
+                {
+                    Name = "RetroDitherOverlay",
+                    Size = new Vector2(800, 600),
+                    Position = Vector2.Zero,
+                    MouseFilter = Control.MouseFilterEnum.Ignore,
+                    Material = mat,
+                    ZIndex = 150,
+                    Visible = false
+                };
+                AddChild(_retroDitherOverlay);
+            }
         }
 
         private void LoadResources()
@@ -244,8 +277,24 @@ namespace Mir2Client.UI
             {
                 if (_entityNodes.TryGetValue(uid, out var node))
                 {
-                    node.SetTilePos(x, y, dir);
-                    node.PlayAction(ActionType.Walk, dir);
+                    // 默认步长平滑位移
+                    node.StartStepMovement(x, y, dir, false);
+                }
+            };
+
+            EntityManagerInstance.EntityStepMoved += (uid, x, y, dir, isRun) =>
+            {
+                if (_entityNodes.TryGetValue(uid, out var node))
+                {
+                    node.StartStepMovement(x, y, dir, isRun);
+                }
+            };
+
+            EntityManagerInstance.EntityReconciled += (uid, x, y, dir) =>
+            {
+                if (_entityNodes.TryGetValue(uid, out var node))
+                {
+                    node.ReconcilePosition(x, y, dir);
                 }
             };
 
@@ -476,7 +525,23 @@ namespace Mir2Client.UI
                 return;
             }
 
-            // 3. 普通聊天内容
+            // 3. 复古 16-bit 像素抖动滤镜切换指令 (@dither / @16bit)
+            if (trimmed.StartsWith("@dither", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("@16bit", StringComparison.OrdinalIgnoreCase))
+            {
+                bool enable = !IsRetroDitherEnabled;
+                if (trimmed.Contains("on", StringComparison.OrdinalIgnoreCase)) enable = true;
+                else if (trimmed.Contains("off", StringComparison.OrdinalIgnoreCase)) enable = false;
+
+                SetRetroDither(enable);
+                string statusMsg = enable 
+                    ? "【画质设置】已开启盛大官方原版 DirectDraw 16-bit (RGB 565) 像素抖动复古滤镜！" 
+                    : "【画质设置】已恢复原生 32-bit 全彩平滑高清画质！";
+                HudInstance?.AddChat("系统", statusMsg, new Color(0.2f, 1f, 0.4f));
+                return;
+            }
+
+            // 4. 普通聊天内容
             if (_net != null && _net.IsConnectedToServer)
             {
                 _net.SendPacket(PacketEncoder.Say(trimmed));

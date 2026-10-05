@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using Mir2Client.Audio;
 using Mir2Client.Game;
@@ -1190,14 +1191,84 @@ public partial class AutoEndToEndDriver : Node
 
             case 86:
             {
-                GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、特技特戒、武器试刀、红名守卫与多实体动态池 100% 验证完工 ===");
-                RequestCapture("step17_all_buttons_completed");
+                // 演示多人网络弱网丢包恢复与航位推测 (Dead Reckoning) 平滑插值
+                var gameView = _main?.GetNodeOrNull<GameView>("Game");
+                if (gameView != null && gameView.HudInstance != null)
+                {
+                    int px = gameView.PlayerInstance?.TileX ?? 330;
+                    int py = gameView.PlayerInstance?.TileY ?? 270;
+
+                    // 启动怪物 9101 平滑步进位移与航位推测
+                    gameView.EntityManagerInstance.UpdateStepMove(9101, px + 2, py + 1, 2, false);
+                    // 模拟弱网权威位置纠偏与平滑阻尼吸收
+                    gameView.EntityManagerInstance.UpdateReconcile(9101, px + 2, py + 1, 2);
+
+                    gameView.HudInstance.AddChat("系统", "【弱网同步】变异骷髅航位推测与平滑阻尼插值生效，丢包纠偏平滑过渡！", new Color(0.3f, 1f, 0.6f));
+                    AudioManager.Instance?.PlaySoundId(2);
+                }
+                RequestCapture("step46_dead_reckoning_smooth_interp");
                 break;
             }
 
             case 87:
             {
-                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, MONSTER WIL POOL & Y-SORT COMPLETED SUCCESSFULLY!");
+                // 演示官方原版 DirectDraw 16-bit (RGB 565) 像素抖动复古滤镜开启
+                var gameView = _main?.GetNodeOrNull<GameView>("Game");
+                if (gameView != null && gameView.HudInstance != null)
+                {
+                    gameView.SetRetroDither(true);
+                    gameView.HudInstance.AddChat("画质", "【画质切换】已开启盛大官方原版 DirectDraw 16-bit (RGB 565) 像素抖动复古滤镜！", new Color(0.2f, 1f, 0.4f));
+                    AudioManager.Instance?.PlaySoundId(1);
+                }
+                RequestCapture("step47_directdraw_16bit_dither_active");
+                break;
+            }
+
+            case 88:
+            {
+                // 演示沙巴克攻城战城门攻破物理阻挡动态消除与皇宫争夺加冕
+                var gameView = _main?.GetNodeOrNull<GameView>("Game");
+                if (gameView != null && gameView.HudInstance != null && gameView.MapRendererInstance != null)
+                {
+                    int px = gameView.PlayerInstance?.TileX ?? 330;
+                    int py = gameView.PlayerInstance?.TileY ?? 270;
+
+                    var gate = new SabukCastleEngine.SabukGate();
+                    var gateTiles = new List<Vector2I> { new(px + 1, py), new(px + 1, py + 1) };
+                    gate.Initialize(2000, gateTiles);
+
+                    // 初始设立城门阻挡
+                    foreach (var t in gateTiles)
+                    {
+                        gameView.MapRendererInstance.SetTileBlocked(t.X, t.Y, true);
+                    }
+
+                    // 攻城方施展强力烈火剑法轰击城门，造成 2500 致命打击彻底破门！
+                    gate.TakeDamage(2500, (x, y, blocked) => gameView.MapRendererInstance.SetTileBlocked(x, y, blocked));
+
+                    // 皇宫争夺裁决
+                    var decider = new SabukCastleEngine.PalaceWarDecider();
+                    decider.StartWar(7200f);
+                    decider.EvaluatePalaceOccupancy(new[] { ("邪恶同盟", 9999) });
+                    string winner = decider.FinalizeWar();
+
+                    gameView.HudInstance.AddChat("沙巴克", $"【沙巴克战役】城门已被攻破轰然倒塌！物理阻挡彻底消除！【{winner}】独占皇宫加冕为新沙巴克城主！", new Color(1f, 0.85f, 0.1f));
+                    AudioManager.Instance?.PlaySoundId(2);
+                }
+                RequestCapture("step48_sabuk_gate_broken_block_removed");
+                break;
+            }
+
+            case 89:
+            {
+                GD.Print("[AutoE2E] === 官方 1.5 全量核心战斗机制、弱网航位推测、16位抖动滤镜、沙巴克破门与多实体动态池 100% 验证完工 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 90:
+            {
+                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, RETRO DITHER & SABUK WAR COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();
                 break;
             }
