@@ -42,6 +42,8 @@ public sealed class EquipItem
 
 /// <summary>
 /// 盛大官方 1.5 核心玩家实体状态机与属性模型
+/// 集成官方 7 大特戒 (护身/复活/麻痹/超负载/隐身/传送/技能戒指)
+/// 与 4 大套装 (记忆/祈祷/魔血/虹魔) 底层判定引擎
 /// </summary>
 public sealed class PlayerState
 {
@@ -56,16 +58,25 @@ public sealed class PlayerState
     public int Mp { get; set; } = 100;
     public int MaxMp { get; set; } = 100;
 
+    // 基础 HP/MP (供魔血套装转化计算)
+    public int BaseMaxHp { get; set; } = 100;
+    public int BaseMaxMp { get; set; } = 100;
+
     public int MapX { get; set; }
     public int MapY { get; set; }
     public byte Direction { get; set; } // 0~7
 
     // 官方三大负重体系 (背包负重、穿戴负重、腕力)
     public int BagWeight { get; set; }
+    public int BaseMaxBagWeight { get; set; } = 200;
     public int MaxBagWeight { get; set; } = 200;
+
     public int WearWeight { get; set; }
+    public int BaseMaxWearWeight { get; set; } = 60;
     public int MaxWearWeight { get; set; } = 60;
+
     public int HandWeight { get; set; }
+    public int BaseMaxHandWeight { get; set; } = 40;
     public int MaxHandWeight { get; set; } = 40;
 
     // 金币单人严格 500 万上限 (sub_4A4A20)
@@ -89,22 +100,32 @@ public sealed class PlayerState
     // 背包 40 格
     public List<EquipItem> BagItems { get; } = new(40);
 
-    public bool WearItem(OfficialEquipSlot slot, EquipItem item)
-    {
-        int slotIdx = (int)slot;
-        if (slotIdx < 0 || slotIdx >= 9) return false;
-        Equipment[slotIdx] = item;
-        return true;
-    }
+    // ==================== 官方 7 大特戒与 4 大套装运行时状态 ====================
+    public bool HasProtectRing { get; private set; }
+    public bool HasReviveRing { get; private set; }
+    public int ReviveRingDura { get; set; } = 5000; // 内部持久
+    public long LastReviveTick { get; set; }
 
-    public EquipItem? TakeOffItem(OfficialEquipSlot slot)
-    {
-        int slotIdx = (int)slot;
-        if (slotIdx < 0 || slotIdx >= 9) return null;
-        var item = Equipment[slotIdx];
-        Equipment[slotIdx] = null;
-        return item;
-    }
+    public bool HasParalysisRing { get; private set; }
+    public bool HasOverloadRing { get; private set; }
+    public bool HasInvisibleRing { get; private set; }
+
+    public bool HasTeleportRing { get; private set; }
+    public long LastTeleportTick { get; set; }
+
+    public bool HasRecallSet { get; private set; }
+    public long LastRecallTick { get; set; }
+
+    public bool HasPrayerSet { get; private set; }
+    public bool HasMagicBloodSet { get; private set; }
+    public bool HasRainbowSet { get; private set; }
+
+    public int LeechWeight { get; private set; }
+    public int BonusHit { get; private set; }
+    public double LifestealAccumPool { get; set; }
+
+    // 特戒赋予的技能列表 (如火焰戒指赋予火球术 1，防御戒指赋予治愈术 2)
+    public List<int> GrantedRingSkills { get; } = new();
 
     // 12 状态位掩码 (0: 绿毒, 1: 红毒, 5: 麻痹, 8: 隐身 等)
     public bool[] StatusBits { get; } = new bool[12];
@@ -113,6 +134,192 @@ public sealed class PlayerState
     public uint GetCurrentStatusMask()
     {
         return PlayerAuditEngine.AuditCalcStatusMask(StatusBits, BaseFlags);
+    }
+
+    public bool WearItem(OfficialEquipSlot slot, EquipItem item, long nowTick = 0)
+    {
+        int slotIdx = (int)slot;
+        if (slotIdx < 0 || slotIdx >= 9) return false;
+        Equipment[slotIdx] = item;
+        RecalculateAttributes(nowTick);
+        return true;
+    }
+
+    public EquipItem? TakeOffItem(OfficialEquipSlot slot, long nowTick = 0)
+    {
+        int slotIdx = (int)slot;
+        if (slotIdx < 0 || slotIdx >= 9) return null;
+        var item = Equipment[slotIdx];
+        Equipment[slotIdx] = null;
+        RecalculateAttributes(nowTick);
+        return item;
+    }
+
+    /// <summary>
+    /// 全量重算装备附加属性、7 大特戒状态与 4 大套装加成
+    /// </summary>
+    public void RecalculateAttributes(long nowTick = 0)
+    {
+        // 1. 重置特戒标志
+        HasProtectRing = false;
+        HasReviveRing = false;
+        HasParalysisRing = false;
+        HasOverloadRing = false;
+        HasInvisibleRing = false;
+        HasTeleportRing = false;
+
+        // 收集 Shape 列表
+        var pieceShapes = new List<int>();
+
+        for (int i = 0; i < 9; i++)
+        {
+            var eq = Equipment[i];
+            if (eq == null) continue;
+            pieceShapes.Add(eq.Shape);
+
+            // 护身戒指
+            if (eq.Shape == 118 || eq.Name.Contains("护身戒指"))
+            {
+                HasProtectRing = true;
+            }
+            // 复活戒指
+            if (eq.Shape == 114 || eq.Name.Contains("复活戒指"))
+            {
+                HasReviveRing = true;
+                if (ReviveRingDura <= 0 && eq.Dura > 0)
+                    ReviveRingDura = eq.Dura * 1000;
+            }
+            // 麻痹戒指
+            if (eq.Shape == 113 || eq.Name.Contains("麻痹戒指"))
+            {
+                HasParalysisRing = true;
+            }
+            // 超负载戒指
+            if (eq.Shape == 119 || eq.Name.Contains("超负载戒指"))
+            {
+                HasOverloadRing = true;
+            }
+            // 隐身戒指
+            if (eq.Shape == 111 || eq.Name.Contains("隐身戒指"))
+            {
+                HasInvisibleRing = true;
+            }
+            // 传送戒指
+            if (eq.Shape == 112 || eq.Name.Contains("传送戒指"))
+            {
+                HasTeleportRing = true;
+            }
+        }
+
+        // 2. 超负载戒指负重翻倍
+        var w = SpecialRings.ApplyOverloadRing(BaseMaxBagWeight, BaseMaxWearWeight, BaseMaxHandWeight, HasOverloadRing);
+        MaxBagWeight = w.maxWeight;
+        MaxWearWeight = w.maxWearWeight;
+        MaxHandWeight = w.maxHandWeight;
+
+        // 3. 隐身戒指状态位同步
+        StatusBits[8] = HasInvisibleRing;
+
+        // 4. 技能戒指检测
+        GrantedRingSkills.Clear();
+        GrantedRingSkills.AddRange(SpecialRings.GetSpecialRingGrantedSkills(Equipment, Job));
+
+        // 5. 魔血套装重算
+        var mb = SpecialRings.CalculateMagicBloodBonus(pieceShapes.ToArray(), BaseMaxHp, BaseMaxMp);
+        HasMagicBloodSet = mb.hasFullSet;
+        MaxHp = mb.finalHp;
+        MaxMp = mb.finalMp;
+        Hp = Math.Min(Hp, MaxHp);
+        Mp = Math.Min(Mp, MaxMp);
+
+        // 6. 虹魔套装重算
+        var rm = SpecialRings.CalculateRainbowMagicBonus(pieceShapes.ToArray(), 0, 0);
+        HasRainbowSet = rm.hasFullSet;
+        LeechWeight = rm.leechWeight;
+        BonusHit = rm.bonusHit;
+
+        // 7. 记忆套装检测
+        HasRecallSet = SpecialRings.CheckRecallSet(Equipment);
+
+        // 8. 祈祷套装检测
+        var ps = SpecialRings.CheckPrayerSet(Equipment);
+        HasPrayerSet = ps.isFullSet;
+    }
+
+    /// <summary>
+    /// 执行传送戒指瞬移指令 (@move x y / @飞 x y)
+    /// </summary>
+    public (bool success, int targetX, int targetY, string message) TryExecuteTeleport(
+        string command, Func<int, int, bool>? isTileBlocked = null, int mapW = 1000, int mapH = 1000, long nowTick = 0)
+    {
+        var res = SpecialRings.ExecuteTeleportRing(HasTeleportRing, command, MapX, MapY, isTileBlocked, mapW, mapH, LastTeleportTick, nowTick);
+        if (res.success)
+        {
+            LastTeleportTick = nowTick;
+            MapX = res.targetX;
+            MapY = res.targetY;
+        }
+        return res;
+    }
+
+    /// <summary>
+    /// 执行记忆套装全队召集指令 (@天地合一 / @grouprecall)
+    /// </summary>
+    public (bool success, List<(int uid, int targetX, int targetY)> movedMembers, string message) TryExecuteRecall(
+        string command, bool isLeader, List<(int uid, string name, int x, int y)> teammates,
+        Func<int, int, bool>? isTileBlocked = null, long nowTick = 0)
+    {
+        var res = SpecialRings.TriggerGroupRecall(HasRecallSet, isLeader, command, MapX, MapY, Direction, teammates, isTileBlocked, LastRecallTick, nowTick);
+        if (res.success)
+        {
+            LastRecallTick = nowTick;
+        }
+        return res;
+    }
+
+    /// <summary>
+    /// 触发祈祷套装天谴事件 (集齐时)
+    /// </summary>
+    public (bool triggered, string broadcastMsg, bool petRebellion, OfficialEquipSlot brokenSlot) TryTriggerPrayerApocalypse(int rngSlotRoll = -1)
+    {
+        var ps = SpecialRings.CheckPrayerSet(Equipment);
+        if (!ps.isFullSet)
+        {
+            return (false, string.Empty, false, OfficialEquipSlot.Dress);
+        }
+
+        var res = SpecialRings.TriggerPrayerApocalypse(true, ps.equippedSlots, rngSlotRoll);
+        if (res.triggered)
+        {
+            // 碎裂卸下该装备
+            TakeOffItem(res.brokenSlot);
+        }
+        return res;
+    }
+
+    /// <summary>
+    /// 实体物理攻击造成伤害时触发虹魔吸血
+    /// </summary>
+    public int ProcessAttackLifesteal(int realDamage)
+    {
+        if (LeechWeight <= 0 || realDamage <= 0) return 0;
+        double pool = LifestealAccumPool;
+        int heal = SpecialRings.AccumulateLifesteal(ref pool, realDamage, LeechWeight);
+        LifestealAccumPool = pool;
+        if (heal > 0)
+        {
+            Hp = Math.Min(MaxHp, Hp + heal);
+        }
+        return heal;
+    }
+
+    /// <summary>
+    /// 实体攻击目标时触发麻痹戒指判定
+    /// </summary>
+    public (bool isParalyzed, int durationSec) TryParalyzeTarget(int targetPoisonRecover, bool targetAntiParalysis = false, int rngRoll = -1)
+    {
+        var res = SpecialRings.TriggerParalysisRing(HasParalysisRing, targetPoisonRecover, targetAntiParalysis, rngRoll);
+        return (res.isParalyzed, res.durationSec);
     }
 
     /// <summary>
@@ -134,7 +341,7 @@ public sealed class PlayerState
     }
 
     /// <summary>
-    /// 受到物理或魔法攻击扣血结算 (集成护身戒指 1:1.5 蓝量抵扣与复活戒指)
+    /// 受到物理或魔法攻击扣血结算 (兼容重载，支持显式传入特戒状态)
     /// </summary>
     public (int finalHp, int finalMp, bool died, bool revived) TakeCombatDamage(int rawDamage, bool hasProtectRing, bool hasReviveRing, ref int reviveRingDura, long lastReviveTick, long nowTick)
     {
@@ -168,5 +375,57 @@ public sealed class PlayerState
 
         return (0, Mp, true, false);
     }
-}
 
+    /// <summary>
+    /// 受到物理或魔法攻击扣血结算 (集成护身戒指 1:1.5 蓝量抵扣与复活戒指)
+    /// </summary>
+    public (int finalHp, int finalMp, bool died, bool revived) TakeCombatDamage(int rawDamage, long nowTick = 0)
+    {
+        int actualDamage = rawDamage;
+
+        // 护身戒指
+        if (HasProtectRing && Mp > 0)
+        {
+            var res = SpecialRings.CalculateProtectRingDamage(true, rawDamage, Mp, Hp);
+            Mp = res.remainingMp;
+            actualDamage = res.remainingDamage;
+        }
+
+        Hp = Math.Max(0, Hp - actualDamage);
+        if (Hp > 0)
+        {
+            return (Hp, Mp, false, false);
+        }
+
+        // 濒死判定复活戒指
+        if (HasReviveRing)
+        {
+            var revRes = SpecialRings.TriggerReviveRing(true, Hp, MaxHp, ReviveRingDura, LastReviveTick, nowTick);
+            if (revRes.canRevive)
+            {
+                Hp = revRes.newHp;
+                ReviveRingDura = revRes.newDura;
+                LastReviveTick = nowTick;
+
+                // 若持久耗尽，戒指破碎
+                if (revRes.isBroken)
+                {
+                    // 查找复活戒指槽位并移除
+                    for (int i = 7; i <= 8; i++)
+                    {
+                        var ring = Equipment[i];
+                        if (ring != null && (ring.Shape == 114 || ring.Name.Contains("复活戒指")))
+                        {
+                            TakeOffItem((OfficialEquipSlot)i, nowTick);
+                            break;
+                        }
+                    }
+                }
+
+                return (Hp, Mp, false, true);
+            }
+        }
+
+        return (0, Mp, true, false);
+    }
+}

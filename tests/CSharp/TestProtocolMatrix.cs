@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using Mir2Client.Net;
@@ -625,28 +626,39 @@ public class TestProtocolMatrix
 
         // 3. 循环接收数据包并匹配网关下发的 SM_ALLOWMOVE (203)
         bool foundAllowMove = false;
-        byte[] recvBuf = new byte[12];
-        for (int i = 0; i < 10; i++)
-        {
-            if (client.Available >= 12)
-            {
-                await stream.ReadExactlyAsync(recvBuf.AsMemory(0, 12));
-                short smCode = (short)(recvBuf[1] | (recvBuf[2] << 8));
-                if (smCode == ProtocolConsts.SM_ALLOWMOVE)
-                {
-                    foundAllowMove = true;
-                    int posRecog = recvBuf[3] | (recvBuf[4] << 8) | (recvBuf[5] << 16) | (recvBuf[6] << 24);
-                    int posX = posRecog & 0xFFFF;
-                    int posY = (posRecog >> 16) & 0xFFFF;
-                    short dir = (short)(recvBuf[7] | (recvBuf[8] << 8));
+        using var readCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(3));
+        byte[] recvBuf = new byte[2048];
 
-                    Assert.True(posX > 0);
-                    Assert.True(posY > 0);
-                    Assert.Equal(2, dir & 7);
-                    break;
+        while (!readCts.IsCancellationRequested && !foundAllowMove)
+        {
+            if (client.Available > 0)
+            {
+                int read = await stream.ReadAsync(recvBuf.AsMemory(0, Math.Min(client.Available, recvBuf.Length)), readCts.Token);
+                for (int i = 0; i <= read - 12; i++)
+                {
+                    if (recvBuf[i] >= 0x30 && recvBuf[i] <= 0x39) // '0'..'9' 包序号前缀
+                    {
+                        short smCode = (short)(recvBuf[i + 1] | (recvBuf[i + 2] << 8));
+                        if (smCode == ProtocolConsts.SM_ALLOWMOVE)
+                        {
+                            foundAllowMove = true;
+                            int posRecog = recvBuf[i + 3] | (recvBuf[i + 4] << 8) | (recvBuf[i + 5] << 16) | (recvBuf[i + 6] << 24);
+                            int posX = posRecog & 0xFFFF;
+                            int posY = (posRecog >> 16) & 0xFFFF;
+                            short dir = (short)(recvBuf[i + 7] | (recvBuf[i + 8] << 8));
+
+                            Assert.True(posX > 0);
+                            Assert.True(posY > 0);
+                            Assert.Equal(2, dir & 7);
+                            break;
+                        }
+                    }
                 }
             }
-            await Task.Delay(50);
+            else
+            {
+                await Task.Delay(50);
+            }
         }
 
         Assert.True(foundAllowMove);
@@ -947,6 +959,394 @@ public class TestProtocolMatrix
         Assert.Equal(12, pickupPkt.Length);
         short ident = (short)(pickupPkt[1] | (pickupPkt[2] << 8));
         Assert.Equal(ProtocolConsts.CM_PICKUP, ident);
+    }
+
+    // ==================== 官方 1.5 七大特戒与四大套装底层规则矩阵实证测试 ====================
+
+    [Fact]
+    public void TestSpecialRings_ProtectRing_FormulaAndFlow()
+    {
+        var ps = new Mir2Client.Game.PlayerState
+        {
+            Hp = 100,
+            MaxHp = 100,
+            Mp = 100,
+            MaxMp = 100
+        };
+
+        // 佩戴护身戒指 (槽位 7: 左戒指, Shape 118)
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        {
+            Uid = 9001,
+            Name = "护身戒指",
+            Shape = 118,
+            Dura = 5
+        });
+
+        Assert.True(ps.HasProtectRing);
+
+        // 1. 受到 20 点伤害: mpCost = ROUND(20 * 1.5) = 30 MP, HP 完全不扣
+        var (hp1, mp1, died1, rev1) = ps.TakeCombatDamage(20, nowTick: 1000);
+        Assert.Equal(100, hp1);
+        Assert.Equal(70, mp1);
+        Assert.False(died1);
+        Assert.False(rev1);
+
+        // 2. MP 不足抵扣: 当前 70 MP, 受到 60 点伤害 (需 90 MP)
+        // 抵扣 70 MP, 剩余 20 MP 缺口转为 20 / 1.5 = 13 点伤害扣 HP
+        var (hp2, mp2, died2, rev2) = ps.TakeCombatDamage(60, nowTick: 2000);
+        Assert.Equal(0, mp2);
+        Assert.Equal(87, hp2); // 100 - 13 = 87
+        Assert.False(died2);
+
+        // 3. MP 为 0 时全额扣 HP
+        var (hp3, mp3, died3, rev3) = ps.TakeCombatDamage(10, nowTick: 3000);
+        Assert.Equal(0, mp3);
+        Assert.Equal(77, hp3);
+
+        // 4. 脱下护身戒指
+        ps.TakeOffItem(Mir2Client.Game.OfficialEquipSlot.RingL);
+        Assert.False(ps.HasProtectRing);
+    }
+
+    [Fact]
+    public void TestSpecialRings_ReviveRing_CooldownAndBreak()
+    {
+        var ps = new Mir2Client.Game.PlayerState
+        {
+            BaseMaxHp = 200,
+            Hp = 50,
+            MaxHp = 200,
+            Mp = 50,
+            MaxMp = 100,
+            ReviveRingDura = 2000 // 初始内部持久 2000 (可复活 2 次)
+        };
+
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingR, new Mir2Client.Game.EquipItem
+        {
+            Uid = 9002,
+            Name = "复活戒指",
+            Shape = 114,
+            Dura = 2
+        });
+
+        Assert.True(ps.HasReviveRing);
+
+        // 1. 致命伤害 500 点触发第一次复活
+        var (hp1, mp1, died1, rev1) = ps.TakeCombatDamage(500, nowTick: 10000);
+        Assert.Equal(200, hp1); // 满血复活
+        Assert.False(died1);
+        Assert.True(rev1);
+        Assert.Equal(1000, ps.ReviveRingDura); // 持久扣除 1000
+
+        // 2. 30 秒冷却时间内再次受到致命伤害 (15 秒后，nowTick = 25000): 复活失败死亡
+        var (hp2, mp2, died2, rev2) = ps.TakeCombatDamage(500, nowTick: 25000);
+        Assert.Equal(0, hp2);
+        Assert.True(died2);
+        Assert.False(rev2);
+
+        // 3. 冷却期过后 (45 秒后，nowTick = 55000) 满血复活，持久归零破碎
+        ps.Hp = 10;
+        var (hp3, mp3, died3, rev3) = ps.TakeCombatDamage(500, nowTick: 55000);
+        Assert.Equal(200, hp3);
+        Assert.False(died3);
+        Assert.True(rev3);
+        Assert.Equal(0, ps.ReviveRingDura);
+        Assert.False(ps.HasReviveRing); // 戒指破碎自动脱下销毁
+    }
+
+    [Fact]
+    public void TestSpecialRings_ParalysisRing_ProbabilityAndAntiParalysis()
+    {
+        var ps = new Mir2Client.Game.PlayerState();
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        {
+            Uid = 9003,
+            Name = "麻痹戒指",
+            Shape = 113
+        });
+
+        Assert.True(ps.HasParalysisRing);
+
+        // 1. 目标中毒恢复 = 0 (分母 = 5), roll = 0 命中石化 5 秒
+        var (p1, dur1) = ps.TryParalyzeTarget(targetPoisonRecover: 0, targetAntiParalysis: false, rngRoll: 0);
+        Assert.True(p1);
+        Assert.Equal(5, dur1);
+
+        // 2. roll = 1 未命中
+        var (p2, dur2) = ps.TryParalyzeTarget(targetPoisonRecover: 0, targetAntiParalysis: false, rngRoll: 1);
+        Assert.False(p2);
+        Assert.Equal(0, dur2);
+
+        // 3. 目标佩戴防麻痹装备 (targetAntiParalysis = true): 强制免疫石化
+        var (p3, dur3) = ps.TryParalyzeTarget(targetPoisonRecover: 0, targetAntiParalysis: true, rngRoll: 0);
+        Assert.False(p3);
+        Assert.Equal(0, dur3);
+    }
+
+    [Fact]
+    public void TestSpecialRings_OverloadRing_WeightsDoubled()
+    {
+        var ps = new Mir2Client.Game.PlayerState
+        {
+            BaseMaxBagWeight = 200,
+            BaseMaxWearWeight = 60,
+            BaseMaxHandWeight = 40
+        };
+
+        // 初始负重
+        ps.RecalculateAttributes();
+        Assert.Equal(200, ps.MaxBagWeight);
+        Assert.Equal(60, ps.MaxWearWeight);
+        Assert.Equal(40, ps.MaxHandWeight);
+
+        // 佩戴超负载戒指 (Shape 119)
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingR, new Mir2Client.Game.EquipItem
+        {
+            Uid = 9004,
+            Name = "超负载戒指",
+            Shape = 119
+        });
+
+        Assert.True(ps.HasOverloadRing);
+        Assert.Equal(400, ps.MaxBagWeight); // 严格翻倍
+        Assert.Equal(120, ps.MaxWearWeight);
+        Assert.Equal(80, ps.MaxHandWeight);
+
+        // 脱下超负载戒指恢复
+        ps.TakeOffItem(Mir2Client.Game.OfficialEquipSlot.RingR);
+        Assert.False(ps.HasOverloadRing);
+        Assert.Equal(200, ps.MaxBagWeight);
+        Assert.Equal(60, ps.MaxWearWeight);
+        Assert.Equal(40, ps.MaxHandWeight);
+    }
+
+    [Fact]
+    public void TestSpecialRings_InvisibleRing_MonsterTargeting()
+    {
+        var ps = new Mir2Client.Game.PlayerState();
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        {
+            Uid = 9005,
+            Name = "隐身戒指",
+            Shape = 111
+        });
+
+        Assert.True(ps.HasInvisibleRing);
+        Assert.True(ps.StatusBits[8]); // 隐身状态位激活
+
+        // 普通怪物索敌忽略
+        bool canTargetNormal = Mir2Client.Game.SpecialRings.CheckMonsterCanTarget(ps.HasInvisibleRing, monsterCanDetectInvis: false);
+        Assert.False(canTargetNormal);
+
+        // 破隐视破怪 (如月魔蜘蛛、楔蛾) 可锁定
+        bool canTargetBoss = Mir2Client.Game.SpecialRings.CheckMonsterCanTarget(ps.HasInvisibleRing, monsterCanDetectInvis: true);
+        Assert.True(canTargetBoss);
+
+        // 脱下隐身戒指恢复
+        ps.TakeOffItem(Mir2Client.Game.OfficialEquipSlot.RingL);
+        Assert.False(ps.HasInvisibleRing);
+        Assert.False(ps.StatusBits[8]);
+        Assert.True(Mir2Client.Game.SpecialRings.CheckMonsterCanTarget(ps.HasInvisibleRing, monsterCanDetectInvis: false));
+    }
+
+    [Fact]
+    public void TestSpecialRings_TeleportRing_CommandExecution()
+    {
+        var ps = new Mir2Client.Game.PlayerState
+        {
+            MapX = 330,
+            MapY = 270
+        };
+
+        // 1. 未佩戴传送戒指时输入指令拒接
+        var res1 = ps.TryExecuteTeleport("@move 350 280", nowTick: 1000);
+        Assert.False(res1.success);
+        Assert.Equal(330, ps.MapX);
+
+        // 2. 佩戴传送戒指
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingR, new Mir2Client.Game.EquipItem
+        {
+            Uid = 9006,
+            Name = "传送戒指",
+            Shape = 112
+        });
+        Assert.True(ps.HasTeleportRing);
+
+        // 3. 成功瞬移
+        var res2 = ps.TryExecuteTeleport("@move 350 280", nowTick: 1000);
+        Assert.True(res2.success);
+        Assert.Equal(350, ps.MapX);
+        Assert.Equal(280, ps.MapY);
+
+        // 4. 5 秒冷却期内再次瞬移拒绝
+        var res3 = ps.TryExecuteTeleport("@move 360 290", nowTick: 3000);
+        Assert.False(res3.success);
+        Assert.Equal(350, ps.MapX);
+
+        // 5. 阻挡点瞬移拒绝
+        var res4 = ps.TryExecuteTeleport("@飞 400 400", isTileBlocked: (x, y) => (x == 400 && y == 400), nowTick: 10000);
+        Assert.False(res4.success);
+        Assert.Equal(350, ps.MapX);
+    }
+
+    [Fact]
+    public void TestSpecialRings_FlameAndHealingRing_SkillsGranted()
+    {
+        // 战士角色 (Job = 0)
+        var ps = new Mir2Client.Game.PlayerState { Job = 0 };
+
+        // 佩戴火焰戒指赋予火球术 (MagicId = 1)
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        {
+            Uid = 9007,
+            Name = "火焰戒指",
+            Shape = 113
+        });
+        Assert.Contains(1, ps.GrantedRingSkills);
+
+        // 佩戴防御戒指赋予治愈术 (MagicId = 2)
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingR, new Mir2Client.Game.EquipItem
+        {
+            Uid = 9008,
+            Name = "防御戒指",
+            Shape = 116
+        });
+        Assert.Contains(2, ps.GrantedRingSkills);
+
+        // 脱下火焰戒指注销火球术
+        ps.TakeOffItem(Mir2Client.Game.OfficialEquipSlot.RingL);
+        Assert.DoesNotContain(1, ps.GrantedRingSkills);
+        Assert.Contains(2, ps.GrantedRingSkills);
+    }
+
+    [Fact]
+    public void TestSpecialSets_MemoryRecallSuite_TeammateRecall()
+    {
+        var ps = new Mir2Client.Game.PlayerState
+        {
+            MapX = 330,
+            MapY = 270,
+            Direction = 2 // 朝东
+        };
+
+        // 佩戴记忆套装 4 件
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Helmet, new Mir2Client.Game.EquipItem { Name = "记忆头盔", Shape = 125 });
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Necklace, new Mir2Client.Game.EquipItem { Name = "记忆项链", Shape = 123 });
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.ArmringL, new Mir2Client.Game.EquipItem { Name = "记忆手镯", Shape = 124 });
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem { Name = "记忆戒指", Shape = 122 });
+
+        Assert.True(ps.HasRecallSet);
+
+        var teammates = new List<(int uid, string name, int x, int y)>
+        {
+            (1001, "队友甲", 100, 100),
+            (1002, "队友乙", 150, 150)
+        };
+
+        // 1. 队长输入 @天地合一
+        var res1 = ps.TryExecuteRecall("@天地合一", isLeader: true, teammates, nowTick: 200000);
+        Assert.True(res1.success);
+        Assert.Equal(2, res1.movedMembers.Count);
+        // 验证落在队长周边
+        Assert.True(Math.Abs(res1.movedMembers[0].targetX - ps.MapX) <= 2);
+        Assert.True(Math.Abs(res1.movedMembers[0].targetY - ps.MapY) <= 2);
+
+        // 2. 180 秒冷却期内再次使用拒绝
+        var res2 = ps.TryExecuteRecall("@天地合一", isLeader: true, teammates, nowTick: 250000);
+        Assert.False(res2.success);
+
+        // 3. 非队长使用拒绝
+        var res3 = ps.TryExecuteRecall("@天地合一", isLeader: false, teammates, nowTick: 400000);
+        Assert.False(res3.success);
+    }
+
+    [Fact]
+    public void TestSpecialSets_PrayerApocalypseSuite_TriggerAndBroken()
+    {
+        var ps = new Mir2Client.Game.PlayerState();
+
+        // 佩戴祈祷之刃、头盔、项链、手镯、戒指 5 件全齐
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Weapon, new Mir2Client.Game.EquipItem { Name = "祈祷之刃", Shape = 24 });
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Helmet, new Mir2Client.Game.EquipItem { Name = "祈祷头盔", Shape = 122 });
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Necklace, new Mir2Client.Game.EquipItem { Name = "祈祷项链", Shape = 121 });
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.ArmringL, new Mir2Client.Game.EquipItem { Name = "祈祷手镯", Shape = 123 });
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem { Name = "祈祷戒指", Shape = 124 });
+
+        Assert.True(ps.HasPrayerSet);
+
+        // 触发天谴判定: roll = 2 (对应 equippedSlots[2] 为祈祷头盔)
+        var res = ps.TryTriggerPrayerApocalypse(rngSlotRoll: 2);
+        Assert.True(res.triggered);
+        Assert.True(res.petRebellion);
+        Assert.Contains("神之祈祷", res.broadcastMsg);
+        Assert.Equal(Mir2Client.Game.OfficialEquipSlot.Helmet, res.brokenSlot);
+
+        // 验证该部件已碎裂卸下销毁，套装状态不再激活
+        Assert.Null(ps.Equipment[(int)Mir2Client.Game.OfficialEquipSlot.Helmet]);
+        Assert.False(ps.HasPrayerSet);
+    }
+
+    [Fact]
+    public void TestSpecialSets_MagicBloodSuite_AttributesConversion()
+    {
+        var ps = new Mir2Client.Game.PlayerState
+        {
+            BaseMaxHp = 100,
+            BaseMaxMp = 200,
+            Hp = 100,
+            Mp = 200
+        };
+
+        // 1. 佩戴单件魔血项链 (Shape 135): HP + 25, MP - 25
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Necklace, new Mir2Client.Game.EquipItem { Name = "魔血项链", Shape = 135 });
+        Assert.Equal(125, ps.MaxHp);
+        Assert.Equal(175, ps.MaxMp);
+        Assert.False(ps.HasMagicBloodSet);
+
+        // 2. 佩戴魔血手镯 (Shape 134)
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.ArmringL, new Mir2Client.Game.EquipItem { Name = "魔血手镯", Shape = 134 });
+        Assert.Equal(150, ps.MaxHp);
+        Assert.Equal(150, ps.MaxMp);
+
+        // 3. 佩戴魔血戒指 (Shape 133): 3 件全齐额外 +50 (总共 +125 HP, -125 MP)
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem { Name = "魔血戒指", Shape = 133 });
+        Assert.True(ps.HasMagicBloodSet);
+        Assert.Equal(225, ps.MaxHp);
+        Assert.Equal(75, ps.MaxMp);
+
+        // 4. MP 保底机制: 若基础 MP 为 100，转化 125 会导致负数，必须保底保留 1 点 MP
+        ps.BaseMaxMp = 100;
+        ps.RecalculateAttributes();
+        Assert.Equal(1, ps.MaxMp);
+        Assert.Equal(199, ps.MaxHp); // 100 + 99 = 199
+    }
+
+    [Fact]
+    public void TestSpecialSets_RainbowMagicSuite_LifestealAndBonusHit()
+    {
+        var ps = new Mir2Client.Game.PlayerState { Hp = 50, MaxHp = 100 };
+
+        // 佩戴虹魔项链、手镯、戒指 3 件 (Shape 138, 137, 136)
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Necklace, new Mir2Client.Game.EquipItem { Name = "虹魔项链", Shape = 138 });
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.ArmringL, new Mir2Client.Game.EquipItem { Name = "虹魔手镯", Shape = 137 });
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem { Name = "虹魔戒指", Shape = 136 });
+
+        Assert.True(ps.HasRainbowSet);
+        Assert.Equal(30, ps.LeechWeight); // 30% 吸血权重
+        Assert.Equal(2, ps.BonusHit);     // 全套准确 +2
+
+        // 攻击造成 5 点伤害: 5 * 0.3 = 1.5, 累积池未达 2.0，不回血
+        int heal1 = ps.ProcessAttackLifesteal(5);
+        Assert.Equal(0, heal1);
+        Assert.Equal(1.5, ps.LifestealAccumPool, 2);
+        Assert.Equal(50, ps.Hp);
+
+        // 再次攻击造成 5 点伤害: 累积 1.5 + 1.5 = 3.0, 达到 2.0，提取 3 点回血，池子余 0
+        int heal2 = ps.ProcessAttackLifesteal(5);
+        Assert.Equal(3, heal2);
+        Assert.Equal(0.0, ps.LifestealAccumPool, 2);
+        Assert.Equal(53, ps.Hp);
     }
 }
 

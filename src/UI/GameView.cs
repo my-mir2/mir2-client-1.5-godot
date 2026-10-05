@@ -41,6 +41,7 @@ namespace Mir2Client.UI
         public TradeManager TradeManagerInstance { get; } = new();
         public StorageManager StorageManagerInstance { get; } = new();
         public GuildManager GuildManagerInstance { get; } = new();
+        public PlayerState PlayerStateInstance { get; } = new();
 
         private WilLoader? _wilFloor;
         private WilLoader? _wilSmTiles;
@@ -398,6 +399,97 @@ namespace Mir2Client.UI
                         HudInstance.AddChat("提示", $"使用了 {item}，生命与魔法恢复 50 点。", new Color(1f, 0.9f, 0.2f));
                     }
                 };
+
+                HudInstance.ChatSent += OnChatSent;
+            }
+        }
+
+        private void OnChatSent(string msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg)) return;
+            string trimmed = msg.Trim();
+
+            // 1. 传送戒指瞬移指令 (@move x y / @飞 x y)
+            if (trimmed.StartsWith("@move", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("@飞", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("@瞬移", StringComparison.OrdinalIgnoreCase))
+            {
+                var res = PlayerStateInstance.TryExecuteTeleport(
+                    trimmed,
+                    isTileBlocked: (x, y) => !(MapRendererInstance?.IsPassable(x, y) ?? true),
+                    nowTick: (long)Time.GetTicksMsec());
+
+                if (res.success)
+                {
+                    PlayerInstance?.SetTilePos(res.targetX, res.targetY);
+                    HudInstance?.AddChat("提示", res.message, new Color(0.2f, 1f, 0.4f));
+                    AudioManager.Instance?.PlaySoundId(2);
+                }
+                else
+                {
+                    HudInstance?.AddChat("系统", res.message, new Color(1f, 0.3f, 0.3f));
+                }
+                return;
+            }
+
+            // 2. 记忆套装全队召集指令 (@天地合一 / @grouprecall)
+            if (trimmed.Equals("@天地合一", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("@grouprecall", StringComparison.OrdinalIgnoreCase))
+            {
+                var teammates = new List<(int uid, string name, int x, int y)>();
+                foreach (var tm in TeamManagerInstance.Members)
+                {
+                    teammates.Add((tm.Uid, tm.Name, 0, 0));
+                }
+
+                var res = PlayerStateInstance.TryExecuteRecall(
+                    trimmed,
+                    isLeader: true,
+                    teammates,
+                    isTileBlocked: (x, y) => !(MapRendererInstance?.IsPassable(x, y) ?? true),
+                    nowTick: (long)Time.GetTicksMsec());
+
+                if (res.success)
+                {
+                    HudInstance?.AddChat("行会/组队", res.message, new Color(1f, 0.9f, 0.2f));
+                    AudioManager.Instance?.PlaySoundId(2);
+                }
+                else
+                {
+                    HudInstance?.AddChat("系统", res.message, new Color(1f, 0.3f, 0.3f));
+                }
+                return;
+            }
+
+            // 3. 普通聊天内容
+            if (_net != null && _net.IsConnectedToServer)
+            {
+                _net.SendPacket(PacketEncoder.Say(trimmed));
+            }
+        }
+
+        /// <summary>
+        /// 受到物理或魔法攻击扣血结算 (集成护身戒指蓝量抵扣与复活戒指)
+        /// </summary>
+        public void TakeDamage(int rawDamage)
+        {
+            var res = PlayerStateInstance.TakeCombatDamage(rawDamage, nowTick: (long)Time.GetTicksMsec());
+            HudInstance?.UpdateHp(PlayerStateInstance.Hp, PlayerStateInstance.MaxHp);
+            HudInstance?.UpdateMp(PlayerStateInstance.Mp, PlayerStateInstance.MaxMp);
+
+            if (res.revived)
+            {
+                HudInstance?.AddChat("提示", "【复活戒指】神力生效！生命瞬间恢复全满！", new Color(1f, 0.95f, 0.3f));
+                AudioManager.Instance?.PlaySoundId(2);
+            }
+            else if (res.died)
+            {
+                HudInstance?.AddChat("提示", "你已经阵亡……", new Color(1f, 0.2f, 0.2f));
+                PlayerInstance?.Anim.SetAction(ActionType.Die, PlayerInstance.Direction);
+            }
+            else
+            {
+                HudInstance?.AddChat("承伤", $"受到 {rawDamage} 点攻击，剩余生命 {PlayerStateInstance.Hp}，魔法 {PlayerStateInstance.Mp}", new Color(1f, 0.6f, 0.6f));
             }
         }
 

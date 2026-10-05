@@ -838,14 +838,53 @@ public partial class AutoEndToEndDriver : Node
 
             case 74:
             {
-                GD.Print("[AutoE2E] === 全量大世界面板、底层走跑位移、全门类技能光效、怪物/NPC渲染与掉落拾取 100% 验证完成 ===");
-                RequestCapture("step17_all_buttons_completed");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 特戒规则：穿戴护身戒指 (Shape 118) 与受创扣蓝 (MP 抵扣 HP) ===");
+                    gameView.PlayerStateInstance.WearItem(OfficialEquipSlot.RingL, new EquipItem
+                    {
+                        Uid = 9901,
+                        Name = "护身戒指",
+                        Shape = 118,
+                        Dura = 5
+                    });
+                    // 受到 20 点伤害，护身戒指消耗 ROUND(20 * 1.5) = 30 MP，HP 保持 100
+                    gameView.TakeDamage(20);
+                }
+                RequestCapture("step34_special_ring_protect_mp_deduct");
                 break;
             }
 
             case 75:
             {
-                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS AND SKILL MAGIC CHECKS COMPLETED SUCCESSFULLY!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 特戒规则：佩戴传送戒指 (Shape 112) 执行 @move 335 272 坐标瞬移 ===");
+                    gameView.PlayerStateInstance.WearItem(OfficialEquipSlot.RingR, new EquipItem
+                    {
+                        Uid = 9902,
+                        Name = "传送戒指",
+                        Shape = 112,
+                        Dura = 5
+                    });
+                    gameView.HudInstance?.OnChatInputSubmitted("@move 335 272");
+                }
+                RequestCapture("step35_special_ring_teleport_success");
+                break;
+            }
+
+            case 76:
+            {
+                GD.Print("[AutoE2E] === 全量大世界面板、底层走跑位移、全门类技能光效、怪物/NPC渲染、掉落拾取与特戒套装规则 100% 验证完成 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 77:
+            {
+                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, SKILLS, DROP-PICKUP AND SPECIAL RINGS COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();
                 break;
             }
