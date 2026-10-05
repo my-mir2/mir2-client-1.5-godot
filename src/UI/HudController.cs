@@ -680,6 +680,16 @@ public partial class HudController : CanvasLayer
         AddChild(_shopPanelView);
 
         _repairPanelView = new RepairPanelView();
+        _repairPanelView.StorageDepositConfirmed += (bagSlot, itemName) =>
+        {
+            // 存入仓库：清空该格背包物品并发送系统提示
+            if (bagSlot >= 0 && bagSlot < 40)
+            {
+                ClearBagItem(bagSlot);
+            }
+            AddChat("系统", $"[系统] 物品 [{itemName}] 已成功交付仓库保管员保管。", new Color(1f, 1f, 0f));
+            GD.Print($"[HudController] 仓库保管成功: slot={bagSlot}, item={itemName}");
+        };
         AddChild(_repairPanelView);
 
         _inspectPanelView = new InspectPanelView();

@@ -761,13 +761,13 @@ public class TestProtocolMatrix
 
         var stream = client.GetStream();
 
-        // 1. 登录阶段
-        await stream.WriteAsync(PacketEncoder.Login("testuser", "testpass"));
-        await Task.Delay(50);
+        // 1. 登录阶段 (使用独立账号 e2e_user 隔离与 walk 测试的会话竞争)
+        await stream.WriteAsync(PacketEncoder.Login("e2e_user", "testpass"));
+        await Task.Delay(100);
         await stream.WriteAsync(PacketEncoder.SelectServer(0));
-        await Task.Delay(50);
+        await Task.Delay(100);
         await stream.WriteAsync(PacketEncoder.MakePacket(ProtocolConsts.CM_SELECTCHAR, 0, 0, 0, Encoding.UTF8.GetBytes("热血法师")));
-        await Task.Delay(50);
+        await Task.Delay(150);
 
         // 2. 发送技能施法 CM_SPELL (火球术 MagicId=1, 坐标 332, 272)
         byte[] spellPkt = PacketEncoder.Spell(1, 332, 272);

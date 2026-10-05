@@ -14,6 +14,9 @@ public partial class RepairPanelView : Control, IManagedWindow
     public delegate void RepairConfirmedEventHandler(int itemUid, bool isSpecial);
 
     [Signal]
+    public delegate void StorageDepositConfirmedEventHandler(int bagSlot, string itemName);
+
+    [Signal]
     public delegate void PanelClosedEventHandler();
 
     public const float PanelWidth = 140.0f;
@@ -33,6 +36,12 @@ public partial class RepairPanelView : Control, IManagedWindow
     private Label? _lblTitle;
     private TextureButton? _btnOk;
     private Texture2D? _texRepair;
+    private SlotButton? _repairSlotBtn;
+    private bool _isStorageMode = false;
+    private int _targetBagSlot = 0;
+    private string _targetItemName = "屠龙";
+
+    public bool IsStorageMode => _isStorageMode;
 
     /// <summary>
     /// 仓库托管模式(官方 SM 700 → sub_46DAE8: 窗体 +1888=2 " 托管物品",DSellDlg 位于 (260,176));
@@ -40,12 +49,29 @@ public partial class RepairPanelView : Control, IManagedWindow
     /// </summary>
     public void SetStorageMode(bool storage)
     {
+        _isStorageMode = storage;
         Position = storage ? new Vector2(260, 176) : new Vector2(138, 163);
         if (_lblTitle != null) _lblTitle.Text = storage ? " 托管物品" : "特殊修理";
         if (_btnOk != null)
         {
             // 官方托管模式下底板 Prguse_0392 自身烘焙 OK 凸起，TextureNormal 为空显露原生 OK；修理模式下覆盖 Prguse_0393
             _btnOk.TextureNormal = storage ? null : _texRepair;
+        }
+        if (_repairSlotBtn != null)
+        {
+            // 托管模式下展示待存物品(例如背包第0格屠龙刀 Items_0059)，修理模式下展示待修凝霜剑 Items_0001
+            _repairSlotBtn.ItemTexture = ResPath.LoadImageTexture(
+                storage ? "resources/wil/png/Items/Items_0059.png" : "resources/wil/png/Items/Items_0001.png");
+        }
+    }
+
+    public void SetSlotItem(Texture2D? tex, int bagSlot = 0, string itemName = "")
+    {
+        _targetBagSlot = bagSlot;
+        _targetItemName = itemName;
+        if (_repairSlotBtn != null)
+        {
+            _repairSlotBtn.ItemTexture = tex;
         }
     }
 
@@ -109,7 +135,7 @@ public partial class RepairPanelView : Control, IManagedWindow
         _panel.AddChild(slotRepair);
 
         // 槽位内部物品图标占位 (默认展示一把磨损待修的凝霜剑，消除黑洞死区)
-        var repairSlotBtn = new SlotButton
+        _repairSlotBtn = new SlotButton
         {
             Name = "RepairSlotBtn",
             CurrentSlotType = SlotButton.SlotType.Equip,
@@ -118,9 +144,9 @@ public partial class RepairPanelView : Control, IManagedWindow
             CustomMinimumSize = new Vector2(36, 36),
             Size = new Vector2(36, 36),
             Flat = true,
-            Icon = ResPath.LoadImageTexture("resources/wil/png/Items/Items_0001.png")
+            ItemTexture = ResPath.LoadImageTexture("resources/wil/png/Items/Items_0001.png")
         };
-        slotRepair.AddChild(repairSlotBtn);
+        slotRepair.AddChild(_repairSlotBtn);
 
         // 官方原生单件特修按钮 (Prguse_0393 @ 85, 150, 24x13, IDA sub_481dd4 [0x485159..0x48518c])
         _texRepair = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0393.png");
@@ -131,7 +157,7 @@ public partial class RepairPanelView : Control, IManagedWindow
             Size = new Vector2(24, 13),
             TextureNormal = _texRepair
         };
-        _btnOk.Pressed += OnRepair;
+        _btnOk.Pressed += OnConfirm;
         _panel.AddChild(_btnOk);
     }
 
@@ -140,10 +166,17 @@ public partial class RepairPanelView : Control, IManagedWindow
         Visible = !Visible;
     }
 
-    private void OnRepair()
+    private void OnConfirm()
     {
         Visible = false;
-        EmitSignal(SignalName.RepairConfirmed, 0, true);
+        if (_isStorageMode)
+        {
+            EmitSignal(SignalName.StorageDepositConfirmed, _targetBagSlot, _targetItemName);
+        }
+        else
+        {
+            EmitSignal(SignalName.RepairConfirmed, 0, true);
+        }
     }
 
     private void OnClose()

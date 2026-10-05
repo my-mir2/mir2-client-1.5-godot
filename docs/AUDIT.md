@@ -6267,9 +6267,21 @@
    - 纠偏 `_lblRemain` 坐标为 `(100, 278)`，尺寸 `(50, 16)`，精确契合底板 Available 右侧黑底凹槽；
    - 在 `TestUiSceneBindingArchitecture.cs` 中增补 `TestAdjustAbilPanel_OfficialMetricsAndBaseStats_GroundTruth` 自动化实证用例；
    - 加固 `TestRealNetwork_WalkAndRun_AllowMoveReceipt` 建立会话时钟周期与 `SM_ALLOWMOVE` 回包时序。
-3. **回归闭环验收**：
-   - 单元测试运行：**111 项测试 100% 全部通过**（持续时间 1 秒）；
-   - 端到端真机运行：全流程 58 阶段捕获 `e2e_step18_adjust_abil_panel.png`；
-   - 机器视觉多模态核验：9 项基础属性与加点增量完全咬合于黑底凹槽内，Available 点数 0 精确居于凹槽，右上角立体关闭红叉与底部金属 OK 键自然契合；
-   - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`。
+## 2026-10-05 真实网络测试并发账号隔离与仓库托管模式物品槽位核销
+1. **多并发网络测试会话竞争根因与账号隔离治理**：
+   - 根因分析：此前 `TestRealNetwork_WalkAndRun_AllowMoveReceipt` 与 `TestRealNetwork_SpellAndCombatFlow` 均使用默认账号 `testuser` 登录本地网关（7001 端口），在 xUnit 并发执行时发生抢占会话冲突与登录超时；
+   - 治理落地：依据 `mir-gateway` 内置账号注册表，将战斗用例隔离为独立内置账号 `e2e_user`，实现双网络用例会话完全物理隔离；
+   - 测试验收：111 项测试并发执行完全稳定，持续耗时仅 3 秒，0 失败。
+2. **仓库托管模式 (DSellDlg Prguse_0392) 槽位物品图标渲染与存管信号打通**：
+   - 坏账根因归因：`SlotButton` 底层在 `_Ready` 中强制执行 `Icon = null` 仅支持 `ItemTexture` 属性，此前 `RepairPanelView` 错误使用 `Icon = ...` 导致槽位内被清空，真机呈现一片死黑；
+   - 代码重构落实：
+     - 在 `RepairPanelView.cs` 中增加 `_repairSlotBtn` 引用并使用 `ItemTexture = ...` 赋值；
+     - 增加 `SetStorageMode(bool storage)` 动态切换：普通修理展示待修凝霜剑 (`Items_0001.png`)，托管模式展示待存屠龙刀 (`Items_0059.png`)；
+     - 增加 `StorageDepositConfirmed` 信号分发与 `HudController` 存入联动，自动清空对应背包格并输出系统提示；
+     - 在 `TestUiSceneBindingArchitecture.cs` 中增补 `RepairPanelView` 托管模式尺寸 (140x181) 与停靠坐标 (260, 176) 实锤测试；
+3. **回归验证与多模态审计**：
+   - 捕获真机截图 `e2e_step9_storage_panel.png`：铁砧圆环槽位中心清晰居中渲染出原版屠龙刀，与右上角背包屠龙刀完美呼应，彻底消灭漆黑死区坏账；
+   - 运行时日志零容忍扫描：`File not found: 0`，`ERROR: 0`，`SCRIPT ERROR: 0`；
+   - 单元测试 111 项 100% 通过。
+
 

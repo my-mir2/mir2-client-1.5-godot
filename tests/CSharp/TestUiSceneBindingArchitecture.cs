@@ -395,9 +395,9 @@ public class TestUiSceneBindingArchitecture
         Assert.Equal(60, goldSlot.TextX);
         Assert.Equal(182, goldSlot.TextY);
 
-        // 2. 仓库保管箱底板尺寸严格为 416x347 (Prguse_0402)，纯净金属石板底框，绝非印满加减号的加点面板
-        Assert.Equal(416.0f, StoragePanelView.PanelWidth);
-        Assert.Equal(347.0f, StoragePanelView.PanelHeight);
+        // 2. 仓库托管模式规格：复用 DSellDlg (Prguse_0392 140x181, sub_46DAE8 停靠 (260, 176))
+        Assert.Equal(140.0f, RepairPanelView.PanelWidth);
+        Assert.Equal(181.0f, RepairPanelView.PanelHeight);
 
         // 步骤 8: 组队管理面板 (Prguse_0120 276x242) 与关闭按钮 (260, 0, 16x23)
         Assert.Equal(276.0f, GroupPanelView.PanelWidth);
