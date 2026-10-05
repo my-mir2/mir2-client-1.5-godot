@@ -128,9 +128,9 @@ public partial class KeySelectDialogView : Control, IManagedWindow
             _panel.AddChild(btn);
         }
 
-        // 官方原生 None/清除 按键 (Prguse_0230 凸起 / 0231 凹陷 @ 299, 83, 40x30)
-        _texNoneNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0230.png");
-        _texNonePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0231.png");
+        // 官方原生 None/清除 按键 (Prguse_0231 灰色未选态 / 0230 绿色凹陷选中态 @ 299, 83, 40x30)
+        _texNoneNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0231.png");
+        _texNonePressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0230.png");
         _btnNone = new TextureButton
         {
             Name = "BtnKeyNone",

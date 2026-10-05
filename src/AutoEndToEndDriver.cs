@@ -591,7 +591,7 @@ public partial class AutoEndToEndDriver : Node
                 {
                     if (gameView.HudInstance.AdjustAbilPanel != null) gameView.HudInstance.AdjustAbilPanel.Visible = false;
                     GD.Print("[AutoE2E] === 验证技能快捷键绑定界面 (KeySelectDialogView) ===");
-                    gameView.HudInstance.KeySelectDialog?.OpenForSkill(1001, "基础剑术", 1);
+                    gameView.HudInstance.KeySelectDialog?.OpenForSkill(1, "基本剑术", 1);
                 }
                 break;
             }
