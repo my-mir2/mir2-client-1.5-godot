@@ -1,0 +1,337 @@
+// ============================================================================
+// Mir2 客户端 - 大世界通用实体渲染节点 (怪物 / NPC / 他人) (1:1 盛大 1.5 官方实证)
+// 官方实证：IDA sub_495EBC & sub_496120 怪物外形贴图库与动作帧位移算法
+// ============================================================================
+
+using System;
+using Godot;
+using Mir2Client.Audio;
+using Mir2Client.Game;
+using Mir2Client.Utils;
+
+namespace Mir2Client.Render
+{
+    public partial class EntityNode : Node2D
+    {
+        public int Uid { get; set; }
+        public string EntityName { get; set; } = string.Empty;
+        public EntityManager.EntityType Type { get; set; } = EntityManager.EntityType.Monster;
+        public int Appr { get; set; } = 0;
+        public int TileX { get; set; }
+        public int TileY { get; set; }
+        public int Direction { get; set; } = 2;
+        public int Hp { get; set; } = 100;
+        public int MaxHp { get; set; } = 100;
+        public bool IsDead { get; set; } = false;
+        public bool IsCorpse { get; set; } = false;
+
+        private Sprite2D? _sprite;
+        private Label? _nameLabel;
+        private ColorRect? _hpBarBg;
+        private ColorRect? _hpBarFill;
+        private Label? _damageLabel;
+        private float _hpBarHideTimer = 0f;
+        private float _damageLabelTimer = 0f;
+
+        private WilLoader? _loader;
+        private MapRenderer? _mapRenderer;
+
+        public ActionType CurrentAction { get; private set; } = ActionType.Stand;
+        private float _animTimer = 0f;
+        private int _currentFrame = 0;
+        private bool _isActionLocked = false;
+        private float _actionDuration = 0f;
+
+        public override void _Ready()
+        {
+            SetupVisuals();
+            UpdatePosition();
+            UpdateFrameGraphic();
+        }
+
+        private void SetupVisuals()
+        {
+            _sprite = new Sprite2D { Centered = false };
+            AddChild(_sprite);
+
+            // 头顶名字 (怪物为浅黄，NPC 为水绿，带 2px 黑色轮廓描边)
+            _nameLabel = new Label
+            {
+                Name = "EntityNameLabel",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Position = new Vector2(-40, -45),
+                Size = new Vector2(128, 16)
+            };
+            _nameLabel.AddThemeFontSizeOverride("font_size", 10);
+            Color nameColor = Type switch
+            {
+                EntityManager.EntityType.Npc => new Color(0.45f, 1.0f, 0.45f),
+                EntityManager.EntityType.Monster => new Color(1.0f, 0.95f, 0.5f),
+                _ => new Color(1.0f, 1.0f, 1.0f)
+            };
+            _nameLabel.AddThemeColorOverride("font_color", nameColor);
+            _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
+            _nameLabel.AddThemeConstantOverride("outline_size", 2);
+            _nameLabel.Text = EntityName;
+            AddChild(_nameLabel);
+
+            // 官方 1.5 怪物头顶微型血条 (36x4 像素)
+            _hpBarBg = new ColorRect
+            {
+                Name = "EntityHpBg",
+                Size = new Vector2(36, 4),
+                Position = new Vector2(6, -26),
+                Color = new Color(0.1f, 0.1f, 0.1f, 0.85f),
+                Visible = false
+            };
+            AddChild(_hpBarBg);
+
+            _hpBarFill = new ColorRect
+            {
+                Name = "EntityHpFill",
+                Size = new Vector2(34, 2),
+                Position = new Vector2(1, 1),
+                Color = new Color(0.2f, 0.95f, 0.2f),
+                Visible = false
+            };
+            _hpBarBg.AddChild(_hpBarFill);
+
+            // 受击浮动飘字 (-Damage)
+            _damageLabel = new Label
+            {
+                Name = "DamageLabel",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Position = new Vector2(-16, -60),
+                Size = new Vector2(80, 20),
+                Visible = false
+            };
+            _damageLabel.AddThemeFontSizeOverride("font_size", 12);
+            _damageLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.25f, 0.25f));
+            _damageLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 1.0f));
+            _damageLabel.AddThemeConstantOverride("outline_size", 2);
+            AddChild(_damageLabel);
+        }
+
+        public void SetLoader(WilLoader? loader)
+        {
+            _loader = loader;
+            UpdateFrameGraphic();
+        }
+
+        public void SetMapRenderer(MapRenderer? mr)
+        {
+            _mapRenderer = mr;
+            UpdatePosition();
+        }
+
+        public void SetTilePos(int tx, int ty, int dir = -1)
+        {
+            TileX = tx;
+            TileY = ty;
+            if (dir >= 0) Direction = dir & 7;
+            UpdatePosition();
+        }
+
+        private void UpdatePosition()
+        {
+            if (_mapRenderer != null)
+            {
+                Position = _mapRenderer.TileToScreen(TileX, TileY);
+            }
+            else
+            {
+                Position = new Vector2(TileX * 48, TileY * 32);
+            }
+            // 依据 Y 坐标动态计算 ZIndex 确保透视深度排序
+            ZIndex = Math.Clamp(TileY, 1, 99);
+        }
+
+        public void PlayAction(ActionType action, int dir = -1, float duration = 0.4f)
+        {
+            if (IsCorpse) return;
+            if (dir >= 0) Direction = dir & 7;
+
+            CurrentAction = action;
+            _animTimer = 0f;
+            _currentFrame = 0;
+            _actionDuration = duration;
+            _isActionLocked = (action == ActionType.Hit || action == ActionType.Struck || action == ActionType.Die);
+
+            UpdateFrameGraphic();
+        }
+
+        public void TriggerStruck(int damage, int curHp)
+        {
+            Hp = curHp;
+            PlayAction(ActionType.Struck, Direction, 0.3f);
+            AudioManager.Instance?.PlaySoundId(2);
+
+            // 显示微型血条并维持 3 秒
+            _hpBarHideTimer = 3.0f;
+            if (_hpBarBg != null && _hpBarFill != null)
+            {
+                _hpBarBg.Visible = true;
+                _hpBarFill.Visible = true;
+                float ratio = MaxHp > 0 ? Mathf.Clamp((float)Hp / MaxHp, 0f, 1f) : 0f;
+                _hpBarFill.Size = new Vector2(34 * ratio, 2);
+                _hpBarFill.Color = ratio > 0.5f ? new Color(0.2f, 0.95f, 0.2f) : (ratio > 0.2f ? new Color(1.0f, 0.8f, 0.1f) : new Color(0.95f, 0.2f, 0.2f));
+            }
+
+            // 弹出浮动受创飘字
+            if (_damageLabel != null && damage > 0)
+            {
+                _damageLabel.Text = $"-{damage}";
+                _damageLabel.Position = new Vector2(-40, -95);
+                _damageLabel.Visible = true;
+                _damageLabel.Modulate = new Color(1, 1, 1, 1);
+                _damageLabelTimer = 0.8f;
+            }
+
+            if (Hp <= 0)
+            {
+                TriggerDeath();
+            }
+        }
+
+        public void TriggerDeath()
+        {
+            IsDead = true;
+            PlayAction(ActionType.Die, Direction, 0.8f);
+            AudioManager.Instance?.PlaySoundId(4);
+
+            if (_hpBarBg != null) _hpBarBg.Visible = false;
+            if (_nameLabel != null)
+            {
+                _nameLabel.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f));
+            }
+        }
+
+        public override void _Process(double delta)
+        {
+            UpdatePosition();
+
+            float dt = (float)delta;
+            _animTimer += dt;
+
+            // 血条 3 秒倒计时自动隐退
+            if (_hpBarHideTimer > 0f)
+            {
+                _hpBarHideTimer -= dt;
+                if (_hpBarHideTimer <= 0f && _hpBarBg != null)
+                {
+                    _hpBarBg.Visible = false;
+                }
+            }
+
+            // 浮动伤害字向上飘动渐隐
+            if (_damageLabelTimer > 0f && _damageLabel != null)
+            {
+                _damageLabelTimer -= dt;
+                _damageLabel.Position += new Vector2(0, -35f * dt);
+                _damageLabel.Modulate = new Color(1, 1, 1, Mathf.Clamp(_damageLabelTimer / 0.8f, 0f, 1f));
+                if (_damageLabelTimer <= 0f)
+                {
+                    _damageLabel.Visible = false;
+                }
+            }
+
+            // 动画帧步进
+            if (Type == EntityManager.EntityType.Npc)
+            {
+                _currentFrame = (int)(_animTimer * 4.0f) % 6;
+            }
+            else
+            {
+                int maxF = CurrentAction switch
+                {
+                    ActionType.Stand => 4,
+                    ActionType.Walk => 6,
+                    ActionType.Hit => 6,
+                    ActionType.Struck => 2,
+                    ActionType.Die => 6,
+                    _ => 4
+                };
+
+                if (_isActionLocked)
+                {
+                    float frameDuration = _actionDuration / Math.Max(maxF, 1);
+                    _currentFrame = (int)(_animTimer / frameDuration);
+                    if (_currentFrame >= maxF)
+                    {
+                        if (CurrentAction == ActionType.Die)
+                        {
+                            _currentFrame = maxF - 1; // 保持倒地尸体最后一帧
+                            IsCorpse = true;
+                            _isActionLocked = false;
+                        }
+                        else
+                        {
+                            _isActionLocked = false;
+                            CurrentAction = ActionType.Stand;
+                            _animTimer = 0f;
+                            _currentFrame = 0;
+                        }
+                    }
+                }
+                else
+                {
+                    float fps = CurrentAction == ActionType.Stand ? 4.0f : 6.0f;
+                    _currentFrame = (int)(_animTimer * fps) % maxF;
+                }
+            }
+
+            UpdateFrameGraphic();
+        }
+
+        private void UpdateFrameGraphic()
+        {
+            if (_sprite == null || _loader == null) return;
+
+            int frameIdx = CalcAbsoluteFrameIndex();
+            Texture2D? tex = _loader.GetFrame(frameIdx);
+            if (tex != null)
+            {
+                _sprite.Texture = tex;
+                var anchor = _loader.GetAnchor(frameIdx);
+                _sprite.Position = new Vector2(24 + anchor.X, 32 + anchor.Y);
+                _sprite.Visible = true;
+            }
+        }
+
+        /// <summary>
+        /// 依据官方 IDA sub_495EBC & sub_496120 算法计算贴图绝对帧号
+        /// </summary>
+        private int CalcAbsoluteFrameIndex()
+        {
+            if (Type == EntityManager.EntityType.Npc)
+            {
+                return Appr * 10 + (_currentFrame % 6);
+            }
+
+            // 官方传奇 1.5 怪物帧偏移权威算法 (sub_496120)
+            int v8 = Appr % 10;
+            int v1 = Appr / 10;
+            int baseOffset = v1 switch
+            {
+                0 => 280 * v8,
+                1 => 230 * v8,
+                2 or 3 => 360 * v8,
+                4 => (v8 == 1 ? 600 : 360 * v8),
+                5 => 430 * v8,
+                6 => 440 * v8,
+                _ => 360 * v8
+            };
+
+            int dir = Direction & 7;
+            return CurrentAction switch
+            {
+                ActionType.Stand => baseOffset + dir * 4 + (_currentFrame % 4),
+                ActionType.Walk => baseOffset + 32 + dir * 6 + (_currentFrame % 6),
+                ActionType.Hit => baseOffset + 80 + dir * 6 + (_currentFrame % 6),
+                ActionType.Struck => baseOffset + 128 + dir * 2 + (_currentFrame % 2),
+                ActionType.Die => baseOffset + 144 + dir * 6 + Math.Min(_currentFrame, 5),
+                _ => baseOffset + dir * 4 + (_currentFrame % 4)
+            };
+        }
+    }
+}

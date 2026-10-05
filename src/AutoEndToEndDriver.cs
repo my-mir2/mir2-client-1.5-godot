@@ -793,12 +793,37 @@ public partial class AutoEndToEndDriver : Node
 
             case 70:
             {
-                GD.Print("[AutoE2E] === 全量大世界面板、底层走跑位移与全门类技能光效 100% 验证完成 ===");
-                RequestCapture("step17_all_buttons_completed");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView != null && gameView.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证大世界怪物渲染与受击：雷电术轰击稻草人 (Uid=1001) ===");
+                    var targetTile = new Vector2I(333, 270);
+                    gameView.TriggerSkill(10, targetTile);
+                }
+                RequestCapture("step30_monster_spawn_and_struck");
                 break;
             }
 
             case 71:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView != null)
+                {
+                    GD.Print("[AutoE2E] === 验证大世界怪物倒地死亡 (SM_MONDEAD/Die) 与常驻尸体状态 ===");
+                    gameView.EntityManagerInstance.TriggerDeath(1001);
+                }
+                RequestCapture("step31_monster_death_corpse");
+                break;
+            }
+
+            case 72:
+            {
+                GD.Print("[AutoE2E] === 全量大世界面板、底层走跑位移、全门类技能光效与怪物/NPC实体渲染 100% 验证完成 ===");
+                RequestCapture("step17_all_buttons_completed");
+                break;
+            }
+
+            case 73:
             {
                 GD.Print("[AutoE2E] ALL DYNAMIC DETAILS AND SKILL MAGIC CHECKS COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();

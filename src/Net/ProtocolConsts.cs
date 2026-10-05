@@ -114,6 +114,15 @@ public static class ProtocolConsts
     public const short SM_FLYAXE_ACTION_DELPHI   = 16;   // 投掷飞斧
     public const short SM_LIGHTING_DELPHI        = 17;   // 定向轰击闪电
     public const short SM_DEATH                  = 21;   // 实体死亡倒地
+    public const short SM_WALK_DELPHI            = 10;   // 行走动作 (Delphi 10)
+    public const short SM_RUN_DELPHI             = 11;   // 奔跑动作 (Delphi 11)
+    public const short SM_TURNDIRECTION          = 204;  // 实体转向 (bridge.rs / Delphi 204)
+    public const short SM_TURNDIRECTION_DELPHI   = 204;  // 实体转向别名 (204)
+    public const short SM_MONSPAWN               = 220;  // 怪物进入视野 (bridge.rs 权威实证)
+    public const short SM_MONDELETE              = 221;  // 怪物离开视野 (bridge.rs 权威实证)
+    public const short SM_MONDEAD                = 222;  // 怪物倒地死亡 (bridge.rs 权威实证)
+    public const short SM_NPCSPAWN               = 230;  // NPC 进入视野 (bridge.rs 权威实证)
+    public const short SM_NPCDELETE              = 231;  // NPC 离开视野 (bridge.rs 权威实证)
     public const short SM_ACTION_PARAM_SYNC      = 22;   // 动作参数三元组同步
     public const short SM_MAPMOVE                = 23;   // 地图传送坐标突变
     public const short SM_SITDOWN                = 27;   // 打坐/起立切换

@@ -31,6 +31,7 @@ public sealed class ServerMessageRouter
     public const short SM_MONSPAWN               = 220;  // 怪物进入视野 (220)
     public const short SM_MONDELETE              = 221;  // 怪物离开视野 (221)
     public const short SM_MONDEAD                = 222;  // 怪物倒地死亡 (222)
+    public const short SM_DEATH                  = 21;   // 实体死亡倒地 (21)
     public const short SM_NPCSPAWN               = 230;  // NPC 进入视野 (230)
     public const short SM_NPCDELETE              = 231;  // NPC 离开视野 (231)
     public const short SM_OBJECT_DISAPPEAR       = 29;   // 实体消除 (Delphi 29)
@@ -130,6 +131,10 @@ public sealed class ServerMessageRouter
                 break;
             case SM_TURNDIRECTION_DELPHI:
                 HandleTurnDirection(packet);
+                break;
+            case SM_MONDEAD:
+            case SM_DEATH:
+                HandleEntityDead(packet);
                 break;
             case SM_CLEAROBJECTS:
                 _entityManager?.Clear();
@@ -672,6 +677,8 @@ public sealed class ServerMessageRouter
         int x = int.TryParse(parts[1], out var tx) ? tx : 300;
         int y = int.TryParse(parts[2], out var ty) ? ty : 300;
         byte dir = parts.Length > 3 && byte.TryParse(parts[3], out var td) ? td : (byte)2;
+        int appr = pkt.Param;
+        if (parts.Length > 4 && int.TryParse(parts[4], out var a)) appr = a;
 
         var type = pkt.Ident switch
         {
@@ -680,7 +687,18 @@ public sealed class ServerMessageRouter
             _ => Mir2Client.Game.EntityManager.EntityType.Player
         };
 
-        _entityManager.AddEntity(uid, name, type, x, y, dir);
+        if (appr == 0)
+        {
+            if (name.Contains("稻草人")) appr = 1;
+            else if (name.Contains("钉耙猫")) appr = 2;
+            else if (name.Contains("半兽人")) appr = 3;
+            else if (name.Contains("森林雪人")) appr = 4;
+            else if (name.Contains("食人花")) appr = 5;
+            else if (name.Contains("毒蜘蛛")) appr = 6;
+            else if (name.Contains("骷髅")) appr = 10;
+        }
+
+        _entityManager.AddEntity(uid, name, type, x, y, dir, appr);
     }
 
     private void HandleEntityDelete(ServerPacket pkt)
@@ -695,11 +713,14 @@ public sealed class ServerMessageRouter
         if (_entityManager == null) return;
         int uid = pkt.Recog;
         byte dir = (byte)(pkt.Param & 7);
-        var ent = _entityManager.GetEntity(uid);
-        if (ent != null)
-        {
-            ent.Direction = dir;
-        }
+        _entityManager.UpdateTurn(uid, dir);
+    }
+
+    private void HandleEntityDead(ServerPacket pkt)
+    {
+        if (_entityManager == null) return;
+        int uid = pkt.Recog;
+        _entityManager.TriggerDeath(uid);
     }
 
     private void HandleObjectSpell(ServerPacket pkt)
@@ -786,11 +807,7 @@ public sealed class ServerMessageRouter
         }
         else if (_entityManager?.GetEntity(targetId) is { } targetEnt)
         {
-            targetEnt.Hp = Math.Max(0, targetHp);
-            if (targetEnt.Hp <= 0)
-            {
-                targetEnt.IsDead = true;
-            }
+            _entityManager.TriggerStruck(targetId, damage, targetHp);
             if (damage > 0)
             {
                 _hud?.AddChat("战斗", $"命中目标 {targetEnt.Name}，造成 {damage} 点伤害！", new Color(1f, 0.9f, 0.3f));

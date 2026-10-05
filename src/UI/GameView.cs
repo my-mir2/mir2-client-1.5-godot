@@ -52,6 +52,16 @@ namespace Mir2Client.UI
         private WilLoader? _wilMagic;
         private WilLoader? _wilMagic2;
         private WilLoader? _wilEffect;
+        private WilLoader? _wilMon1;
+        private WilLoader? _wilMon2;
+        private WilLoader? _wilMon3;
+        private WilLoader? _wilNpc;
+
+        public Node2D EntityContainer { get; private set; } = null!;
+        private readonly Dictionary<int, EntityNode> _entityNodes = new();
+
+        private ulong _lastSpellTick = 0;
+        public const ulong SpellCooldownMs = 600;
 
         public override void _Ready()
         {
@@ -65,6 +75,10 @@ namespace Mir2Client.UI
 
             MagicManagerInstance = new MagicManager();
             AddChild(MagicManagerInstance);
+
+            EntityContainer = new Node2D { Name = "EntityContainer", YSortEnabled = true };
+            AddChild(EntityContainer);
+            SetupEntityManagerEvents();
 
             LoadResources();
             ConnectInputAndSignals();
@@ -103,6 +117,15 @@ namespace Mir2Client.UI
             _wilMagic2.Load(ResPath.Resolve("resources/wil/Data/Magic2.wil"), ResPath.Resolve("resources/wil/Data/Magic2.WIX"));
             _wilEffect.Load(ResPath.Resolve("resources/wil/Data/Effect.wil"), ResPath.Resolve("resources/wil/Data/Effect.WIX"));
 
+            _wilMon1 = new WilLoader();
+            _wilMon2 = new WilLoader();
+            _wilMon3 = new WilLoader();
+            _wilNpc = new WilLoader();
+            _wilMon1.Load(ResPath.Resolve("resources/wil/Data/Mon1.wil"), ResPath.Resolve("resources/wil/Data/Mon1.WIX"));
+            _wilMon2.Load(ResPath.Resolve("resources/wil/Data/Mon2.wil"), ResPath.Resolve("resources/wil/Data/Mon2.WIX"));
+            _wilMon3.Load(ResPath.Resolve("resources/wil/Data/Mon3.wil"), ResPath.Resolve("resources/wil/Data/Mon3.WIX"));
+            _wilNpc.Load(ResPath.Resolve("resources/wil/Data/npc.wil"), ResPath.Resolve("resources/wil/Data/npc.WIX"));
+
             MapRendererInstance?.SetLoaders(_wilFloor, _wilObj, _wilSmTiles);
             PlayerInstance?.SetWilLoaders(_wilHum, _wilWeapon, _wilHair);
             MagicManagerInstance?.SetWilLoaders(_wilMagic, _wilMagic2, _wilEffect);
@@ -110,6 +133,84 @@ namespace Mir2Client.UI
             {
                 MagicManagerInstance?.SetMapRenderer(MapRendererInstance);
             }
+        }
+
+        private void SetupEntityManagerEvents()
+        {
+            EntityManagerInstance.EntityAdded += (data) =>
+            {
+                if (_entityNodes.ContainsKey(data.Uid)) return;
+
+                var node = new EntityNode
+                {
+                    Name = $"Entity_{data.Uid}",
+                    Uid = data.Uid,
+                    EntityName = data.Name,
+                    Type = data.Type,
+                    Appr = data.Appr,
+                    TileX = data.TileX,
+                    TileY = data.TileY,
+                    Direction = data.Direction,
+                    Hp = data.Hp,
+                    MaxHp = data.MaxHp
+                };
+
+                WilLoader? loader = data.Type == EntityManager.EntityType.Npc
+                    ? _wilNpc
+                    : (data.Appr switch
+                    {
+                        >= 20 => _wilMon3 ?? _wilMon1,
+                        >= 10 => _wilMon2 ?? _wilMon1,
+                        _ => _wilMon1
+                    });
+
+                node.SetLoader(loader);
+                if (MapRendererInstance != null) node.SetMapRenderer(MapRendererInstance);
+
+                EntityContainer.AddChild(node);
+                _entityNodes[data.Uid] = node;
+            };
+
+            EntityManagerInstance.EntityRemoved += (uid) =>
+            {
+                if (_entityNodes.Remove(uid, out var node))
+                {
+                    if (IsInstanceValid(node)) node.QueueFree();
+                }
+            };
+
+            EntityManagerInstance.EntityTurned += (uid, dir) =>
+            {
+                if (_entityNodes.TryGetValue(uid, out var node))
+                {
+                    node.SetTilePos(node.TileX, node.TileY, dir);
+                }
+            };
+
+            EntityManagerInstance.EntityMoved += (uid, x, y, dir) =>
+            {
+                if (_entityNodes.TryGetValue(uid, out var node))
+                {
+                    node.SetTilePos(x, y, dir);
+                    node.PlayAction(ActionType.Walk, dir);
+                }
+            };
+
+            EntityManagerInstance.EntityStruck += (uid, damage, curHp) =>
+            {
+                if (_entityNodes.TryGetValue(uid, out var node))
+                {
+                    node.TriggerStruck(damage, curHp);
+                }
+            };
+
+            EntityManagerInstance.EntityDied += (uid) =>
+            {
+                if (_entityNodes.TryGetValue(uid, out var node))
+                {
+                    node.TriggerDeath();
+                }
+            };
         }
 
         private void ConnectInputAndSignals()
@@ -179,6 +280,10 @@ namespace Mir2Client.UI
                         short targetX = (short)(PlayerInstance.TileX + offset.X);
                         short targetY = (short)(PlayerInstance.TileY + offset.Y);
                         _net.SendPacket(PacketEncoder.Hit((short)(dir & 7), targetX, targetY));
+                    }
+                    else if (_isSandbox)
+                    {
+                        CheckSandboxMeleeHit(dir, 15);
                     }
                 };
 
@@ -281,6 +386,13 @@ namespace Mir2Client.UI
         {
             if (PlayerInstance == null || PlayerInstance.IsDead) return;
 
+            ulong now = Time.GetTicksMsec();
+            if (now - _lastSpellTick < SpellCooldownMs)
+            {
+                return;
+            }
+            _lastSpellTick = now;
+
             var playerTile = new Vector2I(PlayerInstance.TileX, PlayerInstance.TileY);
             bool isSelfBuff = magicId is 2 or 14 or 15 or 18 or 31;
             if (isSelfBuff && (targetTile.X < 0 || Math.Max(Math.Abs(targetTile.X - playerTile.X), Math.Abs(targetTile.Y - playerTile.Y)) > 5))
@@ -318,6 +430,10 @@ namespace Mir2Client.UI
                     {
                         _net.SendPacket(PacketEncoder.PowerHit((short)dir));
                     }
+                    else if (_isSandbox)
+                    {
+                        CheckSandboxMeleeHit(dir, 30);
+                    }
                     break;
 
                 case 12: // 刺杀剑术
@@ -326,6 +442,10 @@ namespace Mir2Client.UI
                     if (_net != null && _net.IsConnectedToServer)
                     {
                         _net.SendPacket(PacketEncoder.LongHit((short)dir));
+                    }
+                    else if (_isSandbox)
+                    {
+                        CheckSandboxMeleeHit(dir, 35);
                     }
                     break;
 
@@ -336,6 +456,10 @@ namespace Mir2Client.UI
                     {
                         _net.SendPacket(PacketEncoder.WideHit((short)dir));
                     }
+                    else if (_isSandbox)
+                    {
+                        CheckSandboxMeleeHit(dir, 28);
+                    }
                     break;
 
                 case 26: // 烈火剑法
@@ -344,6 +468,10 @@ namespace Mir2Client.UI
                     if (_net != null && _net.IsConnectedToServer)
                     {
                         _net.SendPacket(PacketEncoder.FireHit(0, (short)dir));
+                    }
+                    else if (_isSandbox)
+                    {
+                        CheckSandboxMeleeHit(dir, 65);
                     }
                     break;
 
@@ -363,6 +491,10 @@ namespace Mir2Client.UI
                     {
                         _net.SendPacket(PacketEncoder.Spell((short)magicId, (short)targetTile.X, (short)targetTile.Y));
                     }
+                    else if (_isSandbox)
+                    {
+                        CheckSandboxSpellHit(magicId, targetTile);
+                    }
                     break;
             }
 
@@ -370,6 +502,51 @@ namespace Mir2Client.UI
             {
                 PlayerInstance.Mp = Math.Max(0, PlayerInstance.Mp - mpCost);
                 HudInstance?.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
+            }
+        }
+
+        private void CheckSandboxMeleeHit(int dir, int damage)
+        {
+            if (PlayerInstance == null) return;
+            var offset = PlayerAuditEngine.DirOffsets[dir & 7];
+            int tx = PlayerInstance.TileX + offset.X;
+            int ty = PlayerInstance.TileY + offset.Y;
+
+            foreach (var ent in EntityManagerInstance.AllEntities)
+            {
+                if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead && ent.TileX == tx && ent.TileY == ty)
+                {
+                    int newHp = Math.Max(0, ent.Hp - damage);
+                    EntityManagerInstance.TriggerStruck(ent.Uid, damage, newHp);
+                    HudInstance?.AddChat("战斗", $"物理命中【{ent.Name}】，造成 {damage} 点伤害！", new Color(1f, 0.8f, 0.2f));
+                    break;
+                }
+            }
+        }
+
+        private void CheckSandboxSpellHit(int magicId, Vector2I targetTile)
+        {
+            int damage = magicId switch
+            {
+                1 => 20,  // 火球术
+                10 => 45, // 雷电术
+                22 => 30, // 火墙
+                23 => 35, // 疾光电影
+                33 => 60, // 冰咆哮
+                _ => 25
+            };
+
+            foreach (var ent in EntityManagerInstance.AllEntities)
+            {
+                if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead)
+                {
+                    if (Math.Abs(ent.TileX - targetTile.X) <= 1 && Math.Abs(ent.TileY - targetTile.Y) <= 1)
+                    {
+                        int newHp = Math.Max(0, ent.Hp - damage);
+                        EntityManagerInstance.TriggerStruck(ent.Uid, damage, newHp);
+                        HudInstance?.AddChat("战斗", $"法术命中【{ent.Name}】，造成 {damage} 点魔法伤害！", new Color(0.4f, 0.9f, 1f));
+                    }
+                }
             }
         }
 
@@ -389,6 +566,44 @@ namespace Mir2Client.UI
 
             string mapPath = ResPath.Resolve("resources/maps/Map/0.map");
             MapRendererInstance?.LoadMap(mapPath);
+
+            EntityManagerInstance.Clear();
+            EntityManagerInstance.AddEntity(new EntityManager.EntityData
+            {
+                Uid = 1001,
+                Name = "稻草人",
+                Type = EntityManager.EntityType.Monster,
+                Appr = 1,
+                TileX = 333,
+                TileY = 270,
+                Direction = 6,
+                Hp = 80,
+                MaxHp = 80
+            });
+            EntityManagerInstance.AddEntity(new EntityManager.EntityData
+            {
+                Uid = 1002,
+                Name = "半兽人",
+                Type = EntityManager.EntityType.Monster,
+                Appr = 3,
+                TileX = 328,
+                TileY = 268,
+                Direction = 2,
+                Hp = 120,
+                MaxHp = 120
+            });
+            EntityManagerInstance.AddEntity(new EntityManager.EntityData
+            {
+                Uid = 2001,
+                Name = "比奇老兵",
+                Type = EntityManager.EntityType.Npc,
+                Appr = 0,
+                TileX = 330,
+                TileY = 266,
+                Direction = 4,
+                Hp = 1000,
+                MaxHp = 1000
+            });
 
             if (PlayerInstance != null)
             {

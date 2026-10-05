@@ -606,13 +606,13 @@ public class TestProtocolMatrix
 
         // 1. 登录阶段
         await stream.WriteAsync(PacketEncoder.Login("testuser", "testpass"));
-        await Task.Delay(50);
+        await Task.Delay(100);
         await stream.WriteAsync(PacketEncoder.SelectServer(0));
-        await Task.Delay(50);
+        await Task.Delay(100);
         await stream.WriteAsync(PacketEncoder.MakePacket(ProtocolConsts.CM_SELECTCHAR, 0, 0, 0, Encoding.UTF8.GetBytes("热血战士")));
-        await Task.Delay(50);
+        await Task.Delay(150);
 
-        // 清空前置登录包缓存
+        // 清空前置登录与进入世界包缓存
         byte[] discardBuf = new byte[4096];
         while (client.Available > 0)
         {
@@ -623,21 +623,33 @@ public class TestProtocolMatrix
         byte[] walkPkt = PacketEncoder.Walk(330, 270, 2);
         await stream.WriteAsync(walkPkt);
 
-        // 3. 接收并断言网关下发的 SM_ALLOWMOVE (203)
+        // 3. 循环接收数据包并匹配网关下发的 SM_ALLOWMOVE (203)
+        bool foundAllowMove = false;
         byte[] recvBuf = new byte[12];
-        await stream.ReadExactlyAsync(recvBuf.AsMemory(0, 12));
+        for (int i = 0; i < 10; i++)
+        {
+            if (client.Available >= 12)
+            {
+                await stream.ReadExactlyAsync(recvBuf.AsMemory(0, 12));
+                short smCode = (short)(recvBuf[1] | (recvBuf[2] << 8));
+                if (smCode == ProtocolConsts.SM_ALLOWMOVE)
+                {
+                    foundAllowMove = true;
+                    int posRecog = recvBuf[3] | (recvBuf[4] << 8) | (recvBuf[5] << 16) | (recvBuf[6] << 24);
+                    int posX = posRecog & 0xFFFF;
+                    int posY = (posRecog >> 16) & 0xFFFF;
+                    short dir = (short)(recvBuf[7] | (recvBuf[8] << 8));
 
-        short smCode = (short)(recvBuf[1] | (recvBuf[2] << 8));
-        Assert.Equal(ProtocolConsts.SM_ALLOWMOVE, smCode);
+                    Assert.True(posX > 0);
+                    Assert.True(posY > 0);
+                    Assert.Equal(2, dir & 7);
+                    break;
+                }
+            }
+            await Task.Delay(50);
+        }
 
-        int posRecog = recvBuf[3] | (recvBuf[4] << 8) | (recvBuf[5] << 16) | (recvBuf[6] << 24);
-        int posX = posRecog & 0xFFFF;
-        int posY = (posRecog >> 16) & 0xFFFF;
-        short dir = (short)(recvBuf[7] | (recvBuf[8] << 8));
-
-        Assert.True(posX > 0);
-        Assert.True(posY > 0);
-        Assert.Equal(2, dir & 7);
+        Assert.True(foundAllowMove);
     }
 
     [Fact]
@@ -758,4 +770,99 @@ public class TestProtocolMatrix
         // 3. 验证连接仍然健康可用
         Assert.True(client.Connected);
     }
+
+    [Fact]
+    public void TestMonster_SpawnTurnMoveDeadFlow()
+    {
+        var em = new Mir2Client.Game.EntityManager();
+        var router = new ServerMessageRouter(null, em);
+
+        // 1. 模拟怪物生成 SM_MONSPAWN (220)
+        // Extra: "稻草人\t335\t275\t6\t1" (Name, X, Y, Dir, Appr)
+        byte[] encExtra = PacketCodec.EncodePlus60(Encoding.UTF8.GetBytes("稻草人\t335\t275\t6\t1"));
+        byte[] rawSpawn = new byte[10 + encExtra.Length + 1];
+        rawSpawn[0] = (byte)(ProtocolConsts.SM_MONSPAWN & 0xFF);
+        rawSpawn[1] = (byte)((ProtocolConsts.SM_MONSPAWN >> 8) & 0xFF);
+        rawSpawn[2] = 0x88; rawSpawn[3] = 0x13; rawSpawn[4] = 0x00; rawSpawn[5] = 0x00; // Recog 5000
+        rawSpawn[6] = 1; rawSpawn[7] = 0; // Param (Appr=1)
+        Array.Copy(encExtra, 0, rawSpawn, 10, encExtra.Length);
+        rawSpawn[^1] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_MONSPAWN, rawSpawn);
+
+        var mon = em.GetEntity(5000);
+        Assert.NotNull(mon);
+        Assert.Equal("稻草人", mon.Name);
+        Assert.Equal(Mir2Client.Game.EntityManager.EntityType.Monster, mon.Type);
+        Assert.Equal(335, mon.TileX);
+        Assert.Equal(275, mon.TileY);
+        Assert.Equal(6, mon.Direction);
+        Assert.Equal(1, mon.Appr);
+
+        // 2. 模拟怪物转向 SM_TURNDIRECTION_DELPHI (11)
+        byte[] rawTurn = new byte[11];
+        rawTurn[0] = (byte)(ProtocolConsts.SM_TURNDIRECTION_DELPHI & 0xFF);
+        rawTurn[1] = (byte)((ProtocolConsts.SM_TURNDIRECTION_DELPHI >> 8) & 0xFF);
+        rawTurn[2] = 0x88; rawTurn[3] = 0x13; rawTurn[4] = 0x00; rawTurn[5] = 0x00; // Recog 5000
+        rawTurn[6] = 2; rawTurn[7] = 0; // Param dir=2
+        rawTurn[10] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_TURNDIRECTION_DELPHI, rawTurn);
+        Assert.Equal(2, mon.Direction);
+
+        // 3. 模拟受击掉血 SM_SPELLRESULT (30)
+        byte[] rawDamage = new byte[11];
+        rawDamage[0] = (byte)(ProtocolConsts.SM_SPELLRESULT & 0xFF);
+        rawDamage[1] = (byte)((ProtocolConsts.SM_SPELLRESULT >> 8) & 0xFF);
+        rawDamage[2] = 0x88; rawDamage[3] = 0x13; rawDamage[4] = 0x00; rawDamage[5] = 0x00; // Recog 5000
+        rawDamage[6] = 30; rawDamage[7] = 0; // Param targetHp=30
+        rawDamage[8] = 50; rawDamage[9] = 0; // Tag damage=50
+        rawDamage[10] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_SPELLRESULT, rawDamage);
+        Assert.Equal(30, mon.Hp);
+        Assert.False(mon.IsDead);
+
+        // 4. 模拟怪物倒地死亡 SM_MONDEAD (222)
+        byte[] rawDead = new byte[11];
+        rawDead[0] = (byte)(ProtocolConsts.SM_MONDEAD & 0xFF);
+        rawDead[1] = (byte)((ProtocolConsts.SM_MONDEAD >> 8) & 0xFF);
+        rawDead[2] = 0x88; rawDead[3] = 0x13; rawDead[4] = 0x00; rawDead[5] = 0x00; // Recog 5000
+        rawDead[10] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_MONDEAD, rawDead);
+        Assert.True(mon.IsDead);
+        Assert.Equal(0, mon.Hp);
+    }
+
+    [Fact]
+    public void TestNpc_SpawnAndInteractionFlow()
+    {
+        var em = new Mir2Client.Game.EntityManager();
+        var router = new ServerMessageRouter(null, em);
+
+        // 1. 模拟 NPC 生成 SM_NPCSPAWN (230)
+        byte[] encExtra = PacketCodec.EncodePlus60(Encoding.UTF8.GetBytes("比奇老兵\t330\t266\t4\t0"));
+        byte[] rawSpawn = new byte[10 + encExtra.Length + 1];
+        rawSpawn[0] = (byte)(ProtocolConsts.SM_NPCSPAWN & 0xFF);
+        rawSpawn[1] = (byte)((ProtocolConsts.SM_NPCSPAWN >> 8) & 0xFF);
+        rawSpawn[2] = 0xD0; rawSpawn[3] = 0x07; rawSpawn[4] = 0x00; rawSpawn[5] = 0x00; // Recog 2000
+        Array.Copy(encExtra, 0, rawSpawn, 10, encExtra.Length);
+        rawSpawn[^1] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_NPCSPAWN, rawSpawn);
+
+        var npc = em.GetEntity(2000);
+        Assert.NotNull(npc);
+        Assert.Equal("比奇老兵", npc.Name);
+        Assert.Equal(Mir2Client.Game.EntityManager.EntityType.Npc, npc.Type);
+        Assert.Equal(330, npc.TileX);
+        Assert.Equal(266, npc.TileY);
+        Assert.Equal(4, npc.Direction);
+
+        // 2. 模拟 NPC 消除 SM_NPCDELETE (231)
+        byte[] rawDel = new byte[11];
+        rawDel[0] = (byte)(ProtocolConsts.SM_NPCDELETE & 0xFF);
+        rawDel[1] = (byte)((ProtocolConsts.SM_NPCDELETE >> 8) & 0xFF);
+        rawDel[2] = 0xD0; rawDel[3] = 0x07; rawDel[4] = 0x00; rawDel[5] = 0x00; // Recog 2000
+        rawDel[10] = 0x0A;
+        router.OnPacket(ProtocolConsts.SM_NPCDELETE, rawDel);
+        Assert.Null(em.GetEntity(2000));
+    }
 }
+

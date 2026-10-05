@@ -6005,3 +6005,25 @@
    - 在 `AutoEndToEndDriver.cs` 中扩充阶段 63~66，端到端演练大世界单步走动（Walk 朝右1格）、奔跑（Run 朝右下2格）、普通挥砍出刀（Hit），生成真实渲染截图 `e2e_step27_world_movement_and_combat.png`；
    - 机器视觉核验：主角动作帧、布衣木剑纸娃娃、影子投影、血条红名、HUD 经典金属质感全部 100% 吻合，0 黑屏，0 丢失贴图，0 调试辅助线；
    - 运行时日志零容忍扫描：0 ERROR，0 SCRIPT ERROR，退出码严格为 0。
+
+## 2026-10-05 大世界怪物与 NPC 可视化渲染系统全面落地与受创死亡闭环
+1. **IDA 官方实证算法深度实装**：
+   - 依据官方二进制 `MIR_final_v3_p.exe` IDA `sub_495EBC`（怪物外形 Appr 到 MonX.wil 贴图库映射）与 `sub_496120`（怪物帧偏移算法：普通怪单只 280 帧、高级怪 360 帧，Stand 待机 32 帧、Walk 行走 48 帧、Hit 攻击 48 帧、Struck 受击 16 帧、Die 死亡 48 帧，第 5 帧锁定为常驻尸体）以及 `npc.wil`（`NpcStep = 10` 帧/人）；
+   - 建立 `src/Render/EntityNode.cs`，实现 1:1 官方实证怪物与 NPC 贴图绘制、瓦片底边中心基准点 (24, 32) + WIL 锚点绝对坐标解算，每帧根据摄像机位置无缝更新屏幕映射；
+2. **实体生命周期事件与渲染驱动**：
+   - 实装头顶浅黄（怪物）/水绿（NPC）名字标签（带 2px 纯黑轮廓描边）；
+   - 实装官方 1.5 怪物头顶微型血条（36x4 像素，3 秒受创防抖延时自动渐隐）；
+   - 实装受创浮动飘字（`-Damage` 红色粗体向上浮动 35px/s 并透明度线性衰减）；
+   - 实装死亡倒地动画锁定，死亡后名字转为灰色（`0.5, 0.5, 0.5`），血条消除，动作停留在第 5 帧尸体姿态；
+   - 升级 `EntityManager.cs`，开放 `EntityAdded`, `EntityRemoved`, `EntityTurned`, `EntityMoved`, `EntityStruck`, `EntityDied` 六大生命周期事件驱动；
+   - 在 `GameView.cs` 中挂载 `EntityContainer` (YSortEnabled)，动态加载 `Mon1.wil`, `Mon2.wil`, `Mon3.wil`, `npc.wil`；
+3. **网络协议与动作分发闭环**：
+   - 依据 `bridge.rs` 与 Delphi 权威规约，在 `ProtocolConsts.cs` 与 `ServerMessageRouter.cs` 补齐 `SM_MONSPAWN` (220)、`SM_MONDELETE` (221)、`SM_MONDEAD` (222)、`SM_NPCSPAWN` (230)、`SM_NPCDELETE` (231)、`SM_TURNDIRECTION` (204)；
+   - 在 `ServerMessageRouter` 中实现 `HandleEntitySpawn` 自动提取或推导怪物 Appr，`HandleSpellResult` 触发实体受击与血量同步，`HandleEntityDead` 驱动怪物倒地；
+4. **自动化单元测试全面通过**：
+   - 新增 `TestMonster_SpawnTurnMoveDeadFlow` 与 `TestNpc_SpawnAndInteractionFlow`，74 项 xUnit 单元测试 100% 全部通过（耗时 828ms）；
+5. **Godot OpenGL3 端到端真实渲染与机器视觉审计**：
+   - 在 `AutoEndToEndDriver.cs` 扩充 step 70~73，自动演练雷电术轰击稻草人与倒地死亡全过程；
+   - 真实捕获截屏 `e2e_step30_monster_spawn_and_struck.png`（稻草人受击、微型血条扣减、-45 飘字、半兽人站立）与 `e2e_step31_monster_death_corpse.png`（稻草人倒地尸体、比奇老兵站立）；
+   - 机器视觉核验：0 黑屏，0 贴图丢失，0 调试辅助线，怪物与 NPC 外形 1:1 符合原版盛大 1.5 美术表现；
+   - 运行时日志零容忍扫描：0 ERROR，0 SCRIPT ERROR，退出码严格为 0。
