@@ -1348,6 +1348,230 @@ public class TestProtocolMatrix
         Assert.Equal(0.0, ps.LifestealAccumPool, 2);
         Assert.Equal(53, ps.Hp);
     }
+
+    [Fact]
+    public void TestWarrior_FireHit_CooldownAndDoubleFireWindow()
+    {
+        var tracker = new Mir2Client.Game.WarriorCombatEngine.FireHitTracker();
+
+        // 1. T=1000: 首次凝聚烈火剑法
+        var cast1 = tracker.Cast(1000);
+        Assert.True(cast1.success);
+        Assert.True(tracker.IsReady);
+
+        // 2. T=5000: CD 未到 (8秒)，再次施法被拒绝
+        var castFail = tracker.Cast(5000);
+        Assert.False(castFail.success);
+        Assert.Contains("冷却中", castFail.reason);
+
+        // 3. T=9005: 已经过 8005ms，进入合法双烈火窗口 (8.01s ~ 9.99s)
+        Assert.True(tracker.CanCastSecondFireHit(9005));
+
+        // 4. 在第 9005ms 挥出第一刀: 打出 260% 物理爆发伤害 (基础 100 -> 260)
+        var hit1 = tracker.ConsumeOnHit(100, 9005);
+        Assert.True(hit1.isFireHit);
+        Assert.Equal(260, hit1.damage);
+        Assert.False(tracker.IsReady);
+
+        // 5. 立即二次施展烈火 (第 2 刀双烈火秒出)
+        var cast2 = tracker.Cast(9010);
+        Assert.True(cast2.success);
+        Assert.True(tracker.IsReady);
+
+        // 6. 超时测试: 若蓄力超过 10 秒不出刀 (T=20000)，烈火自然熄灭
+        var hitExpire = tracker.ConsumeOnHit(100, 20000);
+        Assert.False(hitExpire.isFireHit);
+        Assert.Equal(100, hitExpire.damage);
+        Assert.Contains("超时", hitExpire.desc);
+    }
+
+    [Fact]
+    public void TestWarrior_Stabbing_PiercingShieldAndDefense()
+    {
+        // 1. 距离判定: 朝向 0 (正北, Y - 1)
+        var distMelee = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CheckHitDistance(100, 100, 100, 99, 0);
+        Assert.Equal(Mir2Client.Game.WarriorCombatEngine.StabbingTracker.HitDistanceType.MeleeClose, distMelee);
+
+        var distStab = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CheckHitDistance(100, 100, 100, 98, 0);
+        Assert.Equal(Mir2Client.Game.WarriorCombatEngine.StabbingTracker.HitDistanceType.StabbingFar, distStab);
+
+        // 2. 贴身第 1 格: 受到目标防御 15 和魔法盾 60% 减伤
+        // raw=50 -> 50 - 15 = 35 -> 35 * (1 - 0.6) = 14
+        var meleeDmg = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CalculateDamage(
+            50, distMelee, autoStab: true, targetAc: 15, targetShieldReduction: 0.6);
+        Assert.False(meleeDmg.isArmorPiercing);
+        Assert.Equal(14, meleeDmg.finalDamage);
+
+        // 3. 隔位第 2 格开启刺杀: 完全无视防御与魔法盾，造成满额 50 穿透伤害
+        var stabDmg = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CalculateDamage(
+            50, distStab, autoStab: true, targetAc: 15, targetShieldReduction: 0.6);
+        Assert.True(stabDmg.isArmorPiercing);
+        Assert.Equal(50, stabDmg.finalDamage);
+
+        // 4. 隔位第 2 格若关闭刺杀: 退化为常规防御和护盾减免
+        var noStabDmg = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CalculateDamage(
+            50, distStab, autoStab: false, targetAc: 15, targetShieldReduction: 0.6);
+        Assert.False(noStabDmg.isArmorPiercing);
+        Assert.Equal(14, noStabDmg.finalDamage);
+    }
+
+    [Fact]
+    public void TestWarrior_ShoulderDash_LevelAndObstacleCollision()
+    {
+        // 1. 等级压制撞开: 等级 35 冲撞等级 30，朝向 2 (正东, X + 1)
+        var pushRes = Mir2Client.Game.WarriorCombatEngine.ShoulderDash.ExecuteDash(
+            selfLevel: 35,
+            selfX: 100,
+            selfY: 100,
+            dir: 2,
+            obstacleEntity: (true, 30, 101, 100),
+            isTileBlocked: (x, y) => false
+        );
+        Assert.True(pushRes.Success);
+        Assert.True(pushRes.TargetPushed);
+        Assert.Equal(101, pushRes.SelfFinalX);
+        Assert.Equal(102, pushRes.TargetFinalX);
+        Assert.False(pushRes.SelfStunned);
+
+        // 2. 等级不足反弹顿挫: 等级 35 冲撞等级 38，撞击失败自身顿挫
+        var failRes = Mir2Client.Game.WarriorCombatEngine.ShoulderDash.ExecuteDash(
+            selfLevel: 35,
+            selfX: 100,
+            selfY: 100,
+            dir: 2,
+            obstacleEntity: (true, 38, 101, 100),
+            isTileBlocked: (x, y) => false
+        );
+        Assert.False(failRes.Success);
+        Assert.True(failRes.SelfStunned);
+        Assert.Equal(100, failRes.SelfFinalX);
+        Assert.Contains("反弹硬直", failRes.Message);
+
+        // 3. 撞墙反弹: 第 1 格为墙壁阻挡
+        var wallRes = Mir2Client.Game.WarriorCombatEngine.ShoulderDash.ExecuteDash(
+            selfLevel: 35,
+            selfX: 100,
+            selfY: 100,
+            dir: 2,
+            obstacleEntity: null,
+            isTileBlocked: (x, y) => x == 101 && y == 100
+        );
+        Assert.False(wallRes.Success);
+        Assert.True(wallRes.SelfStunned);
+        Assert.Contains("撞击墙体", wallRes.Message);
+
+        // 4. 目标身后受墙壁阻挡: 目标就位第 1 格受撞硬直，自身保持原地
+        var blockedBehindRes = Mir2Client.Game.WarriorCombatEngine.ShoulderDash.ExecuteDash(
+            selfLevel: 35,
+            selfX: 100,
+            selfY: 100,
+            dir: 2,
+            obstacleEntity: (true, 30, 101, 100),
+            isTileBlocked: (x, y) => x == 102 && y == 100 // 目标身后为阻挡点
+        );
+        Assert.True(blockedBehindRes.Success);
+        Assert.False(blockedBehindRes.TargetPushed);
+        Assert.Equal(100, blockedBehindRes.SelfFinalX);
+        Assert.Equal(101, blockedBehindRes.TargetFinalX);
+        Assert.Contains("身后受墙壁阻挡", blockedBehindRes.Message);
+    }
+
+    [Fact]
+    public void TestWarrior_DoubleFireHit_ConsecutiveBursts()
+    {
+        var tracker = new Mir2Client.Game.WarriorCombatEngine.FireHitTracker();
+
+        // 0.0s: 开启烈火蓄力
+        tracker.Cast(0);
+        Assert.True(tracker.IsReady);
+
+        // 8.1s: 冷却转好 (8000ms)，蓄力未过 (10000ms)，挥出第一刀爆发 260%
+        var hit1 = tracker.ConsumeOnHit(80, 8100);
+        Assert.True(hit1.isFireHit);
+        Assert.Equal((int)Math.Round(80 * 2.6), hit1.damage); // 208
+
+        // 8.2s: 立刻无缝开启第二发烈火剑法
+        var cast2 = tracker.Cast(8200);
+        Assert.True(cast2.success);
+
+        // 8.3s: 挥出第二刀秒伤爆发 260%！实现传奇正统双烈火核心战术
+        var hit2 = tracker.ConsumeOnHit(80, 8300);
+        Assert.True(hit2.isFireHit);
+        Assert.Equal(208, hit2.damage);
+    }
+
+    [Fact]
+    public void TestTrade_TwoPhaseLockAndSafetyChecks()
+    {
+        var tm = new Mir2Client.Game.TradeManager();
+        var ps = new Mir2Client.Game.PlayerState { Gold = 1000000 };
+        ps.BagItems.Add(new Mir2Client.Game.EquipItem { Uid = 101, Name = "裁决之杖" });
+
+        tm.StartTrade("传奇战士", 2001);
+        Assert.Equal(Mir2Client.Game.TradeState.Trading, tm.State);
+
+        // 1. 未锁定时尝试确认交易 -> 拒绝
+        var failConfirm = tm.ConfirmTrade(ps);
+        Assert.False(failConfirm.success);
+
+        // 2. 放入本地物品与金币并锁定
+        tm.SetGold(200000, ps.Gold);
+        tm.PutItem(0, ps.BagItems[0]);
+        tm.LockTrade();
+        Assert.True(tm.LocalLocked);
+
+        // 3. 本地主动解锁或修改 -> 自动打断锁定
+        tm.UnlockTrade();
+        Assert.False(tm.LocalLocked);
+        tm.SetGold(300000, ps.Gold);
+        tm.LockTrade();
+        Assert.True(tm.LocalLocked);
+
+        // 模拟对方修改物品或金币 -> 触发安全机制，自动打断我方锁定
+        tm.RemoteChangeGold(400000);
+        Assert.False(tm.LocalLocked);
+
+        // 4. 对方放入金币与物品，双方共同锁定进入 Locked 状态
+        tm.RemoteChangeGold(500000);
+        tm.RemoteAddItem(0, new Mir2Client.Game.EquipItem { Uid = 202, Name = "骨玉权杖" });
+        tm.SetRemoteLocked(true);
+        tm.LockTrade();
+        Assert.Equal(Mir2Client.Game.TradeState.Locked, tm.State);
+
+        // 5. 校验 500 万金币上限防溢出: 假设对方给 500 万金币导致溢出
+        tm.RemoteChangeGold(5000000);
+        tm.SetRemoteLocked(true);
+        tm.LockTrade();
+        var overflowRes = tm.ConfirmTrade(ps);
+        Assert.False(overflowRes.success);
+        Assert.Contains("5,000,000", overflowRes.reason);
+
+        // 6. 恢复正常金币，校验背包满 40 格拦截
+        tm.RemoteChangeGold(100000);
+        tm.SetRemoteLocked(true);
+        tm.LockTrade();
+        for (int i = ps.BagItems.Count; i < 40; i++)
+        {
+            ps.BagItems.Add(new Mir2Client.Game.EquipItem { Uid = 300 + i, Name = "金创药" });
+        }
+        var bagFullRes = tm.ConfirmTrade(ps);
+        Assert.False(bagFullRes.success);
+        Assert.Contains("空间不足", bagFullRes.reason);
+
+        // 7. 腾出空间，两阶段确认成功并执行原子交换
+        ps.BagItems.RemoveAt(ps.BagItems.Count - 1);
+        var successConfirm = tm.ConfirmTrade(ps);
+        Assert.True(successConfirm.success);
+
+        var exchangeRes = tm.ExecuteAtomicExchange(ps);
+        Assert.True(exchangeRes.success);
+
+        // 验证金币变动: 1000000 - 300000 + 100000 = 800000
+        Assert.Equal(800000, ps.Gold);
+        // 验证裁决之杖已移出，骨玉权杖已入袋
+        Assert.DoesNotContain(ps.BagItems, item => item.Uid == 101);
+        Assert.Contains(ps.BagItems, item => item.Uid == 202 && item.Name == "骨玉权杖");
+    }
 }
 
 

@@ -42,6 +42,8 @@ namespace Mir2Client.UI
         public StorageManager StorageManagerInstance { get; } = new();
         public GuildManager GuildManagerInstance { get; } = new();
         public PlayerState PlayerStateInstance { get; } = new();
+        public WarriorCombatEngine.FireHitTracker FireHitTrackerInstance { get; } = new();
+        public WarriorCombatEngine.StabbingTracker StabbingTrackerInstance { get; } = new();
 
         private WilLoader? _wilFloor;
         private WilLoader? _wilSmTiles;
@@ -596,7 +598,7 @@ namespace Mir2Client.UI
                     }
                     else if (_isSandbox)
                     {
-                        CheckSandboxMeleeHit(dir, 35);
+                        CheckSandboxMeleeHit(dir, 35, isStabSkill: true);
                     }
                     break;
 
@@ -615,20 +617,72 @@ namespace Mir2Client.UI
 
                 case 26: // 烈火剑法
                     PlayerInstance.Anim.SetAction(ActionType.FireHit, dir);
-                    AudioManager.Instance?.PlaySoundId(136);
+                    long nowTick = (long)now;
+                    var castRes = FireHitTrackerInstance.Cast(nowTick);
+                    if (castRes.success)
+                    {
+                        HudInstance?.AddChat("技能", castRes.reason, new Color(1f, 0.6f, 0.1f));
+                        AudioManager.Instance?.PlaySoundId(136);
+                    }
+                    else
+                    {
+                        HudInstance?.AddChat("提示", castRes.reason, new Color(1f, 0.3f, 0.3f));
+                    }
                     if (_net != null && _net.IsConnectedToServer)
                     {
                         _net.SendPacket(PacketEncoder.FireHit(0, (short)dir));
                     }
                     else if (_isSandbox)
                     {
-                        CheckSandboxMeleeHit(dir, 65);
+                        // 蓄力成功后如果正前方有目标，立即挥出烈火第一刀
+                        CheckSandboxMeleeHit(dir, 30);
                     }
                     break;
 
                 case 27: // 野蛮冲撞
                     PlayerInstance.Anim.SetAction(ActionType.Run, dir);
                     AudioManager.Instance?.PlaySoundId(134);
+                    if (_isSandbox)
+                    {
+                        var offsetDash = PlayerAuditEngine.DirOffsets[dir & 7];
+                        int f1x = PlayerInstance.TileX + offsetDash.X;
+                        int f1y = PlayerInstance.TileY + offsetDash.Y;
+                        EntityManager.EntityData? obstacle = null;
+                        foreach (var ent in EntityManagerInstance.AllEntities)
+                        {
+                            if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead && ent.TileX == f1x && ent.TileY == f1y)
+                            {
+                                obstacle = ent;
+                                break;
+                            }
+                        }
+
+                        var obsTuple = obstacle != null ? ((bool, int, int, int)?)(true, 10, obstacle.TileX, obstacle.TileY) : null;
+                        var dashRes = WarriorCombatEngine.ShoulderDash.ExecuteDash(
+                            selfLevel: PlayerStateInstance.Level,
+                            selfX: PlayerInstance.TileX,
+                            selfY: PlayerInstance.TileY,
+                            dir: dir,
+                            obstacleEntity: obsTuple,
+                            isTileBlocked: (x, y) => !(MapRendererInstance?.IsPassable(x, y) ?? true)
+                        );
+
+                        if (dashRes.Success)
+                        {
+                            PlayerInstance.SetTilePos(dashRes.SelfFinalX, dashRes.SelfFinalY);
+                            if (dashRes.TargetPushed && obstacle != null)
+                            {
+                                obstacle.TileX = dashRes.TargetFinalX;
+                                obstacle.TileY = dashRes.TargetFinalY;
+                                EntityManagerInstance.TriggerStruck(obstacle.Uid, 15, Math.Max(0, obstacle.Hp - 15));
+                            }
+                            HudInstance?.AddChat("技能", dashRes.Message, new Color(0.2f, 1f, 0.4f));
+                        }
+                        else
+                        {
+                            HudInstance?.AddChat("技能", dashRes.Message, new Color(1f, 0.3f, 0.3f));
+                        }
+                    }
                     if (_net != null && _net.IsConnectedToServer)
                     {
                         _net.SendPacket(PacketEncoder.Motaebo((short)dir));
@@ -716,24 +770,74 @@ namespace Mir2Client.UI
             }
         }
 
-        private void CheckSandboxMeleeHit(int dir, int damage)
+        private void CheckSandboxMeleeHit(int dir, int damage, bool isStabSkill = false)
         {
             if (PlayerInstance == null) return;
+            long now = (long)Time.GetTicksMsec();
+
+            // 1. 若处于烈火剑法蓄力状态，结算烈火出刀消耗
+            if (FireHitTrackerInstance.IsReady)
+            {
+                var fireRes = FireHitTrackerInstance.ConsumeOnHit(damage, now);
+                damage = fireRes.damage;
+                if (fireRes.isFireHit)
+                {
+                    HudInstance?.AddChat("特技", fireRes.desc, new Color(1f, 0.5f, 0.1f));
+                    AudioManager.Instance?.PlaySoundId(136);
+                }
+            }
+
             var offset = PlayerAuditEngine.DirOffsets[dir & 7];
-            int tx = PlayerInstance.TileX + offset.X;
-            int ty = PlayerInstance.TileY + offset.Y;
+            int step1X = PlayerInstance.TileX + offset.X;
+            int step1Y = PlayerInstance.TileY + offset.Y;
+            int step2X = PlayerInstance.TileX + offset.X * 2;
+            int step2Y = PlayerInstance.TileY + offset.Y * 2;
+
+            // 2. 优先命中贴身第 1 格目标
+            EntityManager.EntityData? targetStep1 = null;
+            EntityManager.EntityData? targetStep2 = null;
 
             foreach (var ent in EntityManagerInstance.AllEntities)
             {
-                if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead && ent.TileX == tx && ent.TileY == ty)
+                if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead)
                 {
-                    int newHp = Math.Max(0, ent.Hp - damage);
-                    EntityManagerInstance.TriggerStruck(ent.Uid, damage, newHp);
-                    HudInstance?.AddChat("战斗", $"物理命中【{ent.Name}】，造成 {damage} 点伤害！", new Color(1f, 0.8f, 0.2f));
-                    break;
+                    if (ent.TileX == step1X && ent.TileY == step1Y)
+                    {
+                        targetStep1 = ent;
+                        break;
+                    }
+                    else if (ent.TileX == step2X && ent.TileY == step2Y)
+                    {
+                        targetStep2 = ent;
+                    }
                 }
             }
+
+            if (targetStep1 != null)
+            {
+                int newHp = Math.Max(0, targetStep1.Hp - damage);
+                EntityManagerInstance.TriggerStruck(targetStep1.Uid, damage, newHp);
+                HudInstance?.AddChat("战斗", $"近身命中【{targetStep1.Name}】，造成 {damage} 点物理伤害！", new Color(1f, 0.8f, 0.2f));
+                return;
+            }
+
+            // 3. 若第 1 格无目标，且开启刺杀开关或触发刺杀技能，判定隔位第 2 格剑气
+            if (targetStep2 != null && (isStabSkill || StabbingTrackerInstance.AutoStabEnabled))
+            {
+                var (finalDmg, isPierce, desc) = WarriorCombatEngine.StabbingTracker.CalculateDamage(
+                    damage,
+                    WarriorCombatEngine.StabbingTracker.HitDistanceType.StabbingFar,
+                    autoStab: true,
+                    targetAc: 15,
+                    targetShieldReduction: 0.6);
+
+                int newHp = Math.Max(0, targetStep2.Hp - finalDmg);
+                EntityManagerInstance.TriggerStruck(targetStep2.Uid, finalDmg, newHp);
+                HudInstance?.AddChat("刺杀", $"【隔位刺杀】剑气穿透！命中【{targetStep2.Name}】，无视防御与魔法盾造成 {finalDmg} 点穿透伤害！", new Color(0.3f, 0.9f, 1f));
+                AudioManager.Instance?.PlaySoundId(1);
+            }
         }
+
 
         private void CheckSandboxSpellHit(int magicId, Vector2I targetTile)
         {

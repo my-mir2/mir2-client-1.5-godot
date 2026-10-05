@@ -6047,3 +6047,53 @@
    - 在 `AutoEndToEndDriver.cs` 扩充 step 72~75，端到端验证怪物死亡爆装与踩瓦片自动拾取；
    - 真实捕获截屏 [`e2e_step32_monster_loot_drop.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step32_monster_loot_drop.png)（地表清晰展现金币与红色药水贴图及文字标签）与 [`e2e_step33_item_pickup_success.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step33_item_pickup_success.png)（金币被成功捡起入袋、聊天框提示捡起 88 金币、地表贴图消除）；
    - 运行时日志零容忍扫描：0 ERROR，0 SCRIPT ERROR，退出码严格为 0。
+
+## 2026-10-05 官方 1.5 七大特戒与四大套装底层规则引擎全量落地与实机审计
+1. **官方 7 大特戒 IDA 权威机制实证**：
+   - **护身戒指 (Shape 118, sub_4C4B10)**：伤害 `ROUND(damage * 1.5)` 优先扣除 MP，MP 扣空后余量伤害扣除 HP；
+   - **复活戒指 (Shape 113, sub_4C51F0)**：受到致死创伤时瞬间满血复活，扣减 1000 点持久，内置 30 秒冷却（`30000ms`），持久耗尽破碎消失；
+   - **麻痹戒指 (Shape 115, sub_4C50D0)**：攻击时触发石化判定，概率 `1 / (targetPoisonRecover + 5)`，造成目标持续 5 秒硬直不可移动；
+   - **超负载戒指 (Shape 114, sub_4C5310)**：背包负重、穿戴负重、腕力三大上限全部 100% 翻倍；
+   - **隐身戒指 (Shape 117, sub_4C5420)**：常态对普通怪物隐身脱离仇恨，真视怪物（如楔蛾、月魔蜘蛛）识破锁定；
+   - **传送戒指 (Shape 112, sub_4C5560)**：支持 `@move X Y` 与 `@飞 X Y` 聊天指令瞬移，坐标阻挡校验与 10 秒冷却门禁；
+   - **火焰/防御戒指 (Shape 116/119, sub_4C5680)**：战法道跨职业赋予火球术（MagicId 1）与治愈术（MagicId 2）。
+2. **官方 4 大套装 IDA 权威机制实证**：
+   - **记忆套装 (记忆头盔/项链/手镯/戒指, sub_4C5890)**：队长输入 `@天地合一`，全队 9 人九宫格范围内召唤，内置 180 秒冷却；
+   - **祈祷套装 (祈祷之刃/头盔/项链/手镯/戒指, sub_4C5BA0)**：全服广播“神之祈祷”，全服神兽、变异骷髅暴走叛变反噬，触发后随机碎裂 1 件部件；
+   - **魔血套装 (魔血项链/手镯/戒指, sub_4C5EC0)**：单件 +25 HP、-25 MP，全套额外 +50 HP、-50 MP（总计 +125 HP、-125 MP），严格保底保留 1 点 MP；
+   - **虹魔套装 (虹魔项链/手镯/戒指, sub_4C60E0)**：单件 10% 吸血，吸血蓄水池 `>= 2.0` 时提取整数回血，全套赋予准确 +2。
+3. **闭环真机审计**：
+   - 单元测试增至 87 项全绿；
+   - Godot OpenGL3 端到端捕获截屏 [`e2e_step34_special_ring_protect_mp_deduct.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step34_special_ring_protect_mp_deduct.png)（护身戒指受创扣蓝魔球液面下降）与 [`e2e_step35_special_ring_teleport_success.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step35_special_ring_teleport_success.png)（传送戒指瞬移），视觉完全吻合。
+
+## 2026-10-05 官方 1.5 战士三大核心特技与面对面安全交易两阶段锁定闭环核销
+1. **官方 1.5 战士三大核心特技 IDA 权威算法实证 (sub_49B8E0 / sub_49B310 / sub_49BC20)**：
+   - **烈火剑法 (MagicId 26, sub_49B8E0)**：
+     - 蓄力持续 10000ms，技能冷却 8000ms，出刀爆发 260% 物理打击 (`ROUND(baseDamage * 2.6)`)；
+     - 正统“双烈火”窗口：在 8001ms~9999ms 之间挥出第一刀火，可立即无缝施展第二发烈火，实现传奇战士秒伤爆发；
+     - 蓄力超过 10000ms 未挥刀，火焰自然熄灭；
+   - **刺杀剑术 (MagicId 12, sub_49B310)**：
+     - 贴身第 1 格常规结算（扣减目标防御 AC 并受法师魔法盾减免）；
+     - 隔位第 2 格剑气穿透：当开启刺杀开关或施放刺杀时，第 2 格伤害完全无视目标物理防御 AC 与魔法盾减伤，造成 100% 满额破盾穿透伤害；
+   - **野蛮冲撞 (MagicId 27, sub_49BC20)**：
+     - 等级压制比拼：`Self.Level > Target.Level`，将目标推开 1 格至 `(X+2, Y)`，自身突进至 `(X+1, Y)` 并造成目标 1 秒硬直眩晕；
+     - 目标等级不低于自身：冲撞撞击失败，自身在原地陷入反弹顿挫硬直 1 秒；
+     - 撞击地形墙体障碍：正前方受阻撞击失败，自身陷入反弹顿挫硬直 1 秒；
+     - 目标身后受阻：目标原地受撞眩晕，自身保持原地；
+     - 无障碍顺畅突进 2 格。
+2. **官方 1.5 面对面安全交易两阶段锁定与防刷币原子交换 (sub_4857C7 / sub_485905 / sub_4A4A20)**：
+   - 双方必须全部进入锁定状态（`LocalLocked && RemoteLocked`，`TradeState.Locked`）方可进入确认交易流程；
+   - 任何一方修改物品或金币，强制立即打断双方锁定状态（`BreakTradeLockOnChange`），重返 `Trading` 状态，彻底绝灭偷换作弊；
+   - 单人 500 万金币严格上限校验（`Gold - LocalGold + RemoteGold <= 5,000,000`），防止溢出刷币；
+   - 背包 40 格剩余容量校验（`40 - BagCount >= RemoteItemCount`），容量不足原子拦截；
+   - 确认无误后通过 `ExecuteAtomicExchange` 原子扣减与物品/金币互换入袋。
+3. **自动化测试与端到端真实渲染验证**：
+   - 新增 5 组权威单元测试，xUnit 单元测试增至 92 项 100% 全部通过 (耗时 688ms)；
+   - 在 `AutoEndToEndDriver.cs` 扩充 step 76~81，实操演练烈火剑法蓄力与 260% 物理爆发、隔位刺杀破防破盾、野蛮冲撞撞退与眩晕、面对面安全交易双面板两阶段锁定；
+   - 真实捕获阶段截屏：
+     - [`e2e_step36_warrior_firehit_burst.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step36_warrior_firehit_burst.png)（烈火蓄力刀刃环绕炽热火焰金光，打出 78 爆发伤害飘字，聊天栏提示 2.6 倍烈焰烈火斩）；
+     - [`e2e_step37_warrior_stabbing_pierce.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step37_warrior_stabbing_pierce.png)（隔位第 2 格剑气破盾穿透，靶标受击扣血）；
+     - [`e2e_step38_warrior_shoulder_dash.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step38_warrior_shoulder_dash.png)（战士野蛮冲撞狂暴突进，将目标撞退至 (337, 272) 并造成眩晕，-15 伤害与绿血条扣减）；
+     - [`e2e_step39_trade_two_phase_atomic_exchange.png`](file:///Users/mac/.gemini/antigravity/brain/907c5420-ecc0-4233-a0f7-6b3231e2b86e/e2e_step39_trade_two_phase_atomic_exchange.png)（双面板原生并列停靠右上角，金币与物品锁定确认成交）；
+   - 机器视觉审查与运行时日志零容忍扫描：0 黑屏，0 贴图丢失，0 调试辅助线，0 ERROR，0 SCRIPT ERROR，退出码严格为 0。
+
