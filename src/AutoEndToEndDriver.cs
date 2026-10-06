@@ -5,6 +5,7 @@ using Mir2Client.Audio;
 using Mir2Client.Game;
 using Mir2Client.Render;
 using Mir2Client.UI;
+using Mir2Client.Utils;
 
 namespace Mir2Client;
 
@@ -225,7 +226,7 @@ public partial class AutoEndToEndDriver : Node
                     {
                         GD.Print("[AutoE2E] 验证快捷键呼出包裹面板 (F9) 与底部官方金属内胆属性回显");
                         hud.ToggleBag();
-                        hud.SetBagItem(0, "屠龙刀", "Items_0059.png", "重量 99  持久力 33/33\n攻击 5-35  强度+1  幸运+7\n需要等级 35");
+                        hud.SetBagItem(0, "屠龙刀", "Items_0057.png", "重量 99  持久力 33/33\n攻击 5-35  强度+1  幸运+7\n需要等级 35");
                         hud.ShowSlotTooltip("屠龙刀", "[color=#c0c0c0]重量 99  持久力 33/33[/color]\n[color=#ffff00]攻击 5-35  强度+1[/color]  [color=#00ffff]幸运+7[/color]\n[color=#c0c0c0]需要等级 35[/color]", new Vector2(400, 100), showFloating: false);
                     }
                 }
@@ -377,8 +378,30 @@ public partial class AutoEndToEndDriver : Node
                 if (gameView?.HudInstance != null)
                 {
                     gameView.HudInstance.ToggleGroup(); // 关闭组队
-                    GD.Print("[AutoE2E] === 验证仓库保管箱面板 (StoragePanelView) ===");
+                    GD.Print("[AutoE2E] === 验证官方 1.5 仓库托管物品 (DSellDlg 模式 2) 与存取列表 ===");
                     gameView.HudInstance.ToggleStorage();
+                    
+                    // 1. 设置背包第 0 格待存物品屠龙刀并装载至托管槽位
+                    gameView.HudInstance.SetBagItem(0, "屠龙刀", "Items_0057.png", "[color=#ffff00]攻击 5-35  强度+1[/color]");
+                    // 背包注入其他标准 1:1 物品供视觉审计
+                    gameView.HudInstance.SetBagItem(1, "布衣(男)", "Items_0006.png", "[color=#ffff00]防御 1-2[/color]");
+                    gameView.HudInstance.SetBagItem(2, "强效太阳水", "Items_0016.png", "[color=#c0c0c0]瞬回生命与魔法[/color]");
+                    gameView.HudInstance.SetBagItem(3, "凝霜剑", "Items_0045.png", "[color=#ffff00]攻击 10-13[/color]");
+                    gameView.HudInstance.UpdateGold(888888);
+                    
+                    var texTuLong = ResPath.LoadImageTexture("resources/wil/png/Items/Items_0057.png");
+                    gameView.HudInstance.RepairPanel?.SetSlotItem(texTuLong, 0, "屠龙刀");
+                    
+                    // 2. 模拟点击 OK 按钮确认托管存仓，清空背包第 0 格并回显系统提示
+                    gameView.HudInstance.RepairPanel?.EmitSignal(RepairPanelView.SignalName.StorageDepositConfirmed, 0, "屠龙刀");
+
+                    // 3. 打开仓库已存物品取回列表 (ShopPanelView Storage 模式)，展示官方原版取回列表与高亮行
+                    gameView.HudInstance.OpenStorageList(new[]
+                    {
+                        ShopPanelView.ShopItemEntry.Stored("屠龙刀", 33, 33),
+                        ShopPanelView.ShopItemEntry.Stored("裁决之杖", 20, 28),
+                        ShopPanelView.ShopItemEntry.Stored("金创药(特)", 1, 1)
+                    });
                 }
                 break;
             }
@@ -435,6 +458,8 @@ public partial class AutoEndToEndDriver : Node
                     gameView.HudInstance.ToggleShop(101); // 关闭商店
                     GD.Print("[AutoE2E] === 验证铁匠铺修理面板 (RepairPanelView) ===");
                     gameView.HudInstance.ToggleRepair();
+                    var texFrost = ResPath.LoadImageTexture("resources/wil/png/Items/Items_0045.png");
+                    gameView.HudInstance.RepairPanel?.SetSlotItem(texFrost, 3, "凝霜剑");
                 }
                 break;
             }
@@ -469,12 +494,11 @@ public partial class AutoEndToEndDriver : Node
                 if (gameView?.HudInstance != null)
                 {
                     gameView.HudInstance.ToggleTrade(); // 关闭交易
-                    GD.Print("[AutoE2E] === 验证行会面板 (GuildPanelView) ===");
-                    // MOCK 数据(非官方内容,仅验证官方三段格式的渲染)
-                    gameView.HudInstance.GuildPanel?.SetHomeText(
-                        new[] { "本周六晚八点攻城。", "请备足药品。" },
-                        new[] { "不败神话" },
-                        new[] { "邪风军团", "昔日同盟" });
+                    GD.Print("[AutoE2E] === 验证行会面板三段切分 (GuildPanelView) ===");
+                    // 官方 IDA sub_46E0B8 实证原始服务端三段报文格式
+                    gameView.HudInstance.GuildPanel?.SetGuildName("沙巴克");
+                    gameView.HudInstance.GuildPanel?.UpdateHomeNotice(
+                        "<Notice>\n本周六晚八点攻城，沙巴克风云再起！\n全体成员请提前到比奇皇宫集合，备足疗伤药与随机传送卷！\n<KillGuilds>\n不败神话\n邪风军团\n<AllyGuilds>\n昔日同盟\n兄弟盟");
                     gameView.HudInstance.ToggleGuild();
                 }
                 break;
@@ -492,8 +516,10 @@ public partial class AutoEndToEndDriver : Node
                 if (gameView?.HudInstance != null)
                 {
                     gameView.HudInstance.ToggleGuild(); // 关闭行会
-                    GD.Print("[AutoE2E] === 验证NPC对话框 (NpcDialogView) ===");
-                    gameView.HudInstance.NpcDialog?.ShowDialog("比奇老兵", "欢迎来到热血传奇1.5官方复刻版！\n\n请选择前往的目的地：", new string[] { "前往盟重省", "前往毒蛇山谷", "取消" });
+                    if (gameView.HudInstance.ShopPanel != null) gameView.HudInstance.ShopPanel.Visible = false; // 彻底关闭商店列表避免遮挡
+                    GD.Print("[AutoE2E] === 验证NPC对话框超链接脚本与分色 (NpcDialogView) ===");
+                    // 官方 IDA sub_48EAC0 脚本格式: 普通白字, 黄色超链接带下划线, 红色退出命令带下划线
+                    gameView.HudInstance.NpcDialog?.ShowDialog("欢迎来到玛法大陆！这里是盟重土城。\\最近半兽人猖獗，请年轻勇士多加小心。\\<前往比奇省/@move_biqi>\\<前往毒蛇山谷/@move_snake>\\<购买补给药品/@buy_drugs>\\<离开/@exit>");
                 }
                 break;
             }
@@ -1271,7 +1297,7 @@ public partial class AutoEndToEndDriver : Node
                     GD.Print("[AutoE2E] === 验证官方 1.5 HUD 攻击模式循环切换 (Ctrl+H) 与黑夜日相切换 ===");
                     // 循环切换攻击模式: 全体(1, Prguse_0016) -> 和平(2, Prguse_0017)
                     gameView.HudInstance.CycleNextAttackMode();
-                    // 切换为黑夜模式 (Prguse_0014 @ 748, 428) 并开启火把迷雾
+                    // 切换为黑夜模式 (Prguse_0013 @ 748, 535) 并开启火把迷雾
                     gameView.HudInstance.SetDayNightState(2);
                     gameView.HudInstance.UpdateVisionFog(true, 8, new Vector2(400, 225));
                 }
@@ -1287,7 +1313,7 @@ public partial class AutoEndToEndDriver : Node
                     GD.Print("[AutoE2E] === 验证官方 1.5 物品槽位拖拽调位 (Bag->Bag) 与装备穿戴脱下 (Bag<->Equip) ===");
                     // 1. 设置背包第 0 格为裁决之杖，第 1 格为布衣(男)，第 2 格为强效太阳水，第 3 格为金币
                     gameView.HudInstance.SetBagItem(0, "裁决之杖", "Items_0059.png", "[color=#ffff00]攻击 0-30[/color]");
-                    gameView.HudInstance.SetBagItem(1, "布衣(男)", "Items_0060.png", "[color=#ffff00]防御 1-2[/color]");
+                    gameView.HudInstance.SetBagItem(1, "布衣(男)", "Items_0006.png", "[color=#ffff00]防御 1-2[/color]");
                     gameView.HudInstance.SetBagItem(2, "强效太阳水", "Items_0016.png", "[color=#c0c0c0]瞬回生命与魔法[/color]");
                     gameView.HudInstance.SetBagItem(3, "金币", "Items_0000.png", "[color=#ffff00]面值 5000[/color]");
 
@@ -1313,20 +1339,27 @@ public partial class AutoEndToEndDriver : Node
                 var gameView = _main.GetNodeOrNull<GameView>("Game");
                 if (gameView != null && gameView.HudInstance != null)
                 {
-                    // 1. 打开面对面交易窗体并设置对方玩家名
+                    // 确保先关闭商店面板，避免窗口遮挡
+                    if (gameView.HudInstance.ShopPanel != null) gameView.HudInstance.ShopPanel.Visible = false;
+
+                    // 1. 添加大尺寸武器到背包
+                    gameView.HudInstance.AddBagItem("井中月", "Items_0060.png", "井中月");
+
+                    // 2. 打开面对面交易窗体并设置对方玩家名 (联动定位背包 (0,0) 与交易窗 (464,0))
                     gameView.HudInstance.OpenTrade("无敌战神");
 
-                    // 2. 模拟从背包拖拽物品放入交易栏第 1 格 (Slot 0)
+                    // 3. 模拟从背包拖拽物品放入交易栏 (Slot 0 与 Slot 1)
                     gameView.HudInstance.PutBagItemToTradeSlot(0, 0);
+                    gameView.HudInstance.PutBagItemToTradeSlot(1, 1);
 
-                    // 3. 模拟对方放入物品
+                    // 4. 模拟对方放入大尺寸武器 "骨玉权杖"
                     gameView.HudInstance.OnServerTradeRemoteAddItem(0, "骨玉权杖");
 
-                    // 4. 模拟双方修改交易金币
+                    // 5. 模拟双方修改交易金币
                     gameView.HudInstance.OnServerTradeChgGold(88888, true);
                     gameView.HudInstance.OnServerTradeChgGold(66666, false);
 
-                    // 5. 模拟我方锁定交易
+                    // 6. 模拟我方锁定交易
                     gameView.HudInstance.TradePanel?.SetLocked(true, true);
                 }
                 RequestCapture("step51_face_to_face_trade_panel");
@@ -1342,7 +1375,117 @@ public partial class AutoEndToEndDriver : Node
 
             case 93:
             {
-                GD.Print("[AutoE2E] ALL DYNAMIC DETAILS, RETRO DITHER & SABUK WAR COMPLETED SUCCESSFULLY!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    if (gameView.HudInstance.TradePanel != null) gameView.HudInstance.TradePanel.Visible = false;
+                    if (gameView.HudInstance.StoragePanel != null) gameView.HudInstance.StoragePanel.Visible = false;
+
+                    GD.Print("[AutoE2E] === 验证官方 1.5 行会成员列表视图 (GuildMemberListView) ===");
+                    var guild = gameView.HudInstance.GuildPanel;
+                    if (guild != null)
+                    {
+                        guild.Visible = true;
+                        guild.SetGuildName("沙巴克");
+                        guild.SetMemberList(new List<(string role, string name, string job, int level, bool online)>
+                        {
+                            ("掌门人", "无涯", "道士", 45, true),
+                            ("副会长", "小虾米", "战士", 46, true),
+                            ("青龙堂主", "魂十五", "战士", 45, true),
+                            ("白虎堂主", "风云九哥", "法师", 44, true),
+                            ("朱雀堂主", "乾隆", "法师", 43, false),
+                            ("玄武堂主", "墨风", "道士", 44, true),
+                            ("精英", "保剑锋", "战士", 42, true),
+                            ("精英", "烈火狂人", "战士", 41, false),
+                            ("帮众", "玛法勇士", "法师", 38, true),
+                            ("帮众", "逐日道童", "道士", 35, true),
+                            ("帮众", "半兽克星", "战士", 32, false),
+                            ("帮众", "新手学徒", "道士", 22, true)
+                        });
+                        guild.ShowMemberList();
+                    }
+                }
+                RequestCapture("step13b_guild_member_list");
+                break;
+            }
+
+            case 94:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance?.GuildPanel != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 行会编辑公告子窗口 (Prguse_0204 608x327) ===");
+                    var guild = gameView.HudInstance.GuildPanel;
+                    guild.EditNoticeDlg?.Open("沙巴克攻城战动员令：\n本周六晚八点准时发起总攻！全体成员备好疗伤药与随机卷轴，法师团皇宫铺火，战士组封锁台阶，道士打防施毒！\n胜利必将属于我们！");
+                }
+                RequestCapture("step13c_guild_edit_notice");
+                break;
+            }
+
+            case 95:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance?.GuildPanel != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 行会编辑封号子窗口 (Prguse_0181 352x250) ===");
+                    var guild = gameView.HudInstance.GuildPanel;
+                    if (guild.EditNoticeDlg != null) guild.EditNoticeDlg.Visible = false;
+                    guild.EditRankDlg?.Open("魂十五", "无敌战神", new[] { "无涯", "小虾米", "魂十五", "风云九哥", "乾隆", "墨风" });
+                }
+                RequestCapture("step13d_guild_edit_rank");
+                break;
+            }
+
+            case 96:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance?.GuildPanel != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 行会人事管理模态输入框 (添加成员 / MessageBoxDialog Prguse_0360) ===");
+                    var guild = gameView.HudInstance.GuildPanel;
+                    if (guild.EditRankDlg != null) guild.EditRankDlg.Visible = false;
+                    // 显式调用添加成员弹窗逻辑，弹出官方 1.5 模态输入框 (Prguse_0360)
+                    guild.OpenAddMemberDialog();
+                    var msgBox = gameView.HudInstance.MessageBox;
+                    if (msgBox != null && msgBox.Visible)
+                    {
+                        var txtInput = msgBox.GetNodeOrNull<LineEdit>("Panel/TxtInput");
+                        if (txtInput != null)
+                        {
+                            txtInput.Text = "狂暴战士";
+                        }
+                    }
+                }
+                RequestCapture("step13e_guild_add_member_modal");
+                break;
+            }
+
+            case 97:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance?.GuildPanel != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 行会掌门人/会员权限掩码 (IDA sub_4930A0 [0x4930fa..0x4931fe]) ===");
+                    var guild = gameView.HudInstance.GuildPanel;
+                    var msgBox = gameView.HudInstance.MessageBox;
+                    if (msgBox != null) msgBox.Visible = false; // 关闭前序模态框
+
+                    // 切换为普通成员视图：8 大管理按钮自动隐藏
+                    guild.SetLeaderMode(false);
+                }
+                RequestCapture("step13f_guild_normal_member_mode");
+                break;
+            }
+
+            case 98:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance?.GuildPanel != null)
+                {
+                    // 恢复会长模式
+                    gameView.HudInstance.GuildPanel.SetLeaderMode(true);
+                }
+                GD.Print("[AutoE2E] ALL GUILD SYSTEM PANELS, DYNAMIC DETAILS & SABUK WAR COMPLETED SUCCESSFULLY!");
                 GetTree().Quit();
                 break;
             }
