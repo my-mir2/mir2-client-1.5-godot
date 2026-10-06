@@ -1,0 +1,3 @@
+<Project>
+  <!-- 阻断父级目录 (如 D:\Directory.Build.props) 的非预期 MSBuild 继承 -->
+</Project>
