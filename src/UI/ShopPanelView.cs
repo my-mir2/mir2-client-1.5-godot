@@ -50,6 +50,8 @@ public partial class ShopPanelView : Control, IManagedWindow
     private int _selectedIndex = -1;
     private int _pageIndex = 0;
     private readonly List<Panel> _itemRowPanels = new();
+    private TextureButton? _btnPrev;
+    private TextureButton? _btnNext;
 
     public ShopMode CurrentMode => _currentMode;
 
@@ -67,11 +69,25 @@ public partial class ShopPanelView : Control, IManagedWindow
         public string Name;
         public int Weight;
         public int Price;
+        /// <summary>托管列表专用: 当前持久(IDA sub_46DB28: 源字段 +0x30 ushort / 除数 → 条目 +14h)</summary>
+        public int Dura;
+        /// <summary>托管列表专用: 最大持久(IDA sub_46DB28: 源字段 +0x32 ushort / 除数 → 条目 +18h)</summary>
+        public int MaxDura;
         public ShopItemEntry(string name, int weight, int price)
         {
             Name = name;
             Weight = weight;
             Price = price;
+            Dura = 0;
+            MaxDura = 0;
+        }
+
+        public static ShopItemEntry Stored(string name, int dura, int maxDura)
+        {
+            var e = new ShopItemEntry(name, 0, 0);
+            e.Dura = dura;
+            e.MaxDura = maxDura;
+            return e;
         }
     }
 
@@ -110,28 +126,28 @@ public partial class ShopPanelView : Control, IManagedWindow
         btnClose.Pressed += OnClose;
         _panel.AddChild(btnClose);
 
-        // 官方表头 sub_48F020 0x48f10b..0x48f181: 物品列表(19,8)/价格(156,8)/持久(245,8)
-        _lblHeaderList = new Label { Text = "物品列表", Position = new Vector2(19, 8) };
+        // 官方表头 sub_48F020 0x48f10b..0x48f181 & 0x48f37a: 物品列表(19,11)/价格(156,11)/持久(245,11) (mov eax, 0Bh=11)
+        _lblHeaderList = new Label { Text = "物品列表", Position = new Vector2(19, 11) };
         _lblHeaderList.AddThemeFontSizeOverride("font_size", 12);
         _lblHeaderList.AddThemeColorOverride("font_color", Colors.White);
         _panel.AddChild(_lblHeaderList);
 
-        _lblHeaderPrice = new Label { Text = "价格", Position = new Vector2(156, 8) };
+        _lblHeaderPrice = new Label { Text = "价格", Position = new Vector2(156, 11) };
         _lblHeaderPrice.AddThemeFontSizeOverride("font_size", 12);
         _lblHeaderPrice.AddThemeColorOverride("font_color", Colors.White);
         _panel.AddChild(_lblHeaderPrice);
 
-        _lblHeaderDura = new Label { Text = "持久", Position = new Vector2(245, 8) };
+        _lblHeaderDura = new Label { Text = "持久", Position = new Vector2(245, 11) };
         _lblHeaderDura.AddThemeFontSizeOverride("font_size", 12);
         _lblHeaderDura.AddThemeColorOverride("font_color", Colors.White);
         _panel.AddChild(_lblHeaderDura);
 
-        // 官方原生商品列表展示区域 (Left: 0, Top: 32, Width: 307, Height: 130，10 行 x 13px)
+        // 官方原生商品列表展示区域 (IDA sub_48F020: 内胆 X: 10..295, Top: 32, 10 行 x 13px，左右留出内衬)
         _itemListContainer = new VBoxContainer
         {
             Name = "ShopItemListContainer",
-            Position = new Vector2(0, 32),
-            Size = new Vector2(307, 130),
+            Position = new Vector2(10, 32),
+            Size = new Vector2(285, 130),
             MouseFilter = MouseFilterEnum.Pass
         };
         _itemListContainer.AddThemeConstantOverride("separation", 0);
@@ -140,38 +156,48 @@ public partial class ShopPanelView : Control, IManagedWindow
         // 监听滚轮翻页支持 (IDA sub_48FC14/sub_48FCB4)
         _panel.GuiInput += OnPanelGuiInput;
 
-        // 官方原生上一页按钮 (Prguse_0388 @ 43, 175, 物理尺寸 24x24, IDA sub_481dd4 [0x484fde..0x485011] & sub_48FC14)
+        // IDA 铁证: 商店窗体按钮的绘制回调(0x490AD2..0x490B4F)为
+        //   if (Sender.Downed(+274h)) { 画 (Sender+254h 图库, +258h 图号) 于按钮位置 }
+        // 即 388/387/386 仅是"按下态叠加图"，常态完全不画，显露底板 Prguse_0385 自带的按钮；
+        // 官方无悬停态、无禁用遮罩 → TextureNormal/TextureHover 均为 null，禁止任何自创遮罩。
+        // 上一页 (Prguse_0388 @ 43,175 24x24, IDA sub_481dd4 [0x484fde..0x485011])
         var texPrev = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0388.png");
-        var btnPrev = new TextureButton
+        _btnPrev = new TextureButton
         {
             Name = "BtnShopPrev",
             Position = new Vector2(43, 175),
             Size = new Vector2(24, 24),
-            TextureNormal = texPrev
+            TextureNormal = null,
+            TexturePressed = texPrev,
+            TextureHover = null
         };
-        btnPrev.Pressed += OnPrevPage;
-        _panel.AddChild(btnPrev);
+        _btnPrev.Pressed += OnPrevPage;
+        _panel.AddChild(_btnPrev);
 
-        // 官方原生下一页按钮 (Prguse_0387 @ 90, 175, 物理尺寸 24x24, IDA sub_481dd4 [0x485024..0x485057] & sub_48FCB4)
+        // 下一页 (Prguse_0387 @ 90,175 24x24, IDA sub_481dd4 [0x485024..0x485057])
         var texNext = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0387.png");
-        var btnNext = new TextureButton
+        _btnNext = new TextureButton
         {
             Name = "BtnShopNext",
             Position = new Vector2(90, 175),
             Size = new Vector2(24, 24),
-            TextureNormal = texNext
+            TextureNormal = null,
+            TexturePressed = texNext,
+            TextureHover = null
         };
-        btnNext.Pressed += OnNextPage;
-        _panel.AddChild(btnNext);
+        _btnNext.Pressed += OnNextPage;
+        _panel.AddChild(_btnNext);
 
-        // 官方原生确定购买按钮 (Prguse_0386 OK 标识 @ 215, 171, 物理尺寸 44x16, IDA sub_481dd4 [0x48506a..0x48509d] & sub_48FA80)
+        // 确定 (Prguse_0386 @ 215,171 44x16, IDA sub_481dd4 [0x48506a..0x48509d])
         var texBuy = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0386.png");
         var btnBuy = new TextureButton
         {
             Name = "BtnShopBuy",
             Position = new Vector2(215, 171),
             Size = new Vector2(44, 16),
-            TextureNormal = texBuy
+            TextureNormal = null,
+            TexturePressed = texBuy,
+            TextureHover = null
         };
         btnBuy.Pressed += OnBuyCurrentSelection;
         _panel.AddChild(btnBuy);
@@ -228,13 +254,20 @@ public partial class ShopPanelView : Control, IManagedWindow
     public void SetMode(ShopMode mode)
     {
         _currentMode = mode;
+        // IDA sub_48F020: +775h(托管/列表标志)=0 → 表头 "物品列表"@19 / "价格"@156 / "持久"@245；
+        //                 +775h≠0 → 表头 "托管物品列表"@19 / "持久"@156 / ""@245
+        bool stored = mode == ShopMode.Storage;
         if (_lblHeaderList != null)
         {
-            _lblHeaderList.Text = mode == ShopMode.Storage ? "保管物品列表" : "物品列表";
+            _lblHeaderList.Text = stored ? "托管物品列表" : "物品列表";
         }
         if (_lblHeaderPrice != null)
         {
-            _lblHeaderPrice.Text = mode == ShopMode.Storage ? "数量" : "价格";
+            _lblHeaderPrice.Text = stored ? "持久" : "价格";
+        }
+        if (_lblHeaderDura != null)
+        {
+            _lblHeaderDura.Text = stored ? "" : "持久";
         }
     }
 
@@ -274,69 +307,76 @@ public partial class ShopPanelView : Control, IManagedWindow
 
             var row = new Panel
             {
-                CustomMinimumSize = new Vector2(307, 13),
-                Size = new Vector2(307, 13),
+                CustomMinimumSize = new Vector2(285, 13),
+                Size = new Vector2(285, 13),
                 MouseFilter = MouseFilterEnum.Stop
             };
 
             bool isSelected = (globalIdx == _selectedIndex);
-            row.AddThemeStyleboxOverride("panel", isSelected 
-                ? new StyleBoxFlat { BgColor = new Color(0.18f, 0.25f, 0.45f, 0.85f) } 
-                : new StyleBoxEmpty());
+            // 官方 IDA sub_48F020 @ 0x48f1ef..0x48f240 铁证：列表绝无横向背景拉伸色块！
+            // 选中行文字 SetTextColor(hdc, 0xFF) 为鲜红色(RGB 255, 0, 0)，未选中为白色，背景完全透明
+            row.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
 
-            // 1. 商品名称 (Left=19, Width=130, 官方 13px 行高)
+            var rowColor = isSelected ? new Color(1.0f, 0.0f, 0.0f) : Colors.White;
+
+            // 0. 官方选中指示符 (IDA sub_48F020 @ 0x48f201/0x48f467: 仅选中行在 X=12 绘制 #7 字符标记, 相对行内 X=2)
+            var lblBullet = new Label
+            {
+                Position = new Vector2(2, 0),
+                Size = new Vector2(7, 13),
+                Text = isSelected ? "•" : "",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            lblBullet.AddThemeFontSizeOverride("font_size", 10);
+            lblBullet.AddThemeColorOverride("font_color", new Color(1.0f, 0.0f, 0.0f));
+            row.AddChild(lblBullet);
+
+            // 1. 商品名称 (相对容器 X=10，文本相对行 X=9 即绝对 X=19 对齐表头, 官方 13px 行高)
             var lblName = new Label
             {
-                Position = new Vector2(19, -2),
-                Size = new Vector2(130, 16),
+                Position = new Vector2(9, 0),
+                Size = new Vector2(125, 13),
                 Text = item.Name,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblName.AddThemeFontSizeOverride("font_size", 11);
-            lblName.AddThemeColorOverride("font_color", isSelected ? new Color(1.0f, 1.0f, 0.4f) : new Color(0.9f, 0.9f, 0.9f));
+            lblName.AddThemeColorOverride("font_color", rowColor);
             row.AddChild(lblName);
 
-            // 2. 价格 (Left=146, Width=60, 靠右对齐表头)
+            bool storedMode = _currentMode == ShopMode.Storage;
+
+            // 2. x=156 列 (行容器左偏移 10 → 行内相对 X=146，整行同色，左对齐)
+            //    普通模式 IDA 0x48f2c1..0x48f303: TextOut(156, 32+13*行, 价格+"金币")
+            //    托管模式 IDA 0x48f527..0x48f583: TextOut(156, 32+13*行, 当前持久+"/"+最大持久)
             var lblPrice = new Label
             {
-                Position = new Vector2(146, -2),
-                Size = new Vector2(60, 16),
-                Text = item.Price.ToString(),
-                HorizontalAlignment = HorizontalAlignment.Right,
+                Position = new Vector2(146, 0),
+                Size = new Vector2(88, 13),
+                Text = storedMode ? $"{item.Dura}/{item.MaxDura}" : item.Price.ToString() + "金币",
+                HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblPrice.AddThemeFontSizeOverride("font_size", 11);
-            lblPrice.AddThemeColorOverride("font_color", new Color(1.0f, 0.85f, 0.3f));
+            lblPrice.AddThemeColorOverride("font_color", rowColor);
             row.AddChild(lblPrice);
 
-            // 3. 重量/持久 (Left=235, Width=40, 居中对齐表头)
-            var lblWeight = new Label
+            // 3. x=245 列 仅普通模式存在 (IDA 0x48f317..0x48f35e: TextOut(245, ...), 左对齐)，行内相对 X=235
+            //    托管分支(0x48f43a..0x48f58e)没有该列
+            if (!storedMode)
             {
-                Position = new Vector2(235, -2),
-                Size = new Vector2(40, 16),
-                Text = item.Weight.ToString(),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            lblWeight.AddThemeFontSizeOverride("font_size", 11);
-            lblWeight.AddThemeColorOverride("font_color", new Color(0.75f, 0.75f, 0.75f));
-            row.AddChild(lblWeight);
-
-            // 鼠标悬停高亮与点击选中
-            row.MouseEntered += () =>
-            {
-                if (globalIdx != _selectedIndex)
+                var lblWeight = new Label
                 {
-                    row.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0.25f, 0.35f, 0.55f, 0.35f) });
-                }
-            };
-            row.MouseExited += () =>
-            {
-                if (globalIdx != _selectedIndex)
-                {
-                    row.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
-                }
-            };
+                    Position = new Vector2(235, 0),
+                    Size = new Vector2(50, 13),
+                    Text = item.Weight.ToString(),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                lblWeight.AddThemeFontSizeOverride("font_size", 11);
+                lblWeight.AddThemeColorOverride("font_color", rowColor);
+                row.AddChild(lblWeight);
+            }
 
             row.GuiInput += (ev) =>
             {
@@ -360,6 +400,8 @@ public partial class ShopPanelView : Control, IManagedWindow
             _itemRowPanels.Add(row);
             _itemListContainer.AddChild(row);
         }
+
+        // 官方 sub_48FC14/sub_48FCB4 仅调整 +5FCh 起始行并重绘，按钮无禁用/遮罩态，此处不做任何自创处理
     }
 
     private void SelectRow(int globalIdx)
@@ -373,14 +415,22 @@ public partial class ShopPanelView : Control, IManagedWindow
             var panel = _itemRowPanels[p];
             bool selected = (curGlobalIdx == _selectedIndex);
 
-            panel.AddThemeStyleboxOverride("panel", selected 
-                ? new StyleBoxFlat { BgColor = new Color(0.18f, 0.25f, 0.45f, 0.85f) } 
-                : new StyleBoxEmpty());
+            panel.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
 
             var nameLbl = panel.GetChildOrNull<Label>(0);
             if (nameLbl != null)
             {
-                nameLbl.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 1.0f, 0.4f) : new Color(0.9f, 0.9f, 0.9f));
+                nameLbl.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.25f, 0.25f) : Colors.White);
+            }
+            var priceLbl = panel.GetChildOrNull<Label>(1);
+            if (priceLbl != null)
+            {
+                priceLbl.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.25f, 0.25f) : Colors.White);
+            }
+            var weightLbl = panel.GetChildOrNull<Label>(2);
+            if (weightLbl != null)
+            {
+                weightLbl.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.25f, 0.25f) : Colors.White);
             }
         }
     }

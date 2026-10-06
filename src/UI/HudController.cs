@@ -77,6 +77,7 @@ public partial class HudController : CanvasLayer
     private Panel? _bagPanel;
     private Panel? _equipPanel;
     private TextureRect? _dollBackground;
+    private TextureRect? _dollHair;
     private TextureRect? _dollCloth;
     private TextureRect? _dollWeapon;
     private TextureRect? _dollHelm;
@@ -112,6 +113,7 @@ public partial class HudController : CanvasLayer
     public AdjustAbilPanelView? AdjustAbilPanel => _adjustAbilPanelView;
     public KeySelectDialogView? KeySelectDialog => _keySelectDialogView;
     public MessageBoxDialog? MessageDialog => _messageBoxDialog;
+    public MessageBoxDialog? MessageBox => _messageBoxDialog;
     public NpcDialogView? NpcDialog => _npcDialogView;
     public DeathScreenView? DeathScreen => _deathScreenView;
     public MinimapView? Minimap => _minimapView;
@@ -156,7 +158,13 @@ public partial class HudController : CanvasLayer
         _attackModeIcon.Visible = tex != null;
     }
 
-    /// <summary>快捷键 Ctrl+H 攻击模式循环切换 (全体 -> 和平 -> 夫妻 -> 师徒)</summary>
+    [Signal]
+    public delegate void ChangeAttackModeRequestedEventHandler(int mode);
+
+    [Signal]
+    public delegate void NpcActionSelectedEventHandler(string actionTag);
+
+    /// <summary>快捷键 Ctrl+H 攻击模式循环切换 (全体 -> 和平 -> 夫妻/组队 -> 行会)</summary>
     public void CycleNextAttackMode()
     {
         int nextMode = _currentAttackMode >= 4 ? 1 : _currentAttackMode + 1;
@@ -165,11 +173,27 @@ public partial class HudController : CanvasLayer
         {
             1 => "全体攻击模式",
             2 => "和平攻击模式",
-            3 => "夫妻攻击模式",
-            4 => "师徒攻击模式",
+            3 => "夫妻/组队攻击模式",
+            4 => "行会攻击模式",
             _ => "全体攻击模式"
         };
         AddChat("系统", $"[系统] 切换为{modeDesc}。", new Color(1f, 1f, 0f));
+        EmitSignal(SignalName.ChangeAttackModeRequested, nextMode);
+    }
+
+    /// <summary>服务端 SM_ATTACKMODECHANGED (766, IDA sub_467920 case 766 @ 0x468A2B) 驱动回显</summary>
+    public void OnServerAttackModeChanged(int mode)
+    {
+        SetAttackMode(mode);
+        string modeDesc = mode switch
+        {
+            1 => "全体攻击模式",
+            2 => "和平攻击模式",
+            3 => "夫妻/组队攻击模式",
+            4 => "行会攻击模式",
+            _ => "全体攻击模式"
+        };
+        AddChat("系统", $"[系统] 攻击模式同步为: {modeDesc}。", new Color(1f, 0.95f, 0.3f));
     }
 
     private TextureRect? _dayNightIcon;
@@ -287,18 +311,20 @@ public partial class HudController : CanvasLayer
         _lblLevel.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.7f));
         AddChild(_lblLevel);
 
-        // 攻击模式图标 (IDA sub_48B2A0 0x48b8e0..0x48b92b: 当 mode∈[1,4] 时取 Prguse_(15+mode)，以 (754,553) 绘制)
+        // 攻击模式图标 (IDA sub_48B2A0 0x48b8e0..0x48b92b: 当 mode∈[1,4] 时取 Prguse_(15+mode)，以 (754,553) 叠加绘制于日夜齿轮上层)
         _attackModeIcon = new TextureRect
         {
             Name = "HudAttackModeIcon",
             Position = new Vector2(754, 553),
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            ZIndex = 0
+            ZIndex = 1
         };
         AddChild(_attackModeIcon);
         SetAttackMode(1);
 
-        // 昼夜图标 (IDA sub_48B2A0 0x48b3bd..0x48b476: 全局 off_4A3DD0 为 0 取 Prguse_0015, 1/2/3 取 0012/0013/0014, 以 (748, 349+79=428) 居于日夜月相轮盘大圆环中心)
+        // 昼夜月相轮盘 (盛大官方 1.5 IDA sub_48B2A0 0x48b3bd..0x48b476 实证:
+        // Prguse_0001 停靠于屏幕 Top=349, 右上半月金属D槽相对偏移为 (748, 79), 全局绝对坐标为 (748, 349+79=428),
+        // 与右下攻击模式按钮 (754, 553) 严格上下分离，严丝合缝嵌入金属凹槽)
         _dayNightIcon = new TextureRect
         {
             Name = "HudDayNightIcon",
@@ -442,17 +468,21 @@ public partial class HudController : CanvasLayer
             };
             _bagPanel.AddChild(goldIcon);
 
+            // IDA sub_48DC24 @ 0x48dd26..0x48dd53: TextOut(窗体+64, 窗体+185, 金币串)，左对齐，字体约 12px 高；
+            // 文字视觉中心 ≈ 185+6=191，与金币凹槽 (y≈181..199, 中心≈190) 对齐。
+            // Godot Label 采用 y=180/h=20 + 垂直居中，使字形中心落在 ≈190，不再偏下。
             var lblGold = new Label
             {
                 Name = "LblBagGold",
-                Position = new Vector2(64, 185),
-                Size = new Vector2(140, 16),
+                Position = new Vector2(64, 179),
+                Size = new Vector2(142, 18),
                 Text = "0",
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
             lblGold.AddThemeFontSizeOverride("font_size", 11);
-            lblGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
+            // IDA 0x48dd01: Font.Color=0xFFFFFF(白)，金币串由 sub_49F640 做千分位(",")
+            lblGold.AddThemeColorOverride("font_color", Colors.White);
             _lblBagGold = lblGold;
             _bagPanel.AddChild(lblGold);
 
@@ -522,8 +552,25 @@ public partial class HudController : CanvasLayer
             }
 
             // 盛大官方 1.5 角色纸娃娃核心立绘层 (挂在 _dollBackground 下，与男角色裸身立绘 100% 严丝合缝对齐)
-            // 1. 衣服立绘层: 初始为布衣男 StateItem_0080 (80x127 @ 39, 63)
-            var texCloth = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0080.png");
+            // 0. 发型层: 官方 IDA sub_488AF4 [0x488c73..0x488caf] 实证：男角色基准发型 Prguse_0441 (24x16 @ 73, 44)，完全覆盖额头发际线与头顶
+            var texHair = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0441.png");
+            if (_dollBackground != null)
+            {
+                _dollHair = new TextureRect
+                {
+                    Name = "DollHair",
+                    Texture = texHair,
+                    Position = new Vector2(73, 44),
+                    Size = new Vector2(24, 16),
+                    MouseFilter = Control.MouseFilterEnum.Ignore,
+                    Visible = true,
+                    ZIndex = 1
+                };
+                _dollBackground.AddChild(_dollHair);
+            }
+
+            // 1. 衣服立绘层: 盛大官方 1.5 正宗男布衣 StateItem_0060.png (80x128 @ 39, 63，白袍金边深蓝长裤男战士经典布衣)
+            var texCloth = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0060.png");
             if (_dollBackground != null)
             {
                 _dollCloth = new TextureRect
@@ -531,14 +578,14 @@ public partial class HudController : CanvasLayer
                     Name = "DollCloth",
                     Texture = texCloth,
                     Position = new Vector2(39, 63),
-                    Size = new Vector2(80, 127),
+                    Size = new Vector2(80, 128),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
-                    ZIndex = 1
+                    ZIndex = 2
                 };
                 _dollBackground.AddChild(_dollCloth);
             }
 
-            // 2. 武器立绘层: 初始为木剑 StateItem_0030 (28x57 @ 26, 45)
+            // 2. 武器立绘层: 初始为木剑 StateItem_0030 (28x57 @ 20, 48，剑柄紧紧握在右手手心 (45, 101)，剑尖斜指长空)
             var texWeapon = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0030.png");
             if (_dollBackground != null)
             {
@@ -546,10 +593,10 @@ public partial class HudController : CanvasLayer
                 {
                     Name = "DollWeapon",
                     Texture = texWeapon,
-                    Position = new Vector2(26, 45),
+                    Position = new Vector2(20, 48),
                     Size = new Vector2(28, 57),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
-                    ZIndex = 2
+                    ZIndex = 3
                 };
                 _dollBackground.AddChild(_dollWeapon);
             }
@@ -564,7 +611,7 @@ public partial class HudController : CanvasLayer
                     Size = new Vector2(20, 23),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                     Visible = false,
-                    ZIndex = 3
+                    ZIndex = 4
                 };
                 _dollBackground.AddChild(_dollHelm);
             }
@@ -692,6 +739,7 @@ public partial class HudController : CanvasLayer
                 {
                     ToggleRepair();
                 }
+                EmitSignal(SignalName.NpcActionSelected, actionTag);
             };
         }
         _deathScreenView = GetNodeOrNull<DeathScreenView>("DeathScreen");
@@ -790,6 +838,48 @@ public partial class HudController : CanvasLayer
 
         _messageBoxDialog = new MessageBoxDialog();
         AddChild(_messageBoxDialog);
+
+        _guildPanelView.SetMessageBoxDialog(_messageBoxDialog);
+        _guildPanelView.AddMemberRequested += (targetName) =>
+        {
+            AddChat("行会", $"[行会管理] 向角色 [{targetName}] 发送加入行会邀请。", new Color(1f, 0.9f, 0.3f));
+            GD.Print($"[HudController] 请求添加行会成员: {targetName}");
+        };
+        _guildPanelView.DelMemberRequested += (targetName) =>
+        {
+            AddChat("行会", $"[行会管理] 已将成员 [{targetName}] 逐出行会。", new Color(1f, 0.4f, 0.4f));
+            GD.Print($"[HudController] 请求删除行会成员: {targetName}");
+        };
+        _guildPanelView.AllyRequested += (targetGuild) =>
+        {
+            AddChat("行会", $"[行会外交] 向行会 [{targetGuild}] 发送结盟申请。", new Color(0.4f, 0.9f, 1f));
+            GD.Print($"[HudController] 请求结盟行会: {targetGuild}");
+        };
+        _guildPanelView.CancelAllyRequested += (targetGuild) =>
+        {
+            AddChat("行会", $"[行会外交] 已解除与行会 [{targetGuild}] 的同盟关系。", new Color(1f, 0.5f, 0.2f));
+            GD.Print($"[HudController] 请求解除结盟: {targetGuild}");
+        };
+        _guildPanelView.WarRequested += (targetGuild) =>
+        {
+            AddChat("行会", $"[行会战争] 正式向行会 [{targetGuild}] 宣战！", new Color(1f, 0.2f, 0.2f));
+            GD.Print($"[HudController] 请求行会宣战: {targetGuild}");
+        };
+        _guildPanelView.CancelWarRequested += (targetGuild) =>
+        {
+            AddChat("行会", $"[行会战争] 已向行会 [{targetGuild}] 提议停战。", new Color(0.7f, 1f, 0.4f));
+            GD.Print($"[HudController] 请求行会停战: {targetGuild}");
+        };
+        _guildPanelView.NoticeUpdated += (notice) =>
+        {
+            AddChat("行会", "[行会公告] 行会公告已成功发布并向全体成员广播。", new Color(1f, 0.85f, 0.4f));
+            GD.Print($"[HudController] 行会公告更新: {notice}");
+        };
+        _guildPanelView.RankUpdated += (memberName, rank) =>
+        {
+            AddChat("行会", $"[行会封号] 成员 [{memberName}] 封号已成功调整为 [{rank}]。", new Color(0.9f, 0.9f, 0.2f));
+            GD.Print($"[HudController] 行会封号调整: member={memberName}, rank={rank}");
+        };
 
         _itemTooltipView = new ItemTooltipView();
         AddChild(_itemTooltipView);
@@ -1250,6 +1340,10 @@ public partial class HudController : CanvasLayer
             if (open) { _bagPosBeforeStorage = _bagPanel.Position; _bagPanel.Position = new Vector2(475, 0); _bagPanel.Visible = true; }
             else { _bagPanel.Position = _bagPosBeforeStorage; _bagPanel.Visible = false; }
         }
+        if (!open && _shopPanelView != null && _shopPanelView.Visible && _shopPanelView.CurrentMode == ShopPanelView.ShopMode.Storage)
+        {
+            _stackManager.PopWindow(_shopPanelView);
+        }
         GD.Print($"[HudController] 切换仓库(DSellDlg 托管模式)显示状态: {_repairPanelView.Visible}");
     }
 
@@ -1313,7 +1407,15 @@ public partial class HudController : CanvasLayer
         {
             if (_shopPanelView.Visible)
             {
-                _stackManager.PopWindow(_shopPanelView);
+                if (_shopPanelView.CurrentMode == ShopPanelView.ShopMode.Storage)
+                {
+                    _shopPanelView.SetMode(ShopPanelView.ShopMode.Buy);
+                    _shopPanelView.OpenForNpc(npcUid);
+                }
+                else
+                {
+                    _stackManager.PopWindow(_shopPanelView);
+                }
             }
             else
             {
@@ -1706,6 +1808,24 @@ public partial class HudController : CanvasLayer
     }
 
     /// <summary>
+    /// 盛大官方 1.5 角色发型更新接口 (官方 sub_488AF4: 男发基准440, 女发基准480)
+    /// </summary>
+    public void SetDollHair(int hairIndex = 1, bool isFemale = false)
+    {
+        if (_dollHair == null) return;
+        int baseIdx = isFemale ? 480 : 440;
+        int imgIdx = baseIdx + Math.Max(1, hairIndex);
+        var tex = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{imgIdx:D4}.png");
+        if (tex != null)
+        {
+            _dollHair.Texture = tex;
+            _dollHair.Size = tex.GetSize();
+            _dollHair.Position = isFemale ? new Vector2(74, 38) : new Vector2(73, 39);
+            _dollHair.Visible = true;
+        }
+    }
+
+    /// <summary>
     /// 盛大官方 1.5 角色纸娃娃立绘图层动态更新接口
     /// </summary>
     public void UpdateDollVisuals(string? clothFile, string? weaponFile, string? helmFile)
@@ -1741,7 +1861,8 @@ public partial class HudController : CanvasLayer
                 {
                     _dollWeapon.Texture = tex;
                     _dollWeapon.Size = tex.GetSize();
-                    _dollWeapon.Position = weaponFile.Contains("0030") ? new Vector2(26, 45) : new Vector2(10, 28);
+                    // 木剑握把在手心 (20, 48)，其他武器 (如裁决/屠龙/龙纹) 在 (10, 28)
+                    _dollWeapon.Position = weaponFile.Contains("0030") ? new Vector2(20, 48) : new Vector2(10, 28);
                     _dollWeapon.Visible = true;
                 }
             }
@@ -1752,6 +1873,7 @@ public partial class HudController : CanvasLayer
             if (string.IsNullOrEmpty(helmFile))
             {
                 _dollHelm.Visible = false;
+                if (_dollHair != null) _dollHair.Visible = true; // 脱下头盔显露头发
             }
             else
             {
@@ -1761,6 +1883,8 @@ public partial class HudController : CanvasLayer
                     _dollHelm.Texture = tex;
                     _dollHelm.Size = tex.GetSize();
                     _dollHelm.Visible = true;
+                    // 全封闭或罩住头部的头盔覆盖头发
+                    if (_dollHair != null) _dollHair.Visible = false;
                 }
             }
         }
@@ -1973,6 +2097,10 @@ public partial class HudController : CanvasLayer
 
     /// <summary>
     /// 打开面对面交易窗体 (由 SM_DEALMENU 673 驱动)
+    /// <summary>
+    /// 打开面对面交易窗体
+    /// 盛大官方 1.5 铁证 (IDA sub_4915EC 0x491653/0x491663/0x491673):
+    /// 交易开启时，背包面板 DItemBag 联动定位到 (0, 0) 并强制显示，与右上角 (464, 0) 交易面板形成左右对称联动
     /// </summary>
     public void OpenTrade(string targetName)
     {
@@ -1982,6 +2110,11 @@ public partial class HudController : CanvasLayer
             if (!_tradePanelView.Visible)
             {
                 _stackManager.ToggleWindow(_tradePanelView);
+            }
+            if (_bagPanel != null)
+            {
+                _bagPanel.Position = Vector2.Zero;
+                _bagPanel.Visible = true;
             }
             AddChat("系统", $"[交易] 与 [{targetName}] 开启面对面安全交易。", new Color(1f, 0.9f, 0.5f));
         }

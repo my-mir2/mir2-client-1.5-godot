@@ -114,13 +114,14 @@ public partial class StoragePanelView : Control, IManagedWindow
         };
         _panel.AddChild(goldIcon);
 
-        // 金币数量显示内胆 (Left=96, Top=250, 140x18)
+        // 金币数量显示内胆 (Prguse_0402 物理凹槽 Left=96, Top=248..268, 140x20)
         _lblGold = new Label
         {
             Name = "LblStorageGold",
-            Position = new Vector2(96, 250),
-            Size = new Vector2(140, 18),
+            Position = new Vector2(96, 248),
+            Size = new Vector2(140, 20),
             Text = "0",
+            HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center
         };
         _lblGold.AddThemeFontSizeOverride("font_size", 11);

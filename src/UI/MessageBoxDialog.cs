@@ -77,23 +77,31 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         panel.AddChild(_lblMsg);
 
         // 官方 1.5 模态输入框 (IDA sub_486DF0 @ 0x4872f0: Width=452-70=382, Height=16, Left=35, Top=75)
-        var styleBoxEmpty = new StyleBoxEmpty
+        // 官方 1.5 模态输入框 (IDA sub_486DF0 @ 0x4872f0: Width=452-70=382, Height=16, Left=35, Top=75)
+        var styleBoxInput = new StyleBoxFlat
         {
-            ContentMarginLeft = 4.0f,
-            ContentMarginTop = 0.0f,
-            ContentMarginRight = 4.0f,
-            ContentMarginBottom = 0.0f
+            BgColor = new Color(0.04f, 0.04f, 0.04f, 0.95f),
+            BorderWidthLeft = 1,
+            BorderWidthTop = 1,
+            BorderWidthRight = 1,
+            BorderWidthBottom = 1,
+            BorderColor = new Color(0.35f, 0.3f, 0.22f, 0.8f),
+            ContentMarginLeft = 6.0f,
+            ContentMarginTop = 1.0f,
+            ContentMarginRight = 6.0f,
+            ContentMarginBottom = 1.0f
         };
         _txtInput = new LineEdit
         {
             Name = "TxtInput",
             Visible = false
         };
-        _txtInput.AddThemeStyleboxOverride("normal", styleBoxEmpty);
-        _txtInput.AddThemeStyleboxOverride("focus", styleBoxEmpty);
-        _txtInput.AddThemeStyleboxOverride("read_only", styleBoxEmpty);
+        _txtInput.AddThemeStyleboxOverride("normal", styleBoxInput);
+        _txtInput.AddThemeStyleboxOverride("focus", styleBoxInput);
+        _txtInput.AddThemeStyleboxOverride("read_only", styleBoxInput);
         _txtInput.AddThemeFontSizeOverride("font_size", 11);
         _txtInput.AddThemeColorOverride("font_color", new Color(1, 1, 1, 1));
+        _txtInput.AddThemeColorOverride("selection_color", new Color(0.35f, 0.25f, 0.15f, 0.8f));
         _txtInput.Notification((int)Control.NotificationThemeChanged);
         _txtInput.OffsetLeft = 35.0f;
         _txtInput.OffsetTop = 75.0f;
@@ -129,6 +137,7 @@ public partial class MessageBoxDialog : Control, IManagedWindow
 
     public void ShowMessage(string message, bool hasCancel = true)
     {
+        ZIndex = 200;
         _isInputMode = false;
         _inputCallback = null;
         if (_lblMsg != null)
@@ -147,6 +156,7 @@ public partial class MessageBoxDialog : Control, IManagedWindow
 
     public void ShowInput(string prompt, string defaultValue = "", Action<string>? onConfirm = null, bool isPassword = false)
     {
+        ZIndex = 200;
         _isInputMode = true;
         _inputCallback = onConfirm;
         if (_lblMsg != null)
@@ -167,7 +177,8 @@ public partial class MessageBoxDialog : Control, IManagedWindow
             _txtInput.OffsetBottom = 75.0f + 16.0f;
             _txtInput.Size = new Vector2(382, 16);
             _txtInput.GrabFocus();
-            _txtInput.SelectAll();
+            _txtInput.Deselect();
+            _txtInput.CaretColumn = _txtInput.Text.Length;
         }
         if (_btnCancel != null) _btnCancel.Visible = true;
         if (_btnOk != null) _btnOk.Position = new Vector2(130, 126);

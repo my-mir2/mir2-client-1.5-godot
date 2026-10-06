@@ -134,14 +134,14 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         for (int i = 0; i < 9; i++)
         {
             int statIdx = i;
-            float top = 101f + 20f * i; // IDA sub_494304 0x4949b4: y0=窗体+101,行距 20 (偏移 0,14h,28h,3Ch,50h,64h,78h,8Ch,A0h)
+            float top = 99f + 20f * i; // 官方 Prguse_0226 黑色凹槽物理区间 y=[99..119], 步长 20
 
-            // 1. 官方属性基础当前数值 (IDA sub_494304 0x494497: x=窗体+100, W=52, H=16, 颜色 0xC0C0C0 银灰)
+            // 1. 官方属性基础当前数值 (IDA sub_494304 0x494497: x=窗体+100, W=52, H=20, 垂直居中)
             var lblBase = new Label
             {
                 Name = $"LblBaseStat_{statIdx}",
                 Position = new Vector2(100, top),
-                Size = new Vector2(52, 16),
+                Size = new Vector2(52, 20),
                 Text = DefaultBaseStats[statIdx],
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
@@ -151,12 +151,12 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
             panel.AddChild(lblBase);
             _lblBaseStats[statIdx] = lblBase;
 
-            // 2. 属性分配增量数值显示 (精准咬合于黑底凹槽右侧 155..214, W=56, H=16)
+            // 2. 属性分配增量数值显示 (精准咬合于黑底凹槽 155..214, W=58, H=20, 垂直居中)
             var lblVal = new Label
             {
                 Name = $"LblStat_{statIdx}",
-                Position = new Vector2(155, top), // IDA 0x494994: 加点增量列 x=窗体+155
-                Size = new Vector2(56, 16),
+                Position = new Vector2(156, top), // IDA 0x494994: 加点增量列 x=窗体+155
+                Size = new Vector2(58, 20),
                 Text = "0",
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center

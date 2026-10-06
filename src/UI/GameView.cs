@@ -488,6 +488,19 @@ namespace Mir2Client.UI
                 {
                     _net?.SendPacket(PacketEncoder.DealCancel());
                 };
+
+                // 官方攻击模式变更发包 (CM_CHANGEATTACKMODE 1019)
+                HudInstance.ChangeAttackModeRequested += (mode) =>
+                {
+                    _net?.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_CHANGEATTACKMODE, (short)mode));
+                };
+
+                // 官方 NPC 对话选项点击发包 (CM_NPCSELECT 1011)
+                HudInstance.NpcActionSelected += (actionTag) =>
+                {
+                    int npcUid = HudInstance.NpcDialog?.CurrentNpcUid ?? 0;
+                    _net?.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_NPCSELECT, npcUid, 0, 0, System.Text.Encoding.Default.GetBytes(actionTag)));
+                };
             }
         }
 
@@ -1139,14 +1152,15 @@ namespace Mir2Client.UI
             MapRendererInstance?.LoadMap(mapPath);
 
             EntityManagerInstance.Clear();
+            // 比奇城安全区纯净还原：稻草人与骷髅兵部署在城外演武训练场 (远离安全区 (330, 270))，杜绝界面透出怪物尸体惊悚感
             EntityManagerInstance.AddEntity(new EntityManager.EntityData
             {
                 Uid = 1001,
                 Name = "稻草人",
                 Type = EntityManager.EntityType.Monster,
                 Appr = 10,
-                TileX = 333,
-                TileY = 270,
+                TileX = 360,
+                TileY = 290,
                 Direction = 6,
                 Hp = 80,
                 MaxHp = 80
@@ -1157,8 +1171,8 @@ namespace Mir2Client.UI
                 Name = "骷髅战士",
                 Type = EntityManager.EntityType.Monster,
                 Appr = 21,
-                TileX = 328,
-                TileY = 268,
+                TileX = 362,
+                TileY = 292,
                 Direction = 2,
                 Hp = 120,
                 MaxHp = 120
@@ -1178,11 +1192,11 @@ namespace Mir2Client.UI
 
             if (PlayerInstance != null)
             {
-                PlayerInstance.CharacterName = "传奇体验者";
+                PlayerInstance.CharacterName = "热血战士";
                 PlayerInstance.SetTilePos(330, 270);
                 PlayerInstance.BodyDressType = 2; // 布衣男
                 PlayerInstance.WeaponType = 2;     // 木剑
-                PlayerInstance.HairStyle = 1;
+                PlayerInstance.HairStyle = 4; // 官方经典男战士短发 (Hair.wil base 2400)
                 PlayerInstance.Direction = 2;
                 PlayerInstance.Hp = 100;
                 PlayerInstance.MaxHp = 100;

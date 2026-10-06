@@ -80,8 +80,10 @@ public static class ProtocolConsts
     public const short CM_GUILD_BREAK_ALLY       = 1040; // 解除行会结盟关系
     public const short CM_GUILD_KICK_MEMBER      = 1041; // 开除行会成员
     public const short CM_GUILD_UPDATE_RANK      = 1042; // 调整行会职位封号
+    public const short CM_CHANGEATTACKMODE       = 1019; // 官方切换攻击模式主码 (Ctrl+H)
 
     // ============ 官方 1.5 权威 SM 协议号 (下行) ============
+    public const short SM_ATTACKMODECHANGED      = 766;  // 官方攻击模式变更回显 (IDA sub_467920 case 766 @ 0x468A2B)
     public const short SM_PASSOK                 = 500;  // 账号密码验证成功
     public const short SM_SERVERINDEX            = 114;  // 服务器分区列表下发
     public const short SM_CHARLIST               = 120;  // 官方桥接角色列表下发

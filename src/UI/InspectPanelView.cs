@@ -88,6 +88,20 @@ public partial class InspectPanelView : Control, IManagedWindow
         _panel.AddChild(_dollBg);
 
         // 盛大官方 1.5 观察他人纸娃娃核心立绘层 (挂在 dollBg 下，展示被观察者道士神装纸娃娃)
+        // 0. 发型层: 官方男角色发型 Prguse_0441 (24x16 @ 73, 39)
+        var texHair = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0441.png");
+        _dollHair = new TextureRect
+        {
+            Name = "InspectDollHair",
+            Texture = texHair,
+            Position = new Vector2(73, 39),
+            Size = new Vector2(24, 16),
+            MouseFilter = MouseFilterEnum.Ignore,
+            ZIndex = 1,
+            Visible = true
+        };
+        _dollBg?.AddChild(_dollHair);
+
         // 1. 衣服立绘层: StateItem_0064 (幽灵战衣男 80x129 @ 39, 63)
         var texCloth = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0064.png");
         _dollCloth = new TextureRect
@@ -97,7 +111,7 @@ public partial class InspectPanelView : Control, IManagedWindow
             Position = new Vector2(39, 63),
             Size = new Vector2(80, 129),
             MouseFilter = MouseFilterEnum.Ignore,
-            ZIndex = 1,
+            ZIndex = 2,
             Visible = false
         };
         _dollBg?.AddChild(_dollCloth);
@@ -111,7 +125,7 @@ public partial class InspectPanelView : Control, IManagedWindow
             Position = new Vector2(14, 20),
             Size = new Vector2(44, 112),
             MouseFilter = MouseFilterEnum.Ignore,
-            ZIndex = 2,
+            ZIndex = 3,
             Visible = false
         };
         _dollBg?.AddChild(_dollWeapon);
@@ -125,7 +139,7 @@ public partial class InspectPanelView : Control, IManagedWindow
             Position = new Vector2(74, 42),
             Size = new Vector2(20, 23),
             MouseFilter = MouseFilterEnum.Ignore,
-            ZIndex = 3,
+            ZIndex = 4,
             Visible = false
         };
         _dollBg?.AddChild(_dollHelm);
@@ -194,6 +208,7 @@ public partial class InspectPanelView : Control, IManagedWindow
         }
     }
 
+    private TextureRect? _dollHair;
     private TextureRect? _dollCloth;
     private TextureRect? _dollWeapon;
     private TextureRect? _dollHelm;
@@ -203,9 +218,27 @@ public partial class InspectPanelView : Control, IManagedWindow
     private RichTextLabel? _lblInspectDesc;
 
     /// <summary>
+    /// 设置纸娃娃发型。资源位于 Prguse WIL (男440, 女480)。
+    /// </summary>
+    public void SetDollHair(int hairIndex = 1, bool isFemale = false)
+    {
+        if (_dollHair == null) return;
+        int baseIdx = isFemale ? 480 : 440;
+        int imgIdx = baseIdx + Math.Max(1, hairIndex);
+        var tex = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{imgIdx:D4}.png");
+        if (tex != null)
+        {
+            _dollHair.Texture = tex;
+            _dollHair.Size = tex.GetSize();
+            _dollHair.Position = isFemale ? new Vector2(74, 38) : new Vector2(73, 39);
+            _dollHair.Visible = true;
+        }
+    }
+
+    /// <summary>
     /// 设置纸娃娃立绘(衣服、武器、头盔)。资源位于 StateItem WIL。
     /// </summary>
-    public void SetDoll(string? clothFile, string? weaponFile, string? helmFile)
+    public void SetDollCloth(string? clothFile)
     {
         if (_dollCloth != null)
         {
@@ -220,7 +253,10 @@ public partial class InspectPanelView : Control, IManagedWindow
                 _dollCloth.Visible = false;
             }
         }
+    }
 
+    public void SetDollWeapon(string? weaponFile)
+    {
         if (_dollWeapon != null)
         {
             if (!string.IsNullOrEmpty(weaponFile))
@@ -234,20 +270,35 @@ public partial class InspectPanelView : Control, IManagedWindow
                 _dollWeapon.Visible = false;
             }
         }
+    }
 
+    public void SetDollHelm(string? helmFile)
+    {
         if (_dollHelm != null)
         {
             if (!string.IsNullOrEmpty(helmFile))
             {
                 _dollHelm.Texture = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{helmFile}");
                 _dollHelm.Visible = _dollHelm.Texture != null;
+                if (_dollHair != null) _dollHair.Visible = false; // 戴头盔覆盖头发
             }
             else
             {
                 _dollHelm.Texture = null;
                 _dollHelm.Visible = false;
+                if (_dollHair != null) _dollHair.Visible = true; // 脱头盔显露头发
             }
         }
+    }
+
+    /// <summary>
+    /// 设置纸娃娃立绘(衣服、武器、头盔)。资源位于 StateItem WIL。
+    /// </summary>
+    public void SetDoll(string? clothFile, string? weaponFile, string? helmFile)
+    {
+        SetDollCloth(clothFile);
+        SetDollWeapon(weaponFile);
+        SetDollHelm(helmFile);
     }
 
     /// <summary>
@@ -266,7 +317,29 @@ public partial class InspectPanelView : Control, IManagedWindow
     public void SetSlotItem(int slot, string? iconFile, string? bbDesc)
     {
         if (_slotButtons.TryGetValue(slot, out var btn))
-            btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}");
+        {
+            // 盛大官方 1.5 原生规范：衣服(0)、武器(1)、头盔(4)属于纸娃娃(Doll)全身穿戴，
+            // 槽位热区保持透明仅用于鼠标悬停 Tooltip 交互，严禁在槽位按钮重复贴图，彻底杜绝幽灵双影重叠！
+            if (slot == 0)
+            {
+                btn.ItemTexture = null;
+                if (!string.IsNullOrEmpty(iconFile)) SetDollCloth(iconFile);
+            }
+            else if (slot == 1)
+            {
+                btn.ItemTexture = null;
+                if (!string.IsNullOrEmpty(iconFile)) SetDollWeapon(iconFile);
+            }
+            else if (slot == 4)
+            {
+                btn.ItemTexture = null;
+                if (!string.IsNullOrEmpty(iconFile)) SetDollHelm(iconFile);
+            }
+            else
+            {
+                btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}");
+            }
+        }
         if (string.IsNullOrEmpty(bbDesc)) _slotDesc.Remove(slot); else _slotDesc[slot] = bbDesc;
     }
 

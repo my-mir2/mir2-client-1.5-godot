@@ -66,27 +66,29 @@ public partial class TradePanelView : Control, IManagedWindow
     public int MyGold => _myGold;
     public int RemoteGold => _remoteGold;
 
-    public const float TotalWidth = RemoteWidth + MyWidth; // 220 + 236 = 456
+    public const float PanelOverlap = 15.0f;
+    // 官方 1.5 铁证 (IDA sub_4915EC @ 0x491643):
+    // 对方交易窗 (Prguse_0390 220x175) Top = 0
+    // 我方交易窗 (Prguse_0389 236x175) Top = Remote.Height - 15 = 160, 两者上下重叠咬合 15px
+    // 总高度 = 160 + 175 = 335px
+    public const float TotalTradeHeight = PanelHeight * 2 - PanelOverlap;
 
-    // 独立包围盒: 官方原生左右并列停靠模型 (IDA sub_481dd4 [0x485795/0x48592c])
-    // 对方在左绝对坐标 (344, 0)，我方在右绝对坐标 (564, 0)，总尺寸 456x175
     public (int x, int y, int width, int height) Bounds =>
-        ((int)Position.X, (int)Position.Y, (int)TotalWidth, (int)PanelHeight);
+        ((int)Position.X, (int)Position.Y, (int)MyWidth, (int)TotalTradeHeight);
 
     public override void _Ready()
     {
         Visible = false;
-        Size = new Vector2(TotalWidth, PanelHeight);
-        // 左右并列顶格停靠于屏幕右上角 (IDA 0x485795/0x48592c: Left = 800 - 456 = 344, Top = 0)
-        Position = new Vector2(800 - TotalWidth, 0);
+        Size = new Vector2(MyWidth, TotalTradeHeight);
+        // 官方原版 IDA sub_4915EC (0x4915f5, 0x491618): 对方与我方面板 Left 严格均为 0x1D0 (464), Top=0
+        Position = new Vector2(464, 0);
         MouseFilter = MouseFilterEnum.Pass;
 
-        // 1. 左侧面板：对方面板 (Prguse_0390 220x175, IDA sub_481dd4 [0x48590f..0x485947])
-        // 相对容器 (0, 0)，绝对坐标 (344, 0)
+        // 1. 上方对方面板：对方面板 (Prguse_0390 220x175, IDA sub_4915EC 0x4915f5 left=464, 0x491608 top=0)
         _remotePanel = new Panel
         {
             Name = "RemoteTradePanel",
-            Position = Vector2.Zero,
+            Position = Vector2.Zero, // 与我方面板左侧绝对对齐 (Left 均为 464)
             Size = new Vector2(RemoteWidth, PanelHeight),
             MouseFilter = MouseFilterEnum.Stop
         };
@@ -158,11 +160,12 @@ public partial class TradePanelView : Control, IManagedWindow
         };
         _remotePanel.AddChild(remoteGoldIcon);
 
+        // 对方金币输入凹槽 (Prguse_0390 物理凹槽区间 X: 60..159, Y: 126..154, 高度 29px, 几何中心 140.0)
         var remoteGoldBox = new Panel
         {
             Name = "RemoteGoldBox",
-            Position = new Vector2(60, 127),
-            Size = new Vector2(83, 17),
+            Position = new Vector2(62, 126),
+            Size = new Vector2(80, 28),
             MouseFilter = MouseFilterEnum.Ignore
         };
         remoteGoldBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
@@ -172,20 +175,20 @@ public partial class TradePanelView : Control, IManagedWindow
         {
             Name = "LblRemoteGold",
             Position = new Vector2(4, 0),
-            Size = new Vector2(75, 17),
+            Size = new Vector2(76, 28),
             Text = "0",
+            HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center
         };
-        _lblRemoteGold.AddThemeFontSizeOverride("font_size", 10);
+        _lblRemoteGold.AddThemeFontSizeOverride("font_size", 11);
         _lblRemoteGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
         remoteGoldBox.AddChild(_lblRemoteGold);
 
-        // 2. 右侧面板：我方面板 (Prguse_0389 236x175, IDA sub_481dd4 [0x485784..0x4857b5])
-        // 相对容器 (220, 0)，绝对坐标 (564, 0)，与左侧对方面板齐平拼接
+        // 2. 右侧/下方我方面板：我方面板 (Prguse_0389 236x175, IDA sub_481dd4 [0x485784..0x4857b5])
         _myPanel = new Panel
         {
             Name = "MyTradePanel",
-            Position = new Vector2(RemoteWidth, 0),
+            Position = new Vector2(0, PanelHeight - 15), // IDA sub_4915EC 0x491643: 我方 top=对方高度-15
             Size = new Vector2(MyWidth, PanelHeight),
             MouseFilter = MouseFilterEnum.Stop
         };
@@ -256,11 +259,12 @@ public partial class TradePanelView : Control, IManagedWindow
         };
         _myPanel.AddChild(myGoldIcon);
 
+        // 我方金币输入凹槽 (Prguse_0389 物理凹槽区间 X: 60..159, Y: 126..154, 高度 29px, 几何中心 140.0)
         var myGoldBox = new Panel
         {
             Name = "MyGoldBox",
-            Position = new Vector2(60, 127),
-            Size = new Vector2(92, 17),
+            Position = new Vector2(62, 126),
+            Size = new Vector2(90, 28),
             MouseFilter = MouseFilterEnum.Ignore
         };
         myGoldBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
@@ -270,11 +274,12 @@ public partial class TradePanelView : Control, IManagedWindow
         {
             Name = "LblMyGold",
             Position = new Vector2(4, 0),
-            Size = new Vector2(84, 17),
+            Size = new Vector2(86, 28),
             Text = "0",
+            HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center
         };
-        _lblMyGold.AddThemeFontSizeOverride("font_size", 10);
+        _lblMyGold.AddThemeFontSizeOverride("font_size", 11);
         _lblMyGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
         myGoldBox.AddChild(_lblMyGold);
 
@@ -312,6 +317,8 @@ public partial class TradePanelView : Control, IManagedWindow
     {
         ResetTrade();
         SetRemoteName(targetName);
+        // 盛大官方 1.5 铁证 (IDA sub_4915EC 0x4915f5/0x491618): 强制复位右上角停靠 (464, 0)
+        Position = new Vector2(464, 0);
         Visible = true;
     }
 

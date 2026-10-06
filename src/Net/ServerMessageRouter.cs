@@ -69,6 +69,7 @@ public sealed class ServerMessageRouter
     public const short SM_OPENGUILDDLG           = 753;  // 打开行会主页 (IDA 0x46A528)
     public const short SM_SENDGUILDMEMBERLIST    = 756;  // 行会成员列表 (IDA 0x46A542)
     public const short SM_GUILDMEMBERLIST_ALT    = 671;  // 行会成员列表 (ProtocolConsts)
+    public const short SM_ATTACKMODECHANGED      = 766;  // 官方攻击模式变更回显 (IDA sub_467920 case 766 @ 0x468A2B)
     public const short SM_NEEDPASSWORD           = 2014; // 二级安全密码弹窗 (sub_486DF0)
     public const short SM_OBJECTSPELL            = 243;  // 实体施法动作 (bridge.rs 权威实证)
     public const short SM_OBJECTSTRUCK           = 244;  // 实体受击后仰 (bridge.rs 权威实证)
@@ -241,6 +242,9 @@ public sealed class ServerMessageRouter
                 break;
             case SM_OPENGUILDDLG:
                 HandleOpenGuildDlg(packet);
+                break;
+            case SM_ATTACKMODECHANGED:
+                _hud?.OnServerAttackModeChanged(packet.Param);
                 break;
             case SM_NEEDPASSWORD:
                 _hud?.OnNeedPassword();
@@ -556,31 +560,7 @@ public sealed class ServerMessageRouter
         string text = pkt.ExtraStr;
         if (!string.IsNullOrEmpty(text) && _hud?.GuildPanel != null)
         {
-            if (text.Contains("<Notice>") || text.Contains("公告"))
-            {
-                var notices = new List<string>();
-                var killGuilds = new List<string>();
-                var allyGuilds = new List<string>();
-
-                int section = 0;
-                var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var line in lines)
-                {
-                    string trimmed = line.Trim();
-                    if (trimmed.Equals("<Notice>", StringComparison.OrdinalIgnoreCase)) { section = 1; continue; }
-                    if (trimmed.Equals("<KillGuilds>", StringComparison.OrdinalIgnoreCase)) { section = 2; continue; }
-                    if (trimmed.Equals("<AllyGuilds>", StringComparison.OrdinalIgnoreCase)) { section = 3; continue; }
-
-                    switch (section)
-                    {
-                        case 1: notices.Add(trimmed); break;
-                        case 2: killGuilds.Add(trimmed); break;
-                        case 3: allyGuilds.Add(trimmed); break;
-                        default: notices.Add(trimmed); break;
-                    }
-                }
-                _hud?.GuildPanel.SetHomeText(notices, killGuilds, allyGuilds);
-            }
+            _hud.GuildPanel.UpdateHomeNotice(text);
         }
         _hud?.ToggleGuild();
     }

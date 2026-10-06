@@ -39,6 +39,8 @@ public partial class NpcDialogView : Control, IManagedWindow
     public (int x, int y, int width, int height) Bounds =>
         ((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
 
+    public int CurrentNpcUid { get; set; } = 0;
+
     private List<string> _optionActions = new();
 
     public override void _Ready()
@@ -163,9 +165,11 @@ public partial class NpcDialogView : Control, IManagedWindow
                     actionTag = linkContent.Substring(slashIdx + 1);
                 }
 
-                // 官方超链接样式 (IDA 0x48edb0 byte_48EF8C=4 下划线, 0x48ee50 0x00FFFF 黄色)
+                // 官方超链接分色与样式 (IDA sub_48EAC0 0x48edb0 byte_48EF8C=4 下划线, 0x48ee12: 红色 255/0x0000FF, 0x48ee50: 黄色 0x00FFFF)
+                bool isExit = IsExitAction(actionTag, displayText);
+                string linkColor = isExit ? "#ff0000" : "#ffff00";
                 _optionActions.Add(actionTag);
-                sb.Append($"[url={actionIndex}][color=#ffff00][u]{displayText}[/u][/color][/url]");
+                sb.Append($"[url={actionIndex}][color={linkColor}][u]{displayText}[/u][/color][/url]");
                 actionIndex++;
 
                 cursor = linkEnd + 1;
@@ -203,20 +207,37 @@ public partial class NpcDialogView : Control, IManagedWindow
     private void OnMetaClicked(Variant meta)
     {
         string metaStr = meta.AsString();
+        string triggeredTag = "";
         if (int.TryParse(metaStr, out int idx))
         {
             EmitSignal(SignalName.OptionSelected, idx);
             if (idx >= 0 && idx < _optionActions.Count)
             {
-                EmitSignal(SignalName.ActionTriggered, _optionActions[idx]);
+                triggeredTag = _optionActions[idx];
+                EmitSignal(SignalName.ActionTriggered, triggeredTag);
             }
         }
         else
         {
+            triggeredTag = metaStr;
             int foundIdx = _optionActions.IndexOf(metaStr);
             EmitSignal(SignalName.OptionSelected, foundIdx >= 0 ? foundIdx : 0);
             EmitSignal(SignalName.ActionTriggered, metaStr);
         }
+
+        if (IsExitAction(triggeredTag, ""))
+        {
+            OnClose();
+        }
+    }
+
+    public static bool IsExitAction(string actionTag, string displayText)
+    {
+        string lowerTag = actionTag.ToLowerInvariant().Trim();
+        string lowerText = displayText.ToLowerInvariant().Trim();
+        return lowerTag == "@exit" || lowerTag == "@close" || lowerTag == "@quit" || lowerTag == "@cancel" ||
+               lowerTag.Contains("exit") || lowerTag.Contains("close") || lowerTag.Contains("离开") || lowerTag.Contains("退出") ||
+               lowerText == "退出" || lowerText == "离开" || lowerText == "关闭" || lowerText == "取消";
     }
 
     private void OnClose()

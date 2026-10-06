@@ -173,7 +173,9 @@ namespace Mir2Client.Render
 
         public static int CalcHairFrame(ActionType action, int direction, int animFrame, int hairStyle = 0)
         {
-            int hairBase = hairStyle * HairStep;
+            // 官方 Hair.wil 中 index 0 和 1 为空白占位帧 (单像素透明)，默认经典男短发为发型 4 (Base 2400)
+            int actualStyle = hairStyle <= 1 ? 4 : hairStyle;
+            int hairBase = actualStyle * HairStep;
             int actionOffset = ActionOffsets.GetValueOrDefault(action, 0);
             int dirClamped = direction & 0x07;
             int frames = ActionFramesPerDir.GetValueOrDefault(action, 1);

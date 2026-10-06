@@ -39,7 +39,13 @@ public partial class SlotButton : Button
             {
                 _iconRect.Texture = value;
                 _iconRect.Visible = value != null;
-                UpdateIconLayout();
+                Vector2 targetSize = Size.X > 0 && Size.Y > 0 ? Size : (CustomMinimumSize.X > 0 ? CustomMinimumSize : new Vector2(32, 32));
+                _iconRect.Position = Vector2.Zero;
+                _iconRect.Size = targetSize;
+                _iconRect.OffsetLeft = 0;
+                _iconRect.OffsetTop = 0;
+                _iconRect.OffsetRight = 0;
+                _iconRect.OffsetBottom = 0;
             }
         }
     }
@@ -48,33 +54,45 @@ public partial class SlotButton : Button
     {
         base._Ready();
         // 关键：采用独立的居中 TextureRect 渲染槽位物品图标，绝对禁用 Button.Icon！
-        Icon = null;
-        ClipContents = true;
+        // 官方 1.5 铁证 (IDA sub_48E458 / DItemGridGridPaint):
+        // 官方原生使用 DirectDraw 透明拷贝 DirectPaint 绘制物品, 绝不做裁剪 (ClipRect) 或缩放拉伸!
+        // 36x33 的标准格子里，长剑、屠龙裁决、重盔甲等 42x42 或 48x48 贴图会居中并自然溢出格子边框，
+        // 呈现出原汁原味"物品比格子略大"的经典视觉表现。故 ClipContents 必须为 false。
+        ClipContents = false;
 
+        Vector2 initialSize = Size.X > 0 && Size.Y > 0 ? Size : (CustomMinimumSize.X > 0 ? CustomMinimumSize : new Vector2(32, 32));
         _iconRect = new TextureRect
         {
             Name = "__SlotIcon__",
             Texture = _itemTexture,
             Visible = _itemTexture != null,
             MouseFilter = MouseFilterEnum.Ignore,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            ClipContents = true,
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize
+            // 官方 1.5 铁证 (IDA sub_48E458): 原生 1:1 像素居中拷贝，大物品自然溢出，绝不拉伸与剪裁！
+            StretchMode = TextureRect.StretchModeEnum.KeepCentered,
+            ClipContents = false,
+            ExpandMode = TextureRect.ExpandModeEnum.KeepSize,
+            Position = Vector2.Zero,
+            Size = initialSize
         };
         AddChild(_iconRect);
-        UpdateIconLayout();
+        _iconRect.SetAnchorsPreset(LayoutPreset.FullRect);
+        _iconRect.OffsetLeft = 0;
+        _iconRect.OffsetTop = 0;
+        _iconRect.OffsetRight = 0;
+        _iconRect.OffsetBottom = 0;
 
-        Resized += UpdateIconLayout;
-    }
-
-    private void UpdateIconLayout()
-    {
-        if (_iconRect == null) return;
-        Vector2 slotSize = Size.X > 0 && Size.Y > 0 ? Size : (CustomMinimumSize.X > 0 ? CustomMinimumSize : new Vector2(36, 33));
-        const float padX = 3.0f;
-        const float padY = 3.0f;
-        _iconRect.Position = new Vector2(padX, padY);
-        _iconRect.Size = new Vector2(Math.Max(10.0f, slotSize.X - padX * 2), Math.Max(10.0f, slotSize.Y - padY * 2));
+        Resized += () =>
+        {
+            if (_iconRect != null && Size.X > 0 && Size.Y > 0)
+            {
+                _iconRect.Position = Vector2.Zero;
+                _iconRect.Size = Size;
+                _iconRect.OffsetLeft = 0;
+                _iconRect.OffsetTop = 0;
+                _iconRect.OffsetRight = 0;
+                _iconRect.OffsetBottom = 0;
+            }
+        };
     }
 
     [Signal]
