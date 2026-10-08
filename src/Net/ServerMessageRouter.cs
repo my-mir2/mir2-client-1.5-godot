@@ -516,6 +516,7 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_OPENGUILDDLGFAIL: // 752: 行会面板打开失败 (未加入行会)
                 _hud?.ShowModalMessage("行会提示", "您尚未加入任何行会，无法查看行会管理面板。");
                 break;
+            // 盛大官方 1.5 原版二进制购买成功为 SM_BUY_OK_DELPHI = 648 (IDA 0x469EDA); 629/632 为非标私服兼容别名
             case ProtocolConsts.SM_BUYITEMSUCCESS:
             case ProtocolConsts.SM_BUYITEM_SUCCESS:
                 _hud?.AddChat("商店", $"[商店] 购买成功：{DecodeExtraText(packet.Extra)}", new Color(0.5f, 1f, 0.5f));
@@ -1024,26 +1025,35 @@ public sealed class ServerMessageRouter
         _hud?.UpdateMp(mp, maxMp);
     }
 
+    // 盛大官方 1.5 负重变动协议 (IDA sub_467920 case 622 @ 0x46A7A0)
+    // 物理指令: *(_WORD *)(+80)=v66 (Weight); *(_BYTE *)(+84)=BYTE2(v67) (WearWeight); *(_BYTE *)(+86)=v68 (MaxWeight);
     private void HandleWeightChanged(ServerPacket pkt)
     {
         int curWeight = pkt.Recog;
-        int maxWeight = pkt.Param > 0 ? pkt.Param : 50;
+        int wearWeight = pkt.Param;
+        int maxWeight = pkt.Tag > 0 ? pkt.Tag : (pkt.Param > 0 ? pkt.Param : 50);
         _hud?.UpdateWeight(curWeight, maxWeight);
+
+        var sp = _hud?.StatusPanel;
+        if (sp != null)
+        {
+            sp.UpdateAbilityValue(1, $"{curWeight}/{maxWeight}", curWeight > maxWeight);
+            if (wearWeight > 0)
+            {
+                sp.UpdateAbilityValue(2, $"{wearWeight}");
+            }
+        }
 
         // 若携带制表符 6 字段扩展 (weight, max_weight, wear_weight, max_wear_weight, hand_weight, max_hand_weight)
         // 自动驱动状态面板 (StatusPanelView) 能力页第 1 (背包重)、第 2 (负重)、第 3 (腕力)
         if (!string.IsNullOrEmpty(pkt.ExtraStr) && pkt.ExtraStr.Contains('\t'))
         {
             var parts = pkt.ExtraStr.Split('\t');
-            if (parts.Length >= 6)
+            if (parts.Length >= 6 && sp != null)
             {
-                var sp = _hud?.StatusPanel;
-                if (sp != null)
-                {
-                    sp.UpdateAbilityValue(1, $"{parts[0]}/{parts[1]}", int.TryParse(parts[0], out var w) && int.TryParse(parts[1], out var mw) && w > mw);
-                    sp.UpdateAbilityValue(2, $"{parts[2]}/{parts[3]}", int.TryParse(parts[2], out var ww) && int.TryParse(parts[3], out var mww) && ww > mww);
-                    sp.UpdateAbilityValue(3, $"{parts[4]}/{parts[5]}", int.TryParse(parts[4], out var hw) && int.TryParse(parts[5], out var mhw) && hw > mhw);
-                }
+                sp.UpdateAbilityValue(1, $"{parts[0]}/{parts[1]}", int.TryParse(parts[0], out var w) && int.TryParse(parts[1], out var mw) && w > mw);
+                sp.UpdateAbilityValue(2, $"{parts[2]}/{parts[3]}", int.TryParse(parts[2], out var ww) && int.TryParse(parts[3], out var mww) && ww > mww);
+                sp.UpdateAbilityValue(3, $"{parts[4]}/{parts[5]}", int.TryParse(parts[4], out var hw) && int.TryParse(parts[5], out var mhw) && hw > mhw);
             }
         }
     }

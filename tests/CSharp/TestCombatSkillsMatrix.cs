@@ -542,6 +542,36 @@ public class TestCombatSkillsMatrix
         var pkt666 = new ServerPacket(ProtocolConsts.SM_DISMISS_GROUP, 0, 0, 0, Array.Empty<byte>());
         router.OnPacket(pkt666);
     }
+
+    [Fact]
+    public void Official_1_5_WeightChanged_622_And_Isolation_Test()
+    {
+        // 1. 常量真值断言：
+        // 盛大官方 1.5 原版二进制 IDA ProcessServerMessage case 622 @ 0x46A7A0:
+        // 物理指令: *(_WORD *)(+80)=v66 (Weight); *(_BYTE *)(+84)=BYTE2(v67) (WearWeight); *(_BYTE *)(+86)=v68 (MaxWeight);
+        Assert.Equal((short)622, ProtocolConsts.SM_WEIGHTCHANGED);
+
+        // 2. 隔离铁律断言：
+        // 官方 1.5 商店买卖成功/失败绝对真值核销：
+        Assert.Equal((short)648, ProtocolConsts.SM_BUY_OK_DELPHI);
+        Assert.Equal((short)650, ProtocolConsts.SM_SELL_OK_DELPHI);
+        Assert.Equal((short)649, ProtocolConsts.SM_SELL_FAIL_DELPHI);
+        Assert.Equal((short)651, ProtocolConsts.SM_BUY_FAIL_DELPHI);
+        Assert.Equal((short)669, ProtocolConsts.SM_REPAIROK_DELPHI);
+        Assert.Equal((short)670, ProtocolConsts.SM_REPAIRFAIL_DELPHI);
+
+        // 3. 模拟接收官方 622 封包 (Recog=35当前重量, Param=18穿戴重量, Tag=150最大重量)
+        var router = new ServerMessageRouter(null, null);
+        var weightPkt = new ServerPacket(ProtocolConsts.SM_WEIGHTCHANGED, 35, 18, 150, Array.Empty<byte>());
+        router.OnPacket(weightPkt);
+
+        // 4. 模拟接收 648 购买成功封包与 650 出售成功封包
+        var buyOkPkt = new ServerPacket(ProtocolConsts.SM_BUY_OK_DELPHI, 88888, 0, 0, Array.Empty<byte>());
+        router.OnPacket(buyOkPkt);
+
+        var sellOkPkt = new ServerPacket(ProtocolConsts.SM_SELL_OK_DELPHI, 99999, 0, 0, Array.Empty<byte>());
+        router.OnPacket(sellOkPkt);
+    }
 }
 
 

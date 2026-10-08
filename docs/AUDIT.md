@@ -7290,10 +7290,32 @@
       - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_AttackMode_766_And_GroupMode_659_660_666_GroundTruth_Test` 脱机单测，测试集扩充至 **186 / 186 项 100% 全部通过**；
       - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+50. **盛大官方 1.5 负重协议 (SM_WEIGHTCHANGED 622) 头部三元组物理参数权威纠偏与非标私服 (delphi-custom) 绝对隔离铁律建立 (`ProtocolConsts.cs`, `ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 1159~1164 铁证：
+        ```c
+        case 622:
+          *(_WORD *)(dword_4F7EF8 + 80) = v66;        // Recog: 当前背包重量 (Weight)
+          *(_BYTE *)(dword_4F7EF8 + 84) = BYTE2(v67); // Param: 穿戴重量/腕力 (WearWeight)
+          *(_BYTE *)(dword_4F7EF8 + 86) = v68;        // Tag: 最大背包负重 (MaxWeight)
+          refresh_char_ui(dword_4A2D10);
+          break;
+        ```
+      - 此前客户端将 `Param` 当成 `MaxWeight`，完全遗漏了真实的 `Tag` 字段，导致穿戴负重与背包最大负重倒错；
+      - 排查清理了此前混入 `ProtocolConsts.cs` 的 `delphi-custom` 非标私服魔改常量（623/625/626/629/630/631/632 等），确立官方 1.5 权威真值：购买成功为 648、出售成功为 650、出售失败为 649、购买失败为 651、修理成功为 669、修理失败为 670；
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中：
+        - 纠偏 `HandleWeightChanged` 为 `int curWeight = pkt.Recog; int wearWeight = pkt.Param; int maxWeight = pkt.Tag > 0 ? pkt.Tag : (pkt.Param > 0 ? pkt.Param : 50);`；
+        - 在无 Extra 制表符扩展时，亦能由官方 622 原生三元组同步更新角色面板能力页的背包重与负重；
+        - 标注并隔离 629/632 仅为非标私服兼容别名；
+      - 在 `ProtocolConsts.cs` 中建立官方 1.5 权威买卖/修理真值与非标私服隔离区；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_WeightChanged_622_And_Isolation_Test` 脱机单测，测试集扩充至 **187 / 187 项 100% 全部通过**；
+      - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **186 / 186 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **187 / 187 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

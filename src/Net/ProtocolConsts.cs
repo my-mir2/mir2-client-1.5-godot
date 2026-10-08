@@ -197,9 +197,36 @@ public static class ProtocolConsts
     public const short SM_TAKEOFF_OK             = 619;  // 脱下装备成功
     public const short SM_EQUIPINFO              = 621;  // 全量 9 槽位装备下发
     public const short SM_WEIGHTCHANGED          = 622;  // 负重同步
-    public const short SM_MERCHANTDLG            = 631;  // 商店货架界面下发
-    public const short SM_BUYITEM_SUCCESS        = 632;  // 商店购买成功
-    public const short SM_BUYITEM_FAIL           = 633;  // 商店购买失败
+    // =========================================================================
+    // 【官方 1.5 权威买卖/修理真值】(IDA ProcessServerMessage 0x467920 权威反编译):
+    // 购买成功: 648 (SM_BUY_OK_DELPHI) | 出售成功: 650 (SM_SELL_OK_DELPHI)
+    // 购买失败: 651 (SM_BUY_FAIL_DELPHI) | 出售失败: 649 (SM_SELL_FAIL_DELPHI)
+    // 修理成功: 669 (SM_REPAIROK_DELPHI) | 修理失败: 670 (SM_REPAIRFAIL_DELPHI)
+    // -------------------------------------------------------------------------
+    // 【隔离铁律】：以下 623/625/626/629/630/631/632 均为非标 1.5+ (delphi-custom) 私服魔改号，
+    // 盛大官方 1.5 原版二进制 (MIR_final_v3_p.exe) 无此协议，仅保留别名以防外部反射断裂：
+    public const short SM_MERCHANTDLG_CUSTOM      = 631;  // [非标delphi-custom] 商店货架 (官方为 646)
+    public const short SM_BUYITEM_SUCCESS_CUSTOM  = 632;  // [非标delphi-custom] 购买成功 (官方为 648)
+    public const short SM_BUYITEM_FAIL_CUSTOM     = 633;  // [非标delphi-custom] 购买失败 (官方为 651)
+    public const short SM_BUYITEMFAIL_CUSTOM      = 630;  // [非标delphi-custom] 购买失败 (官方为 651)
+    public const short SM_BUYITEMSUCCESS_CUSTOM   = 629;  // [非标delphi-custom] 购买成功 (官方为 648)
+    public const short SM_REPAIRFAIL_CUSTOM       = 626;  // [非标delphi-custom] 修理失败 (官方为 670)
+    public const short SM_REPAIROK_CUSTOM         = 625;  // [非标delphi-custom] 修理成功 (官方为 669)
+    public const short SM_SELLITEMFAIL_CUSTOM     = 632;  // [非标delphi-custom] 出售失败 (官方为 649)
+    public const short SM_SELLITEMOK_CUSTOM       = 631;  // [非标delphi-custom] 出售成功 (官方为 650)
+    public const short SM_SENDREPAIRCOST_CUSTOM   = 623;  // [非标delphi-custom] 修理费用
+    // 兼容历史命名别名引用
+    public const short SM_MERCHANTDLG            = SM_MERCHANTDLG_CUSTOM;
+    public const short SM_BUYITEM_SUCCESS        = SM_BUYITEM_SUCCESS_CUSTOM;
+    public const short SM_BUYITEM_FAIL           = SM_BUYITEM_FAIL_CUSTOM;
+    public const short SM_BUYITEMFAIL             = SM_BUYITEMFAIL_CUSTOM;
+    public const short SM_BUYITEMSUCCESS          = SM_BUYITEMSUCCESS_CUSTOM;
+    public const short SM_REPAIRFAIL              = SM_REPAIRFAIL_CUSTOM;
+    public const short SM_REPAIROK                = SM_REPAIROK_CUSTOM;
+    public const short SM_SELLITEMFAIL            = SM_SELLITEMFAIL_CUSTOM;
+    public const short SM_SELLITEMOK              = SM_SELLITEMOK_CUSTOM;
+    public const short SM_SENDREPAIRCOST          = SM_SENDREPAIRCOST_CUSTOM;
+    // =========================================================================
     public const short SM_GUILDMEMBERLIST        = 671;  // 行会成员列表
     public const short SM_STORAGE_ITEMS          = 682;  // 仓库物品列表
     public const short SM_GROUPMEMBERS           = 667;  // 队伍成员列表
@@ -214,8 +241,6 @@ public static class ProtocolConsts
     public const short SM_BATCHSTRUCK             = 15;   // 批量受击
     public const short SM_BUILDGUILDFAIL          = 763;  // 创建行会失败
     public const short SM_BUILDGUILDOK            = 762;  // 创建行会成功
-    public const short SM_BUYITEMFAIL             = 630;  // 购买物品失败
-    public const short SM_BUYITEMSUCCESS          = 629;  // 购买物品成功
     public const short SM_CRY                     = 765;  // 叫喊
     public const short SM_DELMAGIC                = 212;  // 删除技能
     public const short SM_DLGMSG                  = 636;  // 对话框消息
@@ -259,14 +284,9 @@ public static class ProtocolConsts
     public const short SM_GUILDJOINFAIL           = 758;  // 盛大官方 1.5 加入行会失败 (IDA sub_467920 0x46A880)
     public const short SM_GUILDMAKEALLYFAIL2      = 768;  // 盛大官方 1.5 结盟申请失败别名 (IDA sub_467920 0x46AAA7)
     public const short SM_GUILDBREAKALLYFAIL2     = 770;  // 盛大官方 1.5 解除结盟失败别名 (IDA sub_467920 0x46AB30)
-    public const short SM_REPAIRFAIL              = 626;  // 修理失败
-    public const short SM_REPAIROK                = 625;  // 修理成功
-    public const short SM_SELLITEMFAIL            = 632;  // 出售物品失败
-    public const short SM_SELLITEMOK              = 631;  // 出售物品成功
     public const short SM_SENDDETAILGOODSLIST     = 622;  // 商品详细列表
     public const short SM_SENDMYMAGIC             = 211;  // 全量技能列表下发
     public const short SM_SENDNOTICE              = 662;  // 发送公告
-    public const short SM_SENDREPAIRCOST          = 623;  // 发送修理费用
     public const short SM_SENDUSEITEMS            = 604;  // 发送使用物品
     public const short SM_SPACEMOVEHIDE           = 800;  // 传送隐身
     public const short SM_SPACEMOVESHOW           = 801;  // 传送显身
