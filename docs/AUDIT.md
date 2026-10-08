@@ -6813,11 +6813,27 @@
     - **精准重构**：
       - 在 `ServerMessageRouter.cs` 中实现重号精准分流，打通 `HandleCry`、`HandleInstanceHealGauge` 与 `HandleDonateResult`。
 
+16. **官方 1.5 下行协议全集与铁匠铺买卖修理大世界闭环 (`SM_BUY_OK_DELPHI 648` / `SM_SELL_OK_DELPHI 650` / `SM_OPENREPAIRDLG 668` / `SM_OPENGUILDDLGFAIL 752` 等)**：
+    - **官方实证**：`docs/ida_evidence/SM_truth_table.md` 官方 80 项 YES 权威协议 100% 分发闭环；
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 扩充实现 `SM_HEAR`、`SM_HIT_DELPHI`、`SM_BUY_OK_DELPHI`、`SM_SELL_OK_DELPHI`、`SM_OPENREPAIRDLG` 等；
+      - 在 `HudController.cs` 中增加 `OpenRepairPanel()`，联动金币刷新与铁匠铺面板；
+      - 单元测试 `TestProtocolMatrix.cs` 扩充至 158 项全部 PASS。
+
+17. **官方 1.5 底栏原生功能按钮矩阵全生命周期闭环 (`docs/ida_evidence/dialog_truth_table.md`)**：
+    - **官方实证**：依据 IDA 原版 Delphi 逆向函数 `TFrmDlg_DBotPlusAbilClick` (0x4915cc / 0x48bc5c)、`TFrmDlg_DBotMiniMapClick` (0x490c80)、`TFrmDlg_DBotLogoutClick` (0x491474)、`TFrmDlg_DBotExitClick` (0x491520)、`TFrmDlg_DMyStateClick` (0x48bdec)、`TFrmDlg_DOptionClick` (0x48be70) 提取底栏控件体系；
+    - **精准重构**：
+      - 在 `HudController.cs` 中挂载并暴露 `BtnHudPlusAbil`、`BtnHudMiniMap`、`BtnHudLogout`、`BtnHudExit`、`BtnHudMyState`、`BtnHudOption`；
+      - 补齐 `ToggleMinimap()`、`ToggleAdjustAbil()`、`ToggleStatus()`、`RequestSoftClose()`、`RequestExitGame()` 底栏事件全链路响应；
+      - `AutoEndToEndDriver.cs` 扩充第 110 步与 111 步实机演练，验证底栏原生按钮与事件。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **156 / 156 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **108 / 108 阶段全生命周期 0 缺陷通过**；
+- **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **158 / 158 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **111 / 111 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
+
 
 

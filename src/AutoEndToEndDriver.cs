@@ -1676,7 +1676,28 @@ public partial class AutoEndToEndDriver : Node
 
             case 110:
             {
-                GD.Print("[AutoE2E] ALL 110 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 底栏原生按钮与事件 (加点/小地图/状态切换/小退/退出) ===");
+                    // 1. 模拟点击底栏加点按钮 (BtnHudPlusAbil / TFrmDlg_DBotPlusAbilClick 0x4915cc)
+                    gameView.HudInstance.BtnHudPlusAbil?.EmitSignal(BaseButton.SignalName.Pressed);
+                    // 2. 模拟点击底栏小地图按钮 (BtnHudMiniMap / TFrmDlg_DBotMiniMapClick 0x490c80)
+                    gameView.HudInstance.BtnHudMiniMap?.EmitSignal(BaseButton.SignalName.Pressed);
+                    // 3. 模拟点击底栏状态切换按钮 (BtnHudMyState / TFrmDlg_DMyStateClick 0x48bdec)
+                    gameView.HudInstance.BtnHudMyState?.EmitSignal(BaseButton.SignalName.Pressed);
+                    // 4. 模拟点击底栏小退按钮 (BtnHudLogout / TFrmDlg_DBotLogoutClick 0x491474)
+                    gameView.HudInstance.BtnHudLogout?.EmitSignal(BaseButton.SignalName.Pressed);
+                    // 5. 模拟点击底栏系统选项按钮 (BtnHudOption / TFrmDlg_DOptionClick 0x48be70)
+                    gameView.HudInstance.BtnHudOption?.EmitSignal(BaseButton.SignalName.Pressed);
+                }
+                RequestCapture("step110_bottom_bar_buttons");
+                break;
+            }
+
+            case 111:
+            {
+                GD.Print("[AutoE2E] ALL 111 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

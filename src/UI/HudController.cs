@@ -142,6 +142,23 @@ public partial class HudController : CanvasLayer
     private TextureButton? _btnHudEquip;
     private TextureButton? _btnHudSkill;
     private TextureButton? _btnHudGroup;
+    private TextureButton? _btnHudPlusAbil;
+    private TextureButton? _btnHudMiniMap;
+    private TextureButton? _btnHudLogout;
+    private TextureButton? _btnHudExit;
+    private TextureButton? _btnHudMyState;
+    private TextureButton? _btnHudOption;
+
+    public TextureButton? BtnHudBag => _btnHudBag;
+    public TextureButton? BtnHudEquip => _btnHudEquip;
+    public TextureButton? BtnHudSkill => _btnHudSkill;
+    public TextureButton? BtnHudGroup => _btnHudGroup;
+    public TextureButton? BtnHudPlusAbil => _btnHudPlusAbil;
+    public TextureButton? BtnHudMiniMap => _btnHudMiniMap;
+    public TextureButton? BtnHudLogout => _btnHudLogout;
+    public TextureButton? BtnHudExit => _btnHudExit;
+    public TextureButton? BtnHudMyState => _btnHudMyState;
+    public TextureButton? BtnHudOption => _btnHudOption;
     private TextureRect? _attackModeIcon;
 
     private int _currentAttackMode = 1;
@@ -987,7 +1004,14 @@ public partial class HudController : CanvasLayer
             ("BtnChatWhisper", 249, 453, 28, 13, "Prguse_0132.png", "Prguse_0133.png", () => {}),
             ("BtnChatTeam", 309, 453, 28, 13, "Prguse_0128.png", "Prguse_0129.png", () => {}),
             ("BtnChatFilter", 530, 453, 28, 13, "Prguse_0136.png", "Prguse_0137.png", () => {}),
-            ("BtnChatHistory", 560, 453, 28, 13, "Prguse_0138.png", "Prguse_0139.png", () => {})
+            ("BtnChatHistory", 560, 453, 28, 13, "Prguse_0138.png", "Prguse_0139.png", () => {}),
+            // 官方 1.5 原生底栏功能按钮 (IDA dialog_truth_table 0x4915cc/0x490c80/0x491474/0x491520/0x48bdec/0x48be70 实证):
+            ("BtnHudPlusAbil", 605, 410, 24, 24, "", null, () => ToggleAdjustAbil(5)),
+            ("BtnHudMiniMap", 748, 410, 24, 24, "", null, ToggleMinimap),
+            ("BtnHudLogout", 600, 453, 28, 13, "", null, RequestSoftClose),
+            ("BtnHudExit", 630, 453, 28, 13, "", null, RequestExitGame),
+            ("BtnHudMyState", 682, 414, 24, 22, "", null, ToggleStatus),
+            ("BtnHudOption", 660, 453, 28, 13, "", null, () => AddChat("系统", "[系统] 呼出系统选项设置。", new Color(1f, 1f, 0.4f)))
         };
 
         var bottomBarContainer = new Control
@@ -1015,7 +1039,7 @@ public partial class HudController : CanvasLayer
                 texNormal = null;
                 texPressed = ResPath.LoadImageTexture($"resources/wil/png/Prguse/{def.NormalPng}");
             }
-            else
+            else if (!string.IsNullOrEmpty(def.NormalPng))
             {
                 texNormal = ResPath.LoadImageTexture($"resources/wil/png/Prguse/{def.NormalPng}");
                 texPressed = !string.IsNullOrEmpty(def.PressedPng)
@@ -1039,6 +1063,12 @@ public partial class HudController : CanvasLayer
             else if (def.Name == "BtnHudEquip") _btnHudEquip = btn;
             else if (def.Name == "BtnHudSkill") _btnHudSkill = btn;
             else if (def.Name == "BtnHudGroup") _btnHudGroup = btn;
+            else if (def.Name == "BtnHudPlusAbil") _btnHudPlusAbil = btn;
+            else if (def.Name == "BtnHudMiniMap") _btnHudMiniMap = btn;
+            else if (def.Name == "BtnHudLogout") _btnHudLogout = btn;
+            else if (def.Name == "BtnHudExit") _btnHudExit = btn;
+            else if (def.Name == "BtnHudMyState") _btnHudMyState = btn;
+            else if (def.Name == "BtnHudOption") _btnHudOption = btn;
         }
 
         // 挂载官方 1.5 快捷药水栏 1~6 格 (IDA sub_481DD4 [0x484be6..0x484da1], left: 285, 328, 371, 415, 459, 503, top: 408, 32x29)
@@ -1403,6 +1433,12 @@ public partial class HudController : CanvasLayer
             _stackManager.ToggleWindow(_tradePanelView);
             GD.Print($"[HudController] 切换交易面板显示状态: {_tradePanelView.Visible}");
         }
+    }
+
+    /// <summary>官方 1.5 底栏小地图按键切换 (IDA TFrmDlg_DBotMiniMapClick 0x490c80)</summary>
+    public void ToggleMinimap()
+    {
+        _minimapView?.CycleMode();
     }
 
     private Vector2 _bagPosBeforeStorage;
