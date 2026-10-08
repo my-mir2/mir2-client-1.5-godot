@@ -260,7 +260,7 @@ public partial class HudController : CanvasLayer
         EmitSignal(SignalName.ExitGameRequested);
     }
 
-    /// <summary>官方 1.5 丢弃金币 (IDA TFrmDlg_DGoldClick 0x48e564, 发包 CM_DROPGOLD 1007)</summary>
+    /// <summary>官方 1.5 丢弃金币 (IDA TFrmDlg_DGoldClick 0x48e564, 发包 CM_DROPGOLD 1016)</summary>
     public void RequestDropGold(int amount)
     {
         AddChat("系统", $"[系统] 丢弃金币 {amount} 枚至地面。", new Color(1f, 1f, 0.4f));
@@ -913,6 +913,35 @@ public partial class HudController : CanvasLayer
         {
             EmitSignal(SignalName.TradeChangeGoldRequested, gold);
             AddChat("系统", $"[交易] 修改出资交易金币为 {gold:N0}。", new Color(1f, 0.9f, 0.3f));
+        };
+        // 官方 1.5 交易面板点击修改金币 (IDA TFrmDlg_DDGoldClick 0x491fb0):
+        _tradePanelView.DealGoldClicked += () =>
+        {
+            if (_currentGold <= 0)
+            {
+                AddChat("系统", "[交易] 背包中没有多余金币可投入交易。", new Color(1f, 0.4f, 0.4f));
+                return;
+            }
+            if (_messageBoxDialog != null)
+            {
+                _messageBoxDialog.ShowInput($"请输入要交易的金币数量 (最多 {_currentGold:N0})：", "1000", (input) =>
+                {
+                    if (int.TryParse(input.Trim(), out var gold) && gold >= 0)
+                    {
+                        int realGold = Math.Min(gold, _currentGold);
+                        // 交易金币上限 10,000,000 (sub_4DDC8C 0x989680 / trade.rs MAX_GOLD_CAP)
+                        realGold = Math.Min(realGold, 10_000_000);
+                        _tradePanelView.SetMyGold(realGold);
+                        _tradePanelView.EmitSignal(TradePanelView.SignalName.ChangeDealGoldRequested, realGold);
+                    }
+                });
+            }
+            else
+            {
+                int defaultGold = Math.Min(1000, _currentGold);
+                _tradePanelView.SetMyGold(defaultGold);
+                _tradePanelView.EmitSignal(TradePanelView.SignalName.ChangeDealGoldRequested, defaultGold);
+            }
         };
         _tradePanelView.AddDealItemRequested += (slot, name) =>
         {

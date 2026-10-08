@@ -6961,11 +6961,22 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_ShopDetailBuySellAndNpcSelect` 单元测试，脱机测试覆盖扩充至 **165 / 165 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 120 步实机验证，总演练步数扩充至 **121 步**。
 
+29. **官方 1.5 交易面板点击修改出资金币交互打通与丢金币发包实证 (`scratch/ida_dialogs.json:1084` TFrmDlg_DDGoldClick `0x491fb0`, `sub_4DDC8C 0x989680`, `bridge.rs:69, 1000`)**：
+    - **官方实证**：
+      - 交易面板点击出资修改金币 (`TFrmDlg_DDGoldClick 0x491fb0`)：官方 1.5 原版在交易面板我方金币图标与凹槽区域点击时呼出输入框，输入本次交易投入的金币数量，并发送 `CM_DEALCHGGOLD 1029`（`recog = gold`）；经核对官方代码与服务端网关 `bridge.rs:1000`，交易金币严格限制单次上限为 10,000,000（`0x989680`，`trade.rs MAX_GOLD_CAP`），此前客户端该区域 `MouseFilter` 为 `Ignore` 处于未连通断链状态；
+      - 背包点击丢弃金币发包 (`TFrmDlg_DGoldClick 0x48e564`)：此前注释曾误写为 1007（实际 1007 为割肉 `CM_BUTCHITEM`），权威发包协议为 `CM_DROPGOLD 1016`，现已完全对齐并建立闭环。
+    - **精准重构**：
+      - 在 `TradePanelView.cs` 增加 `DealGoldClicked` 信号，并将我方金币图标与凹槽改为 `MouseFilterEnum.Stop` 挂接 `OnGoldGuiInput`；
+      - 在 `HudController.cs` 挂接 `DealGoldClicked`，呼出输入模态框，限制单次上限 10,000,000，更新本地展示并发射 `ChangeDealGoldRequested` -> `CM_DEALCHGGOLD 1029`；
+      - 纠偏 `HudController.cs` 中 `RequestDropGold` 注释为 `CM_DROPGOLD 1016`；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_DealChangeGoldAndDropGold` 单元测试，脱机测试覆盖扩充至 **166 / 166 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 121 步实机验证，总演练步数扩充至 **122 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **165 / 165 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **121 / 121 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **166 / 166 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **122 / 122 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

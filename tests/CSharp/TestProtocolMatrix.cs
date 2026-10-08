@@ -2459,6 +2459,24 @@ public class TestProtocolMatrix
         Assert.Equal(2, parsedNpcSel.Param);
         Assert.Equal("@buy", parsedNpcSel.ExtraStr);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthCmCases_DealChangeGoldAndDropGold()
+    {
+        // 1. 官方 1.5 交易修改出资金币发包 (CM_DEALCHGGOLD 1029, 对齐 IDA TFrmDlg_DDGoldClick 0x491fb0)
+        Assert.Equal(1029, ProtocolConsts.CM_DEALCHGGOLD);
+        byte[] rawDealGold = PacketEncoder.DealChangeGold(500000);
+        var parsedDealGold = PacketDecoder.Parse(rawDealGold.AsSpan(1))!.Value;
+        Assert.Equal(1029, parsedDealGold.Ident);
+        Assert.Equal(500000, parsedDealGold.Recog);
+
+        // 2. 官方 1.5 丢弃金币发包 (CM_DROPGOLD 1016, 对齐 IDA TFrmDlg_DGoldClick 0x48e564)
+        Assert.Equal(1016, ProtocolConsts.CM_DROPGOLD);
+        byte[] rawDropGold = PacketEncoder.DropGold(8888);
+        var parsedDropGold = PacketDecoder.Parse(rawDropGold.AsSpan(1))!.Value;
+        Assert.Equal(1016, parsedDropGold.Ident);
+        Assert.Equal(8888, parsedDropGold.Recog);
+    }
 }
 
 

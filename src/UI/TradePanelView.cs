@@ -21,6 +21,9 @@ public partial class TradePanelView : Control, IManagedWindow
     public delegate void ChangeDealGoldRequestedEventHandler(int gold);
 
     [Signal]
+    public delegate void DealGoldClickedEventHandler();
+
+    [Signal]
     public delegate void EndDealConfirmedEventHandler();
 
     [Signal]
@@ -256,8 +259,10 @@ public partial class TradePanelView : Control, IManagedWindow
             Name = "MyGoldIcon",
             Position = new Vector2(11, 137),
             Size = new Vector2(36, 21),
-            Texture = texGold
+            Texture = texGold,
+            MouseFilter = MouseFilterEnum.Stop
         };
+        myGoldIcon.GuiInput += OnGoldGuiInput;
         _myPanel.AddChild(myGoldIcon);
 
         // 我方金币输入凹槽 (Prguse_0389 物理凹槽区间 X: 60..159, Y: 126..154, 高度 29px, 几何中心 140.0)
@@ -266,9 +271,10 @@ public partial class TradePanelView : Control, IManagedWindow
             Name = "MyGoldBox",
             Position = new Vector2(62, 126),
             Size = new Vector2(90, 28),
-            MouseFilter = MouseFilterEnum.Ignore
+            MouseFilter = MouseFilterEnum.Stop
         };
         myGoldBox.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+        myGoldBox.GuiInput += OnGoldGuiInput;
         _myPanel.AddChild(myGoldBox);
 
         _lblMyGold = new Label
@@ -278,7 +284,8 @@ public partial class TradePanelView : Control, IManagedWindow
             Size = new Vector2(86, 28),
             Text = "0",
             HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = MouseFilterEnum.Ignore
         };
         _lblMyGold.AddThemeFontSizeOverride("font_size", 11);
         _lblMyGold.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.3f));
@@ -467,5 +474,17 @@ public partial class TradePanelView : Control, IManagedWindow
         Visible = false;
         ResetTrade();
         EmitSignal(SignalName.TradeCancelled);
+    }
+
+    /// <summary>
+    /// 官方 1.5 交易面板点击修改金币 (IDA TFrmDlg_DDGoldClick 0x491fb0)
+    /// </summary>
+    private void OnGoldGuiInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+        {
+            if (_isMyLocked) return;
+            EmitSignal(SignalName.DealGoldClicked);
+        }
     }
 }

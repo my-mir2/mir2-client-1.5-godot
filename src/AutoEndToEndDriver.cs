@@ -2054,7 +2054,26 @@ public partial class AutoEndToEndDriver : Node
 
             case 121:
             {
-                GD.Print("[AutoE2E] ALL 121 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 交易修改出资金币 (TFrmDlg_DDGoldClick 0x491fb0 -> CM_DEALCHGGOLD 1029) 与丢金币 (1016) ===");
+                    // 1. 打开交易面板并模拟点击我方金币触发修改金币
+                    gameView.HudInstance.ToggleTrade();
+                    gameView.HudInstance.TradePanel?.EmitSignal(TradePanelView.SignalName.DealGoldClicked);
+                    gameView.HudInstance.TradePanel?.EmitSignal(TradePanelView.SignalName.ChangeDealGoldRequested, 88888);
+
+                    // 2. 模拟丢弃金币发包
+                    gameView.HudInstance.RequestDropGold(666);
+                    gameView.HudInstance.ToggleTrade();
+                }
+                RequestCapture("step121_trade_change_deal_gold_drop_gold");
+                break;
+            }
+
+            case 122:
+            {
+                GD.Print("[AutoE2E] ALL 122 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }
