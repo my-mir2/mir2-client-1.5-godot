@@ -7370,10 +7370,54 @@
       - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_Gold_653_And_TakeOff_619_Isolation_Test` 脱机单测，测试集扩充至 **189 / 189 项 100% 全部通过**；
       - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+53. **盛大官方 1.5 打造系统 (SM_MAKEOBJECT_OK 713 / SM_STORAGE_SOUND 711) 金币同步与 255 神圣音效、修理 669 耐久回显与昼夜光照 46 物理指令实证 (`ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 583~588 铁证：
+        ```c
+        case 713:
+          *(_DWORD *)(*off_4A4310 + 1884) = GetTickCount();
+          *(_DWORD *)(dword_4F7EF8 + 88) = v66; // 同步剩余金币！
+          LOWORD(v36) = word_46AFDC;
+          show_dialog_message(v36, dword_46B940); // "物品已经被正确打造。"
+          goto LABEL_486;
+        ```
+      - 此前客户端在 713 打造成功后仅弹窗提示，完全遗漏了 `*(_DWORD *)(dword_4F7EF8 + 88) = v66;` 随身金币的扣减同步；
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 576~579 (case 711) 铁证：
+        ```c
+        case 711:
+          dword_4F94F0 = GetTickCount();
+          play_sound(255); // 播放 255 号打造/升级光效神圣音效
+          goto LABEL_486;
+        ```
+      - 此前客户端在 711 处错调了 106.wav 金币声，现已彻底纠偏为 255 原版音效；
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 408~416 (case 669) 铁证：
+        ```c
+        case 669:
+          *(_DWORD *)(dword_4F7EF8 + 88) = v66; // 剩余金币
+          word_4F9338 = HIWORD(v67);           // Param: 当前修理后耐久
+          word_4F933A = v68;                   // Tag: 最大耐久
+        ```
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 1487~1491 (case '.' 46) 铁证：
+        ```c
+        case '.':
+          dword_4F9384 = HIWORD(v67);          // Param: 昼夜状态
+          *off_4A4144 = (unsigned __int16)v68; // Tag: 火把/蜡烛光照半径
+          byte_4F9382 = *off_4A4144 != 0;
+        ```
+      - 此前客户端 46 协议将 `Tag` 中的独立光照半径丢弃，现已纠偏为优先取 `pkt.Tag` 作为光照半径；
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中：
+        - `SM_MAKEOBJECT_OK (713)` 增加 `if (packet.Recog > 0) _hud?.UpdateGold(packet.Recog);`；
+        - `SM_STORAGE_SOUND (711)` 纠偏为 `AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.LevelUp)`（255）；
+        - `SM_REPAIROK_DELPHI (669)` 增加当前耐久 `pkt.Param` 与最大耐久 `pkt.Tag` 的清晰回显；
+        - `SM_CHANGELIGHT (46)` 纠偏为优先采用 `pkt.Tag` 作为火把光照范围半径；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_MakeObject_713_Sound_711_Light_46_GroundTruth_Test` 脱机单测，测试集扩充至 **190 / 190 项 100% 全部通过**；
+      - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **189 / 189 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **190 / 190 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

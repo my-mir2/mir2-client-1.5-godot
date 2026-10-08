@@ -495,9 +495,16 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_OPENREPAIRDLG: // 668: 铁匠铺打开修理面板 (IDA open_shop_repair 0x46dae8)
                 _hud?.OpenRepairPanel();
                 break;
-            case ProtocolConsts.SM_REPAIROK_DELPHI: // 669: 铁匠铺修理成功更新金币与持久 (IDA 0x469F9B)
+            case ProtocolConsts.SM_REPAIROK_DELPHI: // 669: 铁匠铺修理成功更新金币与持久 (IDA sub_467920 case 669 @ 0x469F9B)
                 _hud?.UpdateGold(packet.Recog);
-                _hud?.AddChat("修理", $"[铁匠铺] 装备修理成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
+                if (packet.Param > 0 && packet.Tag > 0)
+                {
+                    _hud?.AddChat("修理", $"[铁匠铺] 装备修理完毕，耐久恢复为 {packet.Param}/{packet.Tag}，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
+                }
+                else
+                {
+                    _hud?.AddChat("修理", $"[铁匠铺] 装备修理成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
+                }
                 break;
             case ProtocolConsts.SM_REPAIRFAIL_DELPHI: // 670: 铁匠铺修理失败模态弹窗 (IDA 0x469FE9 0x46B83C)
                 _hud?.ShowModalMessage("修理提示", "你不能修理这个物品 .");
@@ -535,11 +542,15 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_TAKEBACKITEM_FULL: // 707: 不能再携带更多东西 (IDA 0x46B8AC)
                 _hud?.ShowModalMessage("保管箱提示", "你不能再携带更多东西了.");
                 break;
-            case ProtocolConsts.SM_STORAGE_SOUND: // 711: 播放金币/存取音效 (IDA sub_467920 play_sound(255))
-                AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money);
+            case ProtocolConsts.SM_STORAGE_SOUND: // 711: 打造/仓储神圣音效 (IDA sub_467920 case 711 play_sound(255))
+                AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.LevelUp); // 官方原版 255 音效
                 break;
-            case ProtocolConsts.SM_MAKEOBJECT_OK: // 713: 打造物品成功 (IDA 0x46B940)
-                _hud?.ShowModalMessage("打造提示", "物品已经被正确打造。");
+            case ProtocolConsts.SM_MAKEOBJECT_OK: // 713: 打造物品成功并更新金币 (IDA sub_467920 case 713 *(_DWORD *)(dword_4F7EF8 + 88) = v66)
+                if (packet.Recog > 0)
+                {
+                    _hud?.UpdateGold(packet.Recog);
+                }
+                _hud?.ShowModalMessage("打造提示", "物品已经被正确打造。"); // 官方原版 0x46B940
                 break;
             case ProtocolConsts.SM_MAKEOBJECT_FAIL: // 714: 打造物品失败 (IDA 0x46B960~0x46B988)
                 HandleMakeObjectFail(packet);
@@ -1038,10 +1049,12 @@ public sealed class ServerMessageRouter
         }
     }
 
+    // 盛大官方 1.5 全局昼夜与火把光照协议 (IDA ProcessServerMessage case '.' 46 @ 0x46A1B8)
+    // 物理指令: dword_4F9384 = HIWORD(v67); (Param: 昼夜状态); *off_4A4144 = v68; (Tag: 光照半径); byte_4F9382 = *off_4A4144 != 0;
     private void HandleChangeLight(ServerPacket pkt)
     {
-        int light = pkt.Param;
-        int state = light switch
+        int dayNight = pkt.Param;
+        int state = dayNight switch
         {
             <= 0 => 2, // 黑夜
             1 => 1,    // 黄昏
@@ -1050,7 +1063,8 @@ public sealed class ServerMessageRouter
         };
         _hud?.SetDayNightState(state);
         bool isDark = state == 1 || state == 2;
-        _hud?.UpdateVisionFog(isDark, isDark ? 6 : 15, new Godot.Vector2(400, 225));
+        int radius = pkt.Tag > 0 ? pkt.Tag : (isDark ? 6 : 15);
+        _hud?.UpdateVisionFog(isDark, radius, new Godot.Vector2(400, 225));
     }
 
     private void HandleAddItem(ServerPacket pkt)

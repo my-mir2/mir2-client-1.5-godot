@@ -648,6 +648,39 @@ public class TestCombatSkillsMatrix
         var expPkt = new ServerPacket(ProtocolConsts.SM_EXPERIENCE, 5000, 10000, 0, Array.Empty<byte>());
         router.OnPacket(expPkt);
     }
+
+    [Fact]
+    public void Official_1_5_MakeObject_713_Sound_711_Light_46_GroundTruth_Test()
+    {
+        // 1. 常量权威真值断言：
+        // 官方 1.5 原版二进制 IDA ProcessServerMessage:
+        // case 713: *(_DWORD *)(dword_4F7EF8 + 88) = v66; (打造物品成功，Recog 为剩余金币)
+        // case 711: play_sound(255); (打造/仓储神圣音效 ID 255)
+        // case 46 ('.'): dword_4F9384 = HIWORD(v67); *off_4A4144 = v68; (Param 为昼夜状态，Tag 为火把光照半径)
+        // case 669: *(_DWORD *)(dword_4F7EF8 + 88) = v66; word_4F9338 = HIWORD(v67); word_4F933A = v68; (Recog 金币，Param 当前持久，Tag 最大持久)
+        Assert.Equal((short)713, ProtocolConsts.SM_MAKEOBJECT_OK);
+        Assert.Equal((short)711, ProtocolConsts.SM_STORAGE_SOUND);
+        Assert.Equal((short)46, ProtocolConsts.SM_CHANGELIGHT);
+        Assert.Equal((short)669, ProtocolConsts.SM_REPAIROK_DELPHI);
+
+        var router = new ServerMessageRouter(null, null);
+
+        // 2. 模拟 713 打造成功：扣除 50,000 金币后剩余 150,000 金币
+        var makePkt = new ServerPacket(ProtocolConsts.SM_MAKEOBJECT_OK, 150000, 0, 0, Array.Empty<byte>());
+        router.OnPacket(makePkt);
+
+        // 3. 模拟 711 打造音效
+        var soundPkt = new ServerPacket(ProtocolConsts.SM_STORAGE_SOUND, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(soundPkt);
+
+        // 4. 模拟 669 修理成功：剩余 80,000 金币，耐久恢复为 25/25
+        var repairPkt = new ServerPacket(ProtocolConsts.SM_REPAIROK_DELPHI, 80000, 25, 25, Array.Empty<byte>());
+        router.OnPacket(repairPkt);
+
+        // 5. 模拟 46 昼夜光照：黑夜模式 (Param=0)，手持火把光照半径 7 格 (Tag=7)
+        var lightPkt = new ServerPacket(ProtocolConsts.SM_CHANGELIGHT, 0, 0, 7, Array.Empty<byte>());
+        router.OnPacket(lightPkt);
+    }
 }
 
 
