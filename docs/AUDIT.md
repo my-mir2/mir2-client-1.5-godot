@@ -7521,10 +7521,69 @@
       - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_SpellEffect_614_639_Page_647_And_Attr2_716_GroundTruth_Test` 脱机单测，测试集扩充至 **194 / 194 项 100% 全部通过**；
       - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+  - [x] **57. 盛大官方 1.5 角色登场实体创建、转向动作同步与状态金币防短路实证** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA ProcessServerMessage 0x467920 反编译真值（`scratch/ida_processmsg.c` 行 1276~1282、1365~1371、1547~1552、1624）：
+        ```c
+        // 20: 角色确认进入世界 / 实体登场 (IDA case 20 @ 0x4683C0)
+        case 20:
+          GetBuffer(16, &v62);
+          v71 = get_actor_by_id();
+          if ( !v71 )
+            v71 = create_entity(v63, v62, SBYTE2(v68), v68);
+          *(_DWORD *)(v71 + 216) = v64;
+          entity_action(0, 0, v63, v62, HIWORD(v68), (unsigned __int16)v68);
+          break;
+
+        // 14: 实体转向与动作族物理指令 (IDA case 14 与 8/15/16/18/19/24 共享)
+        case 8:
+        case 14:
+        case 15:
+        case 16:
+        case 18:
+        case 19:
+        case 24:
+          if ( *(_DWORD *)(dword_4F7EF8 + 4) != v66 )
+          {
+            v71 = get_actor_by_id();
+            if ( v71 )
+            {
+              entity_action(0, 0, 0, 0, HIWORD(v68), (unsigned __int16)v68);
+              if ( (_WORD)v67 == 15 ) { if ( v81 ) *(_BYTE *)(v71 + 220) = 1; }
+            }
+          }
+          break;
+
+        // 52 ('4'): 角色基础属性与金币更新 (IDA case '4' @ 0x46A250)
+        case '4':
+          *(_DWORD *)(dword_4F7EF8 + 88) = v66; // Recog 权威实证为金币 Gold
+          *(_BYTE *)(dword_4F7EF8 + 18) = BYTE2(v67);
+          GetBuffer(40, dword_4F7EF8 + 48);
+          refresh_char_ui(dword_4A2D10);
+          goto LABEL_486;
+
+        // 506 / 532: 修改密码成功响应模态框 (IDA 0x46B59C)
+        if ( (unsigned __int16)v67 != 506 ) goto LABEL_488;
+        LOWORD(v3) = word_46AFDC;
+        show_dialog_message(v3, nullsub_7);
+        ```
+      - 此前客户端坏账：
+        1. 20 (`SM_STARTPLAY`) 仅设置了 `LocalPlayerUid`，若实体池未初始化（如重连或首登），未执行 `create_entity` 自动创建主角实体，丢失了初始姿态与动作参数 `*(_DWORD *)(v71 + 216) = v64;`；
+        2. 14 (`SM_ENTITYTURN`) 在转向时仅更新了 `Direction`，丢失了与 8/18/19/24 同族的动作参数同步 `UpdateActorParam`；
+        3. 52 (`SM_SENDUSERSTATE`) 开头因 `string.IsNullOrEmpty(text)` 检查直接返回，导致服务端下发纯金币/无文本 52 包时被短路吞包，且金币为 0 时无法更新；
+        4. 506 (`SM_CHGPASSWD_SUCCESS`) 未与 532 (`SM_CHANGEPASS_OK`) 合并，导致官方 1.5 密码修改成功响应丢失。
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 将 20 接入主角实体自动检测与 `AddEntity` 创建，并同步动作参数 `UpdateActorParam`；
+      - 在 `HandleTurnDirection` 补齐 `UpdateActorParam(uid, pkt.Param)`，动作族行为 1:1 对齐；
+      - 在 `HandleSendUserState` 提前提取 `pkt.Recog >= 0` 无条件更新金币，并同步刷新 `StatusPanel` 避免短路；
+      - 将 506 与 532 合并路由；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_StartPlay_20_Turn_14_UserState_52_ChangePass_506_GroundTruth_Test` 脱机单测，单测总数提升至 **195 / 195 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **194 / 194 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **195 / 195 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

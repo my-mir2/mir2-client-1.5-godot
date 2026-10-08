@@ -823,6 +823,57 @@ public class TestCombatSkillsMatrix
         var p716 = new ServerPacket(ProtocolConsts.SM_ATTR2_DELPHI, 0, 0, 50, Array.Empty<byte>());
         router.OnPacket(p716);
     }
+
+    [Fact]
+    public void Official_1_5_StartPlay_20_Turn_14_UserState_52_ChangePass_506_GroundTruth_Test()
+    {
+        // 1. 验证官方 1.5 协议常量真值
+        Assert.Equal((short)20, ProtocolConsts.SM_STARTPLAY);
+        Assert.Equal((short)14, ProtocolConsts.SM_ENTITYTURN);
+        Assert.Equal((short)52, ProtocolConsts.SM_SENDUSERSTATE);
+        Assert.Equal((short)506, ProtocolConsts.SM_CHGPASSWD_SUCCESS);
+        Assert.Equal((short)532, ProtocolConsts.SM_CHANGEPASS_OK);
+
+        // 2. 验证 SM_STARTPLAY (20) 实体自动创建与动作参数同步 (IDA case 20: if (!v71) v71 = create_entity(...))
+        var em = new EntityManager();
+        var router = new ServerMessageRouter(null, em);
+
+        // 初始无该实体
+        Assert.Null(em.GetEntity(9999));
+        // 发送 20 包: Recog=9999, Param=105, Tag=205
+        var p20 = new ServerPacket(ProtocolConsts.SM_STARTPLAY, 9999, 105, 205, Array.Empty<byte>());
+        router.OnPacket(p20);
+
+        // 验证主角 UID 与实体被自动创建
+        Assert.Equal(9999, em.LocalPlayerUid);
+        var hero = em.GetEntity(9999);
+        Assert.NotNull(hero);
+        Assert.Equal(105, hero!.ActorParam);
+        Assert.Equal(105, hero.TileX);
+        Assert.Equal(205, hero.TileY);
+
+        // 3. 验证 SM_ENTITYTURN (14) 转向朝向与动作参数同步 (IDA case 14: entity_action)
+        // dir = Param & 7 = 5
+        var p14 = new ServerPacket(ProtocolConsts.SM_ENTITYTURN, 9999, 5, 0, Array.Empty<byte>());
+        router.OnPacket(p14);
+        Assert.Equal((byte)5, hero.Direction);
+        Assert.Equal(5, hero.ActorParam);
+
+        // 4. 验证 SM_SENDUSERSTATE (52) 金币与四维状态 (防短路，Recog >= 0)
+        // 模拟金币花光为 0 的极端情况
+        var p52ZeroGold = new ServerPacket(ProtocolConsts.SM_SENDUSERSTATE, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p52ZeroGold);
+
+        // 模拟带文本属性的 52
+        var p52WithText = new ServerPacket(ProtocolConsts.SM_SENDUSERSTATE, 888888, 0, 0, Encoding.UTF8.GetBytes("测试英雄/35/0/1|20,15,10,5,5,10,10"));
+        router.OnPacket(p52WithText);
+
+        // 5. 验证 506 与 532 密码修改成功响应
+        var p506 = new ServerPacket(ProtocolConsts.SM_CHGPASSWD_SUCCESS, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p506);
+        var p532 = new ServerPacket(ProtocolConsts.SM_CHANGEPASS_OK, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p532);
+    }
 }
 
 

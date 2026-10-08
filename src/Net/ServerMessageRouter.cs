@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Godot;
 using Mir2Client.Audio;
+using Mir2Client.Game;
 using Mir2Client.Render;
 using Mir2Client.UI;
 using Mir2Client.Utils;
@@ -694,10 +695,25 @@ public sealed class ServerMessageRouter
                 }
                 SafeLog($"[SM] 主角色进入世界绑定 (SM_LOGON_DELPHI=50, uid={packet.Recog})");
                 break;
-            case ProtocolConsts.SM_STARTPLAY: // 20: 角色确认进入世界 / 实体登场 (IDA case 20)
+            case ProtocolConsts.SM_STARTPLAY: // 20: 角色确认进入世界 / 实体登场 (IDA case 20 @ 0x4683C0)
                 if (_entityManager != null && packet.Recog > 0)
                 {
                     _entityManager.LocalPlayerUid = packet.Recog;
+                    var hero = _entityManager.GetEntity(packet.Recog);
+                    if (hero == null)
+                    {
+                        // 盛大官方 1.5 IDA 物理指令: if (!v71) v71 = create_entity(v63, v62, SBYTE2(v68), v68);
+                        int x = packet.Param > 0 ? (packet.Param & 0xFFFF) : 100;
+                        int y = packet.Tag > 0 ? (packet.Tag & 0xFFFF) : 100;
+                        byte dir = (byte)((packet.Param >> 16) & 7);
+                        _entityManager.AddEntity(packet.Recog, "本地玩家", EntityManager.EntityType.Player, x, y, dir, 0);
+                    }
+                    else if (packet.Param > 0 && packet.Tag > 0)
+                    {
+                        _entityManager.UpdatePosition(packet.Recog, packet.Param, packet.Tag);
+                    }
+                    // 盛大官方 1.5 IDA 物理指令: *(_DWORD *)(v71 + 216) = v64; entity_action(...)
+                    _entityManager.UpdateActorParam(packet.Recog, packet.Param);
                 }
                 SafeLog($"[SM] 进入游戏世界确认 (SM_STARTPLAY=20, uid={packet.Recog})");
                 break;
@@ -919,6 +935,7 @@ public sealed class ServerMessageRouter
                 _hud?.ShowModalMessage("选服提示", msg);
                 break;
             }
+            case ProtocolConsts.SM_CHGPASSWD_SUCCESS: // 506: 盛大官方 1.5 修改密码成功 (IDA sub_467920 0x46B59C)
             case ProtocolConsts.SM_CHANGEPASS_OK: // 532: 密码变更成功 (IDA 0x46B59C)
                 _hud?.ShowModalMessage("改密提示", "密码变更成功.");
                 break;
@@ -1396,6 +1413,16 @@ public sealed class ServerMessageRouter
 
     private void HandleSendUserState(ServerPacket pkt)
     {
+        // 盛大官方 1.5 IDA 物理指令 (ProcessServerMessage case '4' 52 @ 0x46A250):
+        // *(_DWORD *)(dword_4F7EF8 + 88) = v66; (Recog 权威实证为 Gold 金币)
+        // *(_BYTE *)(dword_4F7EF8 + 18) = BYTE2(v67);
+        // GetBuffer(40, dword_4F7EF8 + 48); refresh_char_ui(dword_4A2D10);
+        if (pkt.Ident == SM_SENDUSERSTATE && pkt.Recog >= 0)
+        {
+            _hud?.UpdateGold(pkt.Recog);
+            _hud?.StatusPanel?.UpdateStat("Gold", pkt.Recog.ToString());
+        }
+
         string text = pkt.ExtraStr;
         if (string.IsNullOrEmpty(text)) return;
 
@@ -1431,15 +1458,10 @@ public sealed class ServerMessageRouter
                 }
             }
             // 2. 若为 52 (SM_SENDUSERSTATE 主角属性下行)，驱动主角自己的 StatusPanel 与 HUD
-            // 盛大官方 1.5 IDA 物理指令: *(_DWORD *)(dword_4F7EF8 + 88) = v66; (Recog 即为 Gold)
             else
             {
                 _hud?.UpdateName(name);
                 _hud?.UpdateLevel(level);
-                if (pkt.Recog > 0)
-                {
-                    _hud?.UpdateGold(pkt.Recog);
-                }
 
                 var sp = _hud?.StatusPanel;
                 if (sp != null)
@@ -1447,6 +1469,7 @@ public sealed class ServerMessageRouter
                     sp.UpdateStat("Name", name);
                     sp.UpdateStat("Level", level.ToString());
                     sp.UpdateStat("Job", job switch { 0 => "战士", 1 => "法师", 2 => "道士", _ => "战士" });
+                    sp.UpdateStat("Gold", pkt.Recog.ToString());
 
                     if (baseParts.Length > 1)
                     {
@@ -2093,6 +2116,8 @@ public sealed class ServerMessageRouter
         int uid = pkt.Recog;
         byte dir = (byte)(pkt.Param & 7);
         _entityManager.UpdateTurn(uid, dir);
+        // 盛大官方 1.5 IDA 物理指令: case 14 entity_action(...) 动作参数同步
+        _entityManager.UpdateActorParam(uid, pkt.Param);
     }
 
     // 他人移动：Extra "x/y/dir" 优先，缺省按 Recog 低16=x/高16=y，L2。
