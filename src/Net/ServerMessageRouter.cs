@@ -426,6 +426,42 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_EAT_OK:
                 _hud?.AddChat("系统", $"[服药] {DecodeExtraText(packet.Extra)}", new Color(1f, 1f, 0.6f));
                 break;
+            case ProtocolConsts.SM_SAVEITEM_OK: // 701: 寄存物品成功
+                _hud?.AddChat("保管箱", "[保管箱] 物品寄存成功。", new Color(0.5f, 1f, 0.5f));
+                break;
+            case ProtocolConsts.SM_SAVEITEM_FULL: // 702: 个人包袱已满 (IDA 0x46B85C)
+                _hud?.ShowModalMessage("保管箱提示", "你的个人包袱已经满了，你不能再寄存任何东西了。");
+                break;
+            case ProtocolConsts.SM_SAVEITEM_FAIL: // 703: 不能寄存 (IDA 0x46B894)
+                _hud?.ShowModalMessage("保管箱提示", "你不能寄存。");
+                break;
+            case ProtocolConsts.SM_TAKEBACKITEM_OK: // 705: 取回物品成功
+                _hud?.AddChat("保管箱", "[保管箱] 物品取回成功。", new Color(0.5f, 1f, 0.5f));
+                break;
+            case ProtocolConsts.SM_TAKEBACKITEM_FAIL: // 706: 不能取回 (IDA 0x46B8CC)
+                _hud?.ShowModalMessage("保管箱提示", "你不能取回。");
+                break;
+            case ProtocolConsts.SM_TAKEBACKITEM_FULL: // 707: 不能再携带更多东西 (IDA 0x46B8AC)
+                _hud?.ShowModalMessage("保管箱提示", "你不能再携带更多东西了.");
+                break;
+            case ProtocolConsts.SM_STORAGE_SOUND: // 711: 播放金币/存取音效 (IDA sub_467920 play_sound(255))
+                AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money);
+                break;
+            case ProtocolConsts.SM_MAKEOBJECT_OK: // 713: 打造物品成功 (IDA 0x46B940)
+                _hud?.ShowModalMessage("打造提示", "物品已经被正确打造。");
+                break;
+            case ProtocolConsts.SM_MAKEOBJECT_FAIL: // 714: 打造物品失败 (IDA 0x46B960~0x46B988)
+                HandleMakeObjectFail(packet);
+                break;
+            case ProtocolConsts.SM_GUILD_MODALMSG: // 772: 行会通用弹窗提示 (IDA sub_467920 0x46AC5C)
+                {
+                    string gMsg = !string.IsNullOrEmpty(packet.ExtraStr) ? packet.ExtraStr : DecodeExtraText(packet.Extra);
+                    if (!string.IsNullOrEmpty(gMsg))
+                    {
+                        _hud?.ShowModalMessage("行会通知", gMsg);
+                    }
+                }
+                break;
             case ProtocolConsts.SM_DELMAGIC:
                 _hud?.AddChat("技能", $"[技能] 已删除技能：{DecodeExtraText(packet.Extra)}", new Color(0.8f, 0.8f, 1f));
                 break;
@@ -449,6 +485,23 @@ public sealed class ServerMessageRouter
                 HandleBatchStruck(packet);
                 break;
         }
+    }
+
+    /// <summary>
+    /// 处理打造/特修失败错误码 (SM_MAKEOBJECT_FAIL 714)
+    /// 严格对齐官方 Delphi sub_467920 (0x46A20D)
+    /// </summary>
+    private void HandleMakeObjectFail(ServerPacket packet)
+    {
+        string errMsg = packet.Recog switch
+        {
+            1 => "发生了错误",                     // 0x46B960
+            2 => "没有更多物品可以携带了",           // 0x46B8FC (LABEL_364 共享)
+            3 => "金币不足.",                      // 0x46B974
+            4 => "你缺乏所必需的物品。",             // 0x46B988
+            _ => "打造失败。"
+        };
+        _hud?.ShowModalMessage("打造提示", errMsg);
     }
 
     private void HandleGoldChanged(ServerPacket pkt)
@@ -885,9 +938,13 @@ public sealed class ServerMessageRouter
     {
         bool ok = pkt.Ident == ProtocolConsts.SM_BUILDGUILDOK;
         string text = DecodeExtraText(pkt.Extra);
-        if (string.IsNullOrEmpty(text)) text = ok ? "行会创建成功！" : "行会创建失败！";
+        if (string.IsNullOrEmpty(text)) text = ok ? "行会正确建立。" : "行会创建失败！";
         _hud?.AddChat("行会", $"[行会] {text}", new Color(0.4f, 1f, 0.5f));
-        if (ok) _hud?.ToggleGuild();
+        if (ok)
+        {
+            _hud?.ShowModalMessage("行会提示", "行会正确建立。"); // 官方 IDA 0x46BDB0 "行会正确建立。" 模态弹窗
+            _hud?.ToggleGuild();
+        }
         else _hud?.ShowModalMessage("行会提示", text);
     }
 

@@ -1755,7 +1755,42 @@ public partial class AutoEndToEndDriver : Node
 
             case 114:
             {
-                GD.Print("[AutoE2E] ALL 114 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 仓库音效、保管箱满仓、打造失败与行会通知模态协议 (SM 702/707/711/714/772) ===");
+                    // 1. 模拟播放存取金币音效 (SM_STORAGE_SOUND 711)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_STORAGE_SOUND,
+                        0, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 2. 模拟仓库满仓错误弹窗 (SM_SAVEITEM_FULL 702)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_SAVEITEM_FULL,
+                        0, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 3. 模拟打造特修物品失败 (SM_MAKEOBJECT_FAIL 714, recog=3 金币不足)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_MAKEOBJECT_FAIL,
+                        3, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 4. 模拟官方行会通用下发模态通知 (SM_GUILD_MODALMSG 772)
+                    byte[] gMsg = System.Text.Encoding.UTF8.GetBytes("行会掌门已开启全员行会攻城总动员！");
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_GUILD_MODALMSG,
+                        0, 0, 0, gMsg
+                    ));
+                }
+                RequestCapture("step114_storage_makeobject_guild_notice");
+                break;
+            }
+
+            case 115:
+            {
+                GD.Print("[AutoE2E] ALL 115 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

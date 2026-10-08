@@ -2067,6 +2067,65 @@ public class TestProtocolMatrix
         var parsedGuildFail = PacketDecoder.Parse(rawGuildFail.AsSpan(1))!.Value;
         Assert.Equal(ProtocolConsts.SM_OPENGUILDDLGFAIL, parsedGuildFail.Ident);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthSmCases_StorageMakeObjectAndGuildNotice()
+    {
+        // 1. 保管箱寄存与满仓 (SM_SAVEITEM_OK 701, SM_SAVEITEM_FULL 702, SM_SAVEITEM_FAIL 703)
+        byte[] rawSaveOk = PacketEncoder.MakePacket(ProtocolConsts.SM_SAVEITEM_OK, 0, 0, 0);
+        var parsedSaveOk = PacketDecoder.Parse(rawSaveOk.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SAVEITEM_OK, parsedSaveOk.Ident);
+
+        byte[] rawSaveFull = PacketEncoder.MakePacket(ProtocolConsts.SM_SAVEITEM_FULL, 0, 0, 0);
+        var parsedSaveFull = PacketDecoder.Parse(rawSaveFull.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SAVEITEM_FULL, parsedSaveFull.Ident);
+
+        byte[] rawSaveFail = PacketEncoder.MakePacket(ProtocolConsts.SM_SAVEITEM_FAIL, 0, 0, 0);
+        var parsedSaveFail = PacketDecoder.Parse(rawSaveFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SAVEITEM_FAIL, parsedSaveFail.Ident);
+
+        // 2. 保管箱取回与超载 (SM_TAKEBACKITEM_OK 705, SM_TAKEBACKITEM_FAIL 706, SM_TAKEBACKITEM_FULL 707)
+        byte[] rawTakeOk = PacketEncoder.MakePacket(ProtocolConsts.SM_TAKEBACKITEM_OK, 0, 0, 0);
+        var parsedTakeOk = PacketDecoder.Parse(rawTakeOk.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_TAKEBACKITEM_OK, parsedTakeOk.Ident);
+
+        byte[] rawTakeFail = PacketEncoder.MakePacket(ProtocolConsts.SM_TAKEBACKITEM_FAIL, 0, 0, 0);
+        var parsedTakeFail = PacketDecoder.Parse(rawTakeFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_TAKEBACKITEM_FAIL, parsedTakeFail.Ident);
+
+        byte[] rawTakeFull = PacketEncoder.MakePacket(ProtocolConsts.SM_TAKEBACKITEM_FULL, 0, 0, 0);
+        var parsedTakeFull = PacketDecoder.Parse(rawTakeFull.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_TAKEBACKITEM_FULL, parsedTakeFull.Ident);
+
+        // 3. 仓库/存取金币音效 (SM_STORAGE_SOUND 711)
+        byte[] rawSound = PacketEncoder.MakePacket(ProtocolConsts.SM_STORAGE_SOUND, 0, 0, 0);
+        var parsedSound = PacketDecoder.Parse(rawSound.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_STORAGE_SOUND, parsedSound.Ident);
+
+        // 4. 打造特修物品成功 (SM_MAKEOBJECT_OK 713) 与打造失败子错误码 (SM_MAKEOBJECT_FAIL 714)
+        byte[] rawMakeOk = PacketEncoder.MakePacket(ProtocolConsts.SM_MAKEOBJECT_OK, 0, 0, 0);
+        var parsedMakeOk = PacketDecoder.Parse(rawMakeOk.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MAKEOBJECT_OK, parsedMakeOk.Ident);
+
+        // 打造失败子错误码 1~4
+        for (int errCode = 1; errCode <= 4; errCode++)
+        {
+            byte[] rawMakeFail = PacketEncoder.MakePacket(ProtocolConsts.SM_MAKEOBJECT_FAIL, errCode, 0, 0);
+            var parsedMakeFail = PacketDecoder.Parse(rawMakeFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_MAKEOBJECT_FAIL, parsedMakeFail.Ident);
+            Assert.Equal(errCode, parsedMakeFail.Recog);
+        }
+
+        // 5. 行会建立成功 (SM_BUILDGUILDOK 762) 与行会通用弹窗提示 (SM_GUILD_MODALMSG 772)
+        byte[] rawGuildOk = PacketEncoder.MakePacket(ProtocolConsts.SM_BUILDGUILDOK, 0, 0, 0);
+        var parsedGuildOk = PacketDecoder.Parse(rawGuildOk.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_BUILDGUILDOK, parsedGuildOk.Ident);
+
+        byte[] rawGuildNotice = PacketEncoder.MakePacket(ProtocolConsts.SM_GUILD_MODALMSG, 0, 0, 0, Encoding.UTF8.GetBytes("沙巴克攻城战将于今晚20:00准时开启！"));
+        var parsedGuildNotice = PacketDecoder.Parse(rawGuildNotice.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_GUILD_MODALMSG, parsedGuildNotice.Ident);
+        Assert.Equal("沙巴克攻城战将于今晚20:00准时开启！", parsedGuildNotice.ExtraStr);
+    }
 }
 
 

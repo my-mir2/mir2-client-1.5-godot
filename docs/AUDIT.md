@@ -6851,18 +6851,24 @@
       - 在 `ToggleTrade` 中补充 `sub_4915EC` 的官方背包联动展示逻辑；
       - `AutoEndToEndDriver.cs` 扩充第 113 步实机验证，总演练步数扩充至 **114 步**。
 
-21. **官方 1.5 底栏退出游戏信号与模态确认框闭环 (`TFrmDlg_DBotExitClick` 0x491520)**：
-    - **官方实证**：依据 `docs/ida_evidence/dialog_truth_table.md` 提取：官方原版在点击底栏退出按钮 (`TFrmDlg_DBotExitClick` 0x491520) 时，客户端向服务端发送 `CM_SOFTCLOSE (1009)` 软注销封包，并弹出官方模态确认框（"确定要退出游戏吗？"），确认后平滑退出进程；
+22. **官方 1.5 仓库音效、保管箱满仓、打造失败与行会通知模态协议全链路实证 (`scratch/ida_processmsg.c` lines 531~611 & `0x46870E, 0x46AC5C`)**：
+    - **官方实证**：严格依据 `scratch/ida_processmsg.c` 中 Delphi 官方客户端 `ProcessServerMessage` (0x467920) 反编译代码实证：
+      - 仓库与金币存取音效 (`SM_STORAGE_SOUND 711`)：触发 `play_sound(255)`，即原版钱币碰撞音效 `AudioManager.SoundId.Money`；
+      - 保管箱寄存与满仓 (`SM_SAVEITEM_OK 701`, `SM_SAVEITEM_FULL 702`, `SM_SAVEITEM_FAIL 703`)：701 成功入包回显，702 满仓精准弹出 `0x46B85C` "你的个人包袱已经满了，你不能再寄存任何东西了。"，703 弹出 `0x46B894` "你不能寄存。"；
+      - 保管箱取回与超载 (`SM_TAKEBACKITEM_OK 705`, `SM_TAKEBACKITEM_FAIL 706`, `SM_TAKEBACKITEM_FULL 707`)：705 成功刷新背包，706 弹出 `0x46B8CC` "你不能取回。"，707 携带超载弹出 `0x46B8AC` "你不能再携带更多东西了."；
+      - 打造与特修物品 (`SM_MAKEOBJECT_OK 713`, `SM_MAKEOBJECT_FAIL 714`)：713 打造成功弹出 `0x46B940` "物品已经被正确打造。"，714 打造失败依据子错误码精准映射（1 为 `0x46B960` "发生了错误"，2 为 `0x46B8FC` "没有更多物品可以携带了"，3 为 `0x46B974` "金币不足."，4 为 `0x46B988` "你缺乏所必需的物品。"，其他为 "打造失败。"）；
+      - 官方行会建立成功 (`SM_BUILDGUILDOK 762`) 与行会通用弹窗通知 (`SM_GUILD_MODALMSG 772`)：762 建立成功弹出 `0x46BDB0` "行会正确建立。"，772 解析下发 extra 字符串并呼出模态框；
     - **精准重构**：
-      - 在 `MessageBoxDialog.cs` 中实现带确认回调委托的 `ShowMessage(string, bool, Action)` 拓展重载；
-      - 在 `GameView.cs` 中挂接 `HudInstance.ExitGameRequested` 信号至软注销发包与官方模态确认退出流程；
-      - 实机端对端演练验证通过，保持 0 缺陷闭环。
+      - 在 `ProtocolConsts.cs` 补全 701、702、703、705、706、707、711、713、714、772 常量；
+      - 在 `ServerMessageRouter.cs` 挂载上述 10 个协议的精准路由分发与 `HandleMakeObjectFail` 错误码解析；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_StorageMakeObjectAndGuildNotice` 单元测试，脱机测试覆盖扩充至 **159 / 159 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 114 步实机验证，总演练步数扩充至 **115 步**。
 
 ### 2. 终局指标与质量守门线核销
-- **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
+- **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **158 / 158 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **114 / 114 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **159 / 159 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **115 / 115 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

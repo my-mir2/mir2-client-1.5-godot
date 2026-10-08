@@ -235,4 +235,14 @@ public static class ProtocolConsts
     public const short SM_PASSWORDSTATUS          = 2015; // 密码状态 (对齐 SM_PASSWORDSTATUS)
     public const short SM_GETREGINFO              = 2016; // 获取注册信息 (对齐 SM_GETREGINFO)
     public const short SM_PASSWORD                = 2017; // 密码设置确认 (对齐 SM_PASSWORD)
+    public const short SM_SAVEITEM_OK             = 701;  // 寄存物品成功
+    public const short SM_SAVEITEM_FULL           = 702;  // 寄存失败-个人包袱已满 (IDA 0x46B85C)
+    public const short SM_SAVEITEM_FAIL           = 703;  // 寄存失败-不能寄存 (IDA 0x46B894)
+    public const short SM_TAKEBACKITEM_OK         = 705;  // 取回物品成功
+    public const short SM_TAKEBACKITEM_FAIL       = 706;  // 取回失败-不能取回 (IDA 0x46B8CC)
+    public const short SM_TAKEBACKITEM_FULL       = 707;  // 取回失败-不能再携带更多 (IDA 0x46B8AC)
+    public const short SM_STORAGE_SOUND           = 711;  // 仓库/金币音效 (IDA sub_467920 play_sound(255))
+    public const short SM_MAKEOBJECT_OK           = 713;  // 打造/特修物品成功 (IDA 0x46B940)
+    public const short SM_MAKEOBJECT_FAIL         = 714;  // 打造/特修物品失败 (IDA 0x46B960~0x46B988)
+    public const short SM_GUILD_MODALMSG          = 772;  // 官方行会通用下发弹窗协议 (IDA sub_467920 0x46AC5C)
 }
