@@ -34,6 +34,9 @@ public partial class ShopPanelView : Control, IManagedWindow
     public delegate void RepairSpecialRequestedEventHandler(int npcUid, int itemUid);
 
     [Signal]
+    public delegate void ItemSelectedForDetailEventHandler(string itemName);
+
+    [Signal]
     public delegate void PanelClosedEventHandler();
 
     public const float PanelWidth = 308.0f;
@@ -432,6 +435,12 @@ public partial class ShopPanelView : Control, IManagedWindow
             {
                 weightLbl.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.25f, 0.25f) : Colors.White);
             }
+        }
+
+        // 官方 1.5 购买模式下单品详情查询 (CM_USERGETDETAILITEM 1013)
+        if (globalIdx >= 0 && globalIdx < _items.Count && _currentMode == ShopMode.Buy)
+        {
+            EmitSignal(SignalName.ItemSelectedForDetail, _items[globalIdx].Name);
         }
     }
 

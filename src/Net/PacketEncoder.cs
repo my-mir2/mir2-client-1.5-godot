@@ -266,6 +266,18 @@ public static class PacketEncoder
     public static byte[] GroupModeToggle(bool allow) =>
         MakePacket(ProtocolConsts.CM_GROUPMODE, allow ? 1 : 0);
 
+    public static byte[] ThrustingOnOff(bool enabled) =>
+        MakePacket(ProtocolConsts.CM_THRUSTINGONOFF, enabled ? 1 : 0);
+
+    public static byte[] HalfMoonOnOff(bool enabled) =>
+        MakePacket(ProtocolConsts.CM_HALFMOONONOFF, enabled ? 1 : 0);
+
+    public static byte[] ChangeAttackMode(short mode) =>
+        MakePacket(ProtocolConsts.CM_CHANGEATTACKMODE, mode);
+
+    public static byte[] UserGetDetailItem(string itemName) =>
+        MakePacket(ProtocolConsts.CM_USERGETDETAILITEM, 0, 0, 0, Encoding.UTF8.GetBytes(itemName));
+
     public static byte[] AdjustBonus(short bonusType) =>
         MakePacket(ProtocolConsts.CM_ADJUST_BONUS, bonusType);
 

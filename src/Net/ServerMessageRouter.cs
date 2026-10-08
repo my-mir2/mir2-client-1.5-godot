@@ -330,14 +330,30 @@ public sealed class ServerMessageRouter
             case 750: // SM_CHANGEGUILDNAME：extra=新行会名（加入/退出/更名同号，bridge 2118）。
                 HandleChangeGuildName(packet);
                 break;
-            case ProtocolConsts.SM_DONATEFAIL:
-                HandleDonateResult(packet);
-                break;
-            case ProtocolConsts.SM_GROUPMEMBERS:
+            case ProtocolConsts.SM_GROUPMEMBERS: // 667 (SM_GROUPMEMBERLIST 同号)
                 HandleGroupMembers(packet);
                 break;
-            case ProtocolConsts.SM_GUILDMESSAGE:
-                HandleGuildMessage(packet);
+            case ProtocolConsts.SM_CRY: // 765: 全服求助与叫喊 (SM_DONATEFAIL 同号)
+                HandleCry(packet);
+                break;
+            case ProtocolConsts.SM_INSTANCEHEALGAUGE: // 659: 即时治愈
+                HandleInstanceHealGauge(packet);
+                break;
+            case ProtocolConsts.SM_SPACEMOVEHIDE: // 800: 空间传送消失
+                HandleSpaceMove(packet, false);
+                break;
+            case ProtocolConsts.SM_SPACEMOVESHOW: // 801: 空间传送出现
+                HandleSpaceMove(packet, true);
+                break;
+            case ProtocolConsts.SM_GUILDMESSAGE: // 764: 行会消息与捐献成功 (SM_DONATEOK 同号)
+                if (packet.Recog > 0)
+                {
+                    HandleDonateResult(packet);
+                }
+                else
+                {
+                    HandleGuildMessage(packet);
+                }
                 break;
             case ProtocolConsts.SM_BUYITEMSUCCESS:
             case ProtocolConsts.SM_BUYITEM_SUCCESS:
@@ -880,13 +896,61 @@ public sealed class ServerMessageRouter
         _hud?.AddChat("行会", $"[行会公告] {text}", new Color(1f, 0.85f, 0.4f));
     }
 
-    // 沙城捐献失败（765，extra=原因）。
+    // 沙城捐献结果（767/768，extra=原因/提示）。
     private void HandleDonateResult(ServerPacket pkt)
     {
         string text = DecodeExtraText(pkt.Extra);
         if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
-        if (string.IsNullOrEmpty(text)) text = "捐献失败";
-        _hud?.AddChat("沙城", $"[捐献] {text}", new Color(1f, 0.5f, 0.5f));
+        bool ok = pkt.Ident == ProtocolConsts.SM_DONATEOK;
+        if (string.IsNullOrEmpty(text)) text = ok ? "捐献金币成功！" : "捐献失败";
+        var col = ok ? new Color(0.4f, 1f, 0.4f) : new Color(1f, 0.5f, 0.5f);
+        _hud?.AddChat("沙城", $"[捐献] {text}", col);
+    }
+
+    // 官方 1.5 求助/全服叫喊广播 (IDA ProcessServerMessage case 765)
+    private void HandleCry(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(text))
+        {
+            _hud?.AddChat("求助", $"[求助] {text}", new Color(1f, 0.4f, 0.4f));
+        }
+    }
+
+    // 官方 1.5 即时治疗/血球回显指示 (IDA ProcessServerMessage case 659)
+    private void HandleInstanceHealGauge(ServerPacket pkt)
+    {
+        int healAmount = pkt.Param;
+        if (healAmount > 0)
+        {
+            _hud?.AddChat("提示", $"[治愈] 恢复生命值 +{healAmount} 点。", new Color(0.4f, 1f, 0.4f));
+        }
+    }
+
+    // 官方 1.5 空间传送隐去与现身联动 (IDA ProcessServerMessage case 800 / 801)
+    private void HandleSpaceMove(ServerPacket pkt, bool isShow)
+    {
+        if (_entityManager == null) return;
+        if (isShow)
+        {
+            var ent = _entityManager.GetEntity(pkt.Recog);
+            if (ent == null)
+            {
+                _entityManager.AddEntity(pkt.Recog, string.Empty,
+                    Mir2Client.Game.EntityManager.EntityType.Player, pkt.Param, pkt.Tag, 2, 0);
+            }
+            else
+            {
+                _entityManager.UpdateMove(pkt.Recog, pkt.Param, pkt.Tag, ent.Direction);
+            }
+            GD.Print($"[SM] 空间传送现身 uid={pkt.Recog} pos=({pkt.Param},{pkt.Tag})");
+        }
+        else
+        {
+            _entityManager.RemoveEntity(pkt.Recog);
+            GD.Print($"[SM] 空间传送隐去 uid={pkt.Recog}");
+        }
     }
 
     // 行会更名/加入/退出（750，extra=新行会名，空=无行会）。

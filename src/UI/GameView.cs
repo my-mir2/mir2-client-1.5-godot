@@ -526,6 +526,74 @@ namespace Mir2Client.UI
                     _net?.SendPacket(PacketEncoder.TakeOffItem((short)equipSlot));
                 };
 
+                // 官方战士核心技能开关网络发包 (CM_THRUSTINGONOFF 3026 / CM_HALFMOONONOFF 3027)
+                HudInstance.ToggleThrustingRequested += (enabled) =>
+                {
+                    _net?.SendPacket(PacketEncoder.ThrustingOnOff(enabled));
+                };
+                HudInstance.ToggleHalfMoonRequested += (enabled) =>
+                {
+                    _net?.SendPacket(PacketEncoder.HalfMoonOnOff(enabled));
+                };
+
+                // 官方 1.5 组队面板交互发包 (CM_CREATEGROUP 1020 / CM_ADDGROUPMEMBER 1021 / CM_DELGROUPMEMBER 1022 / CM_GROUPMODE 1019)
+                if (HudInstance.GroupPanel != null)
+                {
+                    HudInstance.GroupPanel.CreateGroupRequested += (targetName) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GroupAddMember(targetName));
+                    };
+                    HudInstance.GroupPanel.AddMemberRequested += (targetName) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GroupAddMember(targetName));
+                    };
+                    HudInstance.GroupPanel.DelMemberRequested += (targetName) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GroupDelMember(targetName));
+                    };
+                    HudInstance.GroupPanel.GroupModeToggled += (enabled) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GroupModeToggle(enabled));
+                    };
+                }
+
+                // 官方 1.5 商店面板交互发包 (CM_USERBUYITEM 45 / CM_USERSTORAGEWITHDRAW 1032 / CM_USERGETDETAILITEM 1013)
+                if (HudInstance.ShopPanel != null)
+                {
+                    HudInstance.ShopPanel.BuyRequested += (npcUid, itemIdx, count) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.BuyFromShop(npcUid, (short)count, (short)itemIdx));
+                    };
+                    HudInstance.ShopPanel.TakeBackRequested += (storageSlot, itemName) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.WithdrawStorage(storageSlot));
+                    };
+                    HudInstance.ShopPanel.ItemSelectedForDetail += (itemName) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.UserGetDetailItem(itemName));
+                    };
+                }
+
+                // 官方 1.5 铁匠铺修理与仓库保管交互发包 (CM_USERREPAIRITEM 1023 / CM_REPAIRSPECIAL 48 / CM_USERSTORAGEDEPOSIT 1031)
+                if (HudInstance.RepairPanel != null)
+                {
+                    HudInstance.RepairPanel.RepairConfirmed += (itemUid, isSpecial) =>
+                    {
+                        if (isSpecial)
+                        {
+                            _net?.SendPacket(PacketEncoder.RepairSpecial(0, itemUid));
+                        }
+                        else
+                        {
+                            _net?.SendPacket(PacketEncoder.RepairItem(0, itemUid));
+                        }
+                    };
+                    HudInstance.RepairPanel.StorageDepositConfirmed += (bagSlot, itemName) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.DepositStorage(bagSlot, itemName));
+                    };
+                }
+
                 if (HudInstance.Minimap != null)
                 {
                     HudInstance.Minimap.MapTargetSelected += (targetX, targetY) =>

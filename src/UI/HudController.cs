@@ -168,6 +168,35 @@ public partial class HudController : CanvasLayer
     [Signal]
     public delegate void NpcOptionSelectedEventHandler(int index);
 
+    [Signal]
+    public delegate void ToggleThrustingRequestedEventHandler(bool enabled);
+
+    [Signal]
+    public delegate void ToggleHalfMoonRequestedEventHandler(bool enabled);
+
+    private bool _isThrusting = true;
+    private bool _isHalfMoon = false;
+    public bool IsThrustingEnabled => _isThrusting;
+    public bool IsHalfMoonEnabled => _isHalfMoon;
+
+    /// <summary>官方 1.5 快捷键 Ctrl+F 刺杀剑术开关切换 (CM_THRUSTINGONOFF 3026)</summary>
+    public void ToggleThrusting()
+    {
+        _isThrusting = !_isThrusting;
+        string statusText = _isThrusting ? "打开刺杀剑术" : "关闭刺杀剑术";
+        AddChat("系统", $"[系统] {statusText}。", new Color(0.4f, 1f, 0.4f));
+        EmitSignal(SignalName.ToggleThrustingRequested, _isThrusting);
+    }
+
+    /// <summary>官方 1.5 快捷键 Ctrl+B 半月弯刀开关切换 (CM_HALFMOONONOFF 3027)</summary>
+    public void ToggleHalfMoon()
+    {
+        _isHalfMoon = !_isHalfMoon;
+        string statusText = _isHalfMoon ? "打开半月弯刀" : "关闭半月弯刀";
+        AddChat("系统", $"[系统] {statusText}。", new Color(0.4f, 1f, 0.4f));
+        EmitSignal(SignalName.ToggleHalfMoonRequested, _isHalfMoon);
+    }
+
     /// <summary>快捷键 Ctrl+H 攻击模式循环切换 (全体 -> 和平 -> 夫妻/组队 -> 行会)</summary>
     public void CycleNextAttackMode()
     {
@@ -1676,6 +1705,24 @@ public partial class HudController : CanvasLayer
                     if (keyEvent.CtrlPressed)
                     {
                         CycleNextAttackMode();
+                        GetViewport().SetInputAsHandled();
+                    }
+                    break;
+                }
+                case Key.F:
+                {
+                    if (keyEvent.CtrlPressed)
+                    {
+                        ToggleThrusting();
+                        GetViewport().SetInputAsHandled();
+                    }
+                    break;
+                }
+                case Key.B:
+                {
+                    if (keyEvent.CtrlPressed)
+                    {
+                        ToggleHalfMoon();
                         GetViewport().SetInputAsHandled();
                     }
                     break;

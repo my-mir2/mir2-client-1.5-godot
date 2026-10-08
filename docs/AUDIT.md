@@ -6773,15 +6773,40 @@
 
 10. **官方计费到期与断开连接系统模态回显 (SM_BILLING_NOTICE 529 / SM_OUTOFCONNECTION 526 / SM_DISCONNECT 527)**：
     - **官方实证**：`scratch/ida_processmsg.c` lines 188~215，服务端下发计费到期或服务器断开时，弹出官方通用模态框 `MessageBoxDialog (Prguse_0360)` 提示信息；
-    - **精准重构**：在 `ServerMessageRouter.cs` 与 `HudController.cs` 中装配 `ShowModalMessage` 与 `HandleBillingNotice`，打通系统模态提示链路。
+11. **官方 1.5 战士刺杀剑术与半月弯刀开关快捷键及网络发包闭环 (`Ctrl+F` -> `CM_THRUSTINGONOFF 3026` / `Ctrl+B` -> `CM_HALFMOONONOFF 3027`)**：
+    - **官方实证**：依据 `scratch/coverage_gap.json` 与客户端快捷键规范，官方 1.5 战士核心技能刺杀剑术（`Ctrl+F`）与半月弯刀（`Ctrl+B`）通过快捷键翻转客户端开关状态，并在聊天栏输出系统提示（“[系统] 打开/关闭刺杀剑术。”与“[系统] 打开/关闭半月弯刀。”），同时向上行网络发送 `CM_THRUSTINGONOFF (3026)` 与 `CM_HALFMOONONOFF (3027)` 状态同步封包；
+    - **精准重构**：
+      - 在 `HudController.cs` 中实现 `_isThrusting` / `_isHalfMoon` 状态位与属性，并在 `_UnhandledInput` 中挂接 `Key.F` / `Key.B` 组合快捷键，触发 `ToggleThrustingRequested` 与 `ToggleHalfMoonRequested` 信号；
+      - 在 `GameView.cs` 中挂接网络发送器，调用 `PacketEncoder.ThrustingOnOff` 与 `PacketEncoder.HalfMoonOnOff`；
+      - 在 `PacketEncoder.cs` 中增加标准封包编码器。
+
+12. **官方 1.5 组队面板四大核心交互网络发包闭环 (`CM_CREATEGROUP 1020` / `CM_ADDGROUPMEMBER 1021` / `CM_DELGROUPMEMBER 1022` / `CM_GROUPMODE 1019`)**：
+    - **官方实证**：组队面板（`GroupPanelView` 基于 `Prguse_0375`）创建队伍、添加队友、踢出队员与切换允许组队模式时，分别对应上行协议：`CM_CREATEGROUP (1020)`、`CM_ADDGROUPMEMBER (1021)`、`CM_DELGROUPMEMBER (1022)` 与 `CM_GROUPMODE (1019)`；
+    - **精准重构**：
+      - 在 `GameView.cs` 中为 `HudInstance.GroupPanel` 全量挂接上述四项事件并经 `PacketEncoder` 发出网络封包。
+
+13. **官方 1.5 商店面板单品详情查询、买入取回与特修保管发包闭环 (`CM_USERGETDETAILITEM 1013` 等)**：
+    - **官方实证**：在商店买卖面板（`ShopPanelView` 基于 `Prguse_0385`）中选中某件商品行时，客户端触发单品详情查询封包 `CM_USERGETDETAILITEM (1013)`；点击购买触发 `CM_USERBUYITEM (45)`；仓库取回触发 `CM_USERSTORAGEWITHDRAW (1032)`；铁匠铺面板（`RepairPanelView` 基于 `Prguse_0392`）确认普通修理触发 `CM_USERREPAIRITEM (1023)`、特殊修理触发 `CM_REPAIRSPECIAL (48)`、仓库保管确认触发 `CM_USERSTORAGEDEPOSIT (1031)`；
+    - **精准重构**：
+      - 在 `ShopPanelView.cs` 中增加 `ItemSelectedForDetail` 信号并在 `SelectRow` 触发；
+      - 在 `PacketEncoder.cs` 中补齐 `UserGetDetailItem` 编码器；
+      - 在 `GameView.cs` 中将 `ShopPanel` 与 `RepairPanel` 的全部交互完整挂接到网络发包逻辑。
+
+14. **官方 1.5 空间传送现身与隐去实体联动闭环 (`SM_SPACEMOVESHOW 801` / `SM_SPACEMOVEHIDE 800`，IDA ProcessServerMessage case 800/801)**：
+    - **官方实证**：`scratch/ida_processmsg.c` lines 835~860 反编译铁证：收到 800 号封包时实体传送隐匿（非主角执行实体移除与传送离去光效）；收到 801 号封包时实体传送现身（执行实体创建/位置重置与现身光效动画）；
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中实装 `HandleSpaceMove` 分支，与 `EntityManager` 动态增删实体紧密联动。
+
+15. **官方 1.5 全服求助叫喊广播与即时治愈指示闭环 (`SM_CRY 765` / `SM_INSTANCEHEALGAUGE 659` / `SM_DONATEOK 764`，IDA case 765/659/764)**：
+    - **官方实证**：`SM_truth_table.md` 与 `ida_processmsg.c` 铁证：659 为即时治愈血条回显（`SM_INSTANCEHEALGAUGE`）；765 为求助与全服叫喊（`SM_CRY`）；764 为行会公告与沙城捐献成功（`SM_DONATEOK`）；
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中实现重号精准分流，打通 `HandleCry`、`HandleInstanceHealGauge` 与 `HandleDonateResult`。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **154 / 154 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **106 / 106 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **156 / 156 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **108 / 108 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
-- **单元测试**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 运行，全套测试扩充至 **150 项全部 100% 通过（0 失败，0 告警，耗时 4 秒）**；
-- **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通；
-- **实机渲染零错误**：Godot 4.7 引擎 101 步全生命周期巡检运行，日志扫描 `ERROR:` 为 0，`SCRIPT ERROR:` 为 0。
+- **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 
 

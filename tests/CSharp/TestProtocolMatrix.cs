@@ -1853,6 +1853,97 @@ public class TestProtocolMatrix
         Assert.Equal(0, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(170));
         Assert.Equal(350, Mir2Client.Render.MonsterWilPool.CalcMonsterBaseOffset(171));
     }
+
+    [Fact]
+    public void TestOfficialWarriorSkillToggleAndShopDetailEncoders()
+    {
+        // 1. 官方战士刺杀剑术开关封包 (CM_THRUSTINGONOFF 3026)
+        byte[] thrustOn = PacketEncoder.ThrustingOnOff(true);
+        var parsedThrustOn = PacketDecoder.Parse(thrustOn.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_THRUSTINGONOFF, parsedThrustOn.Ident);
+        Assert.Equal(1, parsedThrustOn.Recog);
+
+        byte[] thrustOff = PacketEncoder.ThrustingOnOff(false);
+        var parsedThrustOff = PacketDecoder.Parse(thrustOff.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_THRUSTINGONOFF, parsedThrustOff.Ident);
+        Assert.Equal(0, parsedThrustOff.Recog);
+
+        // 2. 官方战士半月弯刀开关封包 (CM_HALFMOONONOFF 3027)
+        byte[] halfMoonOn = PacketEncoder.HalfMoonOnOff(true);
+        var parsedHalfMoonOn = PacketDecoder.Parse(halfMoonOn.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_HALFMOONONOFF, parsedHalfMoonOn.Ident);
+        Assert.Equal(1, parsedHalfMoonOn.Recog);
+
+        // 3. 官方攻击模式变更封包 (CM_CHANGEATTACKMODE 1019)
+        byte[] attackMode = PacketEncoder.ChangeAttackMode(2);
+        var parsedAttackMode = PacketDecoder.Parse(attackMode.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_CHANGEATTACKMODE, parsedAttackMode.Ident);
+        Assert.Equal(2, parsedAttackMode.Recog);
+
+        // 4. 官方商店单品详情查询封包 (CM_USERGETDETAILITEM 1013)
+        byte[] detailPkt = PacketEncoder.UserGetDetailItem("裁决之杖");
+        var parsedDetail = PacketDecoder.Parse(detailPkt.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_USERGETDETAILITEM, parsedDetail.Ident);
+        Assert.Equal("裁决之杖", parsedDetail.ExtraStr);
+
+        // 5. 组队与修理仓库封包
+        byte[] groupAdd = PacketEncoder.GroupAddMember("测试队友");
+        var parsedGroupAdd = PacketDecoder.Parse(groupAdd.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_ADDGROUPMEMBER, parsedGroupAdd.Ident);
+        Assert.Equal("测试队友", parsedGroupAdd.ExtraStr);
+
+        byte[] groupToggle = PacketEncoder.GroupModeToggle(true);
+        var parsedGroupToggle = PacketDecoder.Parse(groupToggle.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_GROUPMODE, parsedGroupToggle.Ident);
+        Assert.Equal(1, parsedGroupToggle.Recog);
+
+        byte[] repairSpec = PacketEncoder.RepairSpecial(0, 9988);
+        var parsedRepairSpec = PacketDecoder.Parse(repairSpec.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_REPAIRSPECIAL, parsedRepairSpec.Ident);
+        Assert.Equal(9988, parsedRepairSpec.Recog);
+
+        byte[] deposit = PacketEncoder.DepositStorage(3, "强效金创药");
+        var parsedDeposit = PacketDecoder.Parse(deposit.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_USERSTORAGEDEPOSIT, parsedDeposit.Ident);
+        Assert.Equal(3, parsedDeposit.Recog);
+        Assert.Equal("强效金创药", parsedDeposit.ExtraStr);
+    }
+
+    [Fact]
+    public void TestOfficialGroundTruthSmCases_SpaceMoveAndCryAndDonate()
+    {
+        // 1. 空间传送隐去 (SM_SPACEMOVEHIDE 800)
+        byte[] rawHide = PacketEncoder.MakePacket(ProtocolConsts.SM_SPACEMOVEHIDE, 10088);
+        var parsedHide = PacketDecoder.Parse(rawHide.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SPACEMOVEHIDE, parsedHide.Ident);
+        Assert.Equal(10088, parsedHide.Recog);
+
+        // 2. 空间传送显身 (SM_SPACEMOVESHOW 801)
+        byte[] rawShow = PacketEncoder.MakePacket(ProtocolConsts.SM_SPACEMOVESHOW, 10088, 330, 270);
+        var parsedShow = PacketDecoder.Parse(rawShow.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SPACEMOVESHOW, parsedShow.Ident);
+        Assert.Equal(10088, parsedShow.Recog);
+        Assert.Equal(330, parsedShow.Param);
+        Assert.Equal(270, parsedShow.Tag);
+
+        // 3. 全服求助广播 (SM_CRY 765)
+        byte[] rawCry = PacketEncoder.MakePacket(ProtocolConsts.SM_CRY, 0, 0, 0, Encoding.UTF8.GetBytes("沃玛寺庙三层求组队!"));
+        var parsedCry = PacketDecoder.Parse(rawCry.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_CRY, parsedCry.Ident);
+        Assert.Equal("沃玛寺庙三层求组队!", parsedCry.ExtraStr);
+
+        // 4. 即时治愈指示 (SM_INSTANCEHEALGAUGE 659)
+        byte[] rawHeal = PacketEncoder.MakePacket(ProtocolConsts.SM_INSTANCEHEALGAUGE, 0, 80);
+        var parsedHeal = PacketDecoder.Parse(rawHeal.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_INSTANCEHEALGAUGE, parsedHeal.Ident);
+        Assert.Equal(80, parsedHeal.Param);
+
+        // 5. 沙城捐献成功 (SM_DONATEOK 767)
+        byte[] rawDonate = PacketEncoder.MakePacket(ProtocolConsts.SM_DONATEOK, 0, 0, 0, Encoding.UTF8.GetBytes("捐献 100000 金币成功"));
+        var parsedDonate = PacketDecoder.Parse(rawDonate.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_DONATEOK, parsedDonate.Ident);
+        Assert.Equal("捐献 100000 金币成功", parsedDonate.ExtraStr);
+    }
 }
 
 

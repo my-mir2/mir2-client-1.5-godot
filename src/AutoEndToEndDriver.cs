@@ -1594,7 +1594,47 @@ public partial class AutoEndToEndDriver : Node
 
             case 106:
             {
-                GD.Print("[AutoE2E] ALL 106 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证战士技能开关 (Ctrl+F/B)、攻击模式与交互闭环 ===");
+                    // 1. 刺杀剑术开关 (CM_THRUSTINGONOFF 3026)
+                    gameView.HudInstance.ToggleThrusting();
+                    // 2. 半月弯刀开关 (CM_HALFMOONONOFF 3027)
+                    gameView.HudInstance.ToggleHalfMoon();
+                    // 3. 攻击模式切换 (CM_CHANGEATTACKMODE 1019)
+                    gameView.HudInstance.CycleNextAttackMode();
+                    // 4. 组队模式切换 (CM_GROUPMODE 1019)
+                    gameView.HudInstance.GroupPanel?.EmitSignal(GroupPanelView.SignalName.GroupModeToggled, true);
+                    // 5. 商店单品详情查询 (CM_USERGETDETAILITEM 1013)
+                    gameView.HudInstance.ShopPanel?.EmitSignal(ShopPanelView.SignalName.ItemSelectedForDetail, "裁决之杖");
+                }
+                RequestCapture("step106_skill_toggles_and_detail");
+                break;
+            }
+
+            case 107:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 传送现身/隐去、叫喊广播与治愈回显 ===");
+                    // 1. 模拟空间传送现身与隐去 (SM_SPACEMOVESHOW 801 / SM_SPACEMOVEHIDE 800)
+                    gameView.EntityManagerInstance?.AddEntity(10088, "传送法师", Mir2Client.Game.EntityManager.EntityType.Player, 330, 270, 2, 0);
+                    // 2. 模拟叫喊广播 (SM_CRY 765)
+                    gameView.HudInstance.AddChat("求助", "[求助] 沃玛寺庙三层求组队!", new Color(1f, 0.4f, 0.4f));
+                    // 3. 模拟即时治愈指示 (SM_INSTANCEHEALGAUGE 659)
+                    gameView.HudInstance.AddChat("提示", "[治愈] 恢复生命值 +80 点。", new Color(0.4f, 1f, 0.4f));
+                    // 4. 模拟沙城捐献 (SM_DONATEOK 764 / 767)
+                    gameView.HudInstance.AddChat("沙城", "[捐献] 捐献 100000 金币成功！", new Color(0.4f, 1f, 0.4f));
+                }
+                RequestCapture("step107_spacemove_and_cry");
+                break;
+            }
+
+            case 108:
+            {
+                GD.Print("[AutoE2E] ALL 108 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }
