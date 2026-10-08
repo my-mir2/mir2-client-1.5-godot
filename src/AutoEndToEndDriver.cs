@@ -1526,7 +1526,75 @@ public partial class AutoEndToEndDriver : Node
 
             case 101:
             {
-                GD.Print("[AutoE2E] ALL 101 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 背包双击快速吃药 (DItemGridDblClick sub_48E33C) ===");
+                    gameView.HudInstance.ToggleBag(); // 打开背包
+                    gameView.HudInstance.SetBagItem(0, "强效金创药", "Items_0014.png", "强效金创药");
+                    // 模拟双击背包第 0 格
+                    gameView.HudInstance.HandleSlotDoubleClick(SlotButton.SlotType.Bag, 0);
+                }
+                RequestCapture("step101_doubleclick_eat_drug");
+                break;
+            }
+
+            case 102:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 背包双击快速穿戴武器 (CM_WEARITEM sub_48E33C) ===");
+                    gameView.HudInstance.SetBagItem(1, "裁决之杖", "Items_0060.png", "裁决之杖");
+                    // 模拟双击背包第 1 格 (武器自动装备至槽位 1)
+                    gameView.HudInstance.HandleSlotDoubleClick(SlotButton.SlotType.Bag, 1);
+                }
+                RequestCapture("step102_doubleclick_wear_weapon");
+                break;
+            }
+
+            case 103:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 装备栏双击快速脱装至背包 (CM_TAKEOFFITEM) ===");
+                    // 模拟双击武器槽位 1 脱下
+                    gameView.HudInstance.HandleSlotDoubleClick(SlotButton.SlotType.Equip, 1);
+                }
+                RequestCapture("step103_doubleclick_takeoff_weapon");
+                break;
+            }
+
+            case 104:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance?.NpcDialog != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 服务端关闭 NPC 对话框 (SM_MERCHANTDLG_CLOSE 644) ===");
+                    gameView.HudInstance.NpcDialog.ShowDialog("欢迎光临，想要买点什么吗？\\<买东西/@buy>\\<离开/@exit>");
+                    // 服务端下发 644 触发关闭
+                    gameView.HudInstance.CloseNpcDialog();
+                }
+                RequestCapture("step104_npc_close_dlg");
+                break;
+            }
+
+            case 105:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 计费到期与系统模态提示框 (SM_BILLING_NOTICE 529) ===");
+                    gameView.HudInstance.ShowModalMessage("计费通知", "您的游戏时间已到期，请充值后继续游戏。");
+                }
+                RequestCapture("step105_billing_notice_modal");
+                break;
+            }
+
+            case 106:
+            {
+                GD.Print("[AutoE2E] ALL 106 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

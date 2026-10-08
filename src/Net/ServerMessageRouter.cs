@@ -44,7 +44,8 @@ public sealed class ServerMessageRouter
     public const short SM_DELITEM                = 202;  // 背包移除物品
     public const short SM_UPDATEUSERMAGIC        = 203;  // 技能经验熟练度更新
     public const short SM_ALLOWMOVE              = 203;  // 盛大官方/网关位移确认与拉回校准 (bridge.rs)
-    public const short SM_SKILLLEVELUP           = 644;  // 盛大官方/网关技能熟练度升级 (bridge.rs)
+    public const short SM_MERCHANTDLG_CLOSE      = 644;  // 官方关闭 NPC 对话框 (IDA 0x467920 case 644 @ 0x46D65C)
+    public const short SM_SKILLLEVELUP           = 644;  // 历史测试别名兼容 (644)
     public const short SM_TAKEON_OK              = 615;  // 穿戴装备成功
     public const short SM_EXCHGTAKEONOK          = 615;  // 互换穿戴装备成功 (IDA 0x467920)
     public const short SM_TAKEON_FAIL            = 616;  // 穿戴装备失败 (IDA 0x467920)
@@ -198,8 +199,17 @@ public sealed class ServerMessageRouter
             case SM_ALLOWMOVE:
                 HandleAllowMove(packet);
                 break;
-            case SM_SKILLLEVELUP:
-                HandleUpdateUserMagic(packet);
+            case SM_MERCHANTDLG_CLOSE:
+                _hud?.CloseNpcDialog();
+                break;
+            case ProtocolConsts.SM_OUTOFCONNECTION:
+                _hud?.ShowModalMessage("连接提示", "服务器连接人数已满，请稍后再试。");
+                break;
+            case ProtocolConsts.SM_DISCONNECT_DELPHI:
+                _hud?.ShowModalMessage("系统提示", "与服务器的连接已被切断。");
+                break;
+            case ProtocolConsts.SM_BILLING_NOTICE:
+                HandleBillingNotice(packet);
                 break;
             case SM_EQUIPINFO:
                 HandleEquipInfo(packet);
@@ -1217,6 +1227,13 @@ public sealed class ServerMessageRouter
         string itemName = DecodeExtraText(pkt.Extra);
         // 如果己方已经通过拖拽放置，此处确认即可
         _hud?.AddChat("交易", $"[交易] 确认放入物品 [{itemName}] 到交易栏 #{pkt.Param + 1} 格。", new Color(0.8f, 1f, 0.8f));
+    }
+
+    private void HandleBillingNotice(ServerPacket pkt)
+    {
+        string notice = string.IsNullOrEmpty(pkt.ExtraStr) ? "您的游戏时间已到期，请充值后继续游戏。" : pkt.ExtraStr;
+        _hud?.ShowModalMessage("计费通知", notice);
+        _hud?.AddChat("系统", $"[系统] {notice}", new Color(1f, 0.3f, 0.3f));
     }
 
     private static string DecodeExtraText(byte[]? extra)

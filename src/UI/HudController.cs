@@ -980,12 +980,14 @@ public partial class HudController : CanvasLayer
 
         // 注册全生命周期槽位拖拽放置响应 (Bag, Equip, Repair, Storage)
         SlotButton.ItemDroppedGlobal += HandleSlotItemDrop;
+        SlotButton.SlotDoubleClickedGlobal += HandleSlotDoubleClick;
     }
 
     public override void _ExitTree()
     {
         base._ExitTree();
         SlotButton.ItemDroppedGlobal -= HandleSlotItemDrop;
+        SlotButton.SlotDoubleClickedGlobal -= HandleSlotDoubleClick;
     }
 
     private void SetupQuickItemBar(Control parent)
@@ -2540,5 +2542,126 @@ public partial class HudController : CanvasLayer
         EmitSignal(SignalName.ItemDropToGroundRequested, bagSlot, itemName, screenPos);
 
         AddChat("系统", $"[系统] 物品 [{itemName}] 已丢弃至地面。", new Color(1f, 0.8f, 0.4f));
+    }
+
+    /// <summary>
+    /// 槽位双击全局响应分发 (盛大官方 1.5 IDA sub_48E33C / sub_48C188)
+    /// </summary>
+    public void HandleSlotDoubleClick(SlotButton.SlotType slotType, int slotIndex)
+    {
+        switch (slotType)
+        {
+            case SlotButton.SlotType.Bag:
+                HandleBagSlotDoubleClick(slotIndex);
+                break;
+            case SlotButton.SlotType.Equip:
+                // 双击装备栏：脱装至背包
+                TakeoffEquipSlotToBag(slotIndex, -1);
+                break;
+            case SlotButton.SlotType.Quick:
+                // 双击快捷栏：使用药水
+                UseQuickSlot(slotIndex);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 背包物品双击快捷操作 (盛大官方 1.5 IDA sub_48E33C / TFrmDlg_DItemGridDblClick):
+    /// 1. 消耗品/药水/食物/卷轴: 直接使用 (发送 CM_EATITEM, 播放音效 107, 扣减物品)
+    /// 2. 装备类 (武器/衣服/首饰等): 自动寻找最优槽位穿戴 (发送 CM_WEARITEM, 互换/装上)
+    /// </summary>
+    public void HandleBagSlotDoubleClick(int bagSlot)
+    {
+        if (bagSlot < 0 || bagSlot >= 40) return;
+        var item = _bagItemDetails[bagSlot];
+        if (item == null || string.IsNullOrEmpty(item.Value.Name)) return;
+
+        string itemName = item.Value.Name;
+
+        if (IsConsumableItem(itemName))
+        {
+            // 消耗品/吃药使用
+            ConsumeBagItem(bagSlot, itemName);
+        }
+        else
+        {
+            // 装备穿戴
+            int bestEquipSlot = GetBestEquipSlotForItem(itemName);
+            if (bestEquipSlot >= 0)
+            {
+                WearBagItemToEquipSlot(bagSlot, bestEquipSlot);
+            }
+            else
+            {
+                AddChat("系统", $"[系统] 该物品 [{itemName}] 无法直接装备。", new Color(1f, 0.4f, 0.4f));
+            }
+        }
+    }
+
+    public static bool IsConsumableItem(string itemName)
+    {
+        if (string.IsNullOrEmpty(itemName)) return false;
+        return itemName.Contains("药") || itemName.Contains("水") || itemName.Contains("卷") || 
+               itemName.Contains("肉") || itemName.Contains("油") || itemName.Contains("丹") ||
+               itemName.Contains("包") || itemName.Contains("酒");
+    }
+
+    public static int GetBestEquipSlotForItem(string itemName)
+    {
+        if (string.IsNullOrEmpty(itemName)) return -1;
+        if (itemName.Contains("甲") || itemName.Contains("袍") || itemName.Contains("衣") || itemName.Contains("布衣")) return 0; // 衣服
+        if (itemName.Contains("剑") || itemName.Contains("刀") || itemName.Contains("斧") || itemName.Contains("杖") || 
+            itemName.Contains("扇") || itemName.Contains("枪") || itemName.Contains("棍") || itemName.Contains("弓") || 
+            itemName.Contains("匕首") || itemName.Contains("刃") || itemName.Contains("月") || itemName.Contains("屠龙") || 
+            itemName.Contains("炼狱") || itemName.Contains("银蛇") || itemName.Contains("降魔") || itemName.Contains("凝霜") || 
+            itemName.Contains("修罗") || itemName.Contains("破魂") || itemName.Contains("凌风")) return 1; // 武器
+        if (itemName.Contains("头盔") || itemName.Contains("冠") || itemName.Contains("帽") || itemName.Contains("头巾")) return 4; // 头盔
+        if (itemName.Contains("项链") || itemName.Contains("链")) return 3; // 项链
+        if (itemName.Contains("手镯") || itemName.Contains("手套") || itemName.Contains("镯")) return 5; // 手镯 (默认左手镯)
+        if (itemName.Contains("戒") || itemName.Contains("指")) return 7; // 戒指 (默认左戒指)
+        if (itemName.Contains("勋章") || itemName.Contains("佩") || itemName.Contains("符") || itemName.Contains("饰品")) return 2; // 勋章/饰品
+        return -1;
+    }
+
+    public void ConsumeBagItem(int bagSlot, string itemName)
+    {
+        if (bagSlot < 0 || bagSlot >= 40) return;
+        // 播放经典吃药吞咽音效 (官方 sound 107, SoundId.EatDrug)
+        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.EatDrug);
+        
+        // 派发信号供网络层发包 CM_EATITEM (1006)
+        EmitSignal(SignalName.UseItemRequested, bagSlot);
+
+        // 清理/扣减背包槽位
+        ClearBagItem(bagSlot);
+
+        AddChat("系统", $"[系统] 使用了 [{itemName}]。", new Color(0.4f, 1f, 0.4f));
+    }
+
+    /// <summary>
+    /// 服务端 SM_MERCHANTDLG_CLOSE (644) 驱动关闭 NPC 窗体
+    /// </summary>
+    public void CloseNpcDialog()
+    {
+        if (_npcDialogView != null && _npcDialogView.Visible)
+        {
+            _npcDialogView.Visible = false;
+            AddChat("系统", "[系统] NPC 对话已关闭。", new Color(0.7f, 0.7f, 0.7f));
+        }
+    }
+
+    /// <summary>
+    /// 展示官方系统模态提示框 (对齐 sub_467920 show_dialog_message)
+    /// </summary>
+    public void ShowModalMessage(string title, string msg)
+    {
+        if (_messageBoxDialog != null)
+        {
+            _messageBoxDialog.ShowMessage($"[{title}]\n\n{msg}", hasCancel: false);
+        }
+        else
+        {
+            AddChat("系统", $"[{title}] {msg}", new Color(1f, 0.3f, 0.3f));
+        }
     }
 }

@@ -138,6 +138,36 @@ public partial class SlotButton : Button
 
     public static event Action<SlotType, int, SlotType, int>? ItemDroppedGlobal;
 
+    [Signal]
+    public delegate void SlotDoubleClickedEventHandler(int slotType, int slotIndex);
+
+    public static event Action<SlotType, int>? SlotDoubleClickedGlobal;
+
+    public override void _GuiInput(InputEvent @event)
+    {
+        base._GuiInput(@event);
+        if (@event is InputEventMouseButton mb && mb.ButtonIndex == MouseButton.Left && mb.DoubleClick && mb.Pressed)
+        {
+            TriggerDoubleClick();
+            AcceptEvent();
+        }
+    }
+
+    /// <summary>
+    /// 触发双击逻辑（供运行时输入与单元测试双轨调用）
+    /// </summary>
+    public void TriggerDoubleClick()
+    {
+        EmitSignal(SignalName.SlotDoubleClicked, (int)CurrentSlotType, SlotIndex);
+        RaiseSlotDoubleClicked(CurrentSlotType, SlotIndex);
+        GD.Print($"[SlotButton] Double clicked slot ({CurrentSlotType}:{SlotIndex})");
+    }
+
+    public static void RaiseSlotDoubleClicked(SlotType slotType, int slotIndex)
+    {
+        SlotDoubleClickedGlobal?.Invoke(slotType, slotIndex);
+    }
+
     public override Variant _GetDragData(Vector2 atPosition)
     {
         var currentTex = _itemTexture ?? Icon;

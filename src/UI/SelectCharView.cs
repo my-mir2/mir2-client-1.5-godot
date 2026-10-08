@@ -452,8 +452,16 @@ public partial class SelectCharView : Control
         UpdateAnimations(0);
     }
 
+    private int _lastClickedSlot = -1;
+    private ulong _lastClickTime = 0;
+
     public void SelectSlot(int slot)
     {
+        ulong now = Time.GetTicksMsec();
+        bool isDoubleClick = (_lastClickedSlot == slot) && (now - _lastClickTime <= 350);
+        _lastClickedSlot = slot;
+        _lastClickTime = now;
+
         _selectedSlot = slot;
         GD.Print($"[SelectCharView] 切换选中角色槽位: {slot}");
         
@@ -472,6 +480,13 @@ public partial class SelectCharView : Control
             }
         }
         UpdateAnimations(0);
+
+        // 盛大官方 1.5 双击神龛直接进入游戏实证 (sub_463BFC DXDraw1DblClick / sub_4886C0 DscSelect1Click)
+        if (isDoubleClick && slot < _characters.Count)
+        {
+            GD.Print($"[SelectCharView] 双击角色神龛 (槽位 {slot})，直接开始游戏！");
+            OnStartGame();
+        }
     }
 
     private void RefreshCharacterDisplay()

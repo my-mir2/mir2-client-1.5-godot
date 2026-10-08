@@ -6756,8 +6756,30 @@
      - 在 `SlotButton.cs` 中实装 `LowDurabilityWarning` 呼吸闪烁红色边框（`_lowDuraBorder`）；
      - 在 `HudController.cs` 中增加 `UpdateEquipDurability` 接口与聊天预警通知。
 
+7. **官方背包与快捷栏双击快捷操作闭环 (IDA 0x48E33C DItemGridDblClick / 0x48C188 DBelt1DblClick)**：
+   - **官方实证**：双击背包消耗品（药水/食物/卷轴等）直接吃药（发包 `CM_EATITEM 1006`，播放 107 音效并扣减物品）；双击装备（武器/衣服/首饰）根据装备类型自动识别并穿戴至 9 大槽位（发包 `CM_WEARITEM 1003`），双击身上装备自动脱下（发包 `CM_TAKEOFFITEM 1004`）；
+   - **精准重构**：
+     - 在 `SlotButton.cs` 中重写 `_GuiInput` 响应 `DoubleClick`，提供 `TriggerDoubleClick` 与 `RaiseSlotDoubleClicked`；
+     - 在 `HudController.cs` 中实装 `HandleSlotDoubleClick`、`HandleBagSlotDoubleClick`、`IsConsumableItem` 与 `GetBestEquipSlotForItem`；
+     - 在 `GameView.cs` 中完成 `UseItemRequested`、`WearItemRequested`、`TakeoffItemRequested` 网络发包挂接。
+
+8. **官方选角神龛双击直接启动游戏闭环 (IDA 0x463BFC DXDraw1DblClick / 0x4886C0 DscSelect1Click)**：
+   - **官方实证**：在选角神龛立绘或底座上 350ms 内双击鼠标左键，直接派发 `OnStartGame` 登录玛法世界（`CM_SELECTCHAR 103`）；
+   - **精准重构**：在 `SelectCharView.cs:SelectSlot` 中增加 `_lastClickedSlot` 与 `_lastClickTime` 双击判定，触发直连进入游戏。
+
+9. **官方关闭 NPC 对话框协议语义修正 (scratch/ida_processmsg.c 第 1043 行 case 644)**：
+   - **官方实证**：官方 644 号下行包实证为 `SM_MERCHANTDLG_CLOSE`（`handle_sm_merchant_dlg_close`），用于服务端脚本或距离过远时强制关闭对话框；
+   - **精准重构**：在 `ServerMessageRouter.cs` 中将 644 语义由误标的技能熟练度纠偏为 `SM_MERCHANTDLG_CLOSE`，并在 switch 中联动 `HudController.CloseNpcDialog()`。
+
+10. **官方计费到期与断开连接系统模态回显 (SM_BILLING_NOTICE 529 / SM_OUTOFCONNECTION 526 / SM_DISCONNECT 527)**：
+    - **官方实证**：`scratch/ida_processmsg.c` lines 188~215，服务端下发计费到期或服务器断开时，弹出官方通用模态框 `MessageBoxDialog (Prguse_0360)` 提示信息；
+    - **精准重构**：在 `ServerMessageRouter.cs` 与 `HudController.cs` 中装配 `ShowModalMessage` 与 `HandleBillingNotice`，打通系统模态提示链路。
+
 ### 2. 终局指标与质量守门线核销
-- **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的 80 项权威下行协议达到 **80 / 80 项全部覆盖 (100.0% 闭环，0 缺口)**；
+- **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **154 / 154 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **106 / 106 阶段全生命周期 0 缺陷通过**；
+- **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **单元测试**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 运行，全套测试扩充至 **150 项全部 100% 通过（0 失败，0 告警，耗时 4 秒）**；
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通；
 - **实机渲染零错误**：Godot 4.7 引擎 101 步全生命周期巡检运行，日志扫描 `ERROR:` 为 0，`SCRIPT ERROR:` 为 0。

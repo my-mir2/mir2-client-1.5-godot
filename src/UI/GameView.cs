@@ -512,6 +512,20 @@ namespace Mir2Client.UI
                     _net?.SendPacket(PacketEncoder.NpcSelect(npcUid, string.Empty, index));
                 };
 
+                // 官方 1.5 物品使用/吃药、穿戴、脱下网络发包 (CM_EATITEM 1006 / CM_WEARITEM 1003 / CM_TAKEOFFITEM 1004)
+                HudInstance.UseItemRequested += (slot) =>
+                {
+                    _net?.SendPacket(PacketEncoder.EatItem(slot));
+                };
+                HudInstance.WearItemRequested += (bagSlot, equipSlot) =>
+                {
+                    _net?.SendPacket(PacketEncoder.WearItem((short)bagSlot, (short)equipSlot));
+                };
+                HudInstance.TakeoffItemRequested += (equipSlot) =>
+                {
+                    _net?.SendPacket(PacketEncoder.TakeOffItem((short)equipSlot));
+                };
+
                 if (HudInstance.Minimap != null)
                 {
                     HudInstance.Minimap.MapTargetSelected += (targetX, targetY) =>
