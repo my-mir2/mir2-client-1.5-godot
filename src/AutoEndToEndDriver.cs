@@ -1790,7 +1790,47 @@ public partial class AutoEndToEndDriver : Node
 
             case 115:
             {
-                GD.Print("[AutoE2E] ALL 115 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 铁匠铺修理、买卖失败模态弹窗与空间瞬移突变 (SM 649/651/669/670/674/804/806/807) ===");
+                    // 1. 模拟出售失败模态弹窗 (SM_SELL_FAIL_DELPHI 649)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_SELL_FAIL_DELPHI,
+                        0, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 2. 模拟购买失败模态弹窗 (SM_BUY_FAIL_DELPHI 651, recog=3 金币不足)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_BUY_FAIL_DELPHI,
+                        3, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 3. 模拟铁匠铺修理失败模态弹窗 (SM_REPAIRFAIL_DELPHI 670)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_REPAIRFAIL_DELPHI,
+                        0, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 4. 模拟交易面对面未对齐模态弹窗 (SM_DEALTRY_FAIL 674)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_DEALTRY_FAIL,
+                        0, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 5. 模拟空间瞬移位移突变 (SM_TELEPORT 804, x=330, y=270)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_TELEPORT,
+                        0, 330, 270, Array.Empty<byte>()
+                    ));
+                }
+                RequestCapture("step115_repair_teleport_deal_fail_modal");
+                break;
+            }
+
+            case 116:
+            {
+                GD.Print("[AutoE2E] ALL 116 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

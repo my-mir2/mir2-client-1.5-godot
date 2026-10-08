@@ -54,8 +54,7 @@ public sealed class ServerMessageRouter
     public const short SM_EQUIPINFO              = 621;  // 全量 9 槽位装备下发
     public const short SM_WEIGHTCHANGED          = 622;  // 负重同步
     public const short SM_MERCHANTDLG            = 631;  // 商店货架界面下发
-    public const short SM_DEALMENU               = 670;  // 交易界面弹出 (ProtocolConsts)
-    public const short SM_DEALMENU_IDA           = 673;  // 交易界面弹出 (IDA 0x46A5AA)
+    public const short SM_DEALMENU               = 673;  // 交易界面弹出 (IDA 0x46A5AA case 673)
     public const short SM_DEALTRY_FAIL          = 674;  // 交易发起失败/熔断取消
     public const short SM_DEALADDITEM_OK        = 675;  // 己方放入物品成功
     public const short SM_DEALADDITEM_FAIL      = 676;  // 己方放入物品失败
@@ -241,7 +240,6 @@ public sealed class ServerMessageRouter
                 HandleMerchantDlg(packet);
                 break;
             case SM_DEALMENU:
-            case SM_DEALMENU_IDA:
                 HandleDealMenu(packet);
                 break;
             case SM_DEALTRY_FAIL:
@@ -347,10 +345,15 @@ public sealed class ServerMessageRouter
                 HandleInstanceHealGauge(packet);
                 break;
             case ProtocolConsts.SM_SPACEMOVEHIDE: // 800: 空间传送消失
+            case ProtocolConsts.SM_SPACEMOVEHIDE2: // 806: 空间传送消失别名 (IDA sub_467920 case 806)
                 HandleSpaceMove(packet, false);
                 break;
             case ProtocolConsts.SM_SPACEMOVESHOW: // 801: 空间传送出现
+            case ProtocolConsts.SM_SPACEMOVESHOW2: // 807: 空间传送出现别名 (IDA sub_467920 case 807)
                 HandleSpaceMove(packet, true);
+                break;
+            case ProtocolConsts.SM_TELEPORT: // 804: 空间坐标瞬移突变 (IDA sub_467920 case 804)
+                HandleTeleport(packet);
                 break;
             case ProtocolConsts.SM_TAKEON_FAIL: // 616: 穿戴装备失败 (SM_EXCHGTAKEONFAIL 同号)
                 HandleTakeOnFail(packet);
@@ -400,18 +403,38 @@ public sealed class ServerMessageRouter
                 _hud?.UpdateGold(packet.Recog);
                 _hud?.AddChat("商店", $"[商店] 购买成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
                 break;
-            case ProtocolConsts.SM_SELL_FAIL_DELPHI: // 649: 出售物品失败
-                _hud?.AddChat("商店", $"[商店] 出售失败：{DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
+            case ProtocolConsts.SM_SELL_FAIL_DELPHI: // 649: 出售物品失败 (IDA 0x469F04)
+                _hud?.ShowModalMessage("商店提示", "你不能卖这个物品"); // 0x46B820
+                _hud?.AddChat("商店", "[商店] 出售失败：你不能卖这个物品", new Color(1f, 0.4f, 0.4f));
                 break;
             case ProtocolConsts.SM_SELL_OK_DELPHI: // 650: 出售成功更新金币 (recog = gold_gained)
                 _hud?.UpdateGold(packet.Recog);
                 _hud?.AddChat("商店", $"[商店] 出售成功，获得金币或剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
                 break;
-            case ProtocolConsts.SM_BUY_FAIL_DELPHI: // 651: 购买物品失败
-                _hud?.AddChat("商店", $"[商店] 购买失败：{DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
+            case ProtocolConsts.SM_BUY_FAIL_DELPHI: // 651: 购买物品失败 (IDA 0x46A157)
+                {
+                    string bMsg = packet.Recog switch
+                    {
+                        1 => "物品被卖出。",             // 0x46B8E4
+                        2 => "没有更多物品可以携带了",   // 0x46B8FC (LABEL_364 共享)
+                        3 => "你没有足够的钱来购买物品.", // 0x46B91C
+                        _ => !string.IsNullOrEmpty(packet.ExtraStr) ? packet.ExtraStr : DecodeExtraText(packet.Extra)
+                    };
+                    if (string.IsNullOrEmpty(bMsg)) bMsg = "购买失败。";
+                    _hud?.ShowModalMessage("商店提示", bMsg);
+                    _hud?.AddChat("商店", $"[商店] 购买失败：{bMsg}", new Color(1f, 0.4f, 0.4f));
+                }
                 break;
             case ProtocolConsts.SM_OPENREPAIRDLG: // 668: 铁匠铺打开修理面板 (IDA open_shop_repair 0x46dae8)
                 _hud?.OpenRepairPanel();
+                break;
+            case ProtocolConsts.SM_REPAIROK_DELPHI: // 669: 铁匠铺修理成功更新金币与持久 (IDA 0x469F9B)
+                _hud?.UpdateGold(packet.Recog);
+                _hud?.AddChat("修理", $"[铁匠铺] 装备修理成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
+                break;
+            case ProtocolConsts.SM_REPAIRFAIL_DELPHI: // 670: 铁匠铺修理失败模态弹窗 (IDA 0x469FE9 0x46B83C)
+                _hud?.ShowModalMessage("修理提示", "你不能修理这个物品 .");
+                _hud?.AddChat("修理", "[铁匠铺] 修理失败：你不能修理这个物品 .", new Color(1f, 0.4f, 0.4f));
                 break;
             case ProtocolConsts.SM_OPENGUILDDLGFAIL: // 752: 行会面板打开失败 (未加入行会)
                 _hud?.ShowModalMessage("行会提示", "您尚未加入任何行会，无法查看行会管理面板。");
@@ -1074,6 +1097,33 @@ public sealed class ServerMessageRouter
         }
     }
 
+    /// <summary>
+    /// 处理空间坐标瞬移突变 (SM_TELEPORT 804)
+    /// 严格对齐官方 Delphi sub_467920 (0x468A94 handle_sm_teleport)
+    /// </summary>
+    private void HandleTeleport(ServerPacket pkt)
+    {
+        int x = pkt.Param;
+        int y = pkt.Tag;
+        int uid = pkt.Recog;
+
+        if (_gameView?.PlayerInstance != null && (uid == 0 || uid == _gameView.PlayerInstance.Uid))
+        {
+            _gameView.PlayerInstance.SetTilePos(x, y);
+            _gameView.UpdateEnvironmentLighting();
+            SafeLog($"[SM] 主角瞬移至 ({x}, {y})");
+        }
+        else if (_entityManager != null && uid > 0)
+        {
+            var ent = _entityManager.GetEntity(uid);
+            if (ent != null)
+            {
+                _entityManager.UpdateMove(uid, x, y, ent.Direction);
+                SafeLog($"[SM] 实体 uid={uid} 瞬移至 ({x}, {y})");
+            }
+        }
+    }
+
     // 官方 1.5 穿戴装备失败提示与解锁 (IDA ProcessServerMessage case 616)
     private void HandleTakeOnFail(ServerPacket pkt)
     {
@@ -1525,6 +1575,13 @@ public sealed class ServerMessageRouter
     {
         string reason = DecodeExtraText(pkt.Extra);
         _hud?.OnServerTradeCancel(reason);
+
+        // 若为 SM_DEALTRY_FAIL (674)，官方 IDA 0x46A588 弹出模态框 0x46BADC
+        if (pkt.Ident == SM_DEALTRY_FAIL)
+        {
+            string msg = !string.IsNullOrEmpty(reason) ? reason : "交易被取消。\n要正确交易你必须和对方面对面。";
+            _hud?.ShowModalMessage("交易提示", msg);
+        }
     }
 
     private void HandleDealAddItemOk(ServerPacket pkt)

@@ -6864,11 +6864,24 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_StorageMakeObjectAndGuildNotice` 单元测试，脱机测试覆盖扩充至 **159 / 159 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 114 步实机验证，总演练步数扩充至 **115 步**。
 
+23. **官方 1.5 铁匠铺修理、买卖失败模态弹窗、交易面对面未对齐与空间瞬移突变全链路实证 (`scratch/ida_processmsg.c` lines 405~452, 1063~1091, 835~889)**：
+    - **官方实证**：严格依据 `scratch/ida_processmsg.c` 与 `MIR_final_v3_p.exe` 反编译铁证核销：
+      - 商店出售失败 (`SM_SELL_FAIL_DELPHI 649`)：官方 IDA `0x469F04` 调用 `show_dialog_message` 弹出 `0x46B820` "你不能卖这个物品"；
+      - 商店购买失败 (`SM_BUY_FAIL_DELPHI 651`)：官方 IDA `0x46A157` 依据子错误码精准映射（1 为 `0x46B8E4` "物品被卖出。"，2 为 `0x46B8FC` "没有更多物品可以携带了"，3 为 `0x46B91C` "你没有足够的钱来购买物品."）；
+      - 铁匠铺修理成功与失败 (`SM_REPAIROK_DELPHI 669`, `SM_REPAIRFAIL_DELPHI 670`)：669 扣费更新金币与持久，670 官方 IDA `0x469FE9` 弹出模态框 `0x46B83C` "你不能修理这个物品 ."；
+      - 交易面对面未对齐失败 (`SM_DEALTRY_FAIL 674`)：官方 IDA `0x46A588` 弹出模态框 `0x46BADC` "交易被取消。\n要正确交易你必须和对方面对面。"；同时纠偏 `SM_DEALMENU` 为官方原版 673（`sub_4915EC`）；
+      - 空间传送消失/现身别名与瞬移 (`SM_SPACEMOVEHIDE2 806`, `SM_SPACEMOVESHOW2 807`, `SM_TELEPORT 804`)：806/807 驱动视野实体隐现，804 驱动主角或同屏实体坐标突变与环境光影刷新；
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 补全 669、670、674、804、806、807 常量并纠偏 `SM_DEALMENU = 673`；
+      - 在 `ServerMessageRouter.cs` 接入 649/651 模态弹窗分发、669/670 修理分发、674 交易未对齐弹窗与 804/806/807 传送瞬移；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_RepairTeleportAndShopModalFail` 单元测试，脱机测试覆盖扩充至 **160 / 160 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 115 步实机验证，总演练步数扩充至 **116 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **159 / 159 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **115 / 115 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **160 / 160 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **116 / 116 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

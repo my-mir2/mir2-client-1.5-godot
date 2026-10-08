@@ -245,4 +245,10 @@ public static class ProtocolConsts
     public const short SM_MAKEOBJECT_OK           = 713;  // 打造/特修物品成功 (IDA 0x46B940)
     public const short SM_MAKEOBJECT_FAIL         = 714;  // 打造/特修物品失败 (IDA 0x46B960~0x46B988)
     public const short SM_GUILD_MODALMSG          = 772;  // 官方行会通用下发弹窗协议 (IDA sub_467920 0x46AC5C)
+    public const short SM_REPAIROK_DELPHI         = 669;  // 铁匠铺修理成功更新金币与持久 (IDA 0x469F9B)
+    public const short SM_REPAIRFAIL_DELPHI       = 670;  // 铁匠铺修理失败模态弹窗 (IDA 0x469FE9 0x46B83C)
+    public const short SM_SPACEMOVEHIDE2          = 806;  // 空间传送隐去别名 (IDA sub_467920 case 806)
+    public const short SM_SPACEMOVESHOW2          = 807;  // 空间传送现身别名 (IDA sub_467920 case 807)
+    public const short SM_TELEPORT                = 804;  // 空间坐标瞬移突变 (IDA sub_467920 case 804)
+    public const short SM_DEALTRY_FAIL           = 674;  // 交易发起失败/面对面未对正 (IDA 0x46A588)
 }

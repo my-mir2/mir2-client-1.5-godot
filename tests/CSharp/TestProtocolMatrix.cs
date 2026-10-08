@@ -2126,6 +2126,59 @@ public class TestProtocolMatrix
         Assert.Equal(ProtocolConsts.SM_GUILD_MODALMSG, parsedGuildNotice.Ident);
         Assert.Equal("沙巴克攻城战将于今晚20:00准时开启！", parsedGuildNotice.ExtraStr);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthSmCases_RepairTeleportAndShopModalFail()
+    {
+        // 1. 商店出售失败 (SM_SELL_FAIL_DELPHI 649) 与购买失败 1~3 (SM_BUY_FAIL_DELPHI 651)
+        byte[] rawSellFail = PacketEncoder.MakePacket(ProtocolConsts.SM_SELL_FAIL_DELPHI, 0, 0, 0);
+        var parsedSellFail = PacketDecoder.Parse(rawSellFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SELL_FAIL_DELPHI, parsedSellFail.Ident);
+
+        for (int buyErr = 1; buyErr <= 3; buyErr++)
+        {
+            byte[] rawBuyFail = PacketEncoder.MakePacket(ProtocolConsts.SM_BUY_FAIL_DELPHI, buyErr, 0, 0);
+            var parsedBuyFail = PacketDecoder.Parse(rawBuyFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_BUY_FAIL_DELPHI, parsedBuyFail.Ident);
+            Assert.Equal(buyErr, parsedBuyFail.Recog);
+        }
+
+        // 2. 铁匠铺修理成功更新金币持久 (SM_REPAIROK_DELPHI 669) 与修理失败模态弹窗 (SM_REPAIRFAIL_DELPHI 670)
+        byte[] rawRepairOk = PacketEncoder.MakePacket(ProtocolConsts.SM_REPAIROK_DELPHI, 66666, 100, 100);
+        var parsedRepairOk = PacketDecoder.Parse(rawRepairOk.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_REPAIROK_DELPHI, parsedRepairOk.Ident);
+        Assert.Equal(66666, parsedRepairOk.Recog);
+
+        byte[] rawRepairFail = PacketEncoder.MakePacket(ProtocolConsts.SM_REPAIRFAIL_DELPHI, 0, 0, 0);
+        var parsedRepairFail = PacketDecoder.Parse(rawRepairFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_REPAIRFAIL_DELPHI, parsedRepairFail.Ident);
+
+        // 3. 空间传送消失与现身别名 (SM_SPACEMOVEHIDE2 806 / SM_SPACEMOVESHOW2 807)
+        byte[] rawHide2 = PacketEncoder.MakePacket(ProtocolConsts.SM_SPACEMOVEHIDE2, 10099, 0, 0);
+        var parsedHide2 = PacketDecoder.Parse(rawHide2.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SPACEMOVEHIDE2, parsedHide2.Ident);
+        Assert.Equal(10099, parsedHide2.Recog);
+
+        byte[] rawShow2 = PacketEncoder.MakePacket(ProtocolConsts.SM_SPACEMOVESHOW2, 10099, 330, 260);
+        var parsedShow2 = PacketDecoder.Parse(rawShow2.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SPACEMOVESHOW2, parsedShow2.Ident);
+        Assert.Equal(10099, parsedShow2.Recog);
+        Assert.Equal(330, parsedShow2.Param);
+        Assert.Equal(260, parsedShow2.Tag);
+
+        // 4. 空间坐标瞬移突变 (SM_TELEPORT 804)
+        byte[] rawTeleport = PacketEncoder.MakePacket(ProtocolConsts.SM_TELEPORT, 10088, 300, 400);
+        var parsedTeleport = PacketDecoder.Parse(rawTeleport.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_TELEPORT, parsedTeleport.Ident);
+        Assert.Equal(10088, parsedTeleport.Recog);
+        Assert.Equal(300, parsedTeleport.Param);
+        Assert.Equal(400, parsedTeleport.Tag);
+
+        // 5. 交易面对面未对齐失败 (SM_DEALTRY_FAIL 674)
+        byte[] rawDealFail = PacketEncoder.MakePacket(ProtocolConsts.SM_DEALTRY_FAIL, 0, 0, 0);
+        var parsedDealFail = PacketDecoder.Parse(rawDealFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_DEALTRY_FAIL, parsedDealFail.Ident);
+    }
 }
 
 
