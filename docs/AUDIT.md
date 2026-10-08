@@ -7624,10 +7624,34 @@
       - 在 `TestCombatSkillsMatrix.cs` 新增 `Official_1_5_TradeSounds_682_686_ShopSell_671_And_Repair_669_GroundTruth_Test` 脱机单测，单测总数提升至 **196 / 196 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+  - [x] **59. 盛大官方 1.5 多实体生命魔法值更新分发与主角血球解耦实证** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA ProcessServerMessage 0x467920 反编译真值（`scratch/ida_processmsg.c` 行 1553~1560）：
+        ```c
+        case '5': // 53 (SM_HEALTHSPELLCHANGED)
+          v71 = get_actor_by_id(); // Recog (v66) 即为实体 UID
+          if ( v71 )
+          {
+            *(_WORD *)(v71 + 60) = HIWORD(v67); // Param 为当前生命值 HP
+            *(_DWORD *)(v71 + 62) = v68;        // Tag 为最大生命值 MaxHP
+          }
+          goto LABEL_486;
+        ```
+      - 此前客户端坏账：
+        1. `HandleHealthSpellChanged` 将 `pkt.Recog` 直接当作主角的 HP，当大世界中其他玩家、怪物、NPC 受击掉血下发 53 时，主角 HP 被粗暴覆盖为怪物的 UID（例如 9001 导致血球直接爆表错乱）；
+        2. 其他实体的真实血量与浮动血条无法得到更新，丢失了 `_entityManager.UpdateHp(uid, hp, maxHp)` 的实体广播分发。
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中实现三级分流：
+        1. 若含有 ExtraStr（`"hp/maxhp/mp/maxmp"`），执行四元组解析并更新主角与 HUD；
+        2. 若 `pkt.Recog` 在实体池中存在，严格对齐官方 IDA 0x46A275，调用 `_entityManager.UpdateHp(uid, hp, maxHp)` 更新对应实体血量与浮动血条；仅当该实体为本地主角（`uid == LocalPlayerUid`）时驱动 HUD 血球；
+        3. 若 `uid == 0`，作为缺省主角更新；若实体不存在且无文本，保持非标旧协议回退兼容；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_HealthSpellChanged_53_MultiEntity_Decoupling_GroundTruth_Test` 脱机单测，单测总数提升至 **197 / 197 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **196 / 196 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **197 / 197 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

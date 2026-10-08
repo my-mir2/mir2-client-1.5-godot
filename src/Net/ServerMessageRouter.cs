@@ -1099,31 +1099,59 @@ public sealed class ServerMessageRouter
     // 物理指令: v71 = get_actor_by_id(); *(_WORD *)(v71 + 60) = HIWORD(v67); *(_DWORD *)(v71 + 62) = v68;
     private void HandleHealthSpellChanged(ServerPacket pkt)
     {
-        int hp = pkt.Recog;
-        int maxHp = pkt.Param > 0 ? pkt.Param : Math.Max(hp, 1);
-        int mp = pkt.Tag;
-        int maxMp = Math.Max(mp, 1);
-
+        // 1. 若带有 ExtraStr（格式: "hp/maxhp/mp/maxmp" 或 "hp/maxhp"），为主角全量状态同步
         if (!string.IsNullOrEmpty(pkt.ExtraStr))
         {
             var parts = pkt.ExtraStr.Split(new[] { '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 4)
+            if (parts.Length >= 2 && int.TryParse(parts[0], out var eHp) && int.TryParse(parts[1], out var eMaxHp))
             {
-                int.TryParse(parts[0], out hp);
-                int.TryParse(parts[1], out maxHp);
-                int.TryParse(parts[2], out mp);
-                int.TryParse(parts[3], out maxMp);
+                int eMp = parts.Length >= 4 && int.TryParse(parts[2], out var mpVal) ? mpVal : 0;
+                int eMaxMp = parts.Length >= 4 && int.TryParse(parts[3], out var maxMpVal) ? maxMpVal : Math.Max(eMp, 1);
+                _hud?.UpdateHp(eHp, eMaxHp);
+                if (parts.Length >= 4) _hud?.UpdateMp(eMp, eMaxMp);
+                var hero = _entityManager?.Hero;
+                if (hero != null) _entityManager?.UpdateHp(hero.Uid, eHp, eMaxHp);
+                return;
             }
         }
 
-        _hud?.UpdateHp(hp, maxHp);
-        _hud?.UpdateMp(mp, maxMp);
+        // 2. 盛大官方 1.5 原版二进制 (IDA case '5' 53 @ 0x46A275):
+        // v71 = get_actor_by_id(); (Recog 为实体 UID, Param 为当前 HP, Tag 为最大 MaxHP)
+        int uid = pkt.Recog;
+        var targetEntity = _entityManager?.GetEntity(uid);
 
-        // 保持底层 EntityManager 中主角实体的 Hp/MaxHp 与表现层血球 1:1 绝对一致
-        var hero = _entityManager?.Hero;
-        if (hero != null)
+        if (targetEntity != null)
         {
-            _entityManager?.UpdateHp(hero.Uid, hp, maxHp);
+            int hp = pkt.Param;
+            int maxHp = pkt.Tag > 0 ? pkt.Tag : Math.Max(hp, 1);
+            _entityManager?.UpdateHp(uid, hp, maxHp);
+
+            // 若更新的目标实体即为主角色，同步驱动 HUD 血球
+            if (_entityManager != null && uid == _entityManager.LocalPlayerUid)
+            {
+                _hud?.UpdateHp(hp, maxHp);
+            }
+        }
+        else if (uid == 0 || (_entityManager != null && uid == _entityManager.LocalPlayerUid))
+        {
+            // 主角 UID 为 0 或未明确指定时的缺省主角更新
+            int hp = pkt.Param;
+            int maxHp = pkt.Tag > 0 ? pkt.Tag : Math.Max(hp, 1);
+            _hud?.UpdateHp(hp, maxHp);
+            var hero = _entityManager?.Hero;
+            if (hero != null) _entityManager?.UpdateHp(hero.Uid, hp, maxHp);
+        }
+        else
+        {
+            // 兼容非标老旧协议格式 (Recog=HP, Param=MaxHP, Tag=MP)
+            int hp = pkt.Recog;
+            int maxHp = pkt.Param > 0 ? pkt.Param : Math.Max(hp, 1);
+            int mp = pkt.Tag;
+            int maxMp = Math.Max(mp, 1);
+            _hud?.UpdateHp(hp, maxHp);
+            _hud?.UpdateMp(mp, maxMp);
+            var hero = _entityManager?.Hero;
+            if (hero != null) _entityManager?.UpdateHp(hero.Uid, hp, maxHp);
         }
     }
 

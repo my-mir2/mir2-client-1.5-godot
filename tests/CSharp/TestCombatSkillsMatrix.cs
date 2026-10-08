@@ -930,6 +930,65 @@ public class TestCombatSkillsMatrix
         var p528 = new ServerPacket(ProtocolConsts.SM_QUERYCHAR_FAIL, 0, 0, 0, Array.Empty<byte>());
         router.OnPacket(p528);
     }
+
+    [Fact]
+    public void Official_1_5_HealthSpellChanged_53_MultiEntity_Decoupling_GroundTruth_Test()
+    {
+        // 1. 初始化实体管理器与主角 (UID=8001) 及同屏怪物实体 (UID=9001)
+        var em = new EntityManager();
+        em.AddEntity(new EntityManager.EntityData
+        {
+            Uid = 8001,
+            Name = "本地主角",
+            Type = EntityManager.EntityType.Player,
+            Hp = 300,
+            MaxHp = 300
+        });
+        em.LocalPlayerUid = 8001;
+
+        em.AddEntity(new EntityManager.EntityData
+        {
+            Uid = 9001,
+            Name = "白野猪",
+            Type = EntityManager.EntityType.Monster,
+            Hp = 1000,
+            MaxHp = 1000
+        });
+
+        var router = new ServerMessageRouter(null, em);
+
+        // 2. 模拟怪物受击：下发 53 协议 (Recog=9001 怪物UID, Param=650 当前HP, Tag=1000 最大HP)
+        // 盛大官方 1.5 IDA 物理指令: v71 = get_actor_by_id(); *(_WORD *)(v71+60) = Param; *(_DWORD *)(v71+62) = Tag;
+        var monsterHpPkt = new ServerPacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, 9001, 650, 1000, Array.Empty<byte>());
+        router.OnPacket(monsterHpPkt);
+
+        // 验证：怪物血量精准变更为 650/1000，主角血量绝对保持 300/300，未被污染！
+        var monster = em.GetEntity(9001);
+        Assert.NotNull(monster);
+        Assert.Equal(650, monster!.Hp);
+        Assert.Equal(1000, monster.MaxHp);
+
+        var hero = em.Hero;
+        Assert.NotNull(hero);
+        Assert.Equal(300, hero!.Hp);
+        Assert.Equal(300, hero.MaxHp);
+
+        // 3. 模拟主角受击：下发 53 协议 (Recog=8001 主角UID, Param=180 当前HP, Tag=300 最大HP)
+        var heroHpPkt = new ServerPacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, 8001, 180, 300, Array.Empty<byte>());
+        router.OnPacket(heroHpPkt);
+
+        // 验证：主角血量同步变更为 180/300，怪物血量不受影响
+        Assert.Equal(180, hero.Hp);
+        Assert.Equal(300, hero.MaxHp);
+        Assert.Equal(650, monster.Hp);
+
+        // 4. 模拟 ExtraStr 四元组文本格式同步 ("250/300/120/150")
+        var heroTextHpPkt = new ServerPacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, 0, 0, 0, Encoding.UTF8.GetBytes("250/300/120/150"));
+        router.OnPacket(heroTextHpPkt);
+
+        Assert.Equal(250, hero.Hp);
+        Assert.Equal(300, hero.MaxHp);
+    }
 }
 
 
