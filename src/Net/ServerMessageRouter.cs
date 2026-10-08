@@ -116,6 +116,12 @@ public sealed class ServerMessageRouter
             packet = new ServerPacket(smCode, 0, 0, 0, pkt ?? Array.Empty<byte>());
         }
 
+        OnPacket(packet);
+    }
+
+    public void OnPacket(ServerPacket packet)
+    {
+        short smCode = packet.Ident;
         switch (smCode)
         {
             case SM_GOLDCHANGED:
@@ -882,12 +888,14 @@ public sealed class ServerMessageRouter
         if (string.IsNullOrEmpty(text)) text = ok ? "行会创建成功！" : "行会创建失败！";
         _hud?.AddChat("行会", $"[行会] {text}", new Color(0.4f, 1f, 0.5f));
         if (ok) _hud?.ToggleGuild();
+        else _hud?.ShowModalMessage("行会提示", text);
     }
 
     private void HandleGuildMemberChange(ServerPacket pkt)
     {
         string text = DecodeExtraText(pkt.Extra);
         if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        bool isFail = pkt.Ident == ProtocolConsts.SM_GUILDADDMEMBERFAIL || pkt.Ident == ProtocolConsts.SM_GUILDDELMEMBERFAIL;
         string msg = pkt.Ident switch
         {
             var i when i == ProtocolConsts.SM_GUILDADDMEMBEROK => $"已吸纳成员：{text}",
@@ -896,6 +904,7 @@ public sealed class ServerMessageRouter
             _ => $"成员变更失败：{text}",
         };
         _hud?.AddChat("行会", $"[行会] {msg}", new Color(1f, 0.9f, 0.5f));
+        if (isFail) _hud?.ShowModalMessage("行会提示", msg);
     }
 
     private void HandleGuildDiplomacy(ServerPacket pkt)
@@ -908,13 +917,16 @@ public sealed class ServerMessageRouter
             _ => $"解除联盟失败：{text}",
         };
         _hud?.AddChat("行会", $"[行会] {msg}", new Color(0.6f, 0.85f, 1f));
+        _hud?.ShowModalMessage("行会提示", msg);
     }
 
     private void HandleGuildRankResult(ServerPacket pkt)
     {
         string text = DecodeExtraText(pkt.Extra);
         if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
-        _hud?.AddChat("行会", $"[行会] 调整封号失败：{text}", new Color(1f, 0.5f, 0.5f));
+        string msg = $"调整封号失败：{text}";
+        _hud?.AddChat("行会", $"[行会] {msg}", new Color(1f, 0.5f, 0.5f));
+        _hud?.ShowModalMessage("行会提示", msg);
     }
 
     // 组队名单：bridge 纯名换行串（首行为队长），对齐 GroupPanel.SetMembers(leader, members)。
@@ -956,6 +968,7 @@ public sealed class ServerMessageRouter
         if (string.IsNullOrEmpty(text)) text = ok ? "捐献金币成功！" : "捐献失败";
         var col = ok ? new Color(0.4f, 1f, 0.4f) : new Color(1f, 0.5f, 0.5f);
         _hud?.AddChat("沙城", $"[捐献] {text}", col);
+        if (!ok) _hud?.ShowModalMessage("沙城提示", text);
     }
 
     // 官方 1.5 求助/全服叫喊广播 (IDA ProcessServerMessage case 765)

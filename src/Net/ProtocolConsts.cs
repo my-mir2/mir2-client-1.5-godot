@@ -75,7 +75,8 @@ public static class ProtocolConsts
     public const short CM_GUILD_OPEN_PAGE        = 1035; // 打开行会主页
     public const short CM_GUILD_MEMBER_LIST      = 1037; // 获取行会成员列表
     public const short CM_GUILD_NOTICE_UPDATE    = 1040; // 更新发布行会公告
-    public const short CM_GUILD_APPLY_WAR        = 1038; // 已废禁发：1038=官方 ADDMEMBER；宣战无网关CM入口（仅GM @guildwar），见 PacketEncoder.GuildApplyWar
+    public const short CM_GUILDADDMEMBER         = 1038; // 官方 1.5 添加行会成员 (CM_GUILDADDMEMBER)
+    public const short CM_GUILD_APPLY_WAR        = 1038; // 兼容历史标识
     public const short CM_GUILD_ALLY_REQUEST     = 1044; // 发送行会结盟申请
     public const short CM_GUILD_BREAK_ALLY       = 1045; // 解除行会结盟关系
     public const short CM_GUILD_KICK_MEMBER      = 1039; // 开除行会成员

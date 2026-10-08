@@ -36,6 +36,7 @@ namespace Mir2Client.UI
         public EntityManager EntityManagerInstance { get; } = new();
         public MagicManager? MagicManagerInstance { get; private set; }
         public EffectManager? EffectManagerInstance { get; private set; }
+        public ServerMessageRouter? ServerMessageRouterInstance { get; private set; }
 
         public TeamManager TeamManagerInstance { get; } = new();
         public TradeManager TradeManagerInstance { get; } = new();
@@ -603,6 +604,42 @@ namespace Mir2Client.UI
                     HudInstance.RepairPanel.StorageDepositConfirmed += (bagSlot, itemName) =>
                     {
                         _net?.SendPacket(PacketEncoder.DepositStorage(bagSlot, itemName));
+                    };
+                }
+
+                if (HudInstance.GuildPanel != null)
+                {
+                    HudInstance.GuildPanel.HomeRequested += () =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildOpenPage(0));
+                    };
+                    HudInstance.GuildPanel.MemberListRequested += () =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildMemberList(0));
+                    };
+                    HudInstance.GuildPanel.AddMemberRequested += (targetName) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildAddMember(targetName));
+                    };
+                    HudInstance.GuildPanel.DelMemberRequested += (targetName) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildKickMember(targetName));
+                    };
+                    HudInstance.GuildPanel.AllyRequested += (targetGuild) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildAllyRequest(targetGuild));
+                    };
+                    HudInstance.GuildPanel.CancelAllyRequested += (targetGuild) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildBreakAlly(targetGuild));
+                    };
+                    HudInstance.GuildPanel.NoticeUpdated += (newNotice) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildNoticeUpdate(newNotice));
+                    };
+                    HudInstance.GuildPanel.RankUpdated += (memberName, newRank) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildUpdateRank(memberName, newRank));
                     };
                 }
 
@@ -1305,6 +1342,11 @@ namespace Mir2Client.UI
             _isSandbox = true;
             GD.Print("[GameView] 启动 1.50 官方纯 C# 单机沙盒演练模式...");
 
+            if (ServerMessageRouterInstance == null)
+            {
+                ServerMessageRouterInstance = new ServerMessageRouter(HudInstance, EntityManagerInstance, this, GroundItemManagerInstance);
+            }
+
             string mapPath = ResPath.Resolve("resources/maps/Map/0.map");
             MapRendererInstance?.LoadMap(mapPath);
 
@@ -1461,8 +1503,8 @@ namespace Mir2Client.UI
         public void SetNet(NetManager net, int sId, string uname, int ulevel = 35)
         {
             _net = net;
-            var router = new ServerMessageRouter(HudInstance, EntityManagerInstance, this, GroundItemManagerInstance);
-            _net.PacketReceived += router.OnPacket;
+            ServerMessageRouterInstance = new ServerMessageRouter(HudInstance, EntityManagerInstance, this, GroundItemManagerInstance);
+            _net.PacketReceived += ServerMessageRouterInstance.OnPacket;
             SessionId = sId;
             Username = uname;
             if (PlayerInstance != null)

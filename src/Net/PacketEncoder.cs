@@ -299,6 +299,9 @@ public static class PacketEncoder
     public static byte[] GuildNoticeUpdate(string notice) =>
         MakePacket(ProtocolConsts.CM_GUILD_NOTICE_UPDATE, 0, 0, 0, Encoding.UTF8.GetBytes(notice));
 
+    public static byte[] GuildAddMember(string memberName) =>
+        MakePacket(ProtocolConsts.CM_GUILDADDMEMBER, 0, 0, 0, Encoding.UTF8.GetBytes(memberName));
+
     // 宣战无网关 CM 入口（bridge 无映射，仅 GM @guildwar；1038=官方 ADDMEMBER 禁发）：
     // 走 SAY 聊天指令，GM 权限服务端受理，普通玩家服务端拒绝，无害。
     public static byte[] GuildApplyWar(string guildName) =>

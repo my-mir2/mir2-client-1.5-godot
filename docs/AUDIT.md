@@ -6834,11 +6834,20 @@
       - 在 `HudController.cs` 中给 `_equipPanel` 挂载 `BtnEquipToStatus` 按钮，并建立 `SwitchStatusToEquip` 双向状态流转；
       - `AutoEndToEndDriver.cs` 扩充第 111 步实机验证，总演练步数扩充至 **112 步**。
 
+19. **官方 1.5 行会面板交互发包与失败模态弹窗对齐 (`CM_GUILDADDMEMBER 1038` / `SM_GUILDADDMEMBERFAIL 754` / IDA `show_dialog_message`)**：
+    - **官方实证**：依据 `scratch/ida_processmsg.c` lines 654~785 及 `docs/ida_evidence/SM_truth_table.md` 提取：官方客户端在收到行会操作失败（754 加人失败、758 创建失败、760 踢人失败、761/762 结盟解盟失败、763 封号失败、768 捐献失败）时，均调用 `show_dialog_message` 弹出官方模态确认框；客户端发送添加成员封包为官方 1038 号（`CM_GUILDADDMEMBER`）；
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 中补齐官方 1.5 `CM_GUILDADDMEMBER = 1038` 常量；
+      - 在 `PacketEncoder.cs` 中实现 `GuildAddMember(string memberName)` 编码器；
+      - 在 `GameView.cs` 中将 `HudInstance.GuildPanel` 的 8 大交互信号（主页、成员列表、加人、踢人、结盟、解盟、公告更新、封号更新）全量连接到网络发包；
+      - 在 `ServerMessageRouter.cs` 中为行会创建/加人/解散/改名/捐献失败分支接入 `_hud.ShowModalMessage`，与官方原版 `show_dialog_message` 1:1 对齐；
+      - `AutoEndToEndDriver.cs` 扩充第 112 步实机验证，总演练步数扩充至 **113 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
 - **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **158 / 158 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **112 / 112 阶段全生命周期 0 缺陷通过**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **113 / 113 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

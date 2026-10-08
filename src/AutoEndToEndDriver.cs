@@ -1714,7 +1714,33 @@ public partial class AutoEndToEndDriver : Node
 
             case 112:
             {
-                GD.Print("[AutoE2E] ALL 112 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 行会交互发包与失败模态弹窗 (show_dialog_message) ===");
+                    // 1. 触发行会主页请求
+                    gameView.HudInstance.GuildPanel?.EmitSignal(GuildPanelView.SignalName.HomeRequested);
+                    // 2. 触发行会成员列表请求
+                    gameView.HudInstance.GuildPanel?.EmitSignal(GuildPanelView.SignalName.MemberListRequested);
+                    // 3. 触发行会添加成员请求
+                    gameView.HudInstance.GuildPanel?.EmitSignal(GuildPanelView.SignalName.AddMemberRequested, "战神无敌");
+                    // 4. 模拟服务端下发行会添加成员失败模态通知 (SM_GUILDADDMEMBERFAIL 754)
+                    byte[] extra = System.Text.Encoding.UTF8.GetBytes("目标玩家不在视野范围内或已加入其他行会");
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_GUILDADDMEMBERFAIL,
+                        0,
+                        0,
+                        0,
+                        extra
+                    ));
+                }
+                RequestCapture("step112_guild_signals_and_modal");
+                break;
+            }
+
+            case 113:
+            {
+                GD.Print("[AutoE2E] ALL 113 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }
