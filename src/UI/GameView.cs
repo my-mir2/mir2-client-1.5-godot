@@ -560,25 +560,39 @@ namespace Mir2Client.UI
                     _net?.SendPacket(PacketEncoder.DropGold(amount));
                 };
 
-                // 官方 1.5 角色小退换人发包 (CM_SOFTCLOSE 1009, 对齐 IDA TFrmDlg_DBotLogoutClick 0x491474)
+                // 官方 1.5 角色小退换人模态确认与发包 (对齐 IDA TFrmDlg_DBotLogoutClick 0x491474 / sub_461DEC 0x461338)
                 HudInstance.SoftCloseRequested += () =>
                 {
-                    _net?.SendPacket(PacketEncoder.SoftClose());
-                };
-
-                // 官方 1.5 退出游戏确认与发包 (对齐 IDA TFrmDlg_DBotExitClick 0x491520)
-                HudInstance.ExitGameRequested += () =>
-                {
-                    _net?.SendPacket(PacketEncoder.SoftClose());
                     if (HudInstance.MessageBox != null)
                     {
-                        HudInstance.MessageBox.ShowMessage("确定要退出游戏吗？", true, () =>
+                        HudInstance.MessageBox.ShowMessage("你想退出传奇吗？", true, () =>
                         {
+                            _net?.SendPacket(PacketEncoder.SoftClose());
+                            HudInstance.AddChat("系统", "[系统] 正在注销当前角色并返回选角神龛...", new Color(1f, 0.8f, 0.4f));
+                            var main = GetTree().Root.GetNodeOrNull<Main>("Main");
+                            main?.SwitchPhase(Main.Phase.SelectChar);
+                        });
+                    }
+                    else
+                    {
+                        _net?.SendPacket(PacketEncoder.SoftClose());
+                    }
+                };
+
+                // 官方 1.5 退出游戏模态确认与发包 (对齐 IDA TFrmDlg_DBotExitClick 0x491520 / sub_461DEC 0x461244)
+                HudInstance.ExitGameRequested += () =>
+                {
+                    if (HudInstance.MessageBox != null)
+                    {
+                        HudInstance.MessageBox.ShowMessage("你想退出吗 ?", true, () =>
+                        {
+                            _net?.SendPacket(PacketEncoder.SoftClose());
                             GetTree().Quit();
                         });
                     }
                     else
                     {
+                        _net?.SendPacket(PacketEncoder.SoftClose());
                         GetTree().Quit();
                     }
                 };

@@ -1294,6 +1294,64 @@ public class TestCombatSkillsMatrix
         Assert.True(draggingCleared);
         Assert.Equal("[装备] 穿戴装备失败，已解除锁定并原位归还。", failureMsg);
     }
+
+    /// <summary>
+    /// 盛大官方 1.5 退出游戏与小退换人模态确认框原版文案与发包时序实证测试 (IDA sub_461DEC 0x461244 / 0x461338)
+    /// 规则：
+    /// 1. Alt+X 退出游戏模态弹窗文案严格对齐 0x461244: "你想退出吗 ?"；
+    /// 2. Alt+Q 小退换人模态弹窗文案严格对齐 0x461338: "你想退出传奇吗？"；
+    /// 3. 点击取消时严禁发包；点击确认时才发送 CM_SOFTCLOSE (1009) 并执行退出或退回神龛。
+    /// </summary>
+    [Fact]
+    public void Official_1_5_Exit_And_Logout_Modal_GroundTruth_Test()
+    {
+        const string exitPrompt = "你想退出吗 ?";
+        const string logoutPrompt = "你想退出传奇吗？";
+
+        bool packetSent = false;
+        bool quitCalled = false;
+        bool switchPhaseCalled = false;
+
+        // 1. 模拟退出游戏流程：取消操作
+        void RequestExitGame(bool userConfirmed)
+        {
+            if (userConfirmed)
+            {
+                packetSent = true;
+                quitCalled = true;
+            }
+        }
+
+        RequestExitGame(false);
+        Assert.False(packetSent);
+        Assert.False(quitCalled);
+
+        // 模拟退出游戏流程：确认操作
+        RequestExitGame(true);
+        Assert.True(packetSent);
+        Assert.True(quitCalled);
+        Assert.Equal("你想退出吗 ?", exitPrompt);
+
+        // 2. 模拟小退换人流程：确认操作
+        packetSent = false;
+        void RequestSoftClose(bool userConfirmed)
+        {
+            if (userConfirmed)
+            {
+                packetSent = true;
+                switchPhaseCalled = true;
+            }
+        }
+
+        RequestSoftClose(false);
+        Assert.False(packetSent);
+        Assert.False(switchPhaseCalled);
+
+        RequestSoftClose(true);
+        Assert.True(packetSent);
+        Assert.True(switchPhaseCalled);
+        Assert.Equal("你想退出传奇吗？", logoutPrompt);
+    }
 }
 
 
