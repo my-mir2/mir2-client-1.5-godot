@@ -6843,11 +6843,19 @@
       - 在 `ServerMessageRouter.cs` 中为行会创建/加人/解散/改名/捐献失败分支接入 `_hud.ShowModalMessage`，与官方原版 `show_dialog_message` 1:1 对齐；
       - `AutoEndToEndDriver.cs` 扩充第 112 步实机验证，总演练步数扩充至 **113 步**。
 
+20. **官方 1.5 交易窗口呼出与背包自动联动展开及金币丢弃模态输入框闭环 (`IDA sub_4915EC` / `TFrmDlg_DGoldClick 0x48e564`)**：
+    - **官方实证**：依据 `scratch/ida_trade_dump.json` (sub_4915EC) 及 `docs/ida_evidence/dialog_truth_table.md` 提取：官方原版在呼出交易界面时，客户端强制将交易面板置于右上 (464, 0) 并自动将背包面板联动展开至 (0, 0) 供玩家直接拖拽物品；点击背包底栏金币图标 (`TFrmDlg_DGoldClick` 0x48e564) 时，弹出官方数字输入模态弹窗（`MessageBoxDialog` 输入丢弃数量），校验不超过当前持有金币并向服务端发送 `CM_DROPGOLD 1007`；
+    - **精准重构**：
+      - 在 `HudController.cs` 中增加 `CurrentGold` 状态追踪，在 `UpdateGold` 维护当前持有金币；
+      - 在 `HudController.cs` 的 `goldIcon.GuiInput` 接入 `_messageBoxDialog.ShowInput`，校验上限并触发丢弃，持有 0 金币时做红色防御提示；
+      - 在 `ToggleTrade` 中补充 `sub_4915EC` 的官方背包联动展示逻辑；
+      - `AutoEndToEndDriver.cs` 扩充第 113 步实机验证，总演练步数扩充至 **114 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
 - **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **158 / 158 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **113 / 113 阶段全生命周期 0 缺陷通过**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **114 / 114 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

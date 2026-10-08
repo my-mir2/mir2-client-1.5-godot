@@ -165,6 +165,9 @@ public partial class HudController : CanvasLayer
     private int _currentAttackMode = 1;
     public int CurrentAttackMode => _currentAttackMode;
 
+    private int _currentGold = 0;
+    public int CurrentGold => _currentGold;
+
     /// <summary>攻击模式图标(官方 sub_48B2A0 0x48b8e0..0x48b92b): mode∈[1,4] 取 Prguse_(15+mode),其余不绘制。</summary>
     public void SetAttackMode(int mode)
     {
@@ -550,8 +553,27 @@ public partial class HudController : CanvasLayer
             {
                 if (ev is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
                 {
-                    // 官方 1.5 IDA TFrmDlg_DGoldClick (0x48e564): 点击背包金币丢弃到地面
-                    RequestDropGold(100);
+                    // 官方 1.5 IDA TFrmDlg_DGoldClick (0x48e564): 点击背包金币弹出丢弃输入模态框
+                    if (_currentGold <= 0)
+                    {
+                        AddChat("系统", "[系统] 身上没有金币可以丢弃。", new Color(1f, 0.4f, 0.4f));
+                        return;
+                    }
+                    if (_messageBoxDialog != null)
+                    {
+                        _messageBoxDialog.ShowInput($"请输入要丢弃的金币数量 (最多 {_currentGold:N0})：", "100", (input) =>
+                        {
+                            if (int.TryParse(input.Trim(), out var dropAmount) && dropAmount > 0)
+                            {
+                                int realDrop = Math.Min(dropAmount, _currentGold);
+                                RequestDropGold(realDrop);
+                            }
+                        });
+                    }
+                    else
+                    {
+                        RequestDropGold(Math.Min(100, _currentGold));
+                    }
                 }
             };
             _bagPanel.AddChild(goldIcon);
@@ -1301,6 +1323,7 @@ public partial class HudController : CanvasLayer
 
     public void UpdateGold(int gold)
     {
+        _currentGold = gold;
         if (_lblBagGold != null)
         {
             _lblBagGold.Text = gold.ToString("N0"); // 官方千分位或数字回显
@@ -1449,6 +1472,15 @@ public partial class HudController : CanvasLayer
         if (_tradePanelView != null)
         {
             _stackManager.ToggleWindow(_tradePanelView);
+            if (_tradePanelView.Visible)
+            {
+                // 依据官方 1.5 IDA sub_4915EC 实证：打开交易面板时自动呼出背包面板 (DialogManager_ShowHide(a1[179], 1))
+                if (_bagPanel != null)
+                {
+                    _bagPanel.Position = Vector2.Zero;
+                    _bagPanel.Visible = true;
+                }
+            }
             GD.Print($"[HudController] 切换交易面板显示状态: {_tradePanelView.Visible}");
         }
     }

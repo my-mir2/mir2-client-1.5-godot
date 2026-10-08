@@ -1740,7 +1740,22 @@ public partial class AutoEndToEndDriver : Node
 
             case 113:
             {
-                GD.Print("[AutoE2E] ALL 113 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 交易窗口呼出与背包自动弹出联动 (IDA sub_4915EC) ===");
+                    // 1. 呼出交易面板 (自动将背包展开至 (0, 0))
+                    gameView.HudInstance.ToggleTrade();
+                    // 2. 验证交易取消重置并关闭
+                    gameView.HudInstance.TradePanel?.EmitSignal(TradePanelView.SignalName.TradeCancelled);
+                }
+                RequestCapture("step113_trade_auto_popup_bag");
+                break;
+            }
+
+            case 114:
+            {
+                GD.Print("[AutoE2E] ALL 114 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }
