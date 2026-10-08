@@ -7058,10 +7058,27 @@
       - 在 `TestProtocolMatrix.cs` 中增加 `TestOfficialGroundTruth_MapMarkAndCombatAndEntityStatusControl` 单元测试，脱机测试覆盖扩充至 **172 / 172 项 100% 通过**；
       - 在 `AutoEndToEndDriver.cs` 第 124 步实机演练中注入 612, 634, 1100, 1101, 1102, 1105 等全套协议，端到端生命周期保持 **125 / 125 阶段 0 缺陷通过**。
 
+35. **盛大官方 1.5 原版二进制认证、选服、创角与删角权威错误码 (503, 504, 505, 507, 522, 524, 528, 532) 物理模态提示全链路对齐 (`scratch/ida_processmsg.c:1340-1410`, `MIR_final_v3_p - Copy.exe: 0x46AFE8~0x46B758`)**：
+    - **官方实证**：
+      - 从盛大原版 1.5 二进制 (`MIR_final_v3_p - Copy.exe`) 代码段末尾直接提取 Delphi 原生中文错误提示字符串，彻底纠偏此前无模态或非标提示：
+        - 创角失败 (`SM_NEWCHAR_FAIL_DELPHI 522` / `0x46B4C8~0x46B55C`)：2 -> `"[failure] 这个名字已经存在。"`；3 -> `"[Failure] 你只能为一个帐户设两个角色.\请和游戏管理员联系。"`；4 -> `"[failure] 角色建立失败. Error=4"`；default -> `"[Failure] 未知的错误. 请写信给: support@legendofmir.net"`；
+        - 删角失败 (`SM_DELCHAR_FAIL_DELPHI 524` / `0x46B624`)：`"[Failure] 删除角色失败, Email: support@legendofmir.com.cn"`；
+        - 账号注册成功与失败 (`SM_NEWID_SUCCESS 504` / `SM_NEWID_FAIL 505` / `0x46AFE8~0x46B12C`)：成功下发 `0x46AFE8` 官方账号保管密保提示，-2 下发 `0x46B0F4` "在本服务器下, 这个新名字禁止使用。\请联系我们。"，0 下发 `0x46B0A8` "这个帐号正在被其他的玩家使用了。\"，其他错误下发 `0x46B12C`；
+        - 选服失败 (`SM_SELECTSERVER_FAIL 507` / `0x46B5DC~0x46B668`)：-2 下发 `0x46B5DC` "帐户被锁定 .请稍后再试。"，其他错误下发 `0x46B668` "您选择的服务器用户满员。"；
+        - 修改密码成功与失败 (`SM_CHANGEPASS_OK 532` / `SM_CHANGEPASS_FAIL 503` / `0x46B174~0x46B59C`)：成功下发 "密码变更成功."，失败根据 -1~-5 区分密码错误、三次密码错误、账号异常终止锁定、付费到期、账号被禁止；
+        - 角色列表查询失败 (`SM_QUERYCHAR_FAIL 528` / `0x46B758`)："服务器连接被强行中断。\连接时间可能超过限制，\或者用户请求重新连接。"；
+      - 彻底理顺官方 1.5 原版操作码（522 创角失败、524 删角失败、528 查询角色失败）与早期/私服操作码（122/124/128）的同构映射与别名兼容。
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 中增加 `SM_NEWCHAR_FAIL_DELPHI = 522`、`SM_NEWCHAR_SUCCESS_DELPHI = 521`、`SM_DELCHAR_FAIL_DELPHI = 524`、`SM_DELCHAR_SUCCESS_DELPHI = 523`、`SM_QUERYCHAR_FAIL_DELPHI = 528`、`SM_CHANGEPASS_FAIL = 503`、`SM_CHANGEPASS_OK = 532` 等官方 1.5 物理常量；
+      - 在 `Main.cs` 中，收到 522 与 524 时调用 `SelectCharView.ShowMessageModal(msg)` 弹出官方原版模态框提示用户；
+      - 在 `ServerMessageRouter.cs` 中，接入 503, 504, 505, 507, 532 路由分发分支，与 UI 模态对话框完美联动；
+      - 在 `TestProtocolMatrix.cs` 中新增 `TestOfficialGroundTruth_AuthAndCharSelectionOpcodesAndModalStrings` 测试，测试套件扩充至 **173 / 173 项 100% 通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **125 / 125 阶段 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **172 / 172 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **173 / 173 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **125 / 125 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

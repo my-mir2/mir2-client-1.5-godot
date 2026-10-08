@@ -61,23 +61,26 @@
 | 244 SM_OBJECTSTRUCK | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 314 SM_GROUNDITEM | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 315 SM_DELGROUNDITEM | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 500 SM_PASSOK | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 504 SM_NEWID_SUCCESS | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 505 SM_NEWID_FAIL | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 506 SM_CHGPASSWD_SUCCESS | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 507 SM_ID_LOCKED | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 518 SM_QUERYCHR | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 519 SM_NEWCHR_SUCCESS | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 520 SM_NEWCHR_FAIL | YES | 定义 | 在真值表 |
-| 521 SM_NEWMAP_DELPHI | YES | 定义 | 在真值表 |
-| 522 SM_LOGON_FAIL_DELPHI | YES | 定义 | 在真值表 |
-| 524 SM_DELCHR_FAIL | YES | 定义 | 在真值表 |
-| 525 SM_DELCHR_SUCCESS | NO | 定义 | 不在真值表（存疑/变体/错号） |
+| 501 SM_VERSION_FAIL | YES | 定义 | 在真值表 (IDA 0x46B68C 补丁版本不符) |
+| 503 SM_CHANGEPASS_FAIL | YES | 定义 | 在真值表 (IDA ProcessServerMessage 0x467920: -1~-5 密码修改失败) |
+| 504 SM_NEWID_SUCCESS | YES | 定义 | 在真值表 (IDA ProcessServerMessage 0x467920: 0x46AFE8 账号注册成功) |
+| 505 SM_NEWID_FAIL | YES | 定义 | 在真值表 (IDA ProcessServerMessage 0x467920: 0x46B0A8~0x46B12C 账号注册失败) |
+| 506 SM_CHANGEPASS_OK | YES | 定义 | 在真值表 (IDA ProcessServerMessage 0x467920: 0x46B59C 密码修改成功) |
+| 507 SM_SELECTSERVER_FAIL | YES | 定义 | 在真值表 (IDA ProcessServerMessage 0x467920: 0x46B5DC~0x46B668 选服失败锁定/满员) |
+| 518 SM_QUERYCHR | NO | 定义 | 不在真值表（存疑/变体/错号，官方为 523/528） |
+| 519 SM_NEWCHR_SUCCESS | NO | 定义 | 不在真值表（存疑/变体/错号，官方为 521） |
+| 520 SM_NEWCHR_FAIL / SM_SERVERLIST | YES | 定义 | 在真值表 (IDA case 520 handle_sm_server_list) |
+| 521 SM_NEWCHAR_SUCCESS_DELPHI | YES | 定义 | 在真值表 (IDA case 521 send_query_char 创角成功) |
+| 522 SM_NEWCHAR_FAIL_DELPHI | YES | 定义 | 在真值表 (IDA case 522 0x46B4C8~0x46B55C 创角失败) |
+| 523 SM_DELCHAR_SUCCESS_DELPHI / SM_QUERYCHAR_OK | YES | 定义 | 在真值表 (IDA case 523 send_query_char 删角成功) |
+| 524 SM_DELCHAR_FAIL_DELPHI | YES | 定义 | 在真值表 (IDA case 524 0x46B624 删角失败) |
+| 525 SM_DELCHR_SUCCESS | NO | 定义 | 不在真值表（存疑/变体/错号，官方为 523） |
 | 526 SM_OUTOFCONNECTION | YES | 定义 | 在真值表 |
 | 527 SM_DISCONNECT_DELPHI | YES | 定义 | 在真值表 |
-| 529 SM_BILLING_NOTICE | YES | 定义 | 在真值表 |
+| 528 SM_QUERYCHAR_FAIL_DELPHI | YES | 定义 | 在真值表 (IDA 0x46B758 连接超时断开) |
+| 529 SM_BILLING_NOTICE | YES | 定义 | 在真值表 (IDA 0x46B3C8 服务到期) |
 | 530 SM_LOGINSUCCESS | YES | 定义 | 在真值表 |
-| 532 SM_UPDATEID_SUCCESS | NO | 定义 | 不在真值表（存疑/变体/错号） |
+| 532 SM_UPDATEID_SUCCESS / SM_CHANGEPASS_OK | YES | 定义 | 在真值表 (IDA 0x46B59C 密码修改成功) |
 | 533 SM_UPDATEID_FAIL | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 600 SM_BAGITEMS / SM_REFRESH | YES | 定义 | 在真值表 (IDA case 0x258u handle_sm_refresh) |
 | 601 SM_MINERESULT / SM_REFRESH2 | YES | 定义 | 在真值表 (IDA case 0x259u handle_sm_refresh2) |

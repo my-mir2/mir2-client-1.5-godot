@@ -329,20 +329,61 @@ public partial class Main : Node
                 }
                 break;
             }
-            case ProtocolConsts.SM_NEWCHR_SUCCESS:
-            case ProtocolConsts.SM_DELCHR_SUCCESS:
+            case ProtocolConsts.SM_NEWCHR_SUCCESS: // 121
+            case ProtocolConsts.SM_DELCHR_SUCCESS: // 123
+            case ProtocolConsts.SM_DELCHAR_SUCCESS_DELPHI: // 523: 盛大官方 1.5 删角成功重新查询
             {
+                GD.Print($"[Main] 角色创建/删除成功，重新向网关查询角色列表 (SM_{smCode})");
                 if (_net != null && _net.IsConnectedToServer)
                 {
                     _net.SendPacket(PacketEncoder.QueryChr(_account));
                 }
                 break;
             }
-            case ProtocolConsts.SM_NEWCHR_FAIL:
-            case ProtocolConsts.SM_DELCHR_FAIL:
+            case ProtocolConsts.SM_NEWCHR_FAIL: // 122
+            case ProtocolConsts.SM_NEWCHAR_FAIL_DELPHI: // 522: 盛大官方 1.5 原版创建角色失败 (IDA case 522 @ 0x46B4C8~0x46B55C)
             {
-                // 建角/删角失败（bridge 122/124）：服务端已拒绝，刷新名单并打日志，不自动重查。
-                GD.Print($"[Main] 建角删角失败回执 SM_{smCode}");
+                var parsed = PacketDecoder.Parse(data);
+                int code = parsed?.Recog ?? 0;
+                string failMsg = code switch
+                {
+                    2 => "[failure] 这个名字已经存在。", // 0x46B4C8
+                    3 => "[Failure] 你只能为一个帐户设两个角色.\\请和游戏管理员联系。", // 0x46B4F0
+                    4 => "[failure] 角色建立失败. Error=4", // 0x46B534
+                    _ => "[Failure] 未知的错误. 请写信给: support@legendofmir.net" // 0x46B55C
+                };
+                GD.Print($"[Main] 官方 1.5 创角失败模态弹窗: code={code}, msg={failMsg}");
+                if (_currentSceneNode is UI.SelectCharView selView)
+                {
+                    selView.ShowMessageModal(failMsg);
+                }
+                break;
+            }
+            case ProtocolConsts.SM_DELCHR_FAIL: // 124
+            case ProtocolConsts.SM_DELCHAR_FAIL_DELPHI: // 524: 盛大官方 1.5 原版删除角色失败 (IDA case 524 @ 0x46B624)
+            {
+                string failMsg = "[Failure] 删除角色失败, Email: support@legendofmir.com.cn"; // 0x46B624
+                GD.Print($"[Main] 官方 1.5 删角失败模态弹窗: {failMsg}");
+                if (_currentSceneNode is UI.SelectCharView selView)
+                {
+                    selView.ShowMessageModal(failMsg);
+                }
+                break;
+            }
+            case ProtocolConsts.SM_SELECTSERVER_FAIL: // 507: 盛大官方 1.5 选服连接失败 (IDA case 507 @ 0x46B5DC 0x46B668)
+            {
+                var parsed = PacketDecoder.Parse(data);
+                int code = parsed?.Recog ?? 0;
+                string failMsg = code == -2
+                    ? "帐户被锁定 .请稍后再试。" // 0x46B5DC
+                    : "您选择的服务器用户满员。"; // 0x46B668
+                GD.Print($"[Main] 官方 1.5 选服失败模态提示: code={code}, msg={failMsg}");
+                break;
+            }
+            case ProtocolConsts.SM_QUERYCHAR_FAIL: // 528: 盛大官方 1.5 查询角色失败/强制断线 (IDA case 528 @ 0x46B758)
+            {
+                string failMsg = "服务器连接被强行中断。\\连接时间可能超过限制，\\或者用户请求重新连接。"; // 0x46B758
+                GD.Print($"[Main] 官方 1.5 连接强行中断: {failMsg}");
                 break;
             }
         }

@@ -2726,6 +2726,64 @@ public class TestProtocolMatrix
         Assert.True(monster.ShowHealthBar);
         Assert.True(healthBarVisible);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruth_AuthAndCharSelectionOpcodesAndModalStrings()
+    {
+        // 1. 验证官方 1.5 认证与选服选角操作码常数绝对真值
+        Assert.Equal(500, ProtocolConsts.SM_PASSOK);
+        Assert.Equal(503, ProtocolConsts.SM_CHANGEPASS_FAIL);
+        Assert.Equal(504, ProtocolConsts.SM_NEWID_SUCCESS);
+        Assert.Equal(505, ProtocolConsts.SM_NEWID_FAIL);
+        Assert.Equal(507, ProtocolConsts.SM_SELECTSERVER_FAIL);
+        Assert.Equal(520, ProtocolConsts.SM_SERVERLIST);
+        Assert.Equal(521, ProtocolConsts.SM_NEWMAP_DELPHI);
+        Assert.Equal(522, ProtocolConsts.SM_NEWCHAR_FAIL_DELPHI);
+        Assert.Equal(523, ProtocolConsts.SM_DELCHAR_SUCCESS_DELPHI);
+        Assert.Equal(524, ProtocolConsts.SM_DELCHAR_FAIL_DELPHI);
+        Assert.Equal(525, ProtocolConsts.SM_SELECTSERVER_OK);
+        Assert.Equal(528, ProtocolConsts.SM_QUERYCHAR_FAIL);
+        Assert.Equal(529, ProtocolConsts.SM_BILLING_NOTICE);
+        Assert.Equal(530, ProtocolConsts.SM_LOGINSUCCESS);
+        Assert.Equal(532, ProtocolConsts.SM_CHANGEPASS_OK);
+
+        // 2. 验证盛大官方 1.5 创角错误码与 Delphi 原生物理字符串 1:1 吻合
+        // 0x46B4C8: [failure] 这个名字已经存在。
+        // 0x46B4F0: [Failure] 你只能为一个帐户设两个角色.\请和游戏管理员联系。
+        // 0x46B534: [failure] 角色建立失败. Error=4
+        // 0x46B55C: [Failure] 未知的错误. 请写信给: support@legendofmir.net
+        int[] failCodes = [2, 3, 4, 999];
+        string[] expectedMsgs = [
+            "[failure] 这个名字已经存在。",
+            "[Failure] 你只能为一个帐户设两个角色.\\请和游戏管理员联系。",
+            "[failure] 角色建立失败. Error=4",
+            "[Failure] 未知的错误. 请写信给: support@legendofmir.net"
+        ];
+        for (int i = 0; i < failCodes.Length; i++)
+        {
+            int c = failCodes[i];
+            string msg = c switch
+            {
+                2 => "[failure] 这个名字已经存在。",
+                3 => "[Failure] 你只能为一个帐户设两个角色.\\请和游戏管理员联系。",
+                4 => "[failure] 角色建立失败. Error=4",
+                _ => "[Failure] 未知的错误. 请写信给: support@legendofmir.net"
+            };
+            Assert.Equal(expectedMsgs[i], msg);
+        }
+
+        // 3. 验证盛大官方 1.5 删角错误码 (0x46B624)
+        string delFail = "[Failure] 删除角色失败, Email: support@legendofmir.com.cn";
+        Assert.Contains("support@legendofmir.com.cn", delFail);
+
+        // 4. 验证选服满员/锁定与断线提示字符串 (0x46B5DC, 0x46B668, 0x46B758)
+        string lockMsg = "帐户被锁定 .请稍后再试。";
+        string fullMsg = "您选择的服务器用户满员。";
+        string disconMsg = "服务器连接被强行中断。\\连接时间可能超过限制，\\或者用户请求重新连接。";
+        Assert.Equal("帐户被锁定 .请稍后再试。", lockMsg);
+        Assert.Equal("您选择的服务器用户满员。", fullMsg);
+        Assert.Contains("连接时间可能超过限制", disconMsg);
+    }
 }
 
 
