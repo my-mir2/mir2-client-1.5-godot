@@ -240,6 +240,22 @@ public partial class ShopPanelView : Control, IManagedWindow
         }
     }
 
+    /// <summary>官方 1.5 货架下翻页 (SM_MERCHANT_PAGE 647, Recog > 0)</summary>
+    public void PageNext() => OnNextPage();
+
+    /// <summary>官方 1.5 货架上翻页 (SM_MERCHANT_PAGE 647, Recog < 0)</summary>
+    public void PagePrev() => OnPrevPage();
+
+    /// <summary>官方 1.5 货架直接跳页</summary>
+    public void SetPage(int pageIndex)
+    {
+        if (pageIndex >= 0 && pageIndex * PageSize < _items.Count)
+        {
+            _pageIndex = pageIndex;
+            RefreshPageDisplay();
+        }
+    }
+
     private void OnBuyCurrentSelection()
     {
         if (_selectedIndex >= 0 && _selectedIndex < _items.Count)

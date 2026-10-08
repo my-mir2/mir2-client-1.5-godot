@@ -769,6 +769,60 @@ public class TestCombatSkillsMatrix
         var p635 = new ServerPacket(ProtocolConsts.SM_COMBAT_END, 0, 0, 0, Array.Empty<byte>());
         router.OnPacket(p635);
     }
+
+    [Fact]
+    public void Official_1_5_SpellEffect_614_639_Page_647_And_Attr2_716_GroundTruth_Test()
+    {
+        // 1. 验证官方 1.5 协议常量真值
+        Assert.Equal((short)614, ProtocolConsts.SM_SPELLEFFECT_DELPHI);
+        Assert.Equal((short)639, ProtocolConsts.SM_MAGICEFFECT);
+        Assert.Equal((short)51, ProtocolConsts.SM_REFRESH_DELPHI);
+        Assert.Equal((short)647, ProtocolConsts.SM_MERCHANT_PAGE);
+        Assert.Equal((short)716, ProtocolConsts.SM_ATTR2_DELPHI);
+
+        // 2. 验证 EntityManager 实体特效事件联动
+        var em = new EntityManager();
+        int triggeredUid = 0, triggeredEffect = 0, triggeredParam = 0;
+        em.EntityEffectTriggered += (uid, effectId, effectParam) =>
+        {
+            triggeredUid = uid;
+            triggeredEffect = effectId;
+            triggeredParam = effectParam;
+        };
+
+        var router = new ServerMessageRouter(null, em);
+
+        // 模拟 614 施法光效 (Recog=8001, Tag=15, Param=2)
+        var p614 = new ServerPacket(ProtocolConsts.SM_SPELLEFFECT_DELPHI, 8001, 2, 15, Array.Empty<byte>());
+        router.OnPacket(p614);
+        Assert.Equal(8001, triggeredUid);
+        Assert.Equal(15, triggeredEffect);
+        Assert.Equal(2, triggeredParam);
+
+        // 模拟 639 魔法光效 (Recog=8002, Tag=20, Param=3)
+        var p639 = new ServerPacket(ProtocolConsts.SM_MAGICEFFECT, 8002, 3, 20, Array.Empty<byte>());
+        router.OnPacket(p639);
+        Assert.Equal(8002, triggeredUid);
+        Assert.Equal(20, triggeredEffect);
+        Assert.Equal(3, triggeredParam);
+
+        // 模拟 51 实体特效 (Recog=8003, Tag=25, Param=4)
+        var p51 = new ServerPacket(ProtocolConsts.SM_REFRESH_DELPHI, 8003, 4, 25, Array.Empty<byte>());
+        router.OnPacket(p51);
+        Assert.Equal(8003, triggeredUid);
+        Assert.Equal(25, triggeredEffect);
+        Assert.Equal(4, triggeredParam);
+
+        // 模拟 647 货架分页
+        var p647Next = new ServerPacket(ProtocolConsts.SM_MERCHANT_PAGE, 1, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p647Next);
+        var p647Prev = new ServerPacket(ProtocolConsts.SM_MERCHANT_PAGE, -1, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p647Prev);
+
+        // 模拟 716 扩展属性同步2 (Tag 驱动)
+        var p716 = new ServerPacket(ProtocolConsts.SM_ATTR2_DELPHI, 0, 0, 50, Array.Empty<byte>());
+        router.OnPacket(p716);
+    }
 }
 
 

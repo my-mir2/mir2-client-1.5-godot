@@ -663,8 +663,9 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_SELECTSERVER_OK: // 525: 盛大官方 1.5 选服确认进入选角 (IDA case 525)
                 SafeLog($"[SM] 选服确认进入选角 (SM_SELECTSERVER_OK=525)");
                 break;
-            case ProtocolConsts.SM_REFRESH_DELPHI: // 51: 官方 1.5 实体数据重置刷新 (IDA case '3')
-                SafeLog($"[SM] 实体数据重置刷新 (SM_REFRESH_DELPHI=51)");
+            case ProtocolConsts.SM_REFRESH_DELPHI: // 51: 盛大官方 1.5 实体动画与特效播放 (IDA case '3' @ 0x46A2B0 show_entity_animation)
+                _entityManager?.PlayEntityEffect(packet.Recog, packet.Tag, packet.Param);
+                SafeLog($"[SM] 实体动画与特效播放 (SM_REFRESH_DELPHI=51, uid={packet.Recog}, effect={packet.Tag}, param={packet.Param})");
                 break;
 
             case ProtocolConsts.SM_QUERYCHAR_FAIL: // 528: 查询角色失败
@@ -720,9 +721,10 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_TAKEOFF_FAIL: // 620: 脱下装备失败回滚 (IDA 0x4687C8)
                 _hud?.OnTakeOffFail(packet.Param);
                 break;
-            case ProtocolConsts.SM_SPELLEFFECT_DELPHI: // 614: 官方 1.5 施法光效与受击结算 (IDA sub_467920 case 614 @ 0x469B56)
-            case ProtocolConsts.SM_MAGICEFFECT: // 639: 施法光效与命中特效
-                SafeLog($"[SM] 施法光效/命中特效触发 (ident={packet.Ident})");
+            case ProtocolConsts.SM_SPELLEFFECT_DELPHI: // 614: 官方 1.5 施法光效与受击结算 (IDA sub_467920 case 614 @ 0x469B56: handle_sm_spell_effect)
+            case ProtocolConsts.SM_MAGICEFFECT: // 639: 官方 1.5 魔法光效播放 (IDA case 639 handle_sm_magic_effect)
+                _entityManager?.PlayEntityEffect(packet.Recog, packet.Tag, packet.Param);
+                SafeLog($"[SM] 施法光效/命中特效触发 (ident={packet.Ident}, target={packet.Recog}, effect={packet.Tag}, param={packet.Param})");
                 break;
             case ProtocolConsts.SM_DURACHANGE_REC: // 642: 物品持久度变动回显
                 _hud?.UpdateItemDurability(packet.Recog);
@@ -792,8 +794,20 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_TAKEON_NOOP2: // 618
                 // 官方 1.5 空占位分支 (goto LABEL_486)
                 break;
-            case ProtocolConsts.SM_MERCHANT_PAGE: // 647: 商店货架分页切换
-                SafeLog($"[SM] 商店货架分页切换 (SM_MERCHANT_PAGE=647, page={packet.Recog})");
+            case ProtocolConsts.SM_MERCHANT_PAGE: // 647: 盛大官方 1.5 商店货架分页切换 (IDA case 647: v66 > 0 ? NextPage : PrevPage)
+                if (packet.Recog > 0)
+                {
+                    _hud?.ShopPanel?.PageNext();
+                }
+                else if (packet.Recog < 0)
+                {
+                    _hud?.ShopPanel?.PagePrev();
+                }
+                else
+                {
+                    _hud?.ShopPanel?.SetPage(packet.Param);
+                }
+                SafeLog($"[SM] 商店货架分页切换 (SM_MERCHANT_PAGE=647, recog={packet.Recog}, param={packet.Param})");
                 break;
             case ProtocolConsts.SM_LISTADD_DELPHI: // 610: 名单列表条目添加 (IDA case 0x262)
                 _hud?.AddChat("系统", $"[名单] 添加条目: {DecodeExtraText(packet.Extra)}", new Color(0.7f, 0.9f, 0.6f));
@@ -818,8 +832,8 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_ACTOR_TIMESTAMP: // 656: 实体动作校验时间戳同步 (IDA case 656)
                 _entityManager?.UpdateActorTimestamp(packet.Recog, packet.Param);
                 break;
-            case ProtocolConsts.SM_ATTR2_DELPHI: // 716: 官方扩展属性同步2 (IDA case 716)
-                SafeLog($"[SM] 扩展属性同步2 (SM_ATTR2_DELPHI=716, val={packet.Recog})");
+            case ProtocolConsts.SM_ATTR2_DELPHI: // 716: 盛大官方 1.5 扩展属性同步2 (IDA 0x46A382: handle_sm_attr2(Tag))
+                SafeLog($"[SM] 扩展属性同步2 (SM_ATTR2_DELPHI=716, val={packet.Tag})");
                 break;
             case ProtocolConsts.SM_CHAR_FREEZE_START: // 1100: 实体麻痹/定身开始 (IDA case 0x44C)
                 _entityManager?.SetActorFrozen(packet.Recog, true);

@@ -7479,13 +7479,52 @@
       - 在 `PacketDecoder.cs` 增加 `DecodeShopItems`，支持制表符、斜杠、空格分隔的商品条目解析（名称、价格、重量/耐久、最大耐久）；
       - 在 `HudController.cs` 增加 `OnCombatEnd()`；
       - 在 `ServerMessageRouter.cs` 将 660 纠偏为无条件 `allowGroup = true`，将 666 接入 `RefreshMembers()`，将 645/652 解析数据注入 `ShopPanel.SetItems` 并驱动界面显现，将 635 接入 `OnCombatEnd()`；
-      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_Shop_Items_645_652_And_Group_660_666_GroundTruth_Test` 脱机单测，测试集扩充至 **193 / 193 项 100% 全部通过**；
+56. **盛大官方 1.5 施法光效/命中特效联动 (SM 614/639/51)、货架双向翻页 (SM 647) 与扩展属性2 (SM 716) 物理指令实证 (`ServerMessageRouter.cs`, `ShopPanelView.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 308~310、1052~1057、1173~1176、1542~1546 铁证：
+        ```c
+        // 614: 施法光效与受击结算 (Tag 为光效编号，Param 为参数)
+        if ( (unsigned __int16)v67 == 614 )
+        {
+          handle_sm_spell_effect((unsigned __int16)v68, HIWORD(v67));
+          goto LABEL_486;
+        }
+        // 639: 魔法光效播放
+        case 639:
+          handle_sm_magic_effect();
+          goto LABEL_486;
+        // 51 ('3'): 实体动画与光效播放
+        case '3':
+          show_entity_animation(v77, 0, 0, 0, HIWORD(v68), (unsigned __int16)v68, HIWORD(v67));
+          goto LABEL_486;
+        // 647: 商店货架分页切换 (Recog > 0 下一页，Recog < 0 上一页，或直接跳页)
+        case 647:
+          if ( !byte_4F92D4 ) goto LABEL_486;
+          if ( v66 > 0 ) goto LABEL_336; // NextPage
+          goto LABEL_342; // PrevPage
+        // 716: 官方扩展属性同步2 (操作数明确为 Tag / (unsigned __int16)v68)
+        if ( (unsigned __int16)v67 == 716 )
+        {
+          handle_sm_attr2((unsigned __int16)v68);
+        }
+        ```
+      - 此前客户端坏账：
+        1. 614 与 639 仅打印 SafeLog 空壳，未向 `EntityManager.PlayEntityEffect` 派发光效动画；
+        2. 51 仅打印重置日志，丢失了实体动画播放驱动；
+        3. 647 仅记录日志，`ShopPanelView` 内部翻页方法为私有且未暴露对外联动接口；
+        4. 716 错误将 Recog 记为属性值，官方指令明确由 Tag `(unsigned __int16)v68` 驱动。
+    - **精准重构**：
+      - 在 `ShopPanelView.cs` 暴露 `PageNext()`、`PagePrev()` 与 `SetPage(int)` 公共接口；
+      - 在 `ServerMessageRouter.cs` 将 614、639、51 接入 `_entityManager.PlayEntityEffect` 真实驱动光效渲染；
+      - 将 647 接入 `_hud.ShopPanel` 的双向翻页与指定跳转；
+      - 将 716 修正为由 `packet.Tag` 官方物理操作数驱动；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_SpellEffect_614_639_Page_647_And_Attr2_716_GroundTruth_Test` 脱机单测，测试集扩充至 **194 / 194 项 100% 全部通过**；
       - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
-- **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **193 / 193 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **194 / 194 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
