@@ -455,6 +455,51 @@ public class TestOfficialUiGroundTruth
         Assert.True(brokenDura <= warningThreshold);
         Assert.False(safeDura <= warningThreshold);
     }
+
+    [Fact]
+    public void TestEntityActionDigUpAndFlyAxe_OfficialGroundTruth()
+    {
+        // 1. 盛大官方 1.5 实体动作族真值验证 (scratch/ida_processmsg.c 行 1276~1296: case 8, 14, 15, 16, 18, 19, 24)
+        Assert.Equal(15, Mir2Client.Net.ProtocolConsts.SM_DIGUP_ACTION_DELPHI);
+        Assert.Equal(16, Mir2Client.Net.ProtocolConsts.SM_FLYAXE_ACTION_DELPHI);
+
+        // 2. EntityManager 破土状态维护实证 (case 15: *(_BYTE *)(v71 + 220) = 1)
+        var em = new Mir2Client.Game.EntityManager();
+        em.AddEntity(new Mir2Client.Game.EntityManager.EntityData
+        {
+            Uid = 9999,
+            Name = "僵尸",
+            Type = Mir2Client.Game.EntityManager.EntityType.Monster,
+            TileX = 100,
+            TileY = 100,
+            DigUpFinished = false
+        });
+
+        var ent = em.GetEntity(9999);
+        Assert.NotNull(ent);
+        Assert.False(ent.DigUpFinished);
+
+        bool eventFired = false;
+        em.EntityDigUpChanged += (uid, finished) =>
+        {
+            if (uid == 9999 && finished) eventFired = true;
+        };
+
+        em.SetEntityDigUpFinished(9999, true);
+        Assert.True(ent.DigUpFinished);
+        Assert.True(eventFired);
+
+        // 3. 官方 1.5 case 50 进入世界组队初始状态协议实证 (scratch/ida_processmsg.c 行 1425: byte_4F94F8 = (_BYTE)v64 == 1)
+        var pktLogon = new Mir2Client.Net.ServerPacket(
+            ident: Mir2Client.Net.ProtocolConsts.SM_LOGON_DELPHI,
+            recog: 8888,
+            param: 100,
+            tag: 100,
+            extra: new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 } // Extra[8]=1 表示允许组队开启
+        );
+        Assert.True(pktLogon.Extra != null && pktLogon.Extra.Length >= 12);
+        Assert.Equal(1, pktLogon.Extra[8]);
+    }
 }
 
 

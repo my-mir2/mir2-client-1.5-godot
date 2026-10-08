@@ -615,12 +615,28 @@ public sealed class ServerMessageRouter
             case SM_OBJECTSTRUCK_DELPHI:
                 HandleSpellResult(packet);
                 break;
-            // 批量包：15/16 均在真值表内；逐行 "uid/x/y/dir[/run]" 与 "uid/damage/hp"，L2。
-            case ProtocolConsts.SM_BATCHMOVE:
-                HandleBatchMove(packet);
+            // 盛大官方 1.5 实体动作族：15 为钻出破土完成 (IDA case 15: *(_BYTE *)(v71 + 220) = 1)，16 为投掷飞斧动作 (IDA case 16)
+            // 兼顾多行格式批量包 (ExtraStr 包含换行)
+            case ProtocolConsts.SM_FLYAXE_ACTION_DELPHI: // 16
+                if (!string.IsNullOrEmpty(packet.ExtraStr) && (packet.ExtraStr.Contains('\n') || packet.ExtraStr.Contains('\r')))
+                {
+                    HandleBatchMove(packet);
+                }
+                else
+                {
+                    _entityManager?.UpdateActorParam(packet.Recog, packet.Param);
+                }
                 break;
-            case ProtocolConsts.SM_BATCHSTRUCK:
-                HandleBatchStruck(packet);
+            case ProtocolConsts.SM_DIGUP_ACTION_DELPHI: // 15
+                if (!string.IsNullOrEmpty(packet.ExtraStr) && (packet.ExtraStr.Contains('\n') || packet.ExtraStr.Contains('\r')))
+                {
+                    HandleBatchStruck(packet);
+                }
+                else
+                {
+                    _entityManager?.SetEntityDigUpFinished(packet.Recog, true);
+                    _entityManager?.UpdateActorParam(packet.Recog, packet.Param);
+                }
                 break;
             case ProtocolConsts.SM_SERVERLIST: // 520: 选服服务器列表
                 SafeLog($"[SM] 接收选服服务器列表 (SM_SERVERLIST=520)");
@@ -668,6 +684,12 @@ public sealed class ServerMessageRouter
                         _entityManager.UpdatePosition(packet.Recog, packet.Param, packet.Tag);
                     }
                 }
+                // 盛大官方 1.5 原版二进制 case 50: byte_4F94F8 = (_BYTE)v64 == 1; (初始组队开关模式同步，v64 为 Extra[8])
+                if (packet.Extra != null && packet.Extra.Length >= 12)
+                {
+                    bool allowGroup = packet.Extra[8] == 1;
+                    _hud?.GroupPanel?.SetAllowGroup(allowGroup);
+                }
                 SafeLog($"[SM] 主角色进入世界绑定 (SM_LOGON_DELPHI=50, uid={packet.Recog})");
                 break;
             case ProtocolConsts.SM_STARTPLAY: // 20: 角色确认进入世界 / 实体登场 (IDA case 20)
@@ -681,9 +703,9 @@ public sealed class ServerMessageRouter
                 HandleEntityMove(packet);
                 break;
             case 8:  // 8: 实体受创硬直动作 (IDA case 8)
-            case 18: // 18: 实体特定动作 (IDA case 18)
-            case 19: // 19: 实体特定动作 (IDA case 19)
-            case 24: // 24: 实体特定动作 (IDA case 24)
+            case 18: // 18: 实体特定动作/定向轰击闪电 (IDA case 18)
+            case 19: // 19: 实体特定动作/火球 (IDA case 19)
+            case 24: // 24: 实体特定动作/施法攻击 (IDA case 24)
                 _entityManager?.UpdateActorParam(packet.Recog, packet.Param);
                 break;
             case 1:  // 1: 心跳时钟同步 (IDA case 1)

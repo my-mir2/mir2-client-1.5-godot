@@ -51,6 +51,7 @@ public class EntityManager
         public int ActorParam { get; set; } = 0; // 实体参数/攻速/体态 (SM_ACTOR_PARAM 654)
         public long LastActionTick { get; set; } = 0; // 实体动作校验时间戳 (SM_ACTOR_TIMESTAMP 656)
         public bool ShowHealthBar { get; set; } = true; // 浮动血条显隐 (SM_HEALTHBAR_DELPHI 1105)
+        public bool DigUpFinished { get; set; } = false; // 钻出/破土完成状态 (官方 IDA case 15 offset 220: *(_BYTE *)(v71 + 220) = 1)
     }
 
     public event Action<EntityData>? EntityAdded;
@@ -70,6 +71,7 @@ public class EntityManager
     public event Action<int, int, int>? EntityEffectTriggered;    // uid, effectId, effectParam (657)
     public event Action<int, bool>? EntityHealthBarToggled;       // uid, visible (1105)
     public event Action<int, int, int, int>? EntityHealthBarColorChanged; // uid, hp, maxHp, color (1104)
+    public event Action<int, bool>? EntityDigUpChanged;           // uid, digUpFinished (SM_DIGUP_ACTION_DELPHI 15)
 
     private readonly Dictionary<int, EntityData> _entities = new();
 
@@ -454,6 +456,18 @@ public class EntityManager
             if (hp >= 0) ent.Hp = hp;
             if (maxHp > 0) ent.MaxHp = maxHp;
             if (hp <= 0) ent.IsDead = true;
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体钻出/破土状态更新 (SM_DIGUP_ACTION_DELPHI 15, IDA case 15 offset 220)
+    /// </summary>
+    public void SetEntityDigUpFinished(int uid, bool finished = true)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.DigUpFinished = finished;
+            EntityDigUpChanged?.Invoke(uid, finished);
         }
     }
 }
