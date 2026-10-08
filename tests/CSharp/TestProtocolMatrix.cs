@@ -2477,6 +2477,37 @@ public class TestProtocolMatrix
         Assert.Equal(1016, parsedDropGold.Ident);
         Assert.Equal(8888, parsedDropGold.Recog);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthCmCases_GroupCreateAddDelMemberAndMode()
+    {
+        // 1. 官方 1.5 组队创建发包 (CM_CREATEGROUP 1020, 对齐 IDA TFrmDlg_DGrpCreateClick 0x491160)
+        Assert.Equal(1020, ProtocolConsts.CM_CREATEGROUP);
+        byte[] rawCreate = PacketEncoder.GroupCreate();
+        var parsedCreate = PacketDecoder.Parse(rawCreate.AsSpan(1))!.Value;
+        Assert.Equal(1020, parsedCreate.Ident);
+
+        // 2. 官方 1.5 邀请组队发包 (CM_ADDGROUPMEMBER 1021, 对齐 IDA TFrmDlg_DGrpAddMemClick 0x491264)
+        Assert.Equal(1021, ProtocolConsts.CM_ADDGROUPMEMBER);
+        byte[] rawAdd = PacketEncoder.GroupAddMember("传奇法神");
+        var parsedAdd = PacketDecoder.Parse(rawAdd.AsSpan(1))!.Value;
+        Assert.Equal(1021, parsedAdd.Ident);
+        Assert.Equal("传奇法神", parsedAdd.ExtraStr);
+
+        // 3. 官方 1.5 踢出队伍发包 (CM_DELGROUPMEMBER 1022, 对齐 IDA TFrmDlg_DGrpDelMemClick 0x491368)
+        Assert.Equal(1022, ProtocolConsts.CM_DELGROUPMEMBER);
+        byte[] rawDel = PacketEncoder.GroupDelMember("道家尊者");
+        var parsedDel = PacketDecoder.Parse(rawDel.AsSpan(1))!.Value;
+        Assert.Equal(1022, parsedDel.Ident);
+        Assert.Equal("道家尊者", parsedDel.ExtraStr);
+
+        // 4. 官方 1.5 允许组队模式翻转 (CM_GROUPMODE 1019, 对齐 IDA TFrmDlg_DGrpAllowGroupClick 0x491104)
+        Assert.Equal(1019, ProtocolConsts.CM_GROUPMODE);
+        byte[] rawMode = PacketEncoder.GroupModeToggle(true);
+        var parsedMode = PacketDecoder.Parse(rawMode.AsSpan(1))!.Value;
+        Assert.Equal(1019, parsedMode.Ident);
+        Assert.Equal(1, parsedMode.Recog);
+    }
 }
 
 

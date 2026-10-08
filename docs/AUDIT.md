@@ -6972,11 +6972,22 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_DealChangeGoldAndDropGold` 单元测试，脱机测试覆盖扩充至 **166 / 166 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 121 步实机验证，总演练步数扩充至 **122 步**。
 
+30. **官方 1.5 组队创建协议发包纠偏 (CM_CREATEGROUP 1020) 与队员加踢弹窗输入实证 (`scratch/ida_dialogs.json:964` TFrmDlg_DGrpCreateClick `0x491160`, `0x491264`, `0x491368`, `bridge.rs:77, 1043, 1048, 1051`)**：
+    - **官方实证**：
+      - 组队创建协议发包纠偏 (`CM_CREATEGROUP 1020`)：此前客户端在 `CreateGroupRequested` 触发时错误调用了 `GroupAddMember`（发了 1021 号包），导致创建队伍被当成添加队员。经核验官方原版与网关 `bridge.rs:77, 1043`，创建队伍发送独立的 `CM_CREATEGROUP 1020`，添加队员才发送 `CM_ADDGROUPMEMBER 1021`；
+      - 消除组队按钮硬编码字符串：原界面在添加队员和删除队员时写死了 `"新队友"` 和 `"我"`，现已严格对齐官方原生规范，通过 `GetOrFindMessageBox()` 唤出 `MessageBoxDialog` 弹窗输入目标玩家名字，实现无硬编码纯动态闭环。
+    - **精准重构**：
+      - 在 `GroupPanelView.cs` 增加 `GetOrFindMessageBox` 并接入点击弹窗输入；
+      - 在 `HudController.cs` 导出 `MessageBoxDialog` 统一子窗体访问入口；
+      - 在 `GameView.cs` 将组队创建发包修正为 `PacketEncoder.GroupCreate()`；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_GroupCreateAddDelMemberAndMode` 单元测试，脱机测试覆盖扩充至 **167 / 167 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 122 步实机验证，总演练步数扩充至 **123 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **166 / 166 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **122 / 122 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **167 / 167 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **123 / 123 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

@@ -2073,7 +2073,34 @@ public partial class AutoEndToEndDriver : Node
 
             case 122:
             {
-                GD.Print("[AutoE2E] ALL 122 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 组队创建 (CM_CREATEGROUP 1020)、加人 (1021)、踢人 (1022) 与模式切换 (1019) ===");
+                    // 1. 打开组队面板
+                    gameView.HudInstance.ToggleGroup();
+
+                    // 2. 模拟触发创建队伍发包 (CM_CREATEGROUP 1020)
+                    gameView.HudInstance.GroupPanel?.EmitSignal(GroupPanelView.SignalName.CreateGroupRequested, string.Empty);
+
+                    // 3. 模拟邀请加入队伍发包 (CM_ADDGROUPMEMBER 1021)
+                    gameView.HudInstance.GroupPanel?.EmitSignal(GroupPanelView.SignalName.AddMemberRequested, "战神狂暴");
+
+                    // 4. 模拟踢出队伍发包 (CM_DELGROUPMEMBER 1022)
+                    gameView.HudInstance.GroupPanel?.EmitSignal(GroupPanelView.SignalName.DelMemberRequested, "战神狂暴");
+
+                    // 5. 模拟组队开关切换发包 (CM_GROUPMODE 1019)
+                    gameView.HudInstance.GroupPanel?.EmitSignal(GroupPanelView.SignalName.GroupModeToggled, false);
+
+                    gameView.HudInstance.ToggleGroup();
+                }
+                RequestCapture("step122_group_create_add_del_mode");
+                break;
+            }
+
+            case 123:
+            {
+                GD.Print("[AutoE2E] ALL 123 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

@@ -571,7 +571,7 @@ namespace Mir2Client.UI
                 {
                     HudInstance.GroupPanel.CreateGroupRequested += (targetName) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GroupAddMember(targetName));
+                        _net?.SendPacket(PacketEncoder.GroupCreate());
                     };
                     HudInstance.GroupPanel.AddMemberRequested += (targetName) =>
                     {

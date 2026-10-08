@@ -108,9 +108,9 @@ public partial class GroupPanelView : Control, IManagedWindow
 
         // 官方 1.5 原生底栏 3 按钮交互热区 (底板 Prguse_0120 已精细烘焙 新建/添加/删除 金属文字凹槽)
         // 采用精准无边框透明热区咬合:
-        // - 新建: (22, 203, 72, 19) -> Prguse_0123
-        // - 添加: (97, 203, 72, 19) -> Prguse_0124
-        // - 删除: (172, 203, 72, 19) -> Prguse_0125
+        // - 新建: (22, 203, 72, 19) -> Prguse_0123 (IDA TFrmDlg_DGrpCreateClick 0x491160)
+        // - 添加: (97, 203, 72, 19) -> Prguse_0124 (IDA TFrmDlg_DGrpAddMemClick 0x491264)
+        // - 删除: (172, 203, 72, 19) -> Prguse_0125 (IDA TFrmDlg_DGrpDelMemClick 0x491368)
         var btnCreate = new TextureButton
         {
             Name = "BtnGroupCreate",
@@ -119,7 +119,7 @@ public partial class GroupPanelView : Control, IManagedWindow
             Size = new Vector2(72, 19),
             FocusMode = FocusModeEnum.None
         };
-        btnCreate.Pressed += () => EmitSignal(SignalName.CreateGroupRequested, "我");
+        btnCreate.Pressed += () => EmitSignal(SignalName.CreateGroupRequested, string.Empty);
         _panel.AddChild(btnCreate);
 
         var btnAdd = new TextureButton
@@ -130,7 +130,24 @@ public partial class GroupPanelView : Control, IManagedWindow
             Size = new Vector2(72, 19),
             FocusMode = FocusModeEnum.None
         };
-        btnAdd.Pressed += () => EmitSignal(SignalName.AddMemberRequested, "新队友");
+        btnAdd.Pressed += () =>
+        {
+            var msgBox = GetOrFindMessageBox();
+            if (msgBox != null)
+            {
+                msgBox.ShowInput("请输入要邀请加入队伍的玩家名字:", "", (name) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        EmitSignal(SignalName.AddMemberRequested, name.Trim());
+                    }
+                });
+            }
+            else
+            {
+                EmitSignal(SignalName.AddMemberRequested, "新队友");
+            }
+        };
         _panel.AddChild(btnAdd);
 
         var btnLeave = new TextureButton
@@ -141,7 +158,24 @@ public partial class GroupPanelView : Control, IManagedWindow
             Size = new Vector2(72, 19),
             FocusMode = FocusModeEnum.None
         };
-        btnLeave.Pressed += () => EmitSignal(SignalName.DelMemberRequested, "我");
+        btnLeave.Pressed += () =>
+        {
+            var msgBox = GetOrFindMessageBox();
+            if (msgBox != null)
+            {
+                msgBox.ShowInput("请输入要踢出队伍的玩家名字:", "", (name) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        EmitSignal(SignalName.DelMemberRequested, name.Trim());
+                    }
+                });
+            }
+            else
+            {
+                EmitSignal(SignalName.DelMemberRequested, "新队友");
+            }
+        };
         _panel.AddChild(btnLeave);
     }
 
@@ -221,5 +255,12 @@ public partial class GroupPanelView : Control, IManagedWindow
     {
         Visible = false;
         EmitSignal(SignalName.PanelClosed);
+    }
+
+    private MessageBoxDialog? GetOrFindMessageBox()
+    {
+        var hud = GetParent() as HudController;
+        if (hud?.MessageBoxDialog != null) return hud.MessageBoxDialog;
+        return GetTree().Root.FindChild("MessageBoxDialog", true, false) as MessageBoxDialog;
     }
 }

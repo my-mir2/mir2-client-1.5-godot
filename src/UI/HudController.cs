@@ -118,6 +118,7 @@ public partial class HudController : CanvasLayer
     public KeySelectDialogView? KeySelectDialog => _keySelectDialogView;
     public MessageBoxDialog? MessageDialog => _messageBoxDialog;
     public MessageBoxDialog? MessageBox => _messageBoxDialog;
+    public MessageBoxDialog? MessageBoxDialog => _messageBoxDialog;
     public NpcDialogView? NpcDialog => _npcDialogView;
     public DeathScreenView? DeathScreen => _deathScreenView;
     public MinimapView? Minimap => _minimapView;
