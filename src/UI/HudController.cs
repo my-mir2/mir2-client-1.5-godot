@@ -288,6 +288,9 @@ public partial class HudController : CanvasLayer
     /// <summary>官方 1.5 丢弃金币 (IDA TFrmDlg_DGoldClick 0x48e564, 发包 CM_DROPGOLD 1016)</summary>
     public void RequestDropGold(int amount)
     {
+        if (amount <= 0 || amount > _currentGold) return;
+        _currentGold -= amount;
+        UpdateGold(_currentGold);
         AddChat("系统", $"[系统] 丢弃金币 {amount} 枚至地面。", new Color(1f, 1f, 0.4f));
         EmitSignal(SignalName.DropGoldRequested, amount);
     }

@@ -528,7 +528,8 @@ namespace Mir2Client.UI
                 HudInstance.NpcOptionSelected += (index) =>
                 {
                     int npcUid = HudInstance.NpcDialog?.CurrentNpcUid ?? 0;
-                    _net?.SendPacket(PacketEncoder.NpcSelect(npcUid, string.Empty, index));
+                    string npcName = EntityManagerInstance.GetEntity(npcUid)?.Name ?? string.Empty;
+                    _net?.SendPacket(PacketEncoder.NpcSelect(npcUid, npcName, index));
                 };
 
                 // 官方 1.5 物品使用/吃药、穿戴、脱下网络发包 (CM_EATITEM 1006 / CM_WEARITEM 1003 / CM_TAKEOFFITEM 1004)
@@ -1313,17 +1314,23 @@ namespace Mir2Client.UI
             }
         }
 
+        private ulong _lastPickupTick = 0;
+
         public void PerformPickup()
         {
             if (PlayerInstance == null || PlayerInstance.IsDead) return;
+
+            ulong now = Time.GetTicksMsec();
+            if (now - _lastPickupTick < 300) return; // 盛大官方 300ms 拾取防刷节流冷却 (ClMain.pas / IDA sub_46594C)
+            _lastPickupTick = now;
 
             int px = PlayerInstance.TileX;
             int py = PlayerInstance.TileY;
 
             if (_net != null && _net.IsConnectedToServer)
             {
-                int posRecog = (px << 16) | (py & 0xFFFF);
-                _net.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_PICKUP, posRecog));
+                // 盛大官方 1.5 格式对齐 (带 x\ty 坐标 Extra，完全闭环网关解包)
+                _net.SendPacket(PacketEncoder.Pickup((short)px, (short)py));
             }
             else if (_isSandbox)
             {
@@ -1331,9 +1338,9 @@ namespace Mir2Client.UI
                 if (items.Count > 0)
                 {
                     var picked = items[0];
-                    GroundItemManagerInstance.RemoveItem(picked.ItemId);
                     if (picked.Name.Contains("金币"))
                     {
+                        GroundItemManagerInstance.RemoveItem(picked.ItemId);
                         PlayerInstance.Gold += Math.Max(1, picked.Amount);
                         HudInstance?.UpdateGold(PlayerInstance.Gold);
                         HudInstance?.AddChat("拾取", $"捡起金币：{picked.Amount} 金币。", new Color(1f, 0.9f, 0.3f));
@@ -1341,9 +1348,16 @@ namespace Mir2Client.UI
                     }
                     else
                     {
-                        HudInstance?.AddBagItem(picked.Name);
-                        HudInstance?.AddChat("拾取", $"捡起物品：【{picked.Name}】。", new Color(0.4f, 1f, 0.4f));
-                        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick); // 官方 s_itmclick = 118
+                        if (HudInstance != null && HudInstance.AddBagItem(picked.Name))
+                        {
+                            GroundItemManagerInstance.RemoveItem(picked.ItemId);
+                            HudInstance.AddChat("拾取", $"捡起物品：【{picked.Name}】。", new Color(0.4f, 1f, 0.4f));
+                            AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick); // 官方 s_itmclick = 118
+                        }
+                        else
+                        {
+                            HudInstance?.AddChat("提示", "你身上携带的物品太多，无法再拿了。", new Color(1f, 0.4f, 0.4f));
+                        }
                     }
                 }
             }

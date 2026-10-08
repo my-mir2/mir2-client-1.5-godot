@@ -228,6 +228,8 @@
 | 84 | `752` | `SM_OPENGUILDDLGFAIL` | 打开行会面板失败提示 (case 752) | `ServerMessageRouter.cs:410` | `bridge.rs:1142` | `[L3 1:1]` | 弹出未加入行会模态警告弹窗 |
 | 85 | `655` | `SM_LAMPCHANGEDURA` | 蜡烛火把持久度衰减与燃尽熄灭 (case 655) | `HudController.cs:1414` | `bridge.rs:655` | `[L3 1:1]` | 官方 IDA sub_48A0F0 DSWLightDirectPaint 逆向实证：槽位 2 蜡烛火把持久度同步刷新，持久降为 0 时提示火把燃尽，并在黑夜地牢环境中将光照半径平滑回退至徒手摸黑暗光 |
 | 86 | `21` / `28` | `SM_DEATH` / `SM_DEATH_ACTION_DELPHI` | 实体/主角死亡倒地与回城复活全生命周期闭环 (case 21/28) | `GameView.cs:1735` | `bridge.rs:21` | `[L3 1:1]` | 官方 IDA sub_481DD4 / sub_486DF0 逆向实证：主角死亡倒地播放男女惨叫音效 (144/145)，激活全屏灰度滤镜后处理与血滴动画 (DeathScreenView Prguse 360/361/365)，严密拦截死亡状态下移动、割肉与嗑药穿透，支持安全区满血重获新生 |
+| 87 | `1001` | `CM_PICKUP` | 盛大官方 1.5 拾取协议参数对齐与 300ms 节流防刷 | `GameView.cs:1316` | `bridge.rs:872` | `[L3 1:1]` | 官方 IDA sub_46594C / ClMain.pas 逆向实证：拾取数据包携带制表符分隔 Extra 坐标对齐网关解包，增加官方 300ms 拾取节流防刷与满包友好提示 |
+| 88 | `1016` | `CM_DROPGOLD` | 盛大官方 1.5 丢弃金币前置校验与即时原子扣减 | `HudController.cs:289` | `bridge.rs:1016` | `[L3 1:1]` | 官方 IDA TFrmDlg_DGoldClick 0x48e564 逆向实证：前置校验非法金额与超量丢弃，本地即时扣减持有金币并刷新 LblBagGold |
 
 ---
 
