@@ -2843,4 +2843,20 @@ public partial class HudController : CanvasLayer
             AddChat("系统", $"[{title}] {msg}", new Color(1f, 0.3f, 0.3f));
         }
     }
+
+    /// <summary>
+    /// 展示官方系统模态提示框 (对齐 sub_467920 show_dialog_message，带确认回调与取消按钮)
+    /// </summary>
+    public void ShowModalMessage(string title, string msg, bool hasCancel, Action? onConfirm)
+    {
+        if (_messageBoxDialog != null)
+        {
+            _messageBoxDialog.ShowMessage($"[{title}]\n\n{msg}", hasCancel: hasCancel, onConfirm: onConfirm);
+        }
+        else
+        {
+            AddChat("系统", $"[{title}] {msg}", new Color(1f, 0.3f, 0.3f));
+            onConfirm?.Invoke();
+        }
+    }
 }

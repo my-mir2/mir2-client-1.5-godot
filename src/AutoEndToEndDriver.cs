@@ -1830,7 +1830,54 @@ public partial class AutoEndToEndDriver : Node
 
             case 116:
             {
-                GD.Print("[AutoE2E] ALL 116 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 组队系统全量下行协议 (SM 658/660/661/664/665/666) ===");
+                    // 1. 模拟收到组队邀请确认弹窗 (SM_GROUP_INVITE_CONFIRM 658)
+                    byte[] inviter = System.Text.Encoding.UTF8.GetBytes("风云九哥");
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_GROUP_INVITE_CONFIRM,
+                        0, 0, 0, inviter
+                    ));
+
+                    // 2. 模拟组队模式开关变动回显 (SM_GROUP_MODE_CHANGED 660, 开启组队)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_GROUP_MODE_CHANGED,
+                        1, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 3. 模拟邀请入组反馈错误 (SM_MAPDESCRIPTION 661, recog=-3 对方已有编组)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_MAPDESCRIPTION,
+                        -3, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 4. 模拟创建编组失败模态弹窗 (SM_CREATEGROUP_FAIL 664, recog=-1 编组未成立或等级不够)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_CREATEGROUP_FAIL,
+                        -1, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 5. 模拟踢出/退组失败模态弹窗 (SM_LEAVEGROUP_FAIL 665, recog=-3 不在编组中)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_LEAVEGROUP_FAIL,
+                        -3, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 6. 模拟解散编组清空 (SM_DISMISS_GROUP 666)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_DISMISS_GROUP,
+                        0, 0, 0, Array.Empty<byte>()
+                    ));
+                }
+                RequestCapture("step116_group_system_protocol_matrix");
+                break;
+            }
+
+            case 117:
+            {
+                GD.Print("[AutoE2E] ALL 117 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

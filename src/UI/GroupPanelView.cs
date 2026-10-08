@@ -197,6 +197,26 @@ public partial class GroupPanelView : Control, IManagedWindow
         }
     }
 
+    public void SetAllowGroup(bool enabled)
+    {
+        _groupModeEnabled = enabled;
+        var btn = _panel?.GetNodeOrNull<TextureButton>("BtnAllowGroup");
+        if (btn != null)
+        {
+            var texCheck = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0122.png");
+            btn.TextureNormal = _groupModeEnabled ? texCheck : null;
+        }
+    }
+
+    public void ClearMembers()
+    {
+        if (_membersContainer == null) return;
+        foreach (Node child in _membersContainer.GetChildren())
+        {
+            child.QueueFree();
+        }
+    }
+
     private void OnClose()
     {
         Visible = false;

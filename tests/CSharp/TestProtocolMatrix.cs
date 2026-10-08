@@ -2179,6 +2179,54 @@ public class TestProtocolMatrix
         var parsedDealFail = PacketDecoder.Parse(rawDealFail.AsSpan(1))!.Value;
         Assert.Equal(ProtocolConsts.SM_DEALTRY_FAIL, parsedDealFail.Ident);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthSmCases_GroupSystemProtocolMatrix()
+    {
+        // 1. 组队邀请确认模态框 (SM_GROUP_INVITE_CONFIRM 658)
+        byte[] rawConfirm = PacketEncoder.MakePacket(ProtocolConsts.SM_GROUP_INVITE_CONFIRM, 0, 0, 0, Encoding.UTF8.GetBytes("风云九哥"));
+        var parsedConfirm = PacketDecoder.Parse(rawConfirm.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_GROUP_INVITE_CONFIRM, parsedConfirm.Ident);
+        Assert.Equal("风云九哥", parsedConfirm.ExtraStr);
+
+        // 2. 组队模式开关变动回显 (SM_GROUP_MODE_CHANGED 660)
+        byte[] rawMode = PacketEncoder.MakePacket(ProtocolConsts.SM_GROUP_MODE_CHANGED, 1, 0, 0);
+        var parsedMode = PacketDecoder.Parse(rawMode.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_GROUP_MODE_CHANGED, parsedMode.Ident);
+        Assert.Equal(1, parsedMode.Recog);
+
+        // 3. 邀请入组反馈错误码 (SM_MAPDESCRIPTION 661, Recog = -1 ~ -4)
+        for (int err = -1; err >= -4; err--)
+        {
+            byte[] rawInviteFail = PacketEncoder.MakePacket(ProtocolConsts.SM_MAPDESCRIPTION, err, 0, 0);
+            var parsedInviteFail = PacketDecoder.Parse(rawInviteFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_MAPDESCRIPTION, parsedInviteFail.Ident);
+            Assert.Equal(err, parsedInviteFail.Recog);
+        }
+
+        // 4. 创建编组失败 (SM_CREATEGROUP_FAIL 664, Recog = -1 ~ -5)
+        for (int err = -1; err >= -5; err--)
+        {
+            byte[] rawCreateFail = PacketEncoder.MakePacket(ProtocolConsts.SM_CREATEGROUP_FAIL, err, 0, 0);
+            var parsedCreateFail = PacketDecoder.Parse(rawCreateFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_CREATEGROUP_FAIL, parsedCreateFail.Ident);
+            Assert.Equal(err, parsedCreateFail.Recog);
+        }
+
+        // 5. 踢出/退出编组失败 (SM_LEAVEGROUP_FAIL 665, Recog = -1 ~ -3)
+        for (int err = -1; err >= -3; err--)
+        {
+            byte[] rawLeaveFail = PacketEncoder.MakePacket(ProtocolConsts.SM_LEAVEGROUP_FAIL, err, 0, 0);
+            var parsedLeaveFail = PacketDecoder.Parse(rawLeaveFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_LEAVEGROUP_FAIL, parsedLeaveFail.Ident);
+            Assert.Equal(err, parsedLeaveFail.Recog);
+        }
+
+        // 6. 编组解散 (SM_DISMISS_GROUP 666)
+        byte[] rawDismiss = PacketEncoder.MakePacket(ProtocolConsts.SM_DISMISS_GROUP, 0, 0, 0);
+        var parsedDismiss = PacketDecoder.Parse(rawDismiss.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_DISMISS_GROUP, parsedDismiss.Ident);
+    }
 }
 
 

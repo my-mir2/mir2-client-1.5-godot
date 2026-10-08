@@ -251,4 +251,9 @@ public static class ProtocolConsts
     public const short SM_SPACEMOVESHOW2          = 807;  // 空间传送现身别名 (IDA sub_467920 case 807)
     public const short SM_TELEPORT                = 804;  // 空间坐标瞬移突变 (IDA sub_467920 case 804)
     public const short SM_DEALTRY_FAIL           = 674;  // 交易发起失败/面对面未对正 (IDA 0x46A588)
+    public const short SM_GROUP_INVITE_CONFIRM    = 658;  // 被邀请加入编组确认模态框 (IDA sub_467920 case 658)
+    public const short SM_GROUP_MODE_CHANGED      = 660;  // 允许组队模式开关变动回显 (IDA case 660)
+    public const short SM_CREATEGROUP_FAIL        = 664;  // 创建编组失败模态弹窗 (IDA sub_467920 case 664)
+    public const short SM_LEAVEGROUP_FAIL         = 665;  // 踢出/退组失败模态弹窗 (IDA sub_467920 case 665)
+    public const short SM_DISMISS_GROUP           = 666;  // 解散编组注销清空 (IDA sub_467920 case 666)
 }

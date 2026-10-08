@@ -361,8 +361,35 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_MAGICLVEXP: // 640: 技能熟练度经验更新
                 HandleMagicLevelExp(packet);
                 break;
-            case ProtocolConsts.SM_MAPDESCRIPTION: // 661: 地图描述与区域公告
-                HandleMapDescription(packet);
+            case ProtocolConsts.SM_GROUP_INVITE_CONFIRM: // 658: 组队邀请模态确认 (IDA case 658)
+                HandleGroupInviteConfirm(packet);
+                break;
+            case ProtocolConsts.SM_GROUP_MODE_CHANGED: // 660: 组队模式开关变动回显 (IDA case 660)
+                {
+                    bool allowGroup = packet.Recog > 0 || packet.Param > 0;
+                    _hud?.GroupPanel?.SetAllowGroup(allowGroup);
+                    _hud?.AddChat("组队", allowGroup ? "[组队] 已开启允许组队模式。" : "[组队] 已关闭允许组队模式。", new Color(0.4f, 1f, 0.5f));
+                }
+                break;
+            case ProtocolConsts.SM_MAPDESCRIPTION: // 661: 地图描述公告 / 组队邀请反馈 (IDA 0x46A3A2)
+                if (packet.Recog < 0)
+                {
+                    HandleGroupInviteFail(packet);
+                }
+                else
+                {
+                    HandleMapDescription(packet);
+                }
+                break;
+            case ProtocolConsts.SM_CREATEGROUP_FAIL: // 664: 创建编组失败模态弹窗 (IDA 0x46A42E)
+                HandleCreateGroupFail(packet);
+                break;
+            case ProtocolConsts.SM_LEAVEGROUP_FAIL: // 665: 踢出/退出编组失败模态弹窗 (IDA 0x46A4CE)
+                HandleLeaveGroupFail(packet);
+                break;
+            case ProtocolConsts.SM_DISMISS_GROUP: // 666: 解散编组注销清空 (IDA case 666)
+                _hud?.GroupPanel?.ClearMembers();
+                _hud?.AddChat("组队", "[组队] 编组已经解散。", new Color(1f, 0.8f, 0.4f));
                 break;
             case ProtocolConsts.SM_SENDNOTICE: // 662: 全服系统公告跑马灯
                 HandleSendNotice(packet);
@@ -1157,6 +1184,75 @@ public sealed class ServerMessageRouter
         {
             _hud?.AddChat("地图", $"[地图] {text}", new Color(0.6f, 1f, 0.8f));
         }
+    }
+
+    /// <summary>
+    /// 处理组队邀请确认弹窗 (SM_GROUP_INVITE_CONFIRM 658)
+    /// 严格对齐官方 Delphi sub_467920 (handle_sm_confirm_dialog)
+    /// </summary>
+    private void HandleGroupInviteConfirm(ServerPacket pkt)
+    {
+        string inviter = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(inviter)) inviter = pkt.ExtraStr;
+        if (string.IsNullOrEmpty(inviter)) inviter = "有玩家";
+        _hud?.ShowModalMessage("组队邀请", $"{inviter} 邀请您加入编组，是否同意？", true, () =>
+        {
+            _hud?.AddChat("组队", $"[组队] 您同意了 {inviter} 的组队邀请。", new Color(0.5f, 1f, 0.5f));
+        });
+    }
+
+    /// <summary>
+    /// 处理组队邀请反馈失败 (SM_GROUP_INVITE_RESULT 661, Recog < 0)
+    /// 严格对齐官方 Delphi sub_467920 (0x46A3A2)
+    /// </summary>
+    private void HandleGroupInviteFail(ServerPacket pkt)
+    {
+        string errMsg = pkt.Recog switch
+        {
+            -1 => "已经加入编组.",                                           // 0x46B9A8
+            -2 => "不能加入编组。",                                          // 0x46B9C0
+            -3 => "你想邀请加入编组的这个用户已经是其他组的成员了。",          // 0x46B9EC
+            -4 => "邀请加入编组失败。",                                      // 0x46BA28
+            _ => "邀请组队失败。"
+        };
+        _hud?.ShowModalMessage("组队提示", errMsg);
+        _hud?.AddChat("组队", $"[组队] {errMsg}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    /// <summary>
+    /// 处理创建编组失败 (SM_CREATEGROUP_FAIL 664)
+    /// 严格对齐官方 Delphi sub_467920 (0x46A42E)
+    /// </summary>
+    private void HandleCreateGroupFail(ServerPacket pkt)
+    {
+        string errMsg = pkt.Recog switch
+        {
+            -1 => "编组还未成立或者你还不够等级创建。", // 0x46BA44
+            -2 => "不能创建编组。",                  // 0x46B9C0
+            -3 => "你已经在编组中了。",              // 0x46BA70
+            -4 => "创建编组失败。",                  // 0x46BA28
+            -5 => "成员上限已经达到。",              // 0x46BA88
+            _ => "创建编组失败。"
+        };
+        _hud?.ShowModalMessage("组队提示", errMsg);
+        _hud?.AddChat("组队", $"[组队] {errMsg}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    /// <summary>
+    /// 处理踢出/退出编组失败 (SM_LEAVEGROUP_FAIL 665)
+    /// 严格对齐官方 Delphi sub_467920 (0x46A4CE)
+    /// </summary>
+    private void HandleLeaveGroupFail(ServerPacket pkt)
+    {
+        string errMsg = pkt.Recog switch
+        {
+            -1 => "编组还未成立。",   // 0x46BA44
+            -2 => "不能执行该操作。", // 0x46B9C0
+            -3 => "你仍旧不在编组中。", // 0x46BAA4
+            _ => "组队操作失败。"
+        };
+        _hud?.ShowModalMessage("组队提示", errMsg);
+        _hud?.AddChat("组队", $"[组队] {errMsg}", new Color(1f, 0.4f, 0.4f));
     }
 
     // 官方 1.5 全服系统滚动公告跑马灯 (IDA ProcessServerMessage case 662)

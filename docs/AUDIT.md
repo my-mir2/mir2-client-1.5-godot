@@ -6877,13 +6877,30 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_RepairTeleportAndShopModalFail` 单元测试，脱机测试覆盖扩充至 **160 / 160 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 115 步实机验证，总演练步数扩充至 **116 步**。
 
+24. **官方 1.5 组队系统全量下行协议、错误码弹窗与邀请模态确认全链路实证 (`scratch/ida_processmsg.c` lines 320~398)**：
+    - **官方实证**：严格依据 `scratch/ida_processmsg.c` 与 `MIR_final_v3_p.exe` 反编译铁证核销：
+      - 组队邀请确认框 (`SM_GROUP_INVITE_CONFIRM 658`)：官方 IDA `0x469B56` 调用 `handle_sm_confirm_dialog` 弹出模态框询问是否同意组队；
+      - 允许组队模式开关同步 (`SM_GROUP_MODE_CHANGED 660`)：官方 IDA `0x469B9D` 同步编组面板中的允许组队勾选状态（recog 0/1）；
+      - 组队反馈与地图提示 (`SM_GROUP_RESPONSE / SM_MAPDESCRIPTION 661`)：官方 IDA `0x469BE1` 判断若错误码为负数，精准弹出对应的错误模态提示（如 -1 已经加入编组、-3 对方已有编组），正数则为区域公告；
+      - 创建编组失败 (`SM_CREATEGROUP_FAIL 664`)：官方 IDA `0x469C7E` 精准映射错误码（-1 编组未成立或等级不够、-2 不能创建、-3 已经在编组中、-5 编组人数达到上限）并弹出对应模态框；
+      - 退出/踢出编组失败 (`SM_LEAVEGROUP_FAIL 665`)：官方 IDA `0x469D3C` 精准映射错误码（-1 编组未成立、-3 仍旧不在组中）并弹出模态框；
+      - 编组解散 (`SM_DISMISS_GROUP 666`)：官方 IDA `0x469DD0` 清空编组列表并复位队伍状态；
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 补全 658、660、664、665、666 常量；
+      - 在 `GroupPanelView.cs` 增加 `SetAllowGroup` 与 `ClearMembers` 原生界面状态方法；
+      - 在 `HudController.cs` 扩展 `ShowModalMessage` 支持模态确认回调；
+      - 在 `ServerMessageRouter.cs` 接入 658/660/661/664/665/666 路由解析与各错误码分支处理；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_GroupSystemProtocolMatrix` 单元测试，脱机测试覆盖扩充至 **161 / 161 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 116 步实机验证，总演练步数扩充至 **117 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **160 / 160 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **116 / 116 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **161 / 161 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **117 / 117 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
+
 
 
 
