@@ -350,7 +350,7 @@ public partial class Main : Node
                 string failMsg = code switch
                 {
                     2 => "[failure] 这个名字已经存在。", // 0x46B4C8
-                    3 => "[Failure] 你只能为一个帐户设两个角色.\\请和游戏管理员联系。", // 0x46B4F0
+                    3 => "[Failure] 你只能为一个帐户设两个角色.\n请和游戏管理员联系。", // 0x46B4F0
                     4 => "[failure] 角色建立失败. Error=4", // 0x46B534
                     _ => "[Failure] 未知的错误. 请写信给: support@legendofmir.net" // 0x46B55C
                 };
@@ -384,7 +384,7 @@ public partial class Main : Node
             }
             case ProtocolConsts.SM_QUERYCHAR_FAIL: // 528: 盛大官方 1.5 查询角色失败/强制断线 (IDA case 528 @ 0x46B758)
             {
-                string failMsg = "服务器连接被强行中断。\\连接时间可能超过限制，\\或者用户请求重新连接。"; // 0x46B758
+                string failMsg = "服务器连接被强行中断。\n连接时间可能超过限制，\n或者用户请求重新连接。"; // 0x46B758
                 GD.Print($"[Main] 官方 1.5 连接强行中断: {failMsg}");
                 break;
             }

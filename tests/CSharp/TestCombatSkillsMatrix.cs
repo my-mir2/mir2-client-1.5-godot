@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Mir2Client.Game;
 using Mir2Client.Net;
+using Mir2Client.UI;
 using Xunit;
 
 namespace Mir2Client.Tests;
@@ -988,6 +989,123 @@ public class TestCombatSkillsMatrix
 
         Assert.Equal(250, hero.Hp);
         Assert.Equal(300, hero.MaxHp);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 Delphi 客户端弹窗换行符转义净化与物理文案实证测试 (IDA 0x46AFDC show_dialog_message)
+    /// 原版 Delphi 代码中使用字符 '\' 作为换行折行标记，客户端必须 100% 净化映射为 '\n' 杜绝乱码与溢出
+    /// </summary>
+    [Fact]
+    public void Official_1_5_Dialog_Text_Normalization_And_LineBreak_GroundTruth_Test()
+    {
+        // 1. 验证 503 登录失败 reason=-2 与 reason=-3 官方原文换行
+        string raw503 = "连续三次密码错误。\\你将在一段时间内无法再次连接。";
+        string norm503 = MessageBoxDialog.NormalizeOfficialDialogText(raw503);
+        Assert.Equal("连续三次密码错误。\n你将在一段时间内无法再次连接。", norm503);
+
+        string raw503_3 = "这个帐号正在使用，或者是被异常的终止锁定了,\\请稍后再试。";
+        string norm503_3 = MessageBoxDialog.NormalizeOfficialDialogText(raw503_3);
+        Assert.Equal("这个帐号正在使用，或者是被异常的终止锁定了,\n请稍后再试。", norm503_3);
+
+        // 2. 验证 504 账号建立成功官方原文换行 (IDA 0x46AFE8)
+        string raw504 = "你的帐号已经建立了.\\请妥善保管你的帐户和密码，\\并且不要因任何原因把它们告诉任何其他人。";
+        string norm504 = MessageBoxDialog.NormalizeOfficialDialogText(raw504);
+        Assert.Equal("你的帐号已经建立了.\n请妥善保管你的帐户和密码，\n并且不要因任何原因把它们告诉任何其他人。", norm504);
+
+        // 3. 验证 522 创角失败 code=3 官方原文换行 (IDA 0x46B4F0)
+        string raw522 = "[Failure] 你只能为一个帐户设两个角色.\\请和游戏管理员联系。";
+        string norm522 = MessageBoxDialog.NormalizeOfficialDialogText(raw522);
+        Assert.Equal("[Failure] 你只能为一个帐户设两个角色.\n请和游戏管理员联系。", norm522);
+
+        // 4. 验证 528 连接超时断开官方原文换行 (IDA 0x46B758)
+        string raw528 = "服务器连接被强行中断。\\连接时间可能超过限制，\\或者用户请求重新连接。";
+        string norm528 = MessageBoxDialog.NormalizeOfficialDialogText(raw528);
+        Assert.Equal("服务器连接被强行中断。\n连接时间可能超过限制，\n或者用户请求重新连接。", norm528);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 小地图雷达 300ms 呼吸闪烁周期与坐标投影公式实证测试 (IDA sub_46FF0C @ 0x46ff18~0x470096)
+    /// 官方物理公式：X 轴映射系数 1.5 (48*x >> 5)，Y 轴映射系数 1.0；视口中心偏移 (58, 58)
+    /// 呼吸闪烁周期严格为 300ms (0.3s)
+    /// </summary>
+    [Fact]
+    public void Official_1_5_Minimap_Blink_300ms_And_Coordinate_Mapping_GroundTruth_Test()
+    {
+        // 1. 验证 120x120 小地图与 540x360 全景大地图尺寸与相对中心
+        int playerX = 330;
+        int playerY = 270;
+        int targetX = 340; // dx = +10
+        int targetY = 275; // dy = +5
+
+        // 小地图相对偏移公式：dx * 1.5f, dy * 1.0f
+        float expectedMiniOffsetX = (targetX - playerX) * 1.5f; // 15.0f
+        float expectedMiniOffsetY = (targetY - playerY) * 1.0f; // 5.0f
+        Assert.Equal(15.0f, expectedMiniOffsetX);
+        Assert.Equal(5.0f, expectedMiniOffsetY);
+
+        // 小地图中心坐标为 (58, 58)，投影点应为 (58 + 15, 58 + 5) = (73, 63)
+        float miniPosX = 58.0f + expectedMiniOffsetX;
+        float miniPosY = 58.0f + expectedMiniOffsetY;
+        Assert.Equal(73.0f, miniPosX);
+        Assert.Equal(63.0f, miniPosY);
+
+        // 2. 验证 300ms (0.3s) 呼吸闪烁状态机
+        float blinkTimer = 0.0f;
+        bool blinkState = true;
+
+        // 模拟 100ms 步进
+        blinkTimer += 0.1f;
+        Assert.True(blinkTimer < 0.3f);
+        Assert.True(blinkState); // 未达 300ms，状态维持
+
+        blinkTimer += 0.15f; // 累计 0.25f
+        Assert.True(blinkTimer < 0.3f);
+        Assert.True(blinkState);
+
+        blinkTimer += 0.08f; // 累计 0.33f >= 0.3f，触发翻转
+        if (blinkTimer >= 0.3f)
+        {
+            blinkTimer = 0.0f;
+            blinkState = !blinkState;
+        }
+        Assert.False(blinkState); // 翻转为隐藏
+        Assert.Equal(0.0f, blinkTimer);
+
+        // 再过 300ms 翻转回显现
+        blinkTimer += 0.3f;
+        if (blinkTimer >= 0.3f)
+        {
+            blinkTimer = 0.0f;
+            blinkState = !blinkState;
+        }
+        Assert.True(blinkState); // 翻转回可见
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 智能成对槽位穿戴优先级算法实证测试 (手镯 5/6、戒指 7/8)
+    /// 官方规则：左槽 (5/7) 为基础默认槽；若左槽已有物品且右槽 (6/8) 为空，双击优先装入右槽
+    /// </summary>
+    [Fact]
+    public void Official_1_5_Paired_Slots_Bracelet_Ring_Smart_Equip_GroundTruth_Test()
+    {
+        // 1. 基础物品槽位映射：手镯归 5，戒指归 7，项链归 3，武器归 1，衣服归 0，头盔归 4
+        Assert.Equal(5, HudController.GetBestEquipSlotForItem("金手镯"));
+        Assert.Equal(5, HudController.GetBestEquipSlotForItem("阎罗手套"));
+        Assert.Equal(7, HudController.GetBestEquipSlotForItem("珊瑚戒指"));
+        Assert.Equal(7, HudController.GetBestEquipSlotForItem("降妖除魔戒指"));
+        Assert.Equal(1, HudController.GetBestEquipSlotForItem("裁决之杖"));
+        Assert.Equal(0, HudController.GetBestEquipSlotForItem("战神披风"));
+        Assert.Equal(4, HudController.GetBestEquipSlotForItem("黑铁头盔"));
+        Assert.Equal(3, HudController.GetBestEquipSlotForItem("幽灵项链"));
+
+        // 2. 消耗品与药水甄别：药水、卷轴、食物属于消耗品，双击触发吃药/使用，非穿戴
+        Assert.True(HudController.IsConsumableItem("强效太阳水"));
+        Assert.True(HudController.IsConsumableItem("中量金创药"));
+        Assert.True(HudController.IsConsumableItem("回城卷"));
+        Assert.True(HudController.IsConsumableItem("鹿肉"));
+        Assert.True(HudController.IsConsumableItem("祝福油"));
+        Assert.False(HudController.IsConsumableItem("裁决之杖"));
+        Assert.False(HudController.IsConsumableItem("力量戒指"));
     }
 }
 

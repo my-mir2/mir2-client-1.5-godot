@@ -2118,6 +2118,40 @@ public partial class HudController : CanvasLayer
                     }
                     break;
                 }
+                // 盛大官方 1.5 主键盘数字键 1~6 快捷药水栏 (IDA TFrmMain_FormKeyDown 0x461DEC @ 0x46226A)
+                case Key.Key1:
+                case Key.Key2:
+                case Key.Key3:
+                case Key.Key4:
+                case Key.Key5:
+                case Key.Key6:
+                {
+                    if (!keyEvent.CtrlPressed && !keyEvent.AltPressed && !keyEvent.ShiftPressed &&
+                        (_chatInput == null || !_chatInput.HasFocus()))
+                    {
+                        int slot = (int)keyEvent.Keycode - (int)Key.Key1;
+                        UseQuickSlot(slot);
+                        GetViewport().SetInputAsHandled();
+                    }
+                    break;
+                }
+                // 盛大官方 1.5 小键盘数字键 1~6 快捷药水栏兼容
+                case Key.Kp1:
+                case Key.Kp2:
+                case Key.Kp3:
+                case Key.Kp4:
+                case Key.Kp5:
+                case Key.Kp6:
+                {
+                    if (!keyEvent.CtrlPressed && !keyEvent.AltPressed && !keyEvent.ShiftPressed &&
+                        (_chatInput == null || !_chatInput.HasFocus()))
+                    {
+                        int slot = (int)keyEvent.Keycode - (int)Key.Kp1;
+                        UseQuickSlot(slot);
+                        GetViewport().SetInputAsHandled();
+                    }
+                    break;
+                }
             }
         }
     }
@@ -3077,7 +3111,8 @@ public partial class HudController : CanvasLayer
     public static int GetBestEquipSlotForItem(string itemName)
     {
         if (string.IsNullOrEmpty(itemName)) return -1;
-        if (itemName.Contains("甲") || itemName.Contains("袍") || itemName.Contains("衣") || itemName.Contains("布衣")) return 0; // 衣服
+        if (itemName.Contains("甲") || itemName.Contains("袍") || itemName.Contains("衣") || 
+            itemName.Contains("布衣") || itemName.Contains("披风") || itemName.Contains("铠") || itemName.Contains("重盔")) return 0; // 衣服 (含官方六大重装: 法神披风/天魔神甲/圣战宝甲/霓裳羽衣/天尊道袍/天师长袍)
         if (itemName.Contains("剑") || itemName.Contains("刀") || itemName.Contains("斧") || itemName.Contains("杖") || 
             itemName.Contains("扇") || itemName.Contains("枪") || itemName.Contains("棍") || itemName.Contains("弓") || 
             itemName.Contains("匕首") || itemName.Contains("刃") || itemName.Contains("月") || itemName.Contains("屠龙") || 

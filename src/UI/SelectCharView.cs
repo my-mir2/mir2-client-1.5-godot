@@ -640,7 +640,8 @@ public partial class SelectCharView : Control
         if (_newCharPanel != null) _newCharPanel.Visible = false;
         if (_msgModal != null && _msgText != null)
         {
-            _msgText.Text = text;
+            string normalized = string.IsNullOrEmpty(text) ? string.Empty : text.Replace("\\\\", "\n").Replace('\\', '\n');
+            _msgText.Text = normalized;
             _msgModal.Visible = true;
         }
     }

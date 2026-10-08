@@ -928,14 +928,14 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_GUILD_WAR_STATUS_DELPHI: // 1200: 官方 1.5 行会战/攻城战战况广播 (IDA case 0x4B0u)
                 HandleGuildWarStatus(packet);
                 break;
-            case ProtocolConsts.SM_CHANGEPASS_FAIL: // 503: 官方改密失败模态框 (IDA case 503)
+            case ProtocolConsts.SM_CHANGEPASS_FAIL: // 503: 官方改密/登录失败模态框 (IDA case 503 @ 0x467D59)
             {
                 string msg = packet.Recog switch
                 {
                     -1 => "密码错误.",
-                    -2 => "连续三次密码错误。\\你将在一段时间内无法再次连接。.",
-                    -3 => "这个帐号正在使用，或者是被异常的终止锁定了,\\请稍后再试。",
-                    -4 => "这个帐户不能正确访问。\\请改变帐户,\\或者申请付费注册。",
+                    -2 => "连续三次密码错误。\n你将在一段时间内无法再次连接。",
+                    -3 => "这个帐号正在使用，或者是被异常的终止锁定了，\n请稍后再试。",
+                    -4 => "这个帐户不能正确访问。\n请改变帐户，\n或者申请付费注册。",
                     -5 => "这个帐户被禁止了.",
                     _ => "ID不存在或未知错误."
                 };
@@ -943,15 +943,15 @@ public sealed class ServerMessageRouter
                 break;
             }
             case ProtocolConsts.SM_NEWID_SUCCESS: // 504: 官方账号建立成功 (IDA case 504 @ 0x46AFE8)
-                _hud?.ShowModalMessage("账号注册", "你的帐号已经建立了.\\ 请妥善保管你的帐户和密码，\\并且不要因任何原因把它们告诉任何其他人。");
+                _hud?.ShowModalMessage("账号注册", "你的帐号已经建立了.\n请妥善保管你的帐户和密码，\n并且不要因任何原因把它们告诉任何其他人。");
                 break;
             case ProtocolConsts.SM_NEWID_FAIL: // 505: 官方账号注册失败 (IDA case 505 @ 0x46B0A8~0x46B12C)
             {
                 string msg = packet.Recog switch
                 {
-                    -2 => "在本服务器下, 这个新名字禁止使用。\\请联系我们。",
-                    0 => "这个帐号正在被其他的玩家使用了。\\",
-                    _ => "建立ID失败，请确认它没有包含空格,\\特殊字符，或难以辨认的字符。"
+                    -2 => "在本服务器下, 这个新名字禁止使用。\n请联系我们。",
+                    0 => "这个帐号正在被其他的玩家使用了。",
+                    _ => "建立ID失败，请确认它没有包含空格,\n特殊字符，或难以辨认的字符。"
                 };
                 _hud?.ShowModalMessage("注册失败", msg);
                 break;

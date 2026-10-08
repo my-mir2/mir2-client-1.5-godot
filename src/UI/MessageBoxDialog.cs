@@ -136,6 +136,16 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         panel.AddChild(_btnCancel);
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 Delphi 客户端弹窗换行符净化 (IDA 0x46AFDC show_dialog_message)
+    /// 原版 Delphi 代码中使用字符 '\' 作为换行标记，在此统一映射为标准换行符 '\n'
+    /// </summary>
+    public static string NormalizeOfficialDialogText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+        return text.Replace("\\\\", "\n").Replace('\\', '\n');
+    }
+
     public void ShowMessage(string message, bool hasCancel = true)
     {
         ZIndex = 200;
@@ -143,7 +153,7 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         _inputCallback = null;
         if (_lblMsg != null)
         {
-            _lblMsg.Text = message;
+            _lblMsg.Text = NormalizeOfficialDialogText(message);
             _lblMsg.Size = new Vector2(400, 80);
         }
         if (_txtInput != null) _txtInput.Visible = false;

@@ -7648,10 +7648,29 @@
       - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_HealthSpellChanged_53_MultiEntity_Decoupling_GroundTruth_Test` 脱机单测，单测总数提升至 **197 / 197 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+  - [x] **60. 盛大官方 1.5 快捷药水栏 1~6 键盘响应、模态框 Delphi 反斜杠换行净化与成对槽位实证** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据：
+        1. 快捷药水栏按键响应（`sub_461DEC` 内偏移 0x46226A，`TFrmMain_FormKeyDown`）：
+           主键盘数字键 1~6（Key1~Key6）及小键盘 1~6（Kp1~Kp6）在聊天输入框未聚焦且无修饰键时，直驱 `UseQuickSlot(0..5)` 触发物品消耗发包 `CM_EATITEM (1006)` 并播放官方吞咽音效 107；
+        2. 模态提示框换行折行（0x46AFDC `show_dialog_message`）：
+           Delphi 原版以字符 `'\'` 作为换行折行标记；此前客户端在 503/504/505/507/522/528 等协议文案中保留了字面量 `\\` 或未转义反斜杠，导致 UI 文本框出现字面量反斜杠乱码或单行溢出；
+        3. 小地图雷达 300ms 呼吸闪烁与中心点坐标投影（`sub_46FF0C @ 0x46ff18~0x470096`）：
+           X 轴映射系数 1.5，Y 轴映射系数 1.0，小地图中心偏移 `(58, 58)`，呼吸闪烁时钟周期严格为 300ms；
+        4. 成对槽位智能判定与 40 级六大重装（`sub_48E33C`）：
+           左手镯/左戒指已有装备且右槽为空时，双击优先装入右槽；修复衣服槽位缺失 "披风"、"铠甲"、"重盔" 导致 40 级六大重装（如法神披风）无法双击穿戴的隐藏坏账。
+    - **精准重构**：
+      - 在 `HudController.cs` 的 `_UnhandledInput` 接入 `Key1~Key6` 与 `Kp1~Kp6` 快捷喝药按键逻辑；
+      - 在 `HudController.GetBestEquipSlotForItem` 中扩充 "披风"、"铠"、"重盔" 等官方 40 级重装关键字；
+      - 在 `MessageBoxDialog.cs` 与 `SelectCharView.cs` 接入 `NormalizeOfficialDialogText` 净化 Delphi 反斜杠换行符；
+      - 在 `ServerMessageRouter.cs` 与 `Main.cs` 纠正 503/504/505/522/528 的弹窗排版；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 3 项脱机单测，单测总数提升至 **200 / 200 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **197 / 197 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **200 / 200 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
