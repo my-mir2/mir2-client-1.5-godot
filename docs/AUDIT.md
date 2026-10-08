@@ -7166,10 +7166,20 @@
       - 在 `TestCombatSkillsMatrix.cs` 中增加 `BagItems_And_MineResult_GroundTruth_Test` 脱机单元测试，测试集扩充至 **178 / 178 项 100% 全部通过**；
       - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+42. **盛大官方 1.5 攻击模式变更回显 (SM_ATTACKMODECHANGED 766) HIWORD(Tag) 物理参数提取权威核销 (`ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 772~774 确证：`case 766: dword_4F938C = HIWORD(v67);`；
+      - Delphi 1.5 原始二进制中封包主码低 16 位为 Ident (766)，高 16 位 `HIWORD(v67)` 对应封包的 `Tag` 字段；
+      - 修复此前仅读取 `packet.Param` 而在服务端或标准 Delphi 将模式编码于 `Tag` 时失效的单点脆弱性缺陷。
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中修改为 `int attackMode = packet.Tag > 0 ? packet.Tag : packet.Param;`，同时兼容官方 Delphi 原生协议与自定义服务端字段；
+      - 在 `TestCombatSkillsMatrix.cs` 中增加 `AttackModeChanged_766_Tag_And_Param_GroundTruth_Test` 脱机单元测试，测试集扩充至 **179 / 179 项 100% 全部通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (172 / 172 顶层操作码 0 缺失)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **178 / 178 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **179 / 179 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

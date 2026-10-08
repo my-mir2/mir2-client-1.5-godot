@@ -310,7 +310,9 @@ public sealed class ServerMessageRouter
                 HandleOpenGuildDlg(packet);
                 break;
             case SM_ATTACKMODECHANGED:
-                _hud?.OnServerAttackModeChanged(packet.Param);
+                // 官方 1.5 IDA 0x467920 case 766 @ 0x468A2B: dword_4F938C = HIWORD(v67)
+                int attackMode = packet.Tag > 0 ? packet.Tag : packet.Param;
+                _hud?.OnServerAttackModeChanged(attackMode);
                 break;
             case SM_NEEDPASSWORD:
                 _hud?.OnNeedPassword();

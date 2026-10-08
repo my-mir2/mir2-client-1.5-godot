@@ -213,6 +213,23 @@ public class TestCombatSkillsMatrix
         var minePkt = new ServerPacket(ProtocolConsts.SM_MINERESULT, 18, 0, 0, mineExtra);
         router.OnPacket(minePkt);
     }
+
+    [Fact]
+    public void AttackModeChanged_766_Tag_And_Param_GroundTruth_Test()
+    {
+        // 官方 1.5 IDA 0x467920 case 766 @ 0x468A2B: dword_4F938C = HIWORD(v67)
+        Assert.Equal((short)766, ProtocolConsts.SM_ATTACKMODECHANGED);
+
+        var router = new ServerMessageRouter(null, null);
+
+        // 场景 A: 官方 Delphi 原生协议将模式编码在 Tag (HIWORD(v67))
+        var tagPkt = new ServerPacket(ProtocolConsts.SM_ATTACKMODECHANGED, 0, 0, 2, Array.Empty<byte>());
+        router.OnPacket(tagPkt);
+
+        // 场景 B: 服务端将模式编码在 Param
+        var paramPkt = new ServerPacket(ProtocolConsts.SM_ATTACKMODECHANGED, 0, 3, 0, Array.Empty<byte>());
+        router.OnPacket(paramPkt);
+    }
 }
 
 
