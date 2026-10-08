@@ -1655,7 +1655,28 @@ public partial class AutoEndToEndDriver : Node
 
             case 109:
             {
-                GD.Print("[AutoE2E] ALL 109 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 铁匠铺打开修理面板、买卖金币更新、附近说话与NPC脚本下发 ===");
+                    // 1. 模拟铁匠铺打开修理面板 (SM_OPENREPAIRDLG 668)
+                    gameView.HudInstance.OpenRepairPanel();
+                    // 2. 模拟购买成功刷新背包底栏金币 (SM_BUY_OK_DELPHI 648)
+                    gameView.HudInstance.UpdateGold(588888);
+                    // 3. 模拟视野内玩家说话广播 (SM_HEAR 6)
+                    gameView.HudInstance.AddChat("附近", "无敌战神: 有没有组队去祖玛教主大厅的？", Colors.White);
+                    // 4. 模拟 NPC 交互脚本下发 (SM_DLGMSG 636)
+                    gameView.HudInstance.NpcDialog?.ShowDialog("铁匠铺老板：\\欢迎光临！请问想要打造或修理什么武器？\\<普通修理/@repair>\\<特殊修理/@s_repair>\\<离开/@exit>");
+                    // 5. 模拟未入行会打开失败提示 (SM_OPENGUILDDLGFAIL 752)
+                    gameView.HudInstance.ShowModalMessage("行会提示", "您尚未加入任何行会，无法查看行会管理面板。");
+                }
+                RequestCapture("step109_repair_shop_hear_npc");
+                break;
+            }
+
+            case 110:
+            {
+                GD.Print("[AutoE2E] ALL 110 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

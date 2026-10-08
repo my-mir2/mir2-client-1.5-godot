@@ -1523,6 +1523,15 @@ public partial class HudController : CanvasLayer
         }
     }
 
+    public void OpenRepairPanel()
+    {
+        if (_repairPanelView != null && !_repairPanelView.Visible)
+        {
+            _repairPanelView.SetStorageMode(false);
+            _stackManager.PushWindow(_repairPanelView);
+        }
+    }
+
     public void ToggleAdjustAbil(int points = 5)
     {
         if (_adjustAbilPanelView != null)

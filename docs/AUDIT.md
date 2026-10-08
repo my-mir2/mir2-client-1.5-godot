@@ -217,8 +217,15 @@
 | 72 | `640` | `SM_MAGICLVEXP` | 技能熟练度经验动态更新 (case 640) | `ServerMessageRouter.cs:351` | `bridge.rs:198` | `[L3 1:1]` | 驱动 SkillPanelView.UpdateSkillExp 经验增长与魔法书刷新 |
 | 73 | `661` | `SM_MAPDESCRIPTION` | 地图描述与区域公告提示 (case 661) | `ServerMessageRouter.cs:354` | `bridge.rs:2485` | `[L3 1:1]` | 驱动 HudController.AddChat 显示安全区/PK区区域说明 |
 | 74 | `662` | `SM_SENDNOTICE` | 全服系统滚动公告跑马灯 (case 662) | `ServerMessageRouter.cs:357` | `bridge.rs:1882` | `[L3 1:1]` | 驱动全局跑马灯与金色高亮聊天框广播 |
-| 75 | `802` | `SM_MAGICFIRE` | 魔法施放成功服务端回显 (case 802) | `ServerMessageRouter.cs:361` | `bridge.rs:1890` | `[L3 1:1]` | 驱动施法者施法光效与施法状态确认 |
 | 76 | `803` | `SM_MAGICFIREFAIL` | 魔法施放失败提示 (case 803) | `ServerMessageRouter.cs:364` | `bridge.rs:1895` | `[L3 1:1]` | 驱动蓝耗不足/冷却中红色警告提示与施法复位 |
+| 77 | `6` | `SM_HEAR` | 视野说话广播 (case 6) | `ServerMessageRouter.cs:375` | `bridge.rs:1880` | `[L3 1:1]` | 附近玩家白字说话与聊天框输出完全对齐 |
+| 78 | `7` | `SM_SYSTEMMESSAGE` | 屏幕滚动系统公告 (case 7) | `ServerMessageRouter.cs:378` | `bridge.rs:1881` | `[L3 1:1]` | 官方红字系统广播已闭环 |
+| 79 | `12` | `SM_HIT_DELPHI` | 实体挥砍物理攻击广播 (case 12) | `ServerMessageRouter.cs:381` | `bridge.rs:165` | `[L3 1:1]` | 视野内实体挥刀动作与朝向同步已对齐 |
+| 80 | `27` | `SM_SITDOWN` | 割肉蹲下/打坐姿态 (case 27) | `ServerMessageRouter.cs:384` | `bridge.rs:179` | `[L3 1:1]` | 蹲下姿态动作切换已对齐 |
+| 81 | `633` / `636` | `SM_MERCHANTSAY` / `SM_DLGMSG` | NPC 对话框脚本交互下发 (case 633/636) | `ServerMessageRouter.cs:387` | `bridge.rs:910` | `[L3 1:1]` | NPC 对话文本与脚本超链接展示已对齐 |
+| 82 | `648` / `650` | `SM_BUY_OK_DELPHI` / `SM_SELL_OK_DELPHI` | 商店买卖成功更新金币 (case 648/650) | `ServerMessageRouter.cs:391` | `bridge.rs:1915` | `[L3 1:1]` | 购买/出售金币变动与背包底栏 LblBagGold 刷新已对齐 |
+| 83 | `668` | `SM_OPENREPAIRDLG` | 铁匠铺打开修理面板 (case 668) | `ServerMessageRouter.cs:407` | `bridge.rs:190` | `[L3 1:1]` | 驱动 HudController.OpenRepairPanel 弹出装备修理面板 |
+| 84 | `752` | `SM_OPENGUILDDLGFAIL` | 打开行会面板失败提示 (case 752) | `ServerMessageRouter.cs:410` | `bridge.rs:1142` | `[L3 1:1]` | 弹出未加入行会模态警告弹窗 |
 
 ---
 

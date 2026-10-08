@@ -374,13 +374,45 @@ public sealed class ServerMessageRouter
                     HandleGuildMessage(packet);
                 }
                 break;
+            case ProtocolConsts.SM_HEAR: // 6: 视野内说话广播
+                HandleHear(packet);
+                break;
+            case ProtocolConsts.SM_SYSTEMMESSAGE: // 7: 屏幕滚动系统公告
+                HandleSystemMessage(packet);
+                break;
+            case ProtocolConsts.SM_HIT_DELPHI: // 12: 实体挥砍物理攻击广播
+                HandleHit(packet);
+                break;
+            case ProtocolConsts.SM_SITDOWN: // 27: 蹲下/割肉姿态切换
+                HandleSitDown(packet);
+                break;
+            case ProtocolConsts.SM_MERCHANTSAY: // 633: NPC 商人对话广播 (SM_BUYITEMFAIL 同号)
+            case ProtocolConsts.SM_DLGMSG: // 636: NPC 对话框脚本交互下发
+                HandleNpcDialogMsg(packet);
+                break;
+            case ProtocolConsts.SM_BUY_OK_DELPHI: // 648: 购买成功更新金币 (recog = gold_left)
+                _hud?.UpdateGold(packet.Recog);
+                _hud?.AddChat("商店", $"[商店] 购买成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
+                break;
+            case ProtocolConsts.SM_SELL_FAIL_DELPHI: // 649: 出售物品失败
+                _hud?.AddChat("商店", $"[商店] 出售失败：{DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
+                break;
+            case ProtocolConsts.SM_SELL_OK_DELPHI: // 650: 出售成功更新金币 (recog = gold_gained)
+                _hud?.UpdateGold(packet.Recog);
+                _hud?.AddChat("商店", $"[商店] 出售成功，获得金币或剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
+                break;
+            case ProtocolConsts.SM_BUY_FAIL_DELPHI: // 651: 购买物品失败
+                _hud?.AddChat("商店", $"[商店] 购买失败：{DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
+                break;
+            case ProtocolConsts.SM_OPENREPAIRDLG: // 668: 铁匠铺打开修理面板 (IDA open_shop_repair 0x46dae8)
+                _hud?.OpenRepairPanel();
+                break;
+            case ProtocolConsts.SM_OPENGUILDDLGFAIL: // 752: 行会面板打开失败 (未加入行会)
+                _hud?.ShowModalMessage("行会提示", "您尚未加入任何行会，无法查看行会管理面板。");
+                break;
             case ProtocolConsts.SM_BUYITEMSUCCESS:
             case ProtocolConsts.SM_BUYITEM_SUCCESS:
                 _hud?.AddChat("商店", $"[商店] 购买成功：{DecodeExtraText(packet.Extra)}", new Color(0.5f, 1f, 0.5f));
-                break;
-            case ProtocolConsts.SM_BUYITEMFAIL:
-            case ProtocolConsts.SM_BUYITEM_FAIL:
-                _hud?.AddChat("商店", $"[商店] 购买失败：{DecodeExtraText(packet.Extra)}", new Color(1f, 0.5f, 0.5f));
                 break;
             // 注：SM_STORAGE_ITEMS=682 与 SM_DEALREMOTEADDITEM=682 重号，
             // 真值表 682 归交易对方放物（有 OnServerTradeRemoteAddItem 实证），
@@ -1034,6 +1066,62 @@ public sealed class ServerMessageRouter
         if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
         if (string.IsNullOrEmpty(text)) text = "魔法施放失败，可能由于魔法值不足或技能处于冷却中。";
         _hud?.AddChat("技能", $"[法术] {text}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    // 官方 1.5 视野说话广播 (IDA ProcessServerMessage case 6)
+    private void HandleHear(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(text))
+        {
+            _hud?.AddChat("附近", text, Colors.White);
+        }
+    }
+
+    // 官方 1.5 屏幕滚动系统公告 (IDA ProcessServerMessage case 7)
+    private void HandleSystemMessage(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(text))
+        {
+            _hud?.AddChat("系统", $"[系统] {text}", new Color(1f, 0.3f, 0.3f));
+        }
+    }
+
+    // 官方 1.5 实体挥砍物理攻击广播 (IDA ProcessServerMessage case 12)
+    private void HandleHit(ServerPacket pkt)
+    {
+        int attackerId = pkt.Recog;
+        int dir = pkt.Param;
+        _entityManager?.UpdateTurn(attackerId, (byte)dir);
+        if (_gameView?.PlayerInstance != null && (attackerId == 0 || attackerId == _gameView.SessionId))
+        {
+            _gameView.PlayerInstance.Direction = dir;
+            _gameView.PlayerInstance.Anim?.SetAction(ActionType.Hit, dir);
+        }
+    }
+
+    // 官方 1.5 蹲下/割肉姿态 (IDA ProcessServerMessage case 27)
+    private void HandleSitDown(ServerPacket pkt)
+    {
+        int uid = pkt.Recog;
+        if (_gameView?.PlayerInstance != null && (uid == 0 || uid == _gameView.SessionId))
+        {
+            _gameView.PlayerInstance.Anim?.SetAction(ActionType.SitDown, _gameView.PlayerInstance.Direction);
+        }
+    }
+
+    // 官方 1.5 NPC 对话框内容下发 (IDA ProcessServerMessage case 633 / 636)
+    private void HandleNpcDialogMsg(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(text))
+        {
+            _hud?.NpcDialog?.ShowDialog(text);
+        }
     }
 
     // 行会更名/加入/退出（750，extra=新行会名，空=无行会）。

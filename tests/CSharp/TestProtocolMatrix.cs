@@ -2003,6 +2003,70 @@ public class TestProtocolMatrix
         var parsedSoftClose = PacketDecoder.Parse(rawSoftClose.AsSpan(1))!.Value;
         Assert.Equal(ProtocolConsts.CM_SOFTCLOSE, parsedSoftClose.Ident);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthSmCases_ShopBuySellRepairNpcDialogAndHear()
+    {
+        // 1. 视野说话 (SM_HEAR 6) 与屏幕公告 (SM_SYSTEMMESSAGE 7)
+        byte[] rawHear = PacketEncoder.MakePacket(ProtocolConsts.SM_HEAR, 10086, 0, 0, Encoding.UTF8.GetBytes("大家好，我是传奇老骨灰！"));
+        var parsedHear = PacketDecoder.Parse(rawHear.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_HEAR, parsedHear.Ident);
+        Assert.Equal(10086, parsedHear.Recog);
+        Assert.Equal("大家好，我是传奇老骨灰！", parsedHear.ExtraStr);
+
+        byte[] rawSysMsg = PacketEncoder.MakePacket(ProtocolConsts.SM_SYSTEMMESSAGE, 0, 0, 0, Encoding.UTF8.GetBytes("服务器将在5分钟后维护"));
+        var parsedSysMsg = PacketDecoder.Parse(rawSysMsg.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SYSTEMMESSAGE, parsedSysMsg.Ident);
+        Assert.Equal("服务器将在5分钟后维护", parsedSysMsg.ExtraStr);
+
+        // 2. 实体物理挥砍动作 (SM_HIT_DELPHI 12) 与割肉蹲下 (SM_SITDOWN 27)
+        byte[] rawHit = PacketEncoder.MakePacket(ProtocolConsts.SM_HIT_DELPHI, 1002, 3, 0);
+        var parsedHit = PacketDecoder.Parse(rawHit.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_HIT_DELPHI, parsedHit.Ident);
+        Assert.Equal(1002, parsedHit.Recog);
+        Assert.Equal(3, parsedHit.Param);
+
+        byte[] rawSit = PacketEncoder.MakePacket(ProtocolConsts.SM_SITDOWN, 1002, 0, 0);
+        var parsedSit = PacketDecoder.Parse(rawSit.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SITDOWN, parsedSit.Ident);
+        Assert.Equal(1002, parsedSit.Recog);
+
+        // 3. NPC 商人说话 (SM_MERCHANTSAY 633) 与 NPC 交互脚本下发 (SM_DLGMSG 636)
+        byte[] rawMerchantSay = PacketEncoder.MakePacket(ProtocolConsts.SM_MERCHANTSAY, 0, 0, 0, Encoding.UTF8.GetBytes("客官，想要点什么上等兵刃？"));
+        var parsedMerchantSay = PacketDecoder.Parse(rawMerchantSay.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MERCHANTSAY, parsedMerchantSay.Ident);
+        Assert.Equal("客官，想要点什么上等兵刃？", parsedMerchantSay.ExtraStr);
+
+        byte[] rawDlgMsg = PacketEncoder.MakePacket(ProtocolConsts.SM_DLGMSG, 0, 0, 0, Encoding.UTF8.GetBytes("欢迎光临！\\<买/@buy>\\<卖/@sell>"));
+        var parsedDlgMsg = PacketDecoder.Parse(rawDlgMsg.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_DLGMSG, parsedDlgMsg.Ident);
+        Assert.Equal("欢迎光临！\\<买/@buy>\\<卖/@sell>", parsedDlgMsg.ExtraStr);
+
+        // 4. 商店交易金币更新与失败提示 (SM_BUY_OK 648, SM_SELL_FAIL 649, SM_SELL_OK 650, SM_BUY_FAIL 651)
+        byte[] rawBuyOk = PacketEncoder.MakePacket(ProtocolConsts.SM_BUY_OK_DELPHI, 888888, 0, 0);
+        var parsedBuyOk = PacketDecoder.Parse(rawBuyOk.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_BUY_OK_DELPHI, parsedBuyOk.Ident);
+        Assert.Equal(888888, parsedBuyOk.Recog);
+
+        byte[] rawSellOk = PacketEncoder.MakePacket(ProtocolConsts.SM_SELL_OK_DELPHI, 999999, 0, 0);
+        var parsedSellOk = PacketDecoder.Parse(rawSellOk.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SELL_OK_DELPHI, parsedSellOk.Ident);
+        Assert.Equal(999999, parsedSellOk.Recog);
+
+        byte[] rawBuyFail = PacketEncoder.MakePacket(ProtocolConsts.SM_BUY_FAIL_DELPHI, 0, 0, 0, Encoding.UTF8.GetBytes("金币不足"));
+        var parsedBuyFail = PacketDecoder.Parse(rawBuyFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_BUY_FAIL_DELPHI, parsedBuyFail.Ident);
+        Assert.Equal("金币不足", parsedBuyFail.ExtraStr);
+
+        // 5. 铁匠铺打开修理面板 (SM_OPENREPAIRDLG 668) 与未入行会打开失败 (SM_OPENGUILDDLGFAIL 752)
+        byte[] rawOpenRepair = PacketEncoder.MakePacket(ProtocolConsts.SM_OPENREPAIRDLG, 0, 0, 0);
+        var parsedOpenRepair = PacketDecoder.Parse(rawOpenRepair.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_OPENREPAIRDLG, parsedOpenRepair.Ident);
+
+        byte[] rawGuildFail = PacketEncoder.MakePacket(ProtocolConsts.SM_OPENGUILDDLGFAIL, 0, 0, 0);
+        var parsedGuildFail = PacketDecoder.Parse(rawGuildFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_OPENGUILDDLGFAIL, parsedGuildFail.Ident);
+    }
 }
 
 
