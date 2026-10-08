@@ -473,28 +473,7 @@ namespace Mir2Client.UI
                 {
                     // 盛大官方 1.5 快捷栏使用物品发包 CM_EATITEM (1006)
                     _net?.SendPacket(PacketEncoder.EatItem(slot, item));
-
-                    if (PlayerInstance == null) return;
-                    if (item.Contains("金创") || item.Contains("红"))
-                    {
-                        PlayerInstance.Hp = Math.Min(PlayerInstance.MaxHp, PlayerInstance.Hp + 30);
-                        HudInstance.UpdateHp(PlayerInstance.Hp, PlayerInstance.MaxHp);
-                        HudInstance.AddChat("提示", $"使用了 {item}，生命值恢复 30 点。", new Color(1f, 0.4f, 0.4f));
-                    }
-                    else if (item.Contains("魔法") || item.Contains("蓝"))
-                    {
-                        PlayerInstance.Mp = Math.Min(PlayerInstance.MaxMp, PlayerInstance.Mp + 30);
-                        HudInstance.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
-                        HudInstance.AddChat("提示", $"使用了 {item}，魔法值恢复 30 点。", new Color(0.4f, 0.6f, 1f));
-                    }
-                    else if (item.Contains("太阳水"))
-                    {
-                        PlayerInstance.Hp = Math.Min(PlayerInstance.MaxHp, PlayerInstance.Hp + 50);
-                        PlayerInstance.Mp = Math.Min(PlayerInstance.MaxMp, PlayerInstance.Mp + 50);
-                        HudInstance.UpdateHp(PlayerInstance.Hp, PlayerInstance.MaxHp);
-                        HudInstance.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
-                        HudInstance.AddChat("提示", $"使用了 {item}，生命与魔法恢复 50 点。", new Color(1f, 0.9f, 0.2f));
-                    }
+                    ApplyPotionRecovery(item);
                 };
 
                 HudInstance.ChatSent += OnChatSent;
@@ -554,6 +533,7 @@ namespace Mir2Client.UI
                 HudInstance.UseItemRequested += (slot, item) =>
                 {
                     _net?.SendPacket(PacketEncoder.EatItem(slot, item));
+                    ApplyPotionRecovery(item);
                 };
                 HudInstance.WearItemRequested += (bagSlot, equipSlot) =>
                 {
@@ -746,6 +726,84 @@ namespace Mir2Client.UI
                         }
                     };
                 }
+            }
+        }
+
+        /// <summary>
+        /// 盛大官方 1.5 药水平滑回复与单机沙盒数值对齐 (战法道全量药水):
+        /// 1. 金创药: 普通 20 HP, 中量 50 HP, 强效 90 HP;
+        /// 2. 魔法药: 普通 30 MP, 中量 80 MP, 强效 150 MP;
+        /// 3. 太阳水族: 普通 30 HP/40 MP, 强效 50 HP/50 MP, 疗伤药 80 HP/80 MP, 万年雪霜 120 HP/120 MP。
+        /// </summary>
+        private void ApplyPotionRecovery(string item)
+        {
+            if (PlayerInstance == null || HudInstance == null || string.IsNullOrEmpty(item)) return;
+
+            int hpGain = 0;
+            int mpGain = 0;
+
+            if (item.Contains("万年雪霜"))
+            {
+                hpGain = 120;
+                mpGain = 120;
+            }
+            else if (item.Contains("疗伤药"))
+            {
+                hpGain = 80;
+                mpGain = 80;
+            }
+            else if (item.Contains("强效太阳水"))
+            {
+                hpGain = 50;
+                mpGain = 50;
+            }
+            else if (item.Contains("太阳水"))
+            {
+                hpGain = 30;
+                mpGain = 40;
+            }
+            else if (item.Contains("强效金创药") || item.Contains("超强金创药") || item.Contains("大红"))
+            {
+                hpGain = 90;
+            }
+            else if (item.Contains("中量金创药") || item.Contains("中红"))
+            {
+                hpGain = 50;
+            }
+            else if (item.Contains("金创药") || item.Contains("红"))
+            {
+                hpGain = 20;
+            }
+            else if (item.Contains("强效魔法药") || item.Contains("超强魔法药") || item.Contains("大蓝"))
+            {
+                mpGain = 150;
+            }
+            else if (item.Contains("中量魔法药") || item.Contains("中蓝"))
+            {
+                mpGain = 80;
+            }
+            else if (item.Contains("魔法药") || item.Contains("蓝"))
+            {
+                mpGain = 30;
+            }
+
+            if (hpGain > 0 || mpGain > 0)
+            {
+                if (hpGain > 0)
+                {
+                    PlayerInstance.Hp = Math.Min(PlayerInstance.MaxHp, PlayerInstance.Hp + hpGain);
+                    HudInstance.UpdateHp(PlayerInstance.Hp, PlayerInstance.MaxHp);
+                }
+                if (mpGain > 0)
+                {
+                    PlayerInstance.Mp = Math.Min(PlayerInstance.MaxMp, PlayerInstance.Mp + mpGain);
+                    HudInstance.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
+                }
+
+                string gainText = hpGain > 0 && mpGain > 0
+                    ? $"生命恢复 {hpGain} 点，魔法恢复 {mpGain} 点"
+                    : (hpGain > 0 ? $"生命值恢复 {hpGain} 点" : $"魔法值恢复 {mpGain} 点");
+                HudInstance.AddChat("提示", $"使用了 {item}，{gainText}。", new Color(0.6f, 1f, 0.6f));
             }
         }
 

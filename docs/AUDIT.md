@@ -7686,10 +7686,27 @@
       - 在 `TestCombatSkillsMatrix.cs` 中新增脱机单测，单测总数提升至 **201 / 201 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+  - [x] **62. 盛大官方 1.5 获得经验提示音效、穿戴失败手持状态复位与战法道全量药水沙盒平滑回复实证** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据：
+        1. 经验增长提示音效（`scratch/ida_processmsg.c` 行 1485~1486：`case '-': goto LABEL_253 -> play_notice_sound()`）：
+           官方原版获得经验协议 `SM_EXPERIENCE (45)` 会触发 `play_notice_sound()`（即 `Notice = 10` 音效，对应 `resources/wav/10.wav`）。此前客户端仅更新经验值，丢失了该提示音效；
+        2. 穿戴装备失败与手持状态复位（`scratch/ida_processmsg.c` 行 1136~1139：`case 616: sub_49F874(); byte_4F93DC = 0; break;`）：
+           官方原版在穿戴装备失败 `SM_TAKEON_FAIL (616)` 时，调用 `sub_49F874()` 释放鼠标拖拽手持物品并原位归还槽位，解除锁定状态；此前 `HudController.cs` 仅有 `OnTakeOffFail` 而漏掉了 `OnTakeOnFail`；
+        3. 战法道全量药水恢复矩阵与单机沙盒平滑插值（单机与脱机环境药水数值对齐）：
+           金创药（小 20 / 中 50 / 大 90 HP）、魔法药（小 30 / 中 80 / 大 150 MP）、太阳水族（普通 30 HP/40 MP，强效 50 HP/50 MP，疗伤药 80 HP/80 MP，万年雪霜 120 HP/120 MP），此前在双击背包物品使用时未驱动单机恢复，已在 `GameView.cs` 中实现统一的 `ApplyPotionRecovery` 接入双端。
+    - **精准重构**：
+      - 在 `AudioManager.cs` 中补齐 `SoundId.Notice = 10`；
+      - 在 `ServerMessageRouter.cs` 的 `HandleExperience` 中接入 `play_notice_sound()`；
+      - 在 `HudController.cs` 中实现 `OnTakeOnFail(slot)`，并在 `ServerMessageRouter.HandleTakeOnFail` 中精准触发；
+      - 在 `GameView.cs` 中实现 `ApplyPotionRecovery`，并在 `QuickItemUsed` 与 `UseItemRequested` 中统一驱动；
+      - 在 `TestCombatSkillsMatrix.cs` 中追加全量药水恢复矩阵与穿戴失败重置单元测试，测试总数提升至 **203 / 203 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **201 / 201 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **203 / 203 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

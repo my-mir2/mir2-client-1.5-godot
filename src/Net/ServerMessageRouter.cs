@@ -1093,6 +1093,7 @@ public sealed class ServerMessageRouter
         long curExp = (uint)pkt.Recog;
         long maxExp = pkt.Param > 0 ? (uint)pkt.Param : 100000;
         _hud?.UpdateExp(curExp, maxExp);
+        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Notice); // 盛大官方 1.5 IDA case '-' @ 0x46A1B0: play_notice_sound()
     }
 
     // 盛大官方 1.5 生命与魔法值变动协议 (IDA ProcessServerMessage case 53 '5' @ 0x46A275)
@@ -1770,13 +1771,15 @@ public sealed class ServerMessageRouter
         }
     }
 
-    // 官方 1.5 穿戴装备失败提示与解锁 (IDA ProcessServerMessage case 616)
+    // 官方 1.5 穿戴装备失败提示与解锁 (IDA ProcessServerMessage case 616 @ 0x469B60 sub_49F874)
     private void HandleTakeOnFail(ServerPacket pkt)
     {
         string text = DecodeExtraText(pkt.Extra);
         if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
         if (string.IsNullOrEmpty(text)) text = "穿戴装备失败，可能由于等级、职业要求或负重不足。";
         _hud?.AddChat("提示", $"[系统] {text}", new Color(1f, 0.4f, 0.4f));
+        int slot = pkt.Param >= 0 && pkt.Param < 9 ? pkt.Param : (pkt.Recog >= 0 && pkt.Recog < 9 ? pkt.Recog : -1);
+        _hud?.OnTakeOnFail(slot);
     }
 
     // 官方 1.5 技能经验与熟练度更新 (IDA ProcessServerMessage case 640)

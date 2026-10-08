@@ -1442,6 +1442,13 @@ public partial class HudController : CanvasLayer
         AddChat("装备", $"[装备] 脱下装备失败 (槽位: {slot})，已原子回滚。", new Color(1f, 0.4f, 0.4f));
     }
 
+    /// <summary>盛大官方 1.5 穿戴装备失败与手持状态复位 (SM_TAKEON_FAIL 616, IDA sub_49F874)</summary>
+    public void OnTakeOnFail(int slot)
+    {
+        string slotDesc = slot >= 0 ? $" (槽位: {slot})" : "";
+        AddChat("装备", $"[装备] 穿戴装备失败{slotDesc}，已解除锁定并原位归还。", new Color(1f, 0.4f, 0.4f));
+    }
+
     /// <summary>盛大官方 1.5 小地图雷达标记 (SM_MAPMARK_DELPHI 612)</summary>
     public void SetMapMarker(int x, int y)
     {

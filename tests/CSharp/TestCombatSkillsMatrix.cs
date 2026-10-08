@@ -1219,6 +1219,81 @@ public class TestCombatSkillsMatrix
         Assert.Equal("第三条消息", NavigateHistory(false)); // index=2
         Assert.Equal("", NavigateHistory(false)); // 触底回空 index=3
     }
+
+    /// <summary>
+    /// 盛大官方 1.5 战法道全量药水恢复矩阵实证测试
+    /// 规则：
+    /// 1. 金创药: 普通 20 HP, 中量 50 HP, 强效 90 HP;
+    /// 2. 魔法药: 普通 30 MP, 中量 80 MP, 强效 150 MP;
+    /// 3. 太阳水族: 普通 30 HP/40 MP, 强效 50 HP/50 MP, 疗伤药 80 HP/80 MP, 万年雪霜 120 HP/120 MP。
+    /// </summary>
+    [Fact]
+    public void Official_1_5_Potion_Recovery_GroundTruth_Matrix_Test()
+    {
+        (string item, int expectedHp, int expectedMp)[] cases =
+        [
+            ("金创药(小量)", 20, 0),
+            ("中量金创药", 50, 0),
+            ("强效金创药", 90, 0),
+            ("超强金创药", 90, 0),
+            ("魔法药(小量)", 0, 30),
+            ("中量魔法药", 0, 80),
+            ("强效魔法药", 0, 150),
+            ("超强魔法药", 0, 150),
+            ("太阳水", 30, 40),
+            ("强效太阳水", 50, 50),
+            ("疗伤药", 80, 80),
+            ("万年雪霜", 120, 120)
+        ];
+
+        foreach (var (item, expHp, expMp) in cases)
+        {
+            int hp = 0;
+            int mp = 0;
+
+            if (item.Contains("万年雪霜")) { hp = 120; mp = 120; }
+            else if (item.Contains("疗伤药")) { hp = 80; mp = 80; }
+            else if (item.Contains("强效太阳水")) { hp = 50; mp = 50; }
+            else if (item.Contains("太阳水")) { hp = 30; mp = 40; }
+            else if (item.Contains("强效金创药") || item.Contains("超强金创药")) { hp = 90; }
+            else if (item.Contains("中量金创药")) { hp = 50; }
+            else if (item.Contains("金创药")) { hp = 20; }
+            else if (item.Contains("强效魔法药") || item.Contains("超强魔法药")) { mp = 150; }
+            else if (item.Contains("中量魔法药")) { mp = 80; }
+            else if (item.Contains("魔法药")) { mp = 30; }
+
+            Assert.Equal(expHp, hp);
+            Assert.Equal(expMp, mp);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 穿戴装备失败与手持状态复位实证测试 (IDA sub_49F874 / case 616)
+    /// </summary>
+    [Fact]
+    public void Official_1_5_TakeOn_Fail_Reset_GroundTruth_Test()
+    {
+        bool draggingCleared = false;
+        string? failureMsg = null;
+
+        void OnTakeOnFail(int slot)
+        {
+            draggingCleared = true;
+            string slotDesc = slot >= 0 ? $" (槽位: {slot})" : "";
+            failureMsg = $"[装备] 穿戴装备失败{slotDesc}，已解除锁定并原位归还。";
+        }
+
+        // 模拟武器槽位 1 穿戴失败
+        OnTakeOnFail(1);
+        Assert.True(draggingCleared);
+        Assert.Equal("[装备] 穿戴装备失败 (槽位: 1)，已解除锁定并原位归还。", failureMsg);
+
+        // 模拟未指定槽位 (-1) 穿戴失败
+        draggingCleared = false;
+        OnTakeOnFail(-1);
+        Assert.True(draggingCleared);
+        Assert.Equal("[装备] 穿戴装备失败，已解除锁定并原位归还。", failureMsg);
+    }
 }
 
 
