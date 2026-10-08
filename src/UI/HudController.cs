@@ -1293,9 +1293,33 @@ public partial class HudController : CanvasLayer
         _quickSlotAmounts[slot]--;
         if (_quickSlotAmounts[slot] <= 0)
         {
-            _quickSlotItems[slot] = "";
-            if (_quickSlotIcons[slot] != null) _quickSlotIcons[slot].Texture = null;
-            if (_quickSlotCounts[slot] != null) _quickSlotCounts[slot].Text = "";
+            // 盛大官方 1.5 原版人性化药水补给机制:
+            // 当快捷栏某格药水耗尽时，优先检索背包中同名消耗品自动补充至该快捷格
+            int refillBagSlot = FindBagItemByName(itemName);
+            if (refillBagSlot >= 0)
+            {
+                var refillTex = _bagSlots[refillBagSlot]?.ItemTexture;
+                ClearBagItem(refillBagSlot);
+                _quickSlotItems[slot] = itemName;
+                _quickSlotAmounts[slot] = 1;
+                if (_quickSlotIcons[slot] != null)
+                {
+                    _quickSlotIcons[slot].Texture = refillTex;
+                    _quickSlotIcons[slot].Visible = refillTex != null;
+                }
+                if (_quickSlotCounts[slot] != null)
+                {
+                    _quickSlotCounts[slot].Text = "";
+                    _quickSlotCounts[slot].Visible = false;
+                }
+                AddChat("包裹", $"[包裹] 从背包自动补充 1 瓶 [{itemName}] 至快捷栏 #{slot + 1} 格。", new Color(0.7f, 0.95f, 0.7f));
+            }
+            else
+            {
+                _quickSlotItems[slot] = "";
+                if (_quickSlotIcons[slot] != null) _quickSlotIcons[slot].Texture = null;
+                if (_quickSlotCounts[slot] != null) _quickSlotCounts[slot].Text = "";
+            }
         }
         else
         {
@@ -1657,9 +1681,15 @@ public partial class HudController : CanvasLayer
     {
         if (_tradePanelView != null)
         {
-            _stackManager.ToggleWindow(_tradePanelView);
             if (_tradePanelView.Visible)
             {
+                // 关闭交易面板：触发取消并退回交易栏物品
+                _tradePanelView.CloseTrade();
+                _stackManager.PopWindow(_tradePanelView);
+            }
+            else
+            {
+                _stackManager.PushWindow(_tradePanelView);
                 // 依据官方 1.5 IDA sub_4915EC 实证：打开交易面板时自动呼出背包面板 (DialogManager_ShowHide(a1[179], 1))
                 if (_bagPanel != null)
                 {
@@ -2278,6 +2308,10 @@ public partial class HudController : CanvasLayer
         var closed = _stackManager.CloseTopDialog();
         if (closed != null)
         {
+            if (closed == _tradePanelView)
+            {
+                _tradePanelView?.CloseTrade();
+            }
             GD.Print($"[HudController] CloseTopDialog 关闭了: {closed.WindowName}, 剩余StackCount={_stackManager.Count}");
             return true;
         }
@@ -3250,6 +3284,20 @@ public partial class HudController : CanvasLayer
                 return 8;
         }
         return baseSlot;
+    }
+
+    /// <summary>
+    /// 在背包 40 格中检索指定名称的物品槽位 (未找到返回 -1)
+    /// </summary>
+    public int FindBagItemByName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return -1;
+        for (int i = 0; i < 40; i++)
+        {
+            if (_bagItemDetails[i]?.Name == name)
+                return i;
+        }
+        return -1;
     }
 
     public static bool IsConsumableItem(string itemName)

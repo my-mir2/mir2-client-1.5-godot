@@ -346,6 +346,12 @@ namespace Mir2Client.UI
             {
                 PlayerInstance.StepStarted += (tx, ty, dir, isRun) =>
                 {
+                    // 盛大官方 1.5 规则: 玩家移动步伐时，面对面交易自动强制中断并退还物品
+                    if (HudInstance?.TradePanel != null && HudInstance.TradePanel.Visible)
+                    {
+                        HudInstance.CloseTrade();
+                    }
+
                     if (_net != null && _net.IsConnectedToServer)
                     {
                         byte[] pkt = isRun
@@ -514,10 +520,10 @@ namespace Mir2Client.UI
                     _net?.SendPacket(PacketEncoder.WithdrawStorage(storageSlot));
                 };
 
-                // 官方攻击模式变更发包 (CM_CHANGEATTACKMODE 1019)
+                // 官方攻击模式变更发包 (官方原版发送 @AttackMode 聊天指令，避免 1019 破坏 CM_GROUPMODE 组队状态)
                 HudInstance.ChangeAttackModeRequested += (mode) =>
                 {
-                    _net?.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_CHANGEATTACKMODE, (short)mode));
+                    _net?.SendPacket(PacketEncoder.Say("@AttackMode"));
                 };
 
                 // 官方 NPC 对话选项点击发包 (CM_NPCSELECT 1011)
@@ -1005,6 +1011,12 @@ namespace Mir2Client.UI
         /// </summary>
         public void TakeDamage(int rawDamage, bool isArmorPiercing = false)
         {
+            // 盛大官方 1.5 规则: 受到攻击受击结算时强制中断面对面交易
+            if (HudInstance?.TradePanel != null && HudInstance.TradePanel.Visible)
+            {
+                HudInstance.CloseTrade();
+            }
+
             var res = PlayerStateInstance.TakeCombatDamageFull(rawDamage, nowTick: (long)Time.GetTicksMsec(), isArmorPiercing: isArmorPiercing);
             HudInstance?.UpdateHp(PlayerStateInstance.Hp, PlayerStateInstance.MaxHp);
             HudInstance?.UpdateMp(PlayerStateInstance.Mp, PlayerStateInstance.MaxMp);

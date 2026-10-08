@@ -1603,7 +1603,7 @@ public partial class AutoEndToEndDriver : Node
                     gameView.HudInstance.ToggleThrusting();
                     // 2. 半月弯刀开关 (CM_HALFMOONONOFF 3027)
                     gameView.HudInstance.ToggleHalfMoon();
-                    // 3. 攻击模式切换 (CM_CHANGEATTACKMODE 1019)
+                    // 3. 攻击模式切换 (官方原版 @AttackMode 聊天指令通道)
                     gameView.HudInstance.CycleNextAttackMode();
                     // 4. 组队模式切换 (CM_GROUPMODE 1019)
                     gameView.HudInstance.GroupPanel?.EmitSignal(GroupPanelView.SignalName.GroupModeToggled, true);

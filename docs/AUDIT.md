@@ -230,6 +230,8 @@
 | 86 | `21` / `28` | `SM_DEATH` / `SM_DEATH_ACTION_DELPHI` | 实体/主角死亡倒地与回城复活全生命周期闭环 (case 21/28) | `GameView.cs:1735` | `bridge.rs:21` | `[L3 1:1]` | 官方 IDA sub_481DD4 / sub_486DF0 逆向实证：主角死亡倒地播放男女惨叫音效 (144/145)，激活全屏灰度滤镜后处理与血滴动画 (DeathScreenView Prguse 360/361/365)，严密拦截死亡状态下移动、割肉与嗑药穿透，支持安全区满血重获新生 |
 | 87 | `1001` | `CM_PICKUP` | 盛大官方 1.5 拾取协议参数对齐与 300ms 节流防刷 | `GameView.cs:1316` | `bridge.rs:872` | `[L3 1:1]` | 官方 IDA sub_46594C / ClMain.pas 逆向实证：拾取数据包携带制表符分隔 Extra 坐标对齐网关解包，增加官方 300ms 拾取节流防刷与满包友好提示 |
 | 88 | `1016` | `CM_DROPGOLD` | 盛大官方 1.5 丢弃金币前置校验与即时原子扣减 | `HudController.cs:289` | `bridge.rs:1016` | `[L3 1:1]` | 官方 IDA TFrmDlg_DGoldClick 0x48e564 逆向实证：前置校验非法金额与超量丢弃，本地即时扣减持有金币并刷新 LblBagGold |
+| 89 | `3030` | `CM_SAY` (`@AttackMode`) | 盛大官方 1.5 攻击模式权威切换指令通道纠偏 | `GameView.cs:520` | `player.rs:1225` | `[L3 1:1]` | 官方 IDA sub_467920 case 766 (0x468A2B) 与服务端实证：彻底纠正历史 1019 误用别名，将 UI 切换与快捷键 Ctrl+H 统一为发送 @AttackMode 文本指令，杜绝篡改 CM_GROUPMODE 组队状态 |
+| 90 | `1028` | `CM_TRADECANCEL` / Belt Refill | 盛大官方 1.5 面对面交易中断退回安全与快捷药水自动补给 | `HudController.cs:1296/2310` | `trade.rs:1028` | `[L3 1:1]` | 官方 IDA TFrmDlg_DBelt1DblClick 0x48c188 与 sub_49FE38 实证：快捷栏喝尽自动从背包 40 格检索同名药水补齐；ESC、二次开关、角色位移（StepStarted）与受击结算（TakeDamage）全链路强制中断交易并原子退还物品，杜绝悬空丢失 |
 
 ---
 

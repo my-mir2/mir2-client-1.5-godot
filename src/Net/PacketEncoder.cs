@@ -275,8 +275,8 @@ public static class PacketEncoder
     public static byte[] HalfMoonOnOff(bool enabled) =>
         MakePacket(ProtocolConsts.CM_HALFMOONONOFF, enabled ? 1 : 0);
 
-    public static byte[] ChangeAttackMode(short mode) =>
-        MakePacket(ProtocolConsts.CM_CHANGEATTACKMODE, mode);
+    public static byte[] ChangeAttackMode(short mode = 0) =>
+        Say("@AttackMode");
 
     public static byte[] UserGetDetailItem(string itemName) =>
         MakePacket(ProtocolConsts.CM_USERGETDETAILITEM, 0, 0, 0, Encoding.UTF8.GetBytes(itemName));

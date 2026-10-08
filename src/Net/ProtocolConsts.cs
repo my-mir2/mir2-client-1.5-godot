@@ -88,7 +88,7 @@ public static class ProtocolConsts
     public const short CM_GUILD_BREAK_ALLY       = 1045; // 解除行会结盟关系
     public const short CM_GUILD_KICK_MEMBER      = 1039; // 开除行会成员
     public const short CM_GUILD_UPDATE_RANK      = 1041; // 调整行会职位封号
-    public const short CM_CHANGEATTACKMODE       = 1019; // 官方切换攻击模式主码 (Ctrl+H)
+    public const short CM_CHANGEATTACKMODE       = 1019; // 历史私服误用别名 (盛大官方 1.5 原版 1019 为 CM_GROUPMODE 允许编组/退组，攻击模式在双端权威走 @AttackMode 文本指令)
 
     // ============ 官方 1.5 权威 SM 协议号 (下行) ============
     public const short SM_ATTACKMODECHANGED      = 766;  // 官方攻击模式变更回显 (IDA sub_467920 case 766 @ 0x468A2B)

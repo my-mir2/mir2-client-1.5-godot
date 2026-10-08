@@ -1874,11 +1874,11 @@ public class TestProtocolMatrix
         Assert.Equal(ProtocolConsts.CM_HALFMOONONOFF, parsedHalfMoonOn.Ident);
         Assert.Equal(1, parsedHalfMoonOn.Recog);
 
-        // 3. 官方攻击模式变更封包 (CM_CHANGEATTACKMODE 1019)
+        // 3. 官方攻击模式变更指令封包 (官方原版 @AttackMode 走 CM_SAY 3030，避免 1019 破坏 CM_GROUPMODE)
         byte[] attackMode = PacketEncoder.ChangeAttackMode(2);
         var parsedAttackMode = PacketDecoder.Parse(attackMode.AsSpan(1))!.Value;
-        Assert.Equal(ProtocolConsts.CM_CHANGEATTACKMODE, parsedAttackMode.Ident);
-        Assert.Equal(2, parsedAttackMode.Recog);
+        Assert.Equal(ProtocolConsts.CM_SAY, parsedAttackMode.Ident);
+        Assert.Equal("@AttackMode", parsedAttackMode.ExtraStr);
 
         // 4. 官方商店单品详情查询封包 (CM_USERGETDETAILITEM 1013)
         byte[] detailPkt = PacketEncoder.UserGetDetailItem("裁决之杖");
@@ -2847,6 +2847,46 @@ public class TestProtocolMatrix
 
         // 531: 选定角色成功确认
         router.OnPacket(new ServerPacket(ProtocolConsts.SM_SELECTCHAR_OK_DELPHI, 0, 0, 0, Array.Empty<byte>()));
+    }
+
+    [Fact]
+    public void TestQuickSlotRefillAndTradeAbortionRules()
+    {
+        // 1. 验证交易协议族完整上行编码 (CM_DEALTRY 1025 ~ CM_USERSTORAGEDEPOSIT 1031)
+        byte[] tryDeal = PacketEncoder.DealTry(12345);
+        var parsedTry = PacketDecoder.Parse(tryDeal.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_DEALTRY, parsedTry.Ident);
+        Assert.Equal(12345, parsedTry.Recog);
+
+        byte[] addItem = PacketEncoder.DealAddItem(2, "金创药(小量)");
+        var parsedAddItem = PacketDecoder.Parse(addItem.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_DEALADDITEM, parsedAddItem.Ident);
+        Assert.Equal(2, parsedAddItem.Recog);
+        Assert.Equal("金创药(小量)", parsedAddItem.ExtraStr);
+
+        byte[] delItem = PacketEncoder.DealDelItem(2);
+        var parsedDelItem = PacketDecoder.Parse(delItem.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_DEALDELITEM, parsedDelItem.Ident);
+        Assert.Equal(2, parsedDelItem.Recog);
+
+        byte[] chgGold = PacketEncoder.DealChangeGold(99999);
+        var parsedChgGold = PacketDecoder.Parse(chgGold.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_DEALCHGGOLD, parsedChgGold.Ident);
+        Assert.Equal(99999, parsedChgGold.Recog);
+
+        byte[] confirmDeal = PacketEncoder.DealConfirm();
+        var parsedConfirm = PacketDecoder.Parse(confirmDeal.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_DEALEND, parsedConfirm.Ident);
+
+        byte[] cancelDeal = PacketEncoder.DealCancel();
+        var parsedCancel = PacketDecoder.Parse(cancelDeal.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_TRADECANCEL, parsedCancel.Ident);
+
+        // 2. 验证消耗品判定逻辑
+        Assert.True(Mir2Client.UI.HudController.IsConsumableItem("强效太阳水"));
+        Assert.True(Mir2Client.UI.HudController.IsConsumableItem("魔法药(中量)"));
+        Assert.False(Mir2Client.UI.HudController.IsConsumableItem("裁决之杖"));
+        Assert.False(Mir2Client.UI.HudController.IsConsumableItem(null!));
     }
 }
 
