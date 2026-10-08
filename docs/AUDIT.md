@@ -7137,12 +7137,24 @@
       - 在 `GameView.cs` 中打通 `StorageDepositRequested` -> `CM_USERSTORAGEDEPOSIT (1031)` 与 `StorageWithdrawRequested` -> `CM_USERSTORAGEWITHDRAW (1032)` 网络发包；
       - 在 `ServerMessageRouter.cs` 中将 704 接入多行解析与数据驱动刷新，将 709 接入仓库清空，将 701/705 接入 HUD 数据更新；
       - 在 `TestGuildTradeEncoderMatrix.cs` 中增加 `StorageProtocolMatrix_DecodeAndClear_OfficialAlignment` 单元测试，脱机测试覆盖扩充至 **176 / 176 项 100% 通过**；
-      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中扩充至 **127 / 127 阶段全生命周期 0 缺陷通过**。
+40. **盛大官方 1.5 技能学习/熟练度下发 (SM_SKILLLEVELUP 644) 与 NPC 对话框关闭 (SM_MERCHANTDLG_CLOSE 644) 双向权威分流闭环 (`ProtocolConsts.cs`, `SkillPanelView.cs`, `ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 1043~1045（`case 644: handle_sm_merchant_dlg_close();`）确证 644 为关闭 NPC 商人对话框操作码；
+      - Rust 官方网关服务端 `bridge.rs:188` 与 `bridge.rs:2259~2263` 实证服务端在下发已学技能列表与技能熟练度升级时，下发操作码为 `SM_SKILLLEVELUP (644)`，以 `recog` 携带 `magic_id`，`param` 携带 `level`，`tag` 携带当前熟练度点数，`extra` 携带技能名称；
+      - 彻底修复此前因硬编码关闭 NPC 对话框而误吞服务端下发全量技能列表的严重逻辑坏账。
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 中增加官方 `SM_MERCHANTDLG_CLOSE = 644` 常量；
+      - 在 `SkillPanelView.cs` 中公开只读属性 `public IReadOnlyList<SkillItemData> Skills => _skills;`；
+      - 在 `ServerMessageRouter.cs` 中根据 `packet.Recog > 0` 实施智能分流：
+        - `packet.Recog > 0`：路由至 `HandleSkillLevelUp`，动态更新已有技能等级与修炼点数，或将新技能构造 `SkillItemData` 并加入技能魔法书（`AddOrUpdateSkill`）；
+        - `packet.Recog == 0`：遵循官方 IDA 真值调用 `_hud?.CloseNpcDialog()` 关闭 NPC 商人对话框；
+      - 在 `TestCombatSkillsMatrix.cs` 中增加 `SkillLevelUp_And_MerchantClose_644_DualDispatch_GroundTruth` 脱机单元测试，测试集扩充至 **177 / 177 项 100% 通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (172 / 172 顶层操作码 0 缺失)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **176 / 176 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **177 / 177 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

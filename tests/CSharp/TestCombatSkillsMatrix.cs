@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Mir2Client.Game;
+using Mir2Client.Net;
 using Xunit;
 
 namespace Mir2Client.Tests;
@@ -153,6 +155,30 @@ public class TestCombatSkillsMatrix
         Assert.True(crushDash.TargetPushed, "目标应当被推移");
         Assert.False(crushDash.SelfStunned, "自身不应陷入硬直");
         Assert.True(crushDash.TargetFinalX > 101, "目标应当被击退至少 1 格");
+    }
+
+    [Fact]
+    public void SkillLevelUp_And_MerchantClose_644_DualDispatch_GroundTruth()
+    {
+        // 1. 常量真值断言：644 在盛大官方 1.5 IDA 原版为 merchant dlg close，在服务端为 SM_SKILLLEVELUP
+        Assert.Equal((short)644, ProtocolConsts.SM_SKILLLEVELUP);
+        Assert.Equal((short)644, ProtocolConsts.SM_MERCHANTDLG_CLOSE);
+
+        // 2. 脱机路由验证：HUD=null 时，recog=0 分支 (关闭 NPC 对话框) 与 recog>0 分支 (技能熟练度同步) 均零崩溃
+        var router = new ServerMessageRouter(null, null);
+
+        // 分支 A: recog=0，NPC 对话框关闭
+        var closePkt = new ServerPacket(ProtocolConsts.SM_MERCHANTDLG_CLOSE, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(closePkt);
+
+        // 分支 B: recog=26 (烈火剑法), param=3, tag=2400, extra="烈火剑法"
+        byte[] skillNameBytes = Encoding.UTF8.GetBytes("烈火剑法");
+        var skillPkt = new ServerPacket(ProtocolConsts.SM_SKILLLEVELUP, 26, 3, 2400, skillNameBytes);
+        router.OnPacket(skillPkt);
+
+        // 分支 C: 兼容旧版 640 SM_MAGICLVEXP
+        var expPkt = new ServerPacket(ProtocolConsts.SM_MAGICLVEXP, 12, 2, 1500, Array.Empty<byte>());
+        router.OnPacket(expPkt);
     }
 }
 

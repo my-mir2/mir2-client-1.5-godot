@@ -174,6 +174,7 @@ public partial class SkillPanelView : Control, IManagedWindow
     ];
 
     private readonly List<SkillItemData> _skills = new(DefaultSkills);
+    public IReadOnlyList<SkillItemData> Skills => _skills;
 
     /// <summary>
     /// 设置并刷新技能列表 (由 SM_SENDUSERMAGIC / SM_SENDMYMAGIC 驱动)

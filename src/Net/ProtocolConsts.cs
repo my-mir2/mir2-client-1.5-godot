@@ -178,6 +178,7 @@ public static class ProtocolConsts
     public const short SM_UPDATEUSERMAGIC        = 203;  // 技能经验熟练度更新
     public const short SM_ALLOWMOVE              = 203;  // 服务端允许移动/位移确认与拉回校准 (bridge.rs 权威实证)
     public const short SM_SKILLLEVELUP           = 644;  // 技能熟练度升级广播 (bridge.rs 权威实证)
+    public const short SM_MERCHANTDLG_CLOSE      = 644;  // 官方关闭 NPC 对话框 (IDA case 644 @ 0x46D65C)
     public const short SM_MINERESULT             = 601;  // 挖矿产出矿石
     public const short SM_UPDATEITEM             = 603;  // 物品持久度变动
     public const short SM_EAT_OK                 = 606;  // 药水使用确认

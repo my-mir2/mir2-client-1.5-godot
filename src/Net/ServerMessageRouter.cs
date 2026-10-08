@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Godot;
 using Mir2Client.Audio;
@@ -216,8 +217,15 @@ public sealed class ServerMessageRouter
             case SM_ALLOWMOVE:
                 HandleAllowMove(packet);
                 break;
-            case SM_MERCHANTDLG_CLOSE:
-                _hud?.CloseNpcDialog();
+            case SM_MERCHANTDLG_CLOSE: // 644: 官方 NPC 对话框关闭 (IDA case 644 @ 0x46D65C) / 技能学习与熟练度下发 (bridge SM_SKILLLEVELUP)
+                if (packet.Recog > 0)
+                {
+                    HandleSkillLevelUp(packet);
+                }
+                else
+                {
+                    _hud?.CloseNpcDialog();
+                }
                 break;
             case ProtocolConsts.SM_OUTOFCONNECTION:
                 _hud?.ShowModalMessage("连接提示", "服务器连接人数已满，请稍后再试。");
@@ -1553,6 +1561,37 @@ public sealed class ServerMessageRouter
         }
         _hud?.SkillPanel?.UpdateSkillExp(magicId, level, curTrain, maxTrain);
         _hud?.AddChat("技能", $"[技能] 技能熟练度提升：Lv.{level} ({curTrain}/{maxTrain})。", new Color(1f, 0.9f, 0.4f));
+    }
+
+    /// <summary>
+    /// 处理官方 1.5 技能学习/等级熟练度广播 (SM_SKILLLEVELUP 644 / bridge 对齐)
+    /// Recog: magic_id, Param: level, Tag: curTrain, Extra: skill_name
+    /// </summary>
+    private void HandleSkillLevelUp(ServerPacket pkt)
+    {
+        int magicId = pkt.Recog;
+        int level = pkt.Param;
+        int curTrain = pkt.Tag;
+        int maxTrain = 1000;
+        string skillName = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(skillName)) skillName = pkt.ExtraStr;
+        if (string.IsNullOrEmpty(skillName)) skillName = $"技能_{magicId}";
+
+        if (_hud?.SkillPanel != null)
+        {
+            var existing = _hud.SkillPanel.Skills.FirstOrDefault(s => s.MagicId == magicId);
+            if (existing != null)
+            {
+                _hud.SkillPanel.UpdateSkillExp(magicId, level, curTrain, existing.MaxTrain > 0 ? existing.MaxTrain : 1000);
+            }
+            else
+            {
+                int iconIdx = (magicId - 1) % 15;
+                string desc = $"{skillName} (官方权威 ID:{magicId})";
+                _hud.SkillPanel.AddOrUpdateSkill(new SkillPanelView.SkillItemData(magicId, skillName, iconIdx, "", level, curTrain, maxTrain, desc));
+            }
+        }
+        _hud?.AddChat("技能", $"[技能] 技能熟练度同步: 【{skillName}】 (ID:{magicId}, Lv.{level}, 修炼:{curTrain})。", new Color(1f, 0.9f, 0.4f));
     }
 
     // 官方 1.5 进入地图描述公告 (IDA ProcessServerMessage case 661)
