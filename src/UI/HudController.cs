@@ -2859,6 +2859,31 @@ public partial class HudController : CanvasLayer
     }
 
     /// <summary>
+    /// 服务端对方锁定交易栏同步 (由 SM_DEALLOCKED 678 驱动, IDA case 678 sub_49F9E4)
+    /// </summary>
+    public void OnServerTradeRemoteLocked(bool locked)
+    {
+        if (_tradePanelView != null)
+        {
+            _tradePanelView.SetLocked(false, locked);
+            AddChat("系统", "[交易] 对方锁定了交易栏，等待最终交割确认。", new Color(1f, 0.9f, 0.3f));
+            AudioManager.Instance?.PlaySoundId(106);
+        }
+    }
+
+    /// <summary>
+    /// 服务端己方放入物品失败自动回退 (由 SM_DEALADDITEM_FAIL 676 驱动, IDA case 676 sub_49F874)
+    /// </summary>
+    public void OnServerTradeAddItemFail(int slot)
+    {
+        if (slot >= 0 && slot < 10 && _tradeItemOrigins[slot] != null)
+        {
+            TakeTradeItemToBagSlot(slot, -1);
+            AddChat("系统", $"[交易] 放入物品失败，物品已自动原路退回背包。", new Color(1f, 0.4f, 0.4f));
+        }
+    }
+
+    /// <summary>
     /// 背包物品内部交换或移动
     /// </summary>
     public void SwapBagItems(int slotA, int slotB)

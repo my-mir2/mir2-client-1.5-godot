@@ -7719,12 +7719,29 @@
     - **精准重构**：
       - 在 `GameView.cs` 中重构 `SoftCloseRequested` 与 `ExitGameRequested` 事件监听，接入官方原版文案弹窗并在确认回调中发包与切阶段；
       - 在 `TestCombatSkillsMatrix.cs` 中新增官方退出与小退模态确认与时序测试，单测总数提升至 **204 / 204 项 100% 全部通过**；
+  - [x] **64. 盛大官方 1.5 交易协议族全集、行会下行与实体动作 8/18/19/24 物理指令实证与聊天系统指令本地闭环** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据 `scratch/ida_processmsg.c` 行 453~527、650~662、772~779、1276~1282：
+        1. 交易协议族全量常量与状态机补全：
+           官方 1.5 权威交易协议号包含 `SM_DEALMENU (673)`、`SM_DEALTRY_FAIL (674)`、`SM_DEALADDITEM_OK (675)`、`SM_DEALADDITEM_FAIL (676)`、`SM_DEALDELITEM_OK (677)`、`SM_DEALLOCKED (678)`、`SM_DEALCANCEL_DELPHI (681)`、`SM_DEALREMOTEADDITEM (682)`、`SM_DEALREMOTEDELITEM (683)`、`SM_DEALCHGGOLD_OK (684)`、`SM_DEALCHGGOLD_FAIL (685)`、`SM_DEALREMOTECHGGOLD (686)`、`SM_DEALSUCCESS (687)`。此前部分常量分散在局部且遗漏了 `SM_DEALLOCKED (678)` 对方锁定状态同步，且放入失败（676）时未自动将物品回退至背包；
+        2. 官方行会下行协议权威收敛：
+           `SM_OPENGUILDDLG (753)` (IDA case 753 `load_guild_relations`) 与 `SM_SENDGUILDMEMBERLIST (756)` (IDA case 756 `load_guild_members`) 在权威协议字典中建档；
+        3. 实体通用动作协议分发补齐：
+           官方 case 8 (`SM_ENTITY_ACTION_GENERIC`), 18 (`SM_ENTITY_STRUCK_ACTION`), 19 (`SM_ENTITY_FLYAXE_ACTION`), 24 (`SM_ENTITY_DEATH_ACTION`) 严格对齐 IDA 物理指令分发至实体管理器；
+        4. 聊天系统控制指令本地拦截联动：
+           在 `GameView.cs` 中增加对 `@允许编组` / `@拒绝编组` / `@允许交易` / `@拒绝交易` / `@探测 <玩家名>` / `@攻击模式` 的前置拦截与 UI 状态同步反馈，彻底消除以往直接作为普通近聊发送的假性对齐断链。
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 中补齐交易协议族、行会主页与实体通用动作 8/18/19/24 权威常量；
+      - 在 `HudController.cs` 中增加 `OnServerTradeRemoteLocked` 与 `OnServerTradeAddItemFail`，实现远程锁定视图与放入失败物品原子回退；
+      - 在 `ServerMessageRouter.cs` 中打通 `SM_DEALLOCKED` 对方锁定路由分发与 `HandleDealAddItemOk` 的回调；
+      - 在 `GameView.cs` 中新增组队/交易开关/探测项链/攻击模式等 4 组聊天指令优先拦截与状态翻转；
+      - 在 `TestGuildTradeEncoderMatrix.cs` 中新增官方协议真值与解耦路由单元测试，脱机测试总数提升至 **208 / 208 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **204 / 204 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **208 / 208 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

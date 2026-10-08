@@ -381,4 +381,54 @@ public sealed class TestGuildTradeEncoderMatrix
         router.OnPacket(pkt701);
         router.OnPacket(pkt705);
     }
+
+    [Fact]
+    public void TradeProtocolMatrix_And_GuildOfficialConstants_Alignment()
+    {
+        // 1. 盛大官方 1.5 交易协议族物理真值对齐 (IDA ProcessServerMessage case 673~688 @ 0x46A5AA)
+        Assert.Equal((short)673, ProtocolConsts.SM_DEALMENU);
+        Assert.Equal((short)674, ProtocolConsts.SM_DEALTRY_FAIL);
+        Assert.Equal((short)675, ProtocolConsts.SM_DEALADDITEM_OK);
+        Assert.Equal((short)676, ProtocolConsts.SM_DEALADDITEM_FAIL);
+        Assert.Equal((short)677, ProtocolConsts.SM_DEALDELITEM_OK);
+        Assert.Equal((short)678, ProtocolConsts.SM_DEALLOCKED);
+        Assert.Equal((short)681, ProtocolConsts.SM_DEALCANCEL_DELPHI);
+        Assert.Equal((short)682, ProtocolConsts.SM_DEALREMOTEADDITEM);
+        Assert.Equal((short)683, ProtocolConsts.SM_DEALREMOTEDELITEM);
+        Assert.Equal((short)684, ProtocolConsts.SM_DEALCHGGOLD_OK);
+        Assert.Equal((short)685, ProtocolConsts.SM_DEALCHGGOLD_FAIL);
+        Assert.Equal((short)686, ProtocolConsts.SM_DEALREMOTECHGGOLD);
+        Assert.Equal((short)687, ProtocolConsts.SM_DEALSUCCESS);
+        Assert.Equal((short)688, ProtocolConsts.SM_DEALCANCEL);
+
+        // 2. 盛大官方 1.5 行会主页与成员列表物理真值对齐 (IDA case 753/756/767)
+        Assert.Equal((short)753, ProtocolConsts.SM_OPENGUILDDLG);
+        Assert.Equal((short)756, ProtocolConsts.SM_SENDGUILDMEMBERLIST);
+        Assert.Equal((short)767, ProtocolConsts.SM_GUILDNOTICE_RESULT);
+
+        // 3. 盛大官方 1.5 实体通用动作物理真值对齐 (IDA case 8/18/19/24)
+        Assert.Equal((short)8, ProtocolConsts.SM_ENTITY_ACTION_GENERIC);
+        Assert.Equal((short)18, ProtocolConsts.SM_ENTITY_STRUCK_ACTION);
+        Assert.Equal((short)19, ProtocolConsts.SM_ENTITY_FLYAXE_ACTION);
+        Assert.Equal((short)24, ProtocolConsts.SM_ENTITY_DEATH_ACTION);
+
+        // 4. 脱机路由分发健壮性核验
+        var router = new ServerMessageRouter(null, null);
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALMENU, 0, 0, 0, Encoding.UTF8.GetBytes("玩家A")));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALADDITEM_OK, 0, 0, 0, Encoding.UTF8.GetBytes("屠龙")));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALADDITEM_FAIL, 0, 0, 0, Encoding.UTF8.GetBytes("无法放入")));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALLOCKED, 0, 0, 0, Array.Empty<byte>()));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALREMOTEADDITEM, 1, 0, 0, Encoding.UTF8.GetBytes("开天")));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALREMOTEDELITEM, 1, 0, 0, Array.Empty<byte>()));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALCHGGOLD_OK, 100000, 0, 0, Array.Empty<byte>()));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALREMOTECHGGOLD, 200000, 0, 0, Array.Empty<byte>()));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALSUCCESS, 0, 0, 0, Array.Empty<byte>()));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALCANCEL_DELPHI, 0, 0, 0, Array.Empty<byte>()));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_OPENGUILDDLG, 0, 0, 0, Encoding.UTF8.GetBytes("公告内容\n<KillGuilds>\n敌对\n<AllyGuilds>\n联盟")));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_SENDGUILDMEMBERLIST, 0, 0, 0, Encoding.UTF8.GetBytes("掌门\t传奇霸主\t战士\t50\t1\n")));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_ENTITY_ACTION_GENERIC, 1001, 1, 0, Array.Empty<byte>()));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_ENTITY_STRUCK_ACTION, 1001, 2, 0, Array.Empty<byte>()));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_ENTITY_FLYAXE_ACTION, 1001, 3, 0, Array.Empty<byte>()));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_ENTITY_DEATH_ACTION, 1001, 4, 0, Array.Empty<byte>()));
+    }
 }

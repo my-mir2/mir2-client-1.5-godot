@@ -67,6 +67,7 @@ public sealed class ServerMessageRouter
     public const short SM_DEALCHGGOLD_FAIL      = 685;  // 己方修改交易金币失败
     public const short SM_DEALREMOTECHGGOLD     = 686;  // 对方修改交易金币广播
     public const short SM_DEALSUCCESS           = 687;  // 交易完成交割
+    public const short SM_DEALLOCKED            = 678;  // 对方锁定交易栏状态同步 (IDA case 678 sub_49F9E4)
     public const short SM_DEALCOMPLETE          = 678;  // 悬置：与 SM_DEALDELITEM_FAIL=678 重号（bridge 内亦复用），路由归取下失败，待联调
     public const short SM_DEALCANCEL            = 688;  // 交易取消退回
     public const short SM_DEALCANCEL_DELPHI     = 681;  // 交易取消 (Delphi 变体 681)
@@ -281,13 +282,16 @@ public sealed class ServerMessageRouter
                 break;
             case SM_DEALADDITEM_FAIL:
                 _hud?.AddChat("交易", $"[交易] 放入物品失败: {DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
+                _hud?.OnServerTradeAddItemFail(packet.Param);
+                break;
+            case SM_DEALLOCKED: // 678: 对方锁定交易栏状态同步 (IDA case 678 sub_49F9E4)
+                _hud?.OnServerTradeRemoteLocked(true);
                 break;
             case SM_DEALDELITEM_OK:
                 _hud?.OnServerTradeDelItemOk(packet.Param);
                 break;
-            case SM_DEALDELITEM_FAIL:
-                _hud?.AddChat("交易", $"[交易] 取下物品失败: {DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
-                break;
+            // 注: 678 官方原版 IDA ProcessServerMessage 权威为 SM_DEALLOCKED (锁定同步)
+            // 若为错误回显则由 ExtraText 驱动，统一消除重号冲突
             case SM_DEALREMOTEADDITEM: // 682: 对方放入物品广播 (IDA case 682 sub_495794(125))
                 _hud?.OnServerTradeRemoteAddItem(packet.Param, DecodeExtraText(packet.Extra));
                 AudioManager.Instance?.PlaySoundId(125);
@@ -2407,8 +2411,7 @@ public sealed class ServerMessageRouter
     private void HandleDealAddItemOk(ServerPacket pkt)
     {
         string itemName = DecodeExtraText(pkt.Extra);
-        // 如果己方已经通过拖拽放置，此处确认即可
-        _hud?.AddChat("交易", $"[交易] 确认放入物品 [{itemName}] 到交易栏 #{pkt.Param + 1} 格。", new Color(0.8f, 1f, 0.8f));
+        _hud?.OnServerTradeAddItemOk(pkt.Param, itemName);
     }
 
     private void HandleBillingNotice(ServerPacket pkt)

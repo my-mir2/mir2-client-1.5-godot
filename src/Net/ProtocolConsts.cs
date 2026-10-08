@@ -351,4 +351,30 @@ public static class ProtocolConsts
     public const short SM_BREAK_WEAPON            = 1102; // 武器开刀破碎损毁 (IDA case 0x44E @ 0x469635)
     public const short SM_CHAR_STUN               = 1103; // 受到重击击晕硬直 (IDA case 0x44F @ 0x469650)
     public const short SM_HEALTHBAR_DELPHI        = 1105; // 浮动血条显隐切换 (IDA case 0x451 @ 0x469690)
+
+    // ============ 盛大官方 1.5 交易协议族权威真值 (IDA ProcessServerMessage case 673~688 @ 0x46A5AA) ============
+    public const short SM_DEALMENU                = 673;  // 交易界面弹出请求 (IDA case 673 sub_4915EC)
+    public const short SM_DEALADDITEM_OK          = 675;  // 己方放入物品成功确认 (IDA case 675 sub_49FDE4)
+    public const short SM_DEALADDITEM_FAIL        = 676;  // 己方放入物品失败 (IDA case 676 sub_49F874)
+    public const short SM_DEALDELITEM_OK          = 677;  // 己方取下交易物品成功确认 (IDA case 677)
+    public const short SM_DEALLOCKED              = 678;  // 对方锁定交易栏状态同步 (IDA case 678 sub_49F9E4)
+    public const short SM_DEALCANCEL_DELPHI       = 681;  // 交易取消退回物品与金币 (IDA case 681 sub_49FE38)
+    public const short SM_DEALREMOTEADDITEM       = 682;  // 对方放入交易物品广播 (IDA case 682 sub_495794(125))
+    public const short SM_DEALREMOTEDELITEM       = 683;  // 对方取下交易物品广播 (IDA case 683 sub_495794(126))
+    public const short SM_DEALCHGGOLD_OK          = 684;  // 己方修改交易金币成功确认 (IDA case 684)
+    public const short SM_DEALCHGGOLD_FAIL        = 685;  // 己方修改交易金币失败 (IDA case 685)
+    public const short SM_DEALREMOTECHGGOLD       = 686;  // 对方修改交易金币广播 (IDA case 686 sub_495794(106))
+    public const short SM_DEALSUCCESS             = 687;  // 交易完成最终交割成功 (IDA case 687 sub_4916E0)
+    public const short SM_DEALCANCEL              = 688;  // 交易取消退回 (Rust/网关同义宏)
+
+    // ============ 盛大官方 1.5 行会主页与成员列表权威真值 (IDA ProcessServerMessage case 753/756/767) ============
+    public const short SM_OPENGUILDDLG            = 753;  // 打开行会主页 (IDA case 753 load_guild_relations)
+    public const short SM_SENDGUILDMEMBERLIST     = 756;  // 行会成员列表批量下发 (IDA case 756 load_guild_members)
+    public const short SM_GUILDNOTICE_RESULT      = 767;  // 行会公告发布更新结果 (IDA case 767)
+
+    // ============ 盛大官方 1.5 实体通用动作协议族 (IDA ProcessServerMessage case 8/18/19/24) ============
+    public const short SM_ENTITY_ACTION_GENERIC   = 8;    // 实体通用动作 (IDA case 8 entity_action)
+    public const short SM_ENTITY_STRUCK_ACTION    = 18;   // 实体受击后仰动作 (IDA case 18 entity_action)
+    public const short SM_ENTITY_FLYAXE_ACTION    = 19;   // 实体飞斧投掷动作 (IDA case 19 entity_action)
+    public const short SM_ENTITY_DEATH_ACTION     = 24;   // 实体倒地死亡动作 (IDA case 24 entity_action)
 }

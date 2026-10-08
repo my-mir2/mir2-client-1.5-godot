@@ -25,6 +25,7 @@ namespace Mir2Client.UI
 
         private NetManager? _net;
         private bool _isSandbox = false;
+        private bool _isAllowDeal = true;
         public int SessionId { get; set; } = 0;
         public string Username { get; set; } = string.Empty;
 
@@ -916,7 +917,67 @@ namespace Mir2Client.UI
                 return;
             }
 
-            // 3. 复古 16-bit 像素抖动滤镜切换指令 (@dither / @16bit)
+            // 3. 允许/拒绝组队模式指令 (@允许编组 / @拒绝编组 / @编组 / @groupmode)
+            if (trimmed.Equals("@允许编组", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("@允许组队", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("@拒绝编组", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("@拒绝组队", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("@编组", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("@groupmode", StringComparison.OrdinalIgnoreCase))
+            {
+                HudInstance?.GroupPanel?.ToggleAllowGroup();
+                return;
+            }
+
+            // 4. 允许/拒绝交易模式指令 (@允许交易 / @拒绝交易 / @交易 / @allowdeal)
+            if (trimmed.Equals("@允许交易", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("@拒绝交易", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("@交易", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("@allowdeal", StringComparison.OrdinalIgnoreCase))
+            {
+                _isAllowDeal = !_isAllowDeal;
+                string statusMsg = _isAllowDeal 
+                    ? "[系统] 已开启允许面对面交易模式。" 
+                    : "[系统] 已关闭允许面对面交易模式，其他人将无法向你发起交易。";
+                HudInstance?.AddChat("系统", statusMsg, new Color(1f, 0.95f, 0.3f));
+                if (_net != null && _net.IsConnectedToServer)
+                {
+                    _net.SendPacket(PacketEncoder.Say("@AllowDeal"));
+                }
+                return;
+            }
+
+            // 5. 官方 1.5 探测项链坐标侦测指令 (@探测 玩家名字 / @Searching 玩家名字)
+            if (trimmed.StartsWith("@探测", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("@Searching", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("@probe", StringComparison.OrdinalIgnoreCase))
+            {
+                string[] parts = trimmed.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2)
+                {
+                    string targetName = parts[1];
+                    HudInstance?.AddChat("提示", $"【探测项链】正在探查目标玩家 [{targetName}] 当前坐标方位...", new Color(0.4f, 1f, 0.5f));
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Say($"@Searching {targetName}"));
+                    }
+                }
+                else
+                {
+                    HudInstance?.AddChat("系统", "【探测项链】格式错误，正确格式: @探测 玩家名字", new Color(1f, 0.4f, 0.4f));
+                }
+                return;
+            }
+
+            // 6. 官方 1.5 攻击模式切换指令 (@攻击模式 / @AttackMode)
+            if (trimmed.StartsWith("@攻击模式", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("@AttackMode", StringComparison.OrdinalIgnoreCase))
+            {
+                HudInstance?.CycleNextAttackMode();
+                return;
+            }
+
+            // 7. 复古 16-bit 像素抖动滤镜切换指令 (@dither / @16bit)
             if (trimmed.StartsWith("@dither", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.StartsWith("@16bit", StringComparison.OrdinalIgnoreCase))
             {
@@ -932,7 +993,7 @@ namespace Mir2Client.UI
                 return;
             }
 
-            // 4. 普通聊天内容
+            // 8. 普通聊天内容
             if (_net != null && _net.IsConnectedToServer)
             {
                 _net.SendPacket(PacketEncoder.Say(trimmed));
