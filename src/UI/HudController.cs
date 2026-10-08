@@ -173,6 +173,10 @@ public partial class HudController : CanvasLayer
     private TextureButton? _btnHudOption;
     private int _selectedBagSlot = -1;
 
+    // 官方 1.5 聊天输入历史记录 (IDA TFrmMain_FormKeyDown 上下方向键回滚 / BtnChatHistory)
+    private readonly List<string> _chatHistory = new();
+    private int _historyIndex = 0;
+
     public TextureButton? BtnHudBag => _btnHudBag;
     public TextureButton? BtnHudEquip => _btnHudEquip;
     public TextureButton? BtnHudSkill => _btnHudSkill;
@@ -1095,12 +1099,12 @@ public partial class HudController : CanvasLayer
             ("BtnHudGroup", 764, 360, 24, 23, "Prguse_0011.png", null, ToggleGroup),
             ("BtnHudGuild", 279, 453, 28, 13, "Prguse_0134.png", "Prguse_0135.png", ToggleGuild),
             ("BtnHudTrade", 339, 453, 36, 13, "Prguse_0140.png", "Prguse_0141.png", ToggleTrade),
-            // 聊天辅助按键
-            ("BtnChatNear", 219, 453, 28, 13, "Prguse_0130.png", "Prguse_0131.png", () => {}),
-            ("BtnChatWhisper", 249, 453, 28, 13, "Prguse_0132.png", "Prguse_0133.png", () => {}),
-            ("BtnChatTeam", 309, 453, 28, 13, "Prguse_0128.png", "Prguse_0129.png", () => {}),
-            ("BtnChatFilter", 530, 453, 28, 13, "Prguse_0136.png", "Prguse_0137.png", () => {}),
-            ("BtnChatHistory", 560, 453, 28, 13, "Prguse_0138.png", "Prguse_0139.png", () => {}),
+            // 聊天辅助按键 (IDA 0x4915cc TFrmDlg_DChatHelperClick)
+            ("BtnChatNear", 219, 453, 28, 13, "Prguse_0130.png", "Prguse_0131.png", () => SetChatPrefix("")),
+            ("BtnChatWhisper", 249, 453, 28, 13, "Prguse_0132.png", "Prguse_0133.png", () => SetChatPrefix("/")),
+            ("BtnChatTeam", 309, 453, 28, 13, "Prguse_0128.png", "Prguse_0129.png", () => SetChatPrefix("!!")),
+            ("BtnChatFilter", 530, 453, 28, 13, "Prguse_0136.png", "Prguse_0137.png", () => AddChat("系统", "[系统] 聊天过滤功能切换。", new Color(0.8f, 0.8f, 0.8f))),
+            ("BtnChatHistory", 560, 453, 28, 13, "Prguse_0138.png", "Prguse_0139.png", TriggerChatHistoryClick),
             // 官方 1.5 原生底栏功能按钮 (IDA dialog_truth_table 0x4915cc/0x490c80/0x491474/0x491520/0x48bdec/0x48be70 实证):
             ("BtnHudPlusAbil", 605, 410, 24, 24, "", null, () => ToggleAdjustAbil(5)),
             ("BtnHudMiniMap", 748, 410, 24, 24, "", null, ToggleMinimap),
@@ -1932,24 +1936,88 @@ public partial class HudController : CanvasLayer
             _chatInput.ReleaseFocus();
         }
 
-        // 解析官方聊天频道指令
-        if (trimmed.StartsWith("!"))
+        // 记录历史发言（最多保留 20 条，避免重复连续记录）
+        if (_chatHistory.Count == 0 || _chatHistory[^1] != trimmed)
         {
-            // 全服喊话
+            _chatHistory.Add(trimmed);
+            if (_chatHistory.Count > 20) _chatHistory.RemoveAt(0);
+        }
+        _historyIndex = _chatHistory.Count;
+
+        // 解析官方聊天频道指令 (必须按长前缀优先匹配，避免 ! 截断 !~ 与 !!)
+        if (trimmed.StartsWith("!~"))
+        {
+            // 行会聊天 (Guild)
+            EmitSignal(SignalName.ChatSent, trimmed);
+            AddChat("行会", trimmed[2..], new Color(0.3f, 0.85f, 1.0f));
+        }
+        else if (trimmed.StartsWith("!!"))
+        {
+            // 组队聊天 (Group)
+            EmitSignal(SignalName.ChatSent, trimmed);
+            AddChat("组队", trimmed[2..], new Color(0.2f, 0.65f, 1.0f));
+        }
+        else if (trimmed.StartsWith("!"))
+        {
+            // 全服喊话 (Shout)
             EmitSignal(SignalName.ChatSent, trimmed);
             AddChat("喊话", trimmed[1..], new Color(1.0f, 0.95f, 0.4f));
         }
         else if (trimmed.StartsWith("/"))
         {
-            // 私聊
+            // 私聊 (Whisper)
             EmitSignal(SignalName.ChatSent, trimmed);
             AddChat("私聊", trimmed[1..], new Color(0.4f, 1.0f, 1.0f));
+        }
+        else if (trimmed.StartsWith("@"))
+        {
+            // 系统命令 / GM 命令
+            EmitSignal(SignalName.ChatSent, trimmed);
+            AddChat("命令", trimmed, new Color(0.2f, 1.0f, 0.4f));
         }
         else
         {
             // 普通视野说话
             EmitSignal(SignalName.ChatSent, trimmed);
             AddChat("说话", trimmed, new Color(1.0f, 1.0f, 1.0f));
+        }
+    }
+
+    private void SetChatPrefix(string prefix)
+    {
+        if (_chatInput == null) return;
+        _chatInput.Text = prefix;
+        _chatInput.GrabFocus();
+        _chatInput.CaretColumn = _chatInput.Text.Length;
+    }
+
+    private void TriggerChatHistoryClick()
+    {
+        if (_chatInput == null) return;
+        _chatInput.GrabFocus();
+        NavigateChatHistory(true);
+    }
+
+    public void NavigateChatHistory(bool up)
+    {
+        if (_chatHistory.Count == 0 || _chatInput == null) return;
+        if (up)
+        {
+            if (_historyIndex > 0) _historyIndex--;
+        }
+        else
+        {
+            if (_historyIndex < _chatHistory.Count) _historyIndex++;
+        }
+
+        if (_historyIndex >= 0 && _historyIndex < _chatHistory.Count)
+        {
+            _chatInput.Text = _chatHistory[_historyIndex];
+            _chatInput.CaretColumn = _chatInput.Text.Length;
+        }
+        else
+        {
+            _chatInput.Text = "";
         }
     }
 
@@ -2053,6 +2121,25 @@ public partial class HudController : CanvasLayer
                         {
                             OnChatInputSubmitted(_chatInput.Text);
                         }
+                        GetViewport().SetInputAsHandled();
+                    }
+                    break;
+                }
+                // 盛大官方 1.5 聊天输入历史记录上下键导航 (IDA TFrmMain_FormKeyDown)
+                case Key.Up:
+                {
+                    if (_chatInput != null && _chatInput.HasFocus())
+                    {
+                        NavigateChatHistory(true);
+                        GetViewport().SetInputAsHandled();
+                    }
+                    break;
+                }
+                case Key.Down:
+                {
+                    if (_chatInput != null && _chatInput.HasFocus())
+                    {
+                        NavigateChatHistory(false);
                         GetViewport().SetInputAsHandled();
                     }
                     break;
@@ -3008,7 +3095,7 @@ public partial class HudController : CanvasLayer
     }
 
     /// <summary>
-    /// 将背包物品拖拽至大世界地面丢弃
+    /// 将背包物品拖拽至大世界地面丢弃 (官方 1.5 IDA 0x46AFDC / 0x48E33C 装备防误丢二次确认保护)
     /// </summary>
     public void DropBagItemToGround(int bagSlot, Vector2 screenPos)
     {
@@ -3018,6 +3105,21 @@ public partial class HudController : CanvasLayer
 
         string itemName = item.Value.Name;
 
+        // 官方 1.5 贵重装备防误丢二次确认 (IDA 0x46AFDC / 0x48E33C)
+        if (!IsConsumableItem(itemName))
+        {
+            ShowModalMessage("丢弃提示", $"你真的要丢弃【{itemName}】吗？", hasCancel: true, onConfirm: () =>
+            {
+                ExecuteDropItem(bagSlot, itemName, screenPos);
+            });
+            return;
+        }
+
+        ExecuteDropItem(bagSlot, itemName, screenPos);
+    }
+
+    private void ExecuteDropItem(int bagSlot, string itemName, Vector2 screenPos)
+    {
         // 扣减清空背包槽位
         ClearBagItem(bagSlot);
 

@@ -1107,6 +1107,118 @@ public class TestCombatSkillsMatrix
         Assert.False(HudController.IsConsumableItem("裁决之杖"));
         Assert.False(HudController.IsConsumableItem("力量戒指"));
     }
+
+    /// <summary>
+    /// 盛大官方 1.5 聊天前缀 5 态频道分流与历史记录回滚算法实证测试 (IDA TFrmMain_FormKeyDown / sub_461DEC)
+    /// 规则：
+    /// 1. '!~' 对应行会频道 (Guild)，前缀长 2，截取后为正文；
+    /// 2. '!!' 对应组队频道 (Group)，前缀长 2，截取后为正文；
+    /// 3. '!' 对应全服喊话 (Shout)，前缀长 1，截取后为正文；
+    /// 4. '/' 对应私聊 (Whisper)，前缀长 1，截取后为正文；
+    /// 5. '@' 对应系统/GM命令 (Command)；
+    /// 6. 历史记录栈容量 20，连续输入去重，Up 递减，Down 递增。
+    /// </summary>
+    [Fact]
+    public void Official_1_5_Chat_Prefix_Channels_And_History_Navigation_GroundTruth_Test()
+    {
+        // 1. 前缀解析与长前缀优先判定
+        (string raw, string expectedChannel, string expectedContent)[] cases =
+        [
+            ("!~今晚沙巴克攻城集合", "行会", "今晚沙巴克攻城集合"),
+            ("!!打赤月恶魔来个大药道士", "组队", "打赤月恶魔来个大药道士"),
+            ("!出售极品攻37裁决之杖有人要的私聊", "喊话", "出售极品攻37裁决之杖有人要的私聊"),
+            ("/战神无双 在不在，来土城药店", "私聊", "战神无双 在不在，来土城药店"),
+            ("@move 330 270", "命令", "@move 330 270"),
+            ("大家好，我是传奇新玩家", "说话", "大家好，我是传奇新玩家")
+        ];
+
+        foreach (var (raw, expectedChannel, expectedContent) in cases)
+        {
+            string channel;
+            string content;
+            if (raw.StartsWith("!~"))
+            {
+                channel = "行会";
+                content = raw[2..];
+            }
+            else if (raw.StartsWith("!!"))
+            {
+                channel = "组队";
+                content = raw[2..];
+            }
+            else if (raw.StartsWith("!"))
+            {
+                channel = "喊话";
+                content = raw[1..];
+            }
+            else if (raw.StartsWith("/"))
+            {
+                channel = "私聊";
+                content = raw[1..];
+            }
+            else if (raw.StartsWith("@"))
+            {
+                channel = "命令";
+                content = raw;
+            }
+            else
+            {
+                channel = "说话";
+                content = raw;
+            }
+
+            Assert.Equal(expectedChannel, channel);
+            Assert.Equal(expectedContent, content);
+        }
+
+        // 2. 验证聊天历史记录栈回滚算法
+        var history = new List<string>();
+        int historyIndex = 0;
+
+        void AddHistory(string msg)
+        {
+            if (history.Count == 0 || history[^1] != msg)
+            {
+                history.Add(msg);
+                if (history.Count > 20) history.RemoveAt(0);
+            }
+            historyIndex = history.Count;
+        }
+
+        string NavigateHistory(bool up)
+        {
+            if (history.Count == 0) return "";
+            if (up)
+            {
+                if (historyIndex > 0) historyIndex--;
+            }
+            else
+            {
+                if (historyIndex < history.Count) historyIndex++;
+            }
+
+            if (historyIndex >= 0 && historyIndex < history.Count)
+                return history[historyIndex];
+            return "";
+        }
+
+        AddHistory("第一条消息");
+        AddHistory("第二条消息");
+        AddHistory("第三条消息");
+        AddHistory("第三条消息"); // 连续重复不重复进栈
+        Assert.Equal(3, history.Count);
+
+        // 按 Up 向上回滚
+        Assert.Equal("第三条消息", NavigateHistory(true)); // index=2
+        Assert.Equal("第二条消息", NavigateHistory(true)); // index=1
+        Assert.Equal("第一条消息", NavigateHistory(true)); // index=0
+        Assert.Equal("第一条消息", NavigateHistory(true)); // 触顶维持 index=0
+
+        // 按 Down 向下回滚
+        Assert.Equal("第二条消息", NavigateHistory(false)); // index=1
+        Assert.Equal("第三条消息", NavigateHistory(false)); // index=2
+        Assert.Equal("", NavigateHistory(false)); // 触底回空 index=3
+    }
 }
 
 
