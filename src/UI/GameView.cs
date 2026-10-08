@@ -421,6 +421,11 @@ namespace Mir2Client.UI
                     PerformPickup();
                 };
 
+                InputPluginInstance.ButcherRequested += (tx, ty, dir) =>
+                {
+                    PerformButcher(tx, ty, dir);
+                };
+
                 InputPluginInstance.PkModeToggleRequested += () =>
                 {
                     HudInstance?.CycleNextAttackMode();
@@ -499,8 +504,34 @@ namespace Mir2Client.UI
                 HudInstance.NpcActionSelected += (actionTag) =>
                 {
                     int npcUid = HudInstance.NpcDialog?.CurrentNpcUid ?? 0;
-                    _net?.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_NPCSELECT, npcUid, 0, 0, System.Text.Encoding.Default.GetBytes(actionTag)));
+                    _net?.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_NPCSELECT, npcUid, 0, 0, System.Text.Encoding.UTF8.GetBytes(actionTag)));
                 };
+                HudInstance.NpcOptionSelected += (index) =>
+                {
+                    int npcUid = HudInstance.NpcDialog?.CurrentNpcUid ?? 0;
+                    _net?.SendPacket(PacketEncoder.NpcSelect(npcUid, string.Empty, index));
+                };
+
+                if (HudInstance.Minimap != null)
+                {
+                    HudInstance.Minimap.MapTargetSelected += (targetX, targetY) =>
+                    {
+                        if (PlayerInstance == null || PlayerInstance.IsDead) return;
+                        var startTile = new Vector2I(PlayerInstance.TileX, PlayerInstance.TileY);
+                        var targetTile = new Vector2I(targetX, targetY);
+                        var path = FastPathFinder.FindPath(startTile, targetTile, (x, y) => MapRendererInstance?.IsPassable(x, y) ?? true);
+                        if (path != null && path.Count > 0)
+                        {
+                            PlayerInstance.SetPath(path, run: true);
+                            HudInstance?.AddChat("寻路", $"正在自动寻路前往目标点 ({targetX}, {targetY}) ...", new Color(0.3f, 1f, 0.8f));
+                        }
+                        else
+                        {
+                            HudInstance?.AddChat("提示", $"无法到达目标点 ({targetX}, {targetY})，该区域可能存在阻挡障碍。", new Color(1f, 0.4f, 0.4f));
+                            HudInstance?.Minimap?.ClearTarget();
+                        }
+                    };
+                }
             }
         }
 
@@ -866,6 +897,16 @@ namespace Mir2Client.UI
                         }
                         else
                         {
+                            if (dashRes.SelfStunned)
+                            {
+                                PlayerInstance.TriggerStun(dashRes.StunSec);
+                                AudioManager.Instance?.PlaySoundId(1);
+                            }
+                            if (dashRes.SelfDamage > 0)
+                            {
+                                PlayerStateInstance.Hp = Math.Max(1, PlayerStateInstance.Hp - dashRes.SelfDamage);
+                                HudInstance?.UpdateHp(PlayerStateInstance.Hp, PlayerStateInstance.MaxHp);
+                            }
                             HudInstance?.AddChat("技能", dashRes.Message, new Color(1f, 0.3f, 0.3f));
                         }
                     }
@@ -994,15 +1035,37 @@ namespace Mir2Client.UI
                         PlayerInstance.Gold += Math.Max(1, picked.Amount);
                         HudInstance?.UpdateGold(PlayerInstance.Gold);
                         HudInstance?.AddChat("拾取", $"捡起金币：{picked.Amount} 金币。", new Color(1f, 0.9f, 0.3f));
-                        AudioManager.Instance?.PlaySoundId(2);
+                        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money); // 官方 s_money = 106
                     }
                     else
                     {
                         HudInstance?.AddBagItem(picked.Name);
                         HudInstance?.AddChat("拾取", $"捡起物品：【{picked.Name}】。", new Color(0.4f, 1f, 0.4f));
-                        AudioManager.Instance?.PlaySoundId(11);
+                        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick); // 官方 s_itmclick = 118
                     }
                 }
+            }
+        }
+
+        public void PerformButcher(int tx, int ty, int dir)
+        {
+            if (PlayerInstance.IsStunned || PlayerInstance.IsDead) return;
+
+            // 1. 角色转向并进入割肉/蹲下姿势 (Delphi ClMain.pas:2890 ssAlt in Shift -> SendButchAnimal)
+            PlayerInstance.Direction = dir;
+            PlayerInstance.Anim.SetAction(ActionType.SitDown, dir);
+
+            // 2. 真实网络发包
+            if (_net != null && _net.IsConnectedToServer)
+            {
+                _net.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_BUTCHITEM, 0, (short)tx, (short)ty));
+            }
+            else if (_isSandbox)
+            {
+                // 3. 沙箱单机模式：割肉成功并给予高品质肉块
+                AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick);
+                HudInstance?.AddBagItem("品质15的鹿肉");
+                HudInstance?.AddChat("割肉", "割肉成功，获得了品质 15 的【鹿肉】。", new Color(1f, 0.85f, 0.2f));
             }
         }
 

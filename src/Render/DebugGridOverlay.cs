@@ -52,7 +52,7 @@ public partial class DebugGridOverlay : Node
                     RemoveOverlayIfPresent(ctrl);
                 }
             }
-            // 头顶受击微型血条 (HpBarBg, IDA sub_46B210) 纳入审计线框
+            // 头顶受击微型血条 (HpBarBg, IDA 0x46B210（已证client无函数）) 纳入审计线框
             else if (ctrl is ColorRect cr && cr.Name.ToString() == "HpBarBg")
             {
                 if (cr.IsVisibleInTree())

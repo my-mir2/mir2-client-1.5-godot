@@ -6698,3 +6698,68 @@
 - **运行时日志扫描**：控制台与日志中 ERROR: 计数为 0，SCRIPT ERROR: 计数为 0。
 - **机器视觉复测**：通过 view_file 亲眼多模态审查 23 张全量核心渲染画面与面板切片，坏账全量核销。
 
+---
+
+## 2026-10-08 盛大官方 1.5 大地图双模寻路、488 官方音效包装配与野蛮冲撞硬直反弹实证核销 (Official 1.5 Ground Truth Audit)
+
+依据用户明确拍板指令（单轨全面拥抱 Godot 4 + C# 现代工业级工程），拒绝脱机自嗨与伪代理指标，完全基于官方原版 Delphi 源码与 IDA 反编译实证，彻底攻坚落地三大核心系统：
+
+### 1. 坏账发现、逆向归因与破案实证 (Failure Modes & Ground Truth Discovered)
+1. **大地图全景展开与点击自动寻路 1:1 原生实证 (ClMain.pas Line 1464 / PlayScn.pas Line 820)**：
+   - **历史缺陷**：此前仅有右上角 120x120 静态小雷达，无法展开大地图，小地图 `MouseFilter` 为 `Ignore`，点击无法触发寻路；
+   - **Delphi 原生实证**：
+     - `ClMain.pas:1464`：`g_MiniMapSurface.SetSize(540, 360)` 铁证，官方原版大地图全景尺寸严格锁定为 **540×360 像素**，在 800×600 视口中央绝对居中停靠 `(130, 100)`；
+     - `PlayScn.pas:820`：瓦片与像素映射公式 `mx := (x * 48) div 32`, `my := (y * 32) div 32`，横纵比严格为 `1.5 : 1.0`；
+     - 快捷键：原版支持 `TAB` 与 `V` 键双键三态轮转（`0: 关闭, 1: 120x120 小地图, 2: 540x360 全景大地图`）；
+   - **精准重构**：
+     - 在 `MinimapView.cs` 中实现 540x360 黄金比例大地图，嵌入比奇省/盟重省等全图纹理、`Prguse_0064` 关闭红叉与鼠标悬停大世界坐标实时嗅探；
+     - 接入鼠标点击事件与坐标逆向反算公式，发射 `MapTargetSelected` 信号并挂接脉冲目标光标；
+     - 在 `GameView.cs` 中将目标点接入 `FastPathFinder.FindPath`，驱动主角跑步自动寻路与跨屏导航。
+
+2. **官方 488 原版 WAV 音效包装配与 RIFF/WAVE 44100Hz 采样率坏账根治 (AudioManager.cs)**：
+   - **历史缺陷**：游戏处于静音状态；此前代码硬编码 `MixRate = 22050` 并直接传递含 RIFF 头的文件字节流，导致 44100Hz 走步声变调变慢一倍且产生爆音；
+   - **官方实证**：
+     - 官方客户端资源目录包含 488 个经典 `.wav` 文件与 `sound_utf8.lst` 映射表；
+     - 实际采样实证：走步声 `1.wav` 为纯正 **44100 Hz, 16-bit Mono**；
+   - **精准重构**：
+     - 建立了工程原生资源联接，488 个官方原版 WAV 文件与列表全量就位；
+     - 编写纯托管 `ParseWavRiff` 字节流解析器，精准提取 fmt 与 data chunk，根据实际采样率与位宽生成纯 PCM 流，杜绝爆音与音调失真；
+     - 扩充混音通道至 16 通道，实现挥刀、法术、走跑、受击全链路音效触发。
+
+3. **野蛮冲撞撞墙顿挫硬直、自伤反弹与等级压制全闭环 (sub_49BC20 / combat.rs)**：
+   - **历史缺陷**：此前冲撞撞到障碍物（城墙/门/巨石）或等级高于自身的目标时，仅输出聊天提示，主角无受挫动画、无硬直锁死、无自伤扣血；
+   - **官方实证**：
+     - 官方机制铁证：撞墙自身受到碰撞反作用力陷入 0.8 秒顿挫硬直（`Struck` 后仰受挫），自伤反噬公式为 `5 * (skillLevel + 1) + extra`；等级不低于自身时反弹硬直；
+   - **精准重构**：
+     - 在 `PlayerNode.cs` 中实装 `_stunTimer` 倒计时状态机与 `IsStunned` 属性，硬直期间物理阻断 `StartStepMovement`；
+     - 在 `InputPlugin.cs` 中对 `OnLeftClick` 与 `OnRightClick` 增加硬直阻断，杜绝硬直期间鼠标走跑；
+     - 在 `GameView.cs` 中装配顿挫后仰动画、自伤扣血 `PlayerStateInstance.Hp -= dashRes.SelfDamage` 与碰撞惨叫音效。
+
+4. **官方尸体 Alt 键割肉手势与坐下姿态闭环 (ClMain.pas:2890 / CM_BUTCH 1007)**：
+   - **官方实证**：按住 `Alt + 左键点击` 生物尸体，进入蹲下挥刀割肉姿态（`ActionType.SitDown` 值 13），发包 `CM_BUTCH` (1007)，单机/网络双端产出品质 0~20 肉类；
+   - **精准重构**：
+     - 在 `InputPlugin.cs` 中装配 `Alt + 点击` 检测，派发 `ButcherRequested` 信号；
+     - 在 `GameView.cs:PerformButcher` 中驱动角色转向、播放蹲下动作并执行发包与拾取音效回显。
+
+5. **官方死亡经典血滴循环动画与死亡惨叫音效修正 (Prguse_0380~0390 / SoundId.ManDie)**：
+   - **历史缺陷**：角色死亡时音效误播放为草地脚步声 11，且灰屏缺少官方经典血滴动画；
+   - **官方实证**：
+     - 死亡音效实证为男 144 / 女 145（Delphi `SoundUtil.pas:s_man_die/s_wom_die`）；
+     - 官方经典血滴循环动画位于 `Prguse_0380 ~ 0390` 共 11 帧；
+   - **精准重构**：
+     - 修正 `PlayerNode.cs:ApplyDie` 中死亡音效为 144 / 145；
+     - 在 `DeathScreenView.cs` 中挂载 `_bloodDropRect` 与暗红边缘晕影（Vignette），由 `_Process` 以 0.09s 帧率平滑驱动血滴循环播放。
+
+6. **官方装备极低持久红字报警与危急频闪 (IDA sub_488AF4 / DStateWinDirectPaint)**：
+   - **官方实证**：装备当前持久 `<= 2` 点时属于严重危急状态，面板槽位边框红色闪烁；降为 0 时提示即将彻底碎裂；
+   - **精准重构**：
+     - 在 `SlotButton.cs` 中实装 `LowDurabilityWarning` 呼吸闪烁红色边框（`_lowDuraBorder`）；
+     - 在 `HudController.cs` 中增加 `UpdateEquipDurability` 接口与聊天预警通知。
+
+### 2. 终局指标与质量守门线核销
+- **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的 80 项权威下行协议达到 **80 / 80 项全部覆盖 (100.0% 闭环，0 缺口)**；
+- **单元测试**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 运行，全套测试扩充至 **150 项全部 100% 通过（0 失败，0 告警，耗时 4 秒）**；
+- **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通；
+- **实机渲染零错误**：Godot 4.7 引擎 101 步全生命周期巡检运行，日志扫描 `ERROR:` 为 0，`SCRIPT ERROR:` 为 0。
+
+

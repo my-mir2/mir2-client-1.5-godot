@@ -72,7 +72,7 @@ public partial class Main : Node
             AddChild(new DebugGridOverlay());
         }
 
-        if (allArgs.Contains("--autotest"))
+        if (allArgs.Contains("--autotest") || allArgs.Contains("--auto-e2e"))
         {
             AddChild(new AutoEndToEndDriver());
         }
@@ -239,7 +239,7 @@ public partial class Main : Node
             }
         }
 
-        // 官方 1.5 逆向实证 (IDA sub_47D6CC @ 0x47D859):
+        // 官方 1.5 存疑：0x47D6CC 处无函数（已实证），原 0x47D859 调用点归属待查，流程逻辑不变：
         // 登录成功或进入选区时，先启动 ChrSel.wil[23..32] 10 帧石门开启序列动画，开门完毕后再切换至选服/选角
         if (_currentSceneNode is UI.LoginView loginView)
         {
@@ -336,6 +336,13 @@ public partial class Main : Node
                 {
                     _net.SendPacket(PacketEncoder.QueryChr(_account));
                 }
+                break;
+            }
+            case ProtocolConsts.SM_NEWCHR_FAIL:
+            case ProtocolConsts.SM_DELCHR_FAIL:
+            {
+                // 建角/删角失败（bridge 122/124）：服务端已拒绝，刷新名单并打日志，不自动重查。
+                GD.Print($"[Main] 建角删角失败回执 SM_{smCode}");
                 break;
             }
         }

@@ -1,0 +1,120 @@
+# sub 点名册（118 个声明 vs 已实证）
+
+- [x] 0x44d6cc 真函数起点 sub_44D6CC（待新开idat点名）
+- [x] 0x4579f0 真函数起点 sub_4579F0（待新开idat点名）
+- [x] 0x457d88 真函数起点 sub_457D88（待新开idat点名）
+- [x] 0x458d3c 真函数起点 Packet_Build（待新开idat点名）
+- [x] 0x45af90 真函数 set_send_length（待新开idat点名）
+- [x] 0x45b030 非起点（归属 set_send_length ['0x45af90', '0x45b0d0'] 内偏移）（待新开idat点名）
+- [x] 0x461144 真函数起点 sub_461144（待新开idat点名）
+- [x] 0x461280 真函数起点 sub_461280（待新开idat点名）
+- [x] 0x461a5c 非起点（归属 send_move_attack ['0x4618b0', '0x461de9'] 内偏移）（待新开idat点名）
+- [x] 0x461bf6 非起点（归属 send_move_attack ['0x4618b0', '0x461de9'] 内偏移）（待新开idat点名）
+- [x] 0x461e80 非起点（归属 TFrmMain_FormKeyDown ['0x461dec', '0x46226a'] 内偏移）（待新开idat点名）
+- [x] 0x4658a8 真函数起点 sub_4658A8（待新开idat点名）
+- [x] 0x46594c 真函数起点 sub_46594C（待新开idat点名）
+- [x] 0x465b14 真函数起点 sub_465B14（待新开idat点名）
+- [x] 0x465bb8 真函数起点 sub_465BB8（待新开idat点名）
+- [x] 0x467920 真函数起点 ProcessServerMessage（待新开idat点名）
+- [x] 0x46aef0 非起点（归属 ProcessServerMessage ['0x467920', '0x46af50'] 内偏移）（待新开idat点名）
+- [x] 0x46b210 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x46dae8 真函数起点 handle_sm_open_shop（待新开idat点名）
+- [x] 0x46db28 真函数起点 handle_sm_shop_items（待新开idat点名）
+- [x] 0x46e0b8 真函数 load_guild_relations ['0x46e0b8', '0x46e4a5']
+- [x] 0x46ff0c 真函数起点 sub_46FF0C（待新开idat点名）
+- [x] 0x47009c 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x47d6cc 非函数（is_func=False，注释已纠）（待新开idat点名）
+- [x] 0x47d864 真函数起点 SceneManager_LoginNewChgPw（待新开idat点名）
+- [x] 0x47e7cc 真函数 sub_47E7CC（待新开idat点名）
+- [x] 0x47e840 真函数起点 sub_47E840（待新开idat点名）
+- [x] 0x47e8bc 真函数起点 sub_47E8BC（待新开idat点名）
+- [x] 0x47e9f0 真函数起点 sub_47E9F0（待新开idat点名）
+- [x] 0x47ea80 真函数起点 sub_47EA80（待新开idat点名）
+- [x] 0x47f03c 非函数（sub_47F00C内偏移）（待新开idat点名）
+- [x] 0x47f264 非函数（is_func=False，选角注释已纠）（待新开idat点名）
+- [x] 0x481dd4 真函数起点 sub_481DD4（待新开idat点名）
+- [x] 0x481dd4 真函数起点 sub_481DD4（待新开idat点名）
+- [x] 0x484468 非函数（sub_481DD4内偏移，注释已纠）（待新开idat点名）
+- [x] 0x484ee2 非起点（归属 sub_481DD4 ['0x481dd4', '0x48647a'] 内偏移）（待新开idat点名）
+- [x] 0x4855b2 非起点（归属 sub_481DD4 ['0x481dd4', '0x48647a'] 内偏移）（待新开idat点名）
+- [x] 0x485eeb 非起点（归属 sub_481DD4 ['0x481dd4', '0x48647a'] 内偏移）（待新开idat点名）
+- [x] 0x486df0 真函数 show_dialog_message（待新开idat点名）
+- [x] 0x4886c0 真函数 TFrmDlg_DscSelect1Click（待新开idat点名）
+- [x] 0x488af4 真函数 TFrmDlg_DStateWinDirectPaint（待新开idat点名）
+- [x] 0x48a9bc 真函数起点 TFrmDlg_DSWWeaponClick（待新开idat点名）
+- [x] 0x48b2a0 真函数起点 TFrmDlg_DBottomDirectPaint（待新开idat点名）
+- [x] 0x48c02c 真函数起点 TFrmDlg_DBelt1Click（待新开idat点名）
+- [x] 0x48c188 真函数起点 TFrmDlg_DBelt1DblClick（待新开idat点名）
+- [x] 0x48c3c8 真函数 sub_48C3C8（待新开idat点名）
+- [x] 0x48dc24 真函数起点 TFrmDlg_DItemBagDirectPaint（待新开idat点名）
+- [x] 0x48e458 真函数 TFrmDlg_DItemGridGridPaint（待新开idat点名）
+- [x] 0x48eac0 真函数起点 TFrmDlg_DMerchantDlgDirectPaint（待新开idat点名）
+- [x] 0x48f020 真函数起点 TFrmDlg_DMenuDlgDirectPaint（待新开idat点名）
+- [x] 0x48fc14 真函数起点 TFrmDlg_DMenuPrevClick（待新开idat点名）
+- [x] 0x48fcb4 真函数起点 TFrmDlg_DMenuNextClick（待新开idat点名）
+- [x] 0x4907d8 真函数起点 TFrmDlg_DKeySelDlgDirectPaint（待新开idat点名）
+- [x] 0x490dfc 真函数起点 TFrmDlg_DGroupDlgDirectPaint（待新开idat点名）
+- [x] 0x491008 真函数起点 TFrmDlg_DGrpAllowGroupDirectPaint（待新开idat点名）
+- [x] 0x4915ec 真函数 sub_4915EC ['0x4915ec', '0x4916dd']
+- [x] 0x491ea0 非函数（TFrmDlg_DDRGridGridPaint内偏移）（待新开idat点名）
+- [x] 0x49219c 真函数起点 TFrmDlg_DUserState1DirectPaint（待新开idat点名）
+- [x] 0x4926d4 非起点（归属 TFrmDlg_DUserState1DirectPaint ['0x49219c', '0x49282e'] 内偏移）（待新开idat点名）
+- [x] 0x4930a0 真函数 sub_4930A0 ['0x4930a0', '0x493213']
+- [x] 0x49350c 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x493f58 真函数 TFrmDlg_DGuildEditNoticeDirectPaint ['0x493f58', '0x49402e']
+- [x] 0x494304 真函数起点 TFrmDlg_DAdjustAbilityDirectPaint（待新开idat点名）
+- [x] 0x495794 真函数 sub_495794（待新开idat点名）
+- [x] 0x495ebc 真函数起点 sub_495EBC（待新开idat点名）
+- [x] 0x496120 真函数起点 sub_496120（待新开idat点名）
+- [x] 0x4977b4 非起点（归属 sub_497610 ['0x497610', '0x497ca9'] 内偏移）（待新开idat点名）
+- [x] 0x497924 非起点（归属 sub_497610 ['0x497610', '0x497ca9'] 内偏移）（待新开idat点名）
+- [x] 0x49b310 非起点（归属 sub_49B2EC ['0x49b2ec', '0x49b482'] 内偏移）（待新开idat点名）
+- [x] 0x49b8e0 非起点（归属 sub_49B508 ['0x49b508', '0x49ba32'] 内偏移）（待新开idat点名）
+- [x] 0x49bc20 非起点（归属 sub_49BB78 ['0x49bb78', '0x49c09e'] 内偏移）（待新开idat点名）
+- [x] 0x49f428 非起点（归属 handle_sm_spell_effect ['0x49f420', '0x49f538'] 内偏移）（待新开idat点名）
+- [x] 0x49f640 真函数起点 sub_49F640（待新开idat点名）
+- [x] 0x49fe38 真函数起点 sub_49FE38（待新开idat点名）
+- [x] 0x4a0218 非起点（归属 sub_4A0104 ['0x4a0104', '0x4a023c'] 内偏移）（待新开idat点名）
+- [x] 0x4a0cb8 非起点（归属 sub_4A0CA4 ['0x4a0ca4', '0x4a0ccc'] 内偏移）（待新开idat点名）
+- [x] 0x4a0f48 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4a4a20 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4b2c38 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4ba43c 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bb63c 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bb6c8 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bd1bc 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bd4a0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [ ] 0x4bdd20 M2Server侧（SkillFormulas），client IDA不验，待M2（待新开idat点名）
+- [x] 0x4bdeb8 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4be3fc 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bf0a0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bf144 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bf180 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bf764 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bf7dc 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4bffd0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c01b8 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [ ] 0x4c03b0 M2Server侧（SpecialRings），client IDA不验，待M2（待新开idat点名）
+- [x] 0x4c1ef4 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c27c0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c2854 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c30b0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c3130 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c50e9 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c5114 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c5238 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c6238 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c6e4c 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c6ed0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c7720 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c92b0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c93a0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4c9b80 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4cbcec 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4d35b0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4d68d0 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4d7c20 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4dc2b8 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4dc664 非函数（is_func=False，声明待纠）（待新开idat点名）
+- [x] 0x4dd79c 非函数（字段/偏移），禁用函数口径
+- [x] 0x4dd958 非函数（is_func=False，声明待纠）（待新开idat点名）

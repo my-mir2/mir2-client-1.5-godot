@@ -42,6 +42,7 @@ namespace Mir2Client.Game
         public int BodyDressType { get; set; } = 0;
         public int WeaponType { get; set; } = 0;
         public int HairStyle { get; set; } = 1;
+        public int Gender { get; set; } = 0; // 0: 男, 1: 女
 
         public string GuildName { get; set; } = string.Empty;
         public string GuildRank { get; set; } = string.Empty;
@@ -54,7 +55,7 @@ namespace Mir2Client.Game
         private ColorRect? _hpBarFill;
         private float _hpBarHideTimer = 0f;
 
-        public int PkPoints { get; set; } = 0; // 0~99 白名, 100~199 黄名, >=200 红名 (IDA sub_4D68D0)
+        public int PkPoints { get; set; } = 0; // 0~99 白名, 100~199 黄名, >=200 红名 (IDA 0x4D68D0（已证client无函数）)
 
         private WilLoader? _wilHum;
         private WilLoader? _wilWeapon;
@@ -102,7 +103,7 @@ namespace Mir2Client.Game
             _nameLabel.AddThemeConstantOverride("outline_size", 2);
             AddChild(_nameLabel);
 
-            // 官方 1.5 角色/怪物受击头顶微型血条 (IDA sub_46B210, 36x3 像素)
+            // 官方 1.5 角色/怪物受击头顶微型血条 (IDA 0x46B210（已证client无函数）, 36x3 像素)
             _hpBarBg = new ColorRect
             {
                 Name = "HpBarBg",
@@ -160,7 +161,7 @@ namespace Mir2Client.Game
         {
             if (_nameLabel == null) return;
 
-            // 依据 PK 点数设置名字颜色 (IDA sub_4D68D0: 白名/黄名/红名)
+            // 依据 PK 点数设置名字颜色 (IDA 0x4D68D0（已证client无函数）: 白名/黄名/红名)
             Color nameColor = PkPoints switch
             {
                 >= 200 => new Color(1.0f, 0.15f, 0.15f), // 鲜红名 (大恶魔)
@@ -199,8 +200,21 @@ namespace Mir2Client.Game
             SyncCameraAndPlayer(staticWorld);
         }
 
+        private float _stunTimer = 0f;
+        public bool IsStunned => _stunTimer > 0f;
+
+        public void TriggerStun(float durationSec, ActionType animAction = ActionType.Struck)
+        {
+            _stunTimer = Math.Max(_stunTimer, durationSec);
+            _isMoving = false;
+            _pathQueue.Clear();
+            Anim.SetAction(animAction, Direction);
+        }
+
         public void StartStepMovement(int tx, int ty, int stepTiles, ActionType action, int dir)
         {
+            if (IsStunned || IsDead) return;
+
             _isMoving = true;
             _moveStartWorld = new Vector2(TileX * 48, TileY * 32);
             _moveTargetWorld = new Vector2(tx * 48, ty * 32);
@@ -210,6 +224,17 @@ namespace Mir2Client.Game
             _moveTimer = 0f;
             _moveDuration = stepTiles == 1 ? 0.60f : 0.50f;
             Anim.SetAction(action, dir);
+
+            // 触发官方 1:1 左右脚交替脚步声 (对齐 Delphi SoundUtil.pas: s_walk_ground / s_run_ground)
+            if (action == ActionType.Run)
+            {
+                AudioManager.Instance?.PlayRunStepSound();
+            }
+            else
+            {
+                AudioManager.Instance?.PlayWalkStepSound();
+            }
+
             EmitSignal(SignalName.StepStarted, tx, ty, Direction, action == ActionType.Run);
         }
 
@@ -271,7 +296,7 @@ namespace Mir2Client.Game
         {
             float dt = (float)delta;
 
-            // 盛大官方 1.5 角色/怪物受击微型血条 3 秒防抖倒计时自动隐匿 (IDA sub_46B210)
+            // 盛大官方 1.5 角色/怪物受击微型血条 3 秒防抖倒计时自动隐匿 (IDA 0x46B210（已证client无函数）)
             if (_hpBarHideTimer > 0f)
             {
                 _hpBarHideTimer -= dt;
@@ -279,6 +304,16 @@ namespace Mir2Client.Game
                 {
                     _hpBarHideTimer = 0f;
                     if (_hpBarBg != null) _hpBarBg.Visible = false;
+                }
+            }
+
+            if (_stunTimer > 0f)
+            {
+                _stunTimer -= dt;
+                if (_stunTimer <= 0f)
+                {
+                    _stunTimer = 0f;
+                    Anim.SetAction(ActionType.Stand, Direction);
                 }
             }
 
@@ -373,7 +408,9 @@ namespace Mir2Client.Game
         {
             IsDead = true;
             Anim.SetAction(ActionType.Die);
-            AudioManager.Instance?.PlaySoundId(11);
+            // 播放官方死亡惨叫音效 (男 144 / 女 145，对齐 Delphi SoundUtil.pas:s_man_die/s_wom_die)
+            int dieSfx = Gender == 0 ? AudioManager.SoundId.ManDie : AudioManager.SoundId.WomDie;
+            AudioManager.Instance?.PlaySoundId(dieSfx);
             EmitSignal(SignalName.PlayerDied);
         }
 

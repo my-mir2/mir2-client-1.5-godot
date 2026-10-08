@@ -81,8 +81,10 @@ public sealed class PlayerState
     public int BaseMaxHandWeight { get; set; } = 40;
     public int MaxHandWeight { get; set; } = 40;
 
-    // 金币单人严格 500 万上限 (sub_4A4A20)
-    public const int MaxGoldLimit = 5_000_000;
+    // 金币单人严格 500 万上限 (0x4A4A20（已证client无函数）)
+    // 金币上限 10,000,000：M2 sub_4DDC8C *(v43+616)=0x989680 与 Rust trade.rs MAX_GOLD_CAP 一致；
+    // 原 5M 为误标（Rust 侧背包金 5M/交易金 10M 分轨，此处为交易与持有统一上限）。
+    public const int MaxGoldLimit = 10_000_000;
     private int _gold;
     public int Gold
     {
@@ -325,9 +327,9 @@ public sealed class PlayerState
     /// <summary>
     /// 实体攻击目标时触发麻痹戒指判定
     /// </summary>
-    public (bool isParalyzed, int durationSec) TryParalyzeTarget(int targetPoisonRecover, bool targetAntiParalysis = false, int rngRoll = -1)
+    public (bool isParalyzed, int durationSec) TryParalyzeTarget(int targetAntiPoison, bool targetAntiParalysis = false, int rngRoll = -1)
     {
-        var res = SpecialRings.TriggerParalysisRing(HasParalysisRing, targetPoisonRecover, targetAntiParalysis, rngRoll);
+        var res = SpecialRings.TriggerParalysisRing(HasParalysisRing, targetAntiPoison, targetAntiParalysis, rngRoll);
         return (res.isParalyzed, res.durationSec);
     }
 

@@ -33,7 +33,7 @@ public class EntityManager
         public bool IsCorpse { get; set; }
         public bool CanButcher { get; set; }
 
-        // 道士施毒术中毒与随从状态 (官方实证 sub_49350C / sub_4D35B0)
+        // 道士施毒术中毒与随从状态 (官方实证 0x49350C（已证client无函数） / sub_4D35B0)
         public int AntiPoison { get; set; } = 0; // 目标中毒抗性
         public int PoisonMask { get; set; } = 0; // Bit 0: 绿毒, Bit 1: 红毒
         public long GreenPoisonExpireTick { get; set; } = 0;

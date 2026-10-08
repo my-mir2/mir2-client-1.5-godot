@@ -1,0 +1,120 @@
+[
+  {
+    "ea": "0x4b2c38",
+    "is_func": false
+  },
+  {
+    "ea": "0x4ba43c",
+    "is_func": false
+  },
+  {
+    "ea": "0x4bb63c",
+    "is_func": false
+  },
+  {
+    "ea": "0x4bb6c8",
+    "is_func": false
+  },
+  {
+    "ea": "0x4bd4a0",
+    "is_func": true,
+    "name": "sub_4BD48C",
+    "range": [
+      "0x4bd48c",
+      "0x4bd4ac"
+    ],
+    "is_start": false
+  },
+  {
+    "ea": "0x4bdd20",
+    "is_func": true,
+    "name": "sub_4BDCFC",
+    "range": [
+      "0x4bdcfc",
+      "0x4bdd36"
+    ],
+    "is_start": false
+  },
+  {
+    "ea": "0x4bdeb8",
+    "is_func": false
+  },
+  {
+    "ea": "0x4be3fc",
+    "is_func": false
+  },
+  {
+    "ea": "0x4bf0a0",
+    "is_func": false
+  },
+  {
+    "ea": "0x4bf180",
+    "is_func": false
+  },
+  {
+    "ea": "0x4bf7dc",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c01b8",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c03b0",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c1ef4",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c2854",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c3130",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c50e9",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c5114",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c5238",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c6238",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c6e4c",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c7720",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c93a0",
+    "is_func": false
+  },
+  {
+    "ea": "0x4c9b80",
+    "is_func": false
+  },
+  {
+    "ea": "0x4cbcec",
+    "is_func": true,
+    "name": "sub_4CBCD0",
+    "range": [
+      "0x4cbcd0",
+      "0x4cbd12"
+    ],
+    "is_start": false
+  }
+]

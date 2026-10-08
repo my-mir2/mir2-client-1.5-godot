@@ -1,0 +1,30 @@
+[
+  {
+    "ea": "0x4bd48c",
+    "pseudo": "int sub_4BD48C()\n{\n  sub_50D504(4, dword_454974);\n  return sub_40F428();\n}\n"
+  },
+  {
+    "ea": "0x4bdcfc",
+    "pseudo": "int __usercall sub_4BDCFC@<eax>(__int64 a1@<edx:eax>)\n{\n  char v1; // bl\n  int v2; // edi\n\n  if ( BYTE4(a1) != 0 )\n    a1 = sub_409444();\n  v1 = BYTE4(a1);\n  v2 = a1;\n  sub_40F428();\n  if ( v1 != 0 )\n    sub_40949C();\n  return v2;\n}\n"
+  },
+  {
+    "ea": "0x4cbcd0",
+    "pseudo": "int sub_4CBCD0()\n{\n  __int64 v0; // rax\n  char v1; // bl\n  int v2; // ebp\n  int v3; // esi\n  int result; // eax\n\n  v0 = sub_4094EC();\n  v1 = BYTE4(v0);\n  if ( *(_DWORD *)(v0 + 16) - 1 >= 0 )\n  {\n    v2 = *(_DWORD *)(v0 + 16);\n    v3 = 0;\n    do\n    {\n      sub_408E1C();\n      ++v3;\n      --v2;\n    }\n    while ( v2 != 0 );\n  }\n  result = sub_408E0C();\n  if ( v1 > 0 )\n    return sub_409494();\n  return result;\n}\n"
+  },
+  {
+    "ea": "0x4c1ef4",
+    "bytes": "0002771f4c00020002981f4c00020002"
+  },
+  {
+    "ea": "0x4c7720",
+    "bytes": "9c104000010005496e64657802001228"
+  },
+  {
+    "ea": "0x4c03b0",
+    "bytes": "46436f6d706172650200000002000804"
+  },
+  {
+    "ea": "0x4be3fc",
+    "bytes": "020044e44b004400f4ff7ce44b004a00"
+  }
+]

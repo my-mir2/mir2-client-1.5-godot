@@ -1,0 +1,838 @@
+[
+  {
+    "sub": "44D6CC",
+    "ea": "0x44d6cc",
+    "is_func": true,
+    "name": "sub_44D6CC",
+    "range": [
+      "0x44d6cc",
+      "0x44d879"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "4579F0",
+    "ea": "0x4579f0",
+    "is_func": true,
+    "name": "sub_4579F0",
+    "range": [
+      "0x4579f0",
+      "0x457a59"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "457D88",
+    "ea": "0x457d88",
+    "is_func": true,
+    "name": "sub_457D88",
+    "range": [
+      "0x457d88",
+      "0x457e36"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "458D3C",
+    "ea": "0x458d3c",
+    "is_func": true,
+    "name": "Packet_Build",
+    "range": [
+      "0x458d3c",
+      "0x458d87"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "45B030",
+    "ea": "0x45b030",
+    "is_func": true,
+    "name": "set_send_length",
+    "range": [
+      "0x45af90",
+      "0x45b0d0"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "461144",
+    "ea": "0x461144",
+    "is_func": true,
+    "name": "sub_461144",
+    "range": [
+      "0x461144",
+      "0x461235"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "461280",
+    "ea": "0x461280",
+    "is_func": true,
+    "name": "sub_461280",
+    "range": [
+      "0x461280",
+      "0x46132a"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "461A5C",
+    "ea": "0x461a5c",
+    "is_func": true,
+    "name": "send_move_attack",
+    "range": [
+      "0x4618b0",
+      "0x461de9"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "461BF6",
+    "ea": "0x461bf6",
+    "is_func": true,
+    "name": "send_move_attack",
+    "range": [
+      "0x4618b0",
+      "0x461de9"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "461E80",
+    "ea": "0x461e80",
+    "is_func": true,
+    "name": "TFrmMain_FormKeyDown",
+    "range": [
+      "0x461dec",
+      "0x46226a"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "4658A8",
+    "ea": "0x4658a8",
+    "is_func": true,
+    "name": "sub_4658A8",
+    "range": [
+      "0x4658a8",
+      "0x465949"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "46594C",
+    "ea": "0x46594c",
+    "is_func": true,
+    "name": "sub_46594C",
+    "range": [
+      "0x46594c",
+      "0x4659c3"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "465B14",
+    "ea": "0x465b14",
+    "is_func": true,
+    "name": "sub_465B14",
+    "range": [
+      "0x465b14",
+      "0x465bb5"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "465BB8",
+    "ea": "0x465bb8",
+    "is_func": true,
+    "name": "sub_465BB8",
+    "range": [
+      "0x465bb8",
+      "0x465c33"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "467920",
+    "ea": "0x467920",
+    "is_func": true,
+    "name": "ProcessServerMessage",
+    "range": [
+      "0x467920",
+      "0x46af50"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "46AEF0",
+    "ea": "0x46aef0",
+    "is_func": true,
+    "name": "ProcessServerMessage",
+    "range": [
+      "0x467920",
+      "0x46af50"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "46B210",
+    "ea": "0x46b210",
+    "is_func": false
+  },
+  {
+    "sub": "46DAE8",
+    "ea": "0x46dae8",
+    "is_func": true,
+    "name": "handle_sm_open_shop",
+    "range": [
+      "0x46dae8",
+      "0x46db26"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "46DB28",
+    "ea": "0x46db28",
+    "is_func": true,
+    "name": "handle_sm_shop_items",
+    "range": [
+      "0x46db28",
+      "0x46dd26"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "46FF0C",
+    "ea": "0x46ff0c",
+    "is_func": true,
+    "name": "sub_46FF0C",
+    "range": [
+      "0x46ff0c",
+      "0x47009a"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "47009C",
+    "ea": "0x47009c",
+    "is_func": false
+  },
+  {
+    "sub": "47D864",
+    "ea": "0x47d864",
+    "is_func": true,
+    "name": "SceneManager_LoginNewChgPw",
+    "range": [
+      "0x47d864",
+      "0x47db21"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "47E840",
+    "ea": "0x47e840",
+    "is_func": true,
+    "name": "sub_47E840",
+    "range": [
+      "0x47e840",
+      "0x47e8ba"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "47E8BC",
+    "ea": "0x47e8bc",
+    "is_func": true,
+    "name": "sub_47E8BC",
+    "range": [
+      "0x47e8bc",
+      "0x47e997"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "47E9F0",
+    "ea": "0x47e9f0",
+    "is_func": true,
+    "name": "sub_47E9F0",
+    "range": [
+      "0x47e9f0",
+      "0x47ea49"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "47EA80",
+    "ea": "0x47ea80",
+    "is_func": true,
+    "name": "sub_47EA80",
+    "range": [
+      "0x47ea80",
+      "0x47ebd6"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "481DD4",
+    "ea": "0x481dd4",
+    "is_func": true,
+    "name": "sub_481DD4",
+    "range": [
+      "0x481dd4",
+      "0x48647a"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "481dd4",
+    "ea": "0x481dd4",
+    "is_func": true,
+    "name": "sub_481DD4",
+    "range": [
+      "0x481dd4",
+      "0x48647a"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "484ee2",
+    "ea": "0x484ee2",
+    "is_func": true,
+    "name": "sub_481DD4",
+    "range": [
+      "0x481dd4",
+      "0x48647a"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "4855b2",
+    "ea": "0x4855b2",
+    "is_func": true,
+    "name": "sub_481DD4",
+    "range": [
+      "0x481dd4",
+      "0x48647a"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "485eeb",
+    "ea": "0x485eeb",
+    "is_func": true,
+    "name": "sub_481DD4",
+    "range": [
+      "0x481dd4",
+      "0x48647a"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "48A9BC",
+    "ea": "0x48a9bc",
+    "is_func": true,
+    "name": "TFrmDlg_DSWWeaponClick",
+    "range": [
+      "0x48a9bc",
+      "0x48ae2b"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "48B2A0",
+    "ea": "0x48b2a0",
+    "is_func": true,
+    "name": "TFrmDlg_DBottomDirectPaint",
+    "range": [
+      "0x48b2a0",
+      "0x48ba70"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "48C02C",
+    "ea": "0x48c02c",
+    "is_func": true,
+    "name": "TFrmDlg_DBelt1Click",
+    "range": [
+      "0x48c02c",
+      "0x48c187"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "48C188",
+    "ea": "0x48c188",
+    "is_func": true,
+    "name": "TFrmDlg_DBelt1DblClick",
+    "range": [
+      "0x48c188",
+      "0x48c227"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "48DC24",
+    "ea": "0x48dc24",
+    "is_func": true,
+    "name": "TFrmDlg_DItemBagDirectPaint",
+    "range": [
+      "0x48dc24",
+      "0x48deba"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "48EAC0",
+    "ea": "0x48eac0",
+    "is_func": true,
+    "name": "TFrmDlg_DMerchantDlgDirectPaint",
+    "range": [
+      "0x48eac0",
+      "0x48ef5b"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "48F020",
+    "ea": "0x48f020",
+    "is_func": true,
+    "name": "TFrmDlg_DMenuDlgDirectPaint",
+    "range": [
+      "0x48f020",
+      "0x48f5cb"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "48FC14",
+    "ea": "0x48fc14",
+    "is_func": true,
+    "name": "TFrmDlg_DMenuPrevClick",
+    "range": [
+      "0x48fc14",
+      "0x48fcb3"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "48FCB4",
+    "ea": "0x48fcb4",
+    "is_func": true,
+    "name": "TFrmDlg_DMenuNextClick",
+    "range": [
+      "0x48fcb4",
+      "0x48fd2c"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "4907D8",
+    "ea": "0x4907d8",
+    "is_func": true,
+    "name": "TFrmDlg_DKeySelDlgDirectPaint",
+    "range": [
+      "0x4907d8",
+      "0x490901"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "490DFC",
+    "ea": "0x490dfc",
+    "is_func": true,
+    "name": "TFrmDlg_DGroupDlgDirectPaint",
+    "range": [
+      "0x490dfc",
+      "0x490fdd"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "491008",
+    "ea": "0x491008",
+    "is_func": true,
+    "name": "TFrmDlg_DGrpAllowGroupDirectPaint",
+    "range": [
+      "0x491008",
+      "0x491103"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "49219C",
+    "ea": "0x49219c",
+    "is_func": true,
+    "name": "TFrmDlg_DUserState1DirectPaint",
+    "range": [
+      "0x49219c",
+      "0x49282e"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "4926D4",
+    "ea": "0x4926d4",
+    "is_func": true,
+    "name": "TFrmDlg_DUserState1DirectPaint",
+    "range": [
+      "0x49219c",
+      "0x49282e"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "49350C",
+    "ea": "0x49350c",
+    "is_func": false
+  },
+  {
+    "sub": "494304",
+    "ea": "0x494304",
+    "is_func": true,
+    "name": "TFrmDlg_DAdjustAbilityDirectPaint",
+    "range": [
+      "0x494304",
+      "0x494eb6"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "495EBC",
+    "ea": "0x495ebc",
+    "is_func": true,
+    "name": "sub_495EBC",
+    "range": [
+      "0x495ebc",
+      "0x49611d"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "496120",
+    "ea": "0x496120",
+    "is_func": true,
+    "name": "sub_496120",
+    "range": [
+      "0x496120",
+      "0x496290"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "4977B4",
+    "ea": "0x4977b4",
+    "is_func": true,
+    "name": "sub_497610",
+    "range": [
+      "0x497610",
+      "0x497ca9"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "497924",
+    "ea": "0x497924",
+    "is_func": true,
+    "name": "sub_497610",
+    "range": [
+      "0x497610",
+      "0x497ca9"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "49B310",
+    "ea": "0x49b310",
+    "is_func": true,
+    "name": "sub_49B2EC",
+    "range": [
+      "0x49b2ec",
+      "0x49b482"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "49B8E0",
+    "ea": "0x49b8e0",
+    "is_func": true,
+    "name": "sub_49B508",
+    "range": [
+      "0x49b508",
+      "0x49ba32"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "49BC20",
+    "ea": "0x49bc20",
+    "is_func": true,
+    "name": "sub_49BB78",
+    "range": [
+      "0x49bb78",
+      "0x49c09e"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "49F428",
+    "ea": "0x49f428",
+    "is_func": true,
+    "name": "handle_sm_spell_effect",
+    "range": [
+      "0x49f420",
+      "0x49f538"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "49F640",
+    "ea": "0x49f640",
+    "is_func": true,
+    "name": "sub_49F640",
+    "range": [
+      "0x49f640",
+      "0x49f73d"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "49FE38",
+    "ea": "0x49fe38",
+    "is_func": true,
+    "name": "sub_49FE38",
+    "range": [
+      "0x49fe38",
+      "0x49fe80"
+    ],
+    "is_start": true
+  },
+  {
+    "sub": "4A0218",
+    "ea": "0x4a0218",
+    "is_func": true,
+    "name": "sub_4A0104",
+    "range": [
+      "0x4a0104",
+      "0x4a023c"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "4A0CB8",
+    "ea": "0x4a0cb8",
+    "is_func": true,
+    "name": "sub_4A0CA4",
+    "range": [
+      "0x4a0ca4",
+      "0x4a0ccc"
+    ],
+    "is_start": false
+  },
+  {
+    "sub": "4A0F48",
+    "ea": "0x4a0f48",
+    "is_func": false
+  },
+  {
+    "sub": "4A4A20",
+    "ea": "0x4a4a20",
+    "is_func": false
+  },
+  {
+    "sub": "4B2C38",
+    "ea": "0x4b2c38",
+    "is_func": false
+  },
+  {
+    "sub": "4BA43C",
+    "ea": "0x4ba43c",
+    "is_func": false
+  },
+  {
+    "sub": "4BB63C",
+    "ea": "0x4bb63c",
+    "is_func": false
+  },
+  {
+    "sub": "4BB6C8",
+    "ea": "0x4bb6c8",
+    "is_func": false
+  },
+  {
+    "sub": "4BD1BC",
+    "ea": "0x4bd1bc",
+    "is_func": false
+  },
+  {
+    "sub": "4BD4A0",
+    "ea": "0x4bd4a0",
+    "is_func": false
+  },
+  {
+    "sub": "4BDD20",
+    "ea": "0x4bdd20",
+    "is_func": false
+  },
+  {
+    "sub": "4BDEB8",
+    "ea": "0x4bdeb8",
+    "is_func": false
+  },
+  {
+    "sub": "4BE3FC",
+    "ea": "0x4be3fc",
+    "is_func": false
+  },
+  {
+    "sub": "4BF0A0",
+    "ea": "0x4bf0a0",
+    "is_func": false
+  },
+  {
+    "sub": "4BF144",
+    "ea": "0x4bf144",
+    "is_func": false
+  },
+  {
+    "sub": "4BF180",
+    "ea": "0x4bf180",
+    "is_func": false
+  },
+  {
+    "sub": "4BF764",
+    "ea": "0x4bf764",
+    "is_func": false
+  },
+  {
+    "sub": "4BF7DC",
+    "ea": "0x4bf7dc",
+    "is_func": false
+  },
+  {
+    "sub": "4BFFD0",
+    "ea": "0x4bffd0",
+    "is_func": false
+  },
+  {
+    "sub": "4C01B8",
+    "ea": "0x4c01b8",
+    "is_func": false
+  },
+  {
+    "sub": "4C03B0",
+    "ea": "0x4c03b0",
+    "is_func": false
+  },
+  {
+    "sub": "4C1EF4",
+    "ea": "0x4c1ef4",
+    "is_func": false
+  },
+  {
+    "sub": "4C27C0",
+    "ea": "0x4c27c0",
+    "is_func": false
+  },
+  {
+    "sub": "4C2854",
+    "ea": "0x4c2854",
+    "is_func": false
+  },
+  {
+    "sub": "4C30B0",
+    "ea": "0x4c30b0",
+    "is_func": false
+  },
+  {
+    "sub": "4C3130",
+    "ea": "0x4c3130",
+    "is_func": false
+  },
+  {
+    "sub": "4C50E9",
+    "ea": "0x4c50e9",
+    "is_func": false
+  },
+  {
+    "sub": "4C5114",
+    "ea": "0x4c5114",
+    "is_func": false
+  },
+  {
+    "sub": "4C5238",
+    "ea": "0x4c5238",
+    "is_func": false
+  },
+  {
+    "sub": "4C6238",
+    "ea": "0x4c6238",
+    "is_func": false
+  },
+  {
+    "sub": "4C6E4C",
+    "ea": "0x4c6e4c",
+    "is_func": false
+  },
+  {
+    "sub": "4C6ED0",
+    "ea": "0x4c6ed0",
+    "is_func": false
+  },
+  {
+    "sub": "4C7720",
+    "ea": "0x4c7720",
+    "is_func": false
+  },
+  {
+    "sub": "4C92B0",
+    "ea": "0x4c92b0",
+    "is_func": false
+  },
+  {
+    "sub": "4C93A0",
+    "ea": "0x4c93a0",
+    "is_func": false
+  },
+  {
+    "sub": "4C9B80",
+    "ea": "0x4c9b80",
+    "is_func": false
+  },
+  {
+    "sub": "4CBCEC",
+    "ea": "0x4cbcec",
+    "is_func": false
+  },
+  {
+    "sub": "4D35B0",
+    "ea": "0x4d35b0",
+    "is_func": false
+  },
+  {
+    "sub": "4D68D0",
+    "ea": "0x4d68d0",
+    "is_func": false
+  },
+  {
+    "sub": "4D7C20",
+    "ea": "0x4d7c20",
+    "is_func": false
+  },
+  {
+    "sub": "4DC2B8",
+    "ea": "0x4dc2b8",
+    "is_func": false
+  },
+  {
+    "sub": "4DC664",
+    "ea": "0x4dc664",
+    "is_func": false
+  },
+  {
+    "sub": "4DD958",
+    "ea": "0x4dd958",
+    "is_func": false
+  }
+]

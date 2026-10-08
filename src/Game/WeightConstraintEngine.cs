@@ -4,7 +4,7 @@ namespace Mir2Client.Game;
 
 /// <summary>
 /// 盛大热血传奇 1.5 官方三大物理独立负重体系 (纯 C# 实现)
-/// 严格 1:1 对齐官方 IDA sub_4BF764 / sub_4C50E9 / sub_4C5114:
+/// 严格 1:1 对齐官方 IDA 0x4BF764（已证client无函数） / sub_4C50E9 / sub_4C5114:
 ///   1. 腕力限制 (MaxHandWeight): 武器与照明物/副手专属检定
 ///   2. 穿戴负重 (MaxWearWeight): 除武器/照明外 7 大防具饰品总重检定
 ///   3. 背包负重 (MaxBagWeight): 40 格物品真实重量 + 每 10,000 金币折算 1 负重

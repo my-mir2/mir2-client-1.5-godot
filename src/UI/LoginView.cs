@@ -7,7 +7,7 @@ namespace Mir2Client.UI;
 /// <summary>
 /// 盛大官方 1.5 经典账号登录主窗体 (纯 C# 场景驱动控制器)
 /// 严格 1:1 绑定 scenes/Login.tscn 场景树原生节点
-/// 贴图基准：ChrSel.wil[22] 背景 + Prguse.wil[60] 石质登录框 (IDA sub_47F03C / sub_47F264)
+/// 贴图基准：ChrSel.wil[22] 背景 + Prguse.wil[60] 石质登录框 (IDA sub_47F00C 内偏移 0x47F03C；0x47F264 已证无函数)
 /// </summary>
 public partial class LoginView : Control
 {
@@ -23,7 +23,7 @@ public partial class LoginView : Control
     public string ServerHost { get; set; } = "127.0.0.1";
     public int ServerPort { get; set; } = 7001;
 
-    // 官方 1.5 IDA 逆向实证常量 (sub_47D6CC / sub_47D864)
+    // 官方 1.5 IDA 逆向存疑：0x47D6CC 处无函数（已实证 is_func=False），开门帧 23..32 以 ChrSel.wil 为准；0x47D864 待证
     public const int OfficialDoorStartFrame = 23; // ChrSel.wil[23] 开门首帧
     public const int OfficialDoorEndFrame = 32;   // ChrSel.wil[32] 开门尾帧 (全开黑洞)
     public const int OfficialDoorTotalFrames = 10;
@@ -47,7 +47,7 @@ public partial class LoginView : Control
     private double _doorTimer = 0.0;
     private Action? _onDoorOpenedCallback;
 
-    // 官方 1.5 子面板 (IDA sub_47D864: 0x0B=新用户, 0x0C=改密)
+    // 官方 1.5 子面板 (IDA 0x47D864（待实证）: 0x0B=新用户, 0x0C=改密)
     private Panel? _newUserPanel;
     private LineEdit? _txtRegUser;
     private LineEdit? _txtRegPass1;
@@ -94,7 +94,7 @@ public partial class LoginView : Control
             }
         }
 
-        // 2. 预加载官方开门动画纹理序列 (ChrSel.wil[23..32], IDA sub_47D6CC @ 0x47D7D2)
+        // 2. 预加载官方开门动画纹理序列 (ChrSel.wil[23..32], IDA 0x47D6CC（已证无函数） @ 0x47D7D2)
         _doorAnimRect = GetNodeOrNull<TextureRect>("DoorAnimation");
         for (int i = 0; i < OfficialDoorTotalFrames; i++)
         {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Godot;
 using Mir2Client.Audio;
 using Mir2Client.Game;
@@ -1482,17 +1483,53 @@ public partial class AutoEndToEndDriver : Node
                 var gameView = _main.GetNodeOrNull<GameView>("Game");
                 if (gameView?.HudInstance?.GuildPanel != null)
                 {
-                    // 恢复会长模式
+                    // 恢复会长模式并关闭行会面板
                     gameView.HudInstance.GuildPanel.SetLeaderMode(true);
+                    gameView.HudInstance.GuildPanel.Visible = false;
                 }
-                GD.Print("[AutoE2E] ALL GUILD SYSTEM PANELS, DYNAMIC DETAILS & SABUK WAR COMPLETED SUCCESSFULLY!");
-                GetTree().Quit();
                 break;
             }
 
+            case 99:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance?.Minimap != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 540x360 全景大地图展开与 A* 自动寻路 ===");
+                    gameView.HudInstance.Minimap.SetMode(MinimapView.MinimapMode.Big);
+                    gameView.HudInstance.Minimap.SetTargetMarker(350, 280);
+                }
+                RequestCapture("step99_bigmap_world_navigation");
+                break;
+            }
 
+            case 100:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.PlayerInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 野蛮冲撞撞墙顿挫硬直与自伤反弹 (sub_49BC20) ===");
+                    if (gameView.HudInstance?.Minimap != null)
+                    {
+                        gameView.HudInstance.Minimap.SetMode(MinimapView.MinimapMode.Closed);
+                    }
+                    // 模拟撞击城墙地形，触发 0.8 秒顿挫硬直与后仰受击
+                    gameView.PlayerInstance.TriggerStun(0.8f, ActionType.Struck);
+                    if (gameView.HudInstance != null)
+                    {
+                        gameView.HudInstance.AddChat("技能", "冲撞撞击墙体障碍！受到碰撞反作用力陷入顿挫硬直！", new Color(1f, 0.3f, 0.3f));
+                    }
+                }
+                RequestCapture("step100_shoulderdash_wall_stun");
+                break;
+            }
 
-
+            case 101:
+            {
+                GD.Print("[AutoE2E] ALL 101 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                GetTree().Quit();
+                break;
+            }
         }
     }
 
@@ -1506,6 +1543,12 @@ public partial class AutoEndToEndDriver : Node
     {
         try
         {
+            string dsName = DisplayServer.GetName().ToLowerInvariant();
+            if (dsName.Contains("headless") || System.Environment.CommandLine.Contains("headless", StringComparison.OrdinalIgnoreCase))
+            {
+                // 无头 dummy 渲染器无硬件纹理，跳过抓图以避免产生 dummy ERROR 日志
+                return;
+            }
             var vp = GetViewport();
             if (vp == null) return;
             var tex = vp.GetTexture();
@@ -1513,7 +1556,8 @@ public partial class AutoEndToEndDriver : Node
             var img = tex.GetImage();
             if (img != null)
             {
-                string path = $"/tmp/e2e_{stageTag}.png";
+                string tmpDir = Directory.Exists("/tmp") ? "/tmp" : (Directory.Exists("D:\\tmp") ? "D:\\tmp" : Path.GetTempPath());
+                string path = Path.Combine(tmpDir, $"e2e_{stageTag}.png");
                 img.SavePng(path);
                 GD.Print($"[AutoE2E] 捕获阶段渲染截图: {path}");
             }

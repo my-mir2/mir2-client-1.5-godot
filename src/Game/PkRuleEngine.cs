@@ -6,9 +6,9 @@ namespace Mir2Client.Game;
 /// 盛大官方 1.5 PK 红黄名与城镇守卫规则引擎 (Delphi 权威 1:1 还原)
 /// 逆向实证锚点:
 /// - 恶性谋杀与 PKLevel 计算: IDA sub_4BF0A0 @ 0x4BF0A0..0x4BF120 (PKLevel = pk_point / 100)
-/// - 大刀卫士与弓箭手仇恨锁定: IDA sub_4BF180 & sub_4BF144 (PKLevel >= 2 触发极度仇恨)
+/// - 大刀卫士与弓箭手仇恨锁定: IDA sub_4BF180 & 0x4BF144（已证client无函数） (PKLevel >= 2 触发极度仇恨)
 /// - 守卫高速突进与 999 斩杀: IDA sub_4D7C20 @ 0x4D7C20..0x4D7DF0
-/// - 红名村死亡强制重生地图流转: IDA sub_4BD1BC case 3 (红名村地图 "9", 坐标 33, 33)
+/// - 红名村死亡强制重生地图流转: IDA 0x4BD1BC（已证client无函数） case 3 (红名村地图 "9", 坐标 33, 33)
 /// </summary>
 public static class PkRuleEngine
 {
@@ -26,7 +26,7 @@ public static class PkRuleEngine
     }
 
     /// <summary>
-    /// 获取官方 PK 等级 (Delphi sub_4BF0A0: pk_point / 100)
+    /// 获取官方 PK 等级 (Delphi 0x4BF0A0（已证client无函数）: pk_point / 100)
     /// </summary>
     public static int GetPkLevel(int pkPoint)
     {
@@ -45,7 +45,7 @@ public static class PkRuleEngine
     }
 
     /// <summary>
-    /// 判定目标是否被大刀卫士或弓箭手锁定为敌对 (sub_4BF180: PKLevel >= 2 或灰名攻击标志)
+    /// 判定目标是否被大刀卫士或弓箭手锁定为敌对 (0x4BF180（已证client无函数）: PKLevel >= 2 或灰名攻击标志)
     /// </summary>
     public static bool IsHostileToGuard(int targetPkPoint, bool targetHasPkFlag = false)
     {
@@ -53,7 +53,7 @@ public static class PkRuleEngine
     }
 
     /// <summary>
-    /// 大刀卫士或弓箭手处决红名玩家 (sub_4D7C20)
+    /// 大刀卫士或弓箭手处决红名玩家 (0x4D7C20（已证client无函数）)
     /// 造成 999 点无视一切防御与魔法盾的真实伤害秒杀
     /// </summary>
     public static (int damage, bool isDead, string broadcastMsg) ExecuteGuardSlash(
@@ -80,7 +80,7 @@ public static class PkRuleEngine
     }
 
     /// <summary>
-    /// 获取角色阵亡后的重生出生点 (sub_4BD1BC case 3)
+    /// 获取角色阵亡后的重生出生点 (0x4BD1BC（已证client无函数） case 3)
     /// 红名玩家强制遣送红名村 (Map 9, 33, 33)，非红名回主城安全区 (如盟重 3, 330, 330)
     /// </summary>
     public static (int mapId, int spawnX, int spawnY, string locationName) GetRespawnLocation(int pkPoint)
@@ -95,11 +95,11 @@ public static class PkRuleEngine
     }
 
     /// <summary>
-    /// 自然洗红名时间递减 (Delphi m2share: 每 120 秒减少 1 点 PK 值)
+    /// 自然洗红名时间递减（对齐 Rust decay：sub_4BF520 DecPkPoint，50 秒减 1 点）
     /// </summary>
     public static int DecayPkPoint(int currentPkPoint, int elapsedSec)
     {
-        int decay = elapsedSec / 120;
+        int decay = elapsedSec / 50;
         return Math.Max(0, currentPkPoint - decay);
     }
 }

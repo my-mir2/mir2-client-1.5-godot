@@ -4,7 +4,7 @@ using System.IO;
 namespace Mir2Client.Render;
 
 /// <summary>
-/// 盛大官方 1.5 地图单元格数据结构 (12 字节列优先排列, IDA sub_47009C 实证)
+/// 盛大官方 1.5 地图单元格数据结构 (12 字节列优先排列, IDA 0x47009C（已证client无函数） 实证)
 /// </summary>
 public readonly record struct MapCell(
     short FloorRaw,

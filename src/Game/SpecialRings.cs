@@ -6,22 +6,22 @@ namespace Mir2Client.Game;
 /// <summary>
 /// 盛大官方 1.5 原版 7 大特戒与 4 大套装隐藏属性状态与结算引擎 (M2Server sub_4C03B0 / sub_4BE3FC / sub_4C7720 / sub_4C1EF4 / ProcessSpiritSuite 铁证)
 /// 严格 1:1 比特级还原:
-///   1. 护身戒指: 1:1.5 MP 抵扣伤害，MP 耗尽后剩余伤害如实转扣 HP (sub_4BE3FC, flt_4BE508=1.5)
-///   2. 复活戒指: HP 归零瞬间回满，消耗 1 点底层持久(1000点)，30 秒冷却时钟 (sub_4C7720 @ 0x7530ms)
-///   3. 麻痹戒指: 物理攻击命中时 1/(target.poison_recover + 5) 概率石化 5 秒 (sub_4C1EF4 @ 0x4c2268)
-///   4. 超负载戒指: 背包、穿戴、腕力三大负重严格翻倍 (sub_4C03B0 @ 0x4c0dd0)
-///   5. 隐身戒指: 佩戴常态隐身，普通怪物忽略索敌，移动不破隐，攻击破隐后立刻恢复 (sub_4C03B0 @ Shape 111)
-///   6. 传送戒指: 佩戴支持 @move x y / @飞 x y 坐标瞬移指令，需合法坐标与阻挡校验 (sub_4C03B0 @ Shape 112)
-///   7. 技能戒指: 战士/道士佩戴火焰戒指赋予火球术(MagicId=1)，佩戴防御戒指赋予治愈术(MagicId=2) (sub_4BFFD0 / sub_4C01B8)
+///   1. 护身戒指: 1:1.5 MP 抵扣伤害，MP 耗尽后剩余伤害如实转扣 HP (0x4BE3FC（已证client无函数）, flt_4BE508=1.5)
+///   2. 复活戒指: HP 归零瞬间回满，消耗 1 点底层持久(1000点)，30 秒冷却时钟 (0x4C7720（已证client无函数） @ 0x7530ms)
+///   3. 麻痹戒指: 物理攻击命中时 1/(target.poison_recover + 5) 概率石化 5 秒 (0x4C1EF4（已证client无函数） @ 0x4c2268)
+///   4. 超负载戒指: 背包、穿戴、腕力三大负重严格翻倍 (0x4C03B0（已证client无函数） @ 0x4c0dd0)
+///   5. 隐身戒指: 佩戴常态隐身，普通怪物忽略索敌，移动不破隐，攻击破隐后立刻恢复 (0x4C03B0（已证client无函数） @ Shape 111)
+///   6. 传送戒指: 佩戴支持 @move x y / @飞 x y 坐标瞬移指令，需合法坐标与阻挡校验 (0x4C03B0（已证client无函数） @ Shape 112)
+///   7. 技能戒指: 战士/道士佩戴火焰戒指赋予火球术(MagicId=1)，佩戴防御戒指赋予治愈术(MagicId=2) (0x4BFFD0（已证client无函数） / sub_4C01B8)
 ///   8. 记忆套装: 记忆头盔(125)+项链(123)+手镯(124)+戒指(122)；队长佩戴并输入 @天地合一 召唤同图队友 (180s CD)
 ///   9. 祈祷套装: 祈祷之刃+头盔+项链+手镯+戒指 5件全齐，全服天谴广播，宠物暴走叛变，随机碎裂1件
-///  10. 魔血套装: 单件 25 点蓝转血，三件套集齐额外 +50 点蓝转血，保底 1 点 MP (sub_4C03B0 @ 0x4c0891)
-///  11. 虹魔套装: 单件 10% 吸血权重，累积满 2.0 回复生命，三件套集齐准确 +2 (sub_4C03B0 @ 0x4c08a9, sub_4C1EF4 @ 0x4c22aa)
+///  10. 魔血套装: 单件 25 点蓝转血，三件套集齐额外 +50 点蓝转血，保底 1 点 MP (0x4C03B0（已证client无函数） @ 0x4c0891)
+///  11. 虹魔套装: 单件 10% 吸血权重，累积满 2.0 回复生命，三件套集齐准确 +2 (0x4C03B0（已证client无函数） @ 0x4c08a9, sub_4C1EF4 @ 0x4c22aa)
 /// </summary>
 public static class SpecialRings
 {
     /// <summary>
-    /// 1. 护身戒指伤害抵扣计算 (sub_4BE3FC, flt_4BE508=1.5)
+    /// 1. 护身戒指伤害抵扣计算 (0x4BE3FC（已证client无函数）, flt_4BE508=1.5)
     /// </summary>
     public static (bool hasProtect, int mpCost, int remainingMp, int remainingDamage, int newHp, int hpLoss)
         CalculateProtectRingDamage(bool hasProtect, int damage, int curMp, int curHp)
@@ -54,7 +54,7 @@ public static class SpecialRings
     }
 
     /// <summary>
-    /// 2. 复活戒指触发判定 (30 秒冷却，持久扣 1000 点，sub_4C7720 @ 0x7530ms)
+    /// 2. 复活戒指触发判定 (30 秒冷却，持久扣 1000 点，0x4C7720（已证client无函数） @ 0x7530ms)
     /// </summary>
     public static (bool canRevive, int newHp, int newDura, bool isBroken, string reason)
         TriggerReviveRing(bool hasRevive, int curHp, int maxHp, int curDura, long lastReviveTick, long nowTick)
@@ -77,16 +77,16 @@ public static class SpecialRings
     }
 
     /// <summary>
-    /// 3. 麻痹戒指石化判定 (sub_4C1EF4 @ 0x4c2268)
-    /// 概率: 1 / (targetPoisonRecover + 5)
+    /// 3. 麻痹戒指石化判定 (0x4C1EF4（已证client无函数） @ 0x4c2268)
+    /// 概率: Random(目标毒物躲避 AntiPoison + 5) == 0（对齐 Rust check_paralysis_hit；形参旧名 targetPoisonRecover 已正名为 AntiPoison）
     /// </summary>
     public static (bool isParalyzed, int durationSec, int denom)
-        TriggerParalysisRing(bool hasParalysis, int targetPoisonRecover, bool targetHasAntiParalysis = false, int rngRoll = -1)
+        TriggerParalysisRing(bool hasParalysis, int targetAntiPoison, bool targetHasAntiParalysis = false, int rngRoll = -1)
     {
         if (!hasParalysis || targetHasAntiParalysis)
             return (false, 0, 0);
 
-        int denom = targetPoisonRecover + 5;
+        int denom = targetAntiPoison + 5;
         if (denom <= 0) return (false, 0, 0);
 
         int roll = rngRoll >= 0 ? (rngRoll % denom) : (Random.Shared.Next(denom));
@@ -100,7 +100,7 @@ public static class SpecialRings
     }
 
     /// <summary>
-    /// 4. 超负载戒指三大负重翻倍 (sub_4C03B0 @ 0x4c0dd0)
+    /// 4. 超负载戒指三大负重翻倍 (0x4C03B0（已证client无函数） @ 0x4c0dd0)
     /// </summary>
     public static (int maxWeight, int maxWearWeight, int maxHandWeight)
         ApplyOverloadRing(int maxWeight, int maxWearWeight, int maxHandWeight, bool hasRing)
@@ -113,7 +113,7 @@ public static class SpecialRings
     }
 
     /// <summary>
-    /// 5. 隐身戒指索敌判定 (sub_4C03B0 @ Shape 111)
+    /// 5. 隐身戒指索敌判定 (0x4C03B0（已证client无函数） @ Shape 111)
     /// 佩戴常态隐身，普通怪物忽略索敌；破隐视破怪（如楔蛾、月魔蜘蛛、教主）可破隐视破
     /// </summary>
     public static bool CheckMonsterCanTarget(bool playerHasInvisibleRing, bool monsterCanDetectInvis)
@@ -126,7 +126,7 @@ public static class SpecialRings
     }
 
     /// <summary>
-    /// 6. 传送戒指 @move x y 瞬移指令解析与合法校验 (sub_4C03B0 @ Shape 112)
+    /// 6. 传送戒指 @move x y 瞬移指令解析与合法校验 (0x4C03B0（已证client无函数） @ Shape 112)
     /// </summary>
     public static (bool success, int targetX, int targetY, string message)
         ExecuteTeleportRing(bool hasRing, string command, int currentX, int currentY,
@@ -172,7 +172,7 @@ public static class SpecialRings
     }
 
     /// <summary>
-    /// 7. 技能戒指检测 (sub_4BFFD0 / sub_4C01B8)
+    /// 7. 技能戒指检测 (0x4BFFD0（已证client无函数） / sub_4C01B8)
     /// 火焰戒指赋予火球术 (MagicId=1)，防御戒指赋予治愈术 (MagicId=2)
     /// </summary>
     public static List<int> GetSpecialRingGrantedSkills(IEnumerable<EquipItem?> equips, int playerJob)
@@ -209,6 +209,20 @@ public static class SpecialRings
 
         return granted;
     }
+
+    /// <summary>
+    /// 7b. 复合戒指 Shape 谓词（对齐 Rust special_items.rs apply_ring_shape 152..160，M2 0x50a2xx 段）：
+    /// 152=火焰+二阶盾 / 153=火焰+超负载 / 154=护身+盾 / 155=护身+二阶盾 /
+    /// 156=护身+超负载 / 157=传送+火焰 / 158=传送+护身 / 159=传送+探测 / 160=双速。
+    /// 纯 Shape 判定，供战斗/移动/探测调用方装配（服务端 Rust 同源，联调口径一致）。
+    /// </summary>
+    public static bool HasTeleportRingShape(int shape) => shape == 112 || (shape >= 157 && shape <= 159);
+    public static bool HasOverloadRingShape(int shape) => shape == 119 || shape == 153 || shape == 156;
+    public static bool HasMagicShieldRingShape(int shape) => shape >= 154 && shape <= 158;
+    public static bool HasProbeNecklaceShape(int shape) => shape == 159;
+    public static bool HasDoubleSpeedShape(int shape) => shape == 160;
+    public static bool HasFlameRingShape(int shape) =>
+        shape == 113 || shape == 115 || shape == 151 || shape == 152 || shape == 153 || shape == 157;
 
     /// <summary>
     /// 8. 记忆套装检测 (头盔 125, 项链 123, 手镯 124, 戒指 122)
@@ -402,7 +416,7 @@ public static class SpecialRings
 
     /// <summary>
     /// 10. 魔血套装 (戒指 133, 手镯 134, 项链 135) 单件 25 点，全套额外 +50 点
-    /// 限制转化上限不超过 baseMp - 1 (保底 1 点 MP) (sub_4C03B0 @ 0x4c0891)
+    /// 限制转化上限不超过 baseMp - 1 (保底 1 点 MP) (0x4C03B0（已证client无函数） @ 0x4c0891)
     /// </summary>
     public static (bool hasFullSet, int totalTransfer, int finalHp, int finalMp)
         CalculateMagicBloodBonus(ReadOnlySpan<int> pieceShapes, int baseHp, int baseMp)
@@ -435,7 +449,7 @@ public static class SpecialRings
     }
 
     /// <summary>
-    /// 11. 虹魔套装 (戒指 136, 手镯 137, 项链 138) 单件 10% 吸血，全套准确 +2 (sub_4C03B0 @ 0x4c08a9, sub_4C1EF4 @ 0x4c22aa)
+    /// 11. 虹魔套装 (戒指 136, 手镯 137, 项链 138) 单件 10% 吸血，全套准确 +2 (0x4C03B0（已证client无函数） @ 0x4c08a9, sub_4C1EF4 @ 0x4c22aa)
     /// </summary>
     public static (bool hasFullSet, int leechWeight, int bonusHit, int leechHp)
         CalculateRainbowMagicBonus(ReadOnlySpan<int> pieceShapes, int baseHit, int attackDamage)
@@ -461,7 +475,7 @@ public static class SpecialRings
     }
 
     /// <summary>
-    /// 虹魔套装底层跨次吸血池累积算法 (sub_4C1EF4: flt_4C2790=100.0, flt_4C2794=2.0)
+    /// 虹魔套装底层跨次吸血池累积算法 (0x4C1EF4（已证client无函数）: flt_4C2790=100.0, flt_4C2794=2.0)
     /// 每次攻击产生小数累积，当累积池达到 2.0 时一次性提取回复生命
     /// </summary>
     public static int AccumulateLifesteal(ref double currentPool, int realDamage, int leechWeight)

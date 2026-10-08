@@ -27,7 +27,7 @@ namespace Mir2Client.Game
         [Signal] public delegate void PkModeToggleRequestedEventHandler();
         [Signal] public delegate void AltShowItemsToggledEventHandler(bool show);
         [Signal] public delegate void TargetSelectedEventHandler(int targetUid);
-        [Signal] public delegate void ButcherRequestedEventHandler(int targetUid, string targetName);
+        [Signal] public delegate void ButcherRequestedEventHandler(int tileX, int tileY, int dir);
         [Signal] public delegate void PetCommandRequestedEventHandler();
         [Signal] public delegate void LogoutRequestedEventHandler();
         [Signal] public delegate void QuitRequestedEventHandler();
@@ -225,6 +225,7 @@ namespace Mir2Client.Game
         private void OnLeftClick(Vector2 screenPos)
         {
             if (_playerNode == null) return;
+            if (_playerNode is PlayerNode pnl && (pnl.IsStunned || pnl.IsDead)) return;
 
             var playerScreen = GetPlayerScreenPos();
             var delta = screenPos - playerScreen;
@@ -241,6 +242,13 @@ namespace Mir2Client.Game
             int chebyshev = targetTile.X >= 0
                 ? Math.Max(Math.Abs(targetTile.X - playerTile.X), Math.Abs(targetTile.Y - playerTile.Y))
                 : 999;
+
+            // 0. Alt + 点击：官方割肉/屠宰 (对齐 Delphi ClMain.pas:2890 ssAlt in Shift -> SendButchAnimal)
+            if (Input.IsKeyPressed(Key.Alt))
+            {
+                EmitSignal(SignalName.ButcherRequested, targetTile.X, targetTile.Y, dir);
+                return;
+            }
 
             // 1. Shift 原地攻击
             if (Input.IsKeyPressed(Key.Shift))
@@ -280,6 +288,7 @@ namespace Mir2Client.Game
         private void OnRightClick(Vector2 screenPos)
         {
             if (_playerNode == null) return;
+            if (_playerNode is PlayerNode pnr && (pnr.IsStunned || pnr.IsDead)) return;
 
             var playerScreen = GetPlayerScreenPos();
             var delta = screenPos - playerScreen;

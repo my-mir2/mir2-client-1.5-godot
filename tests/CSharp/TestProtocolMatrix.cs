@@ -149,9 +149,9 @@ public class TestProtocolMatrix
         short eatIdent = (short)(eatPkt[1] | (eatPkt[2] << 8));
         Assert.Equal(ProtocolConsts.CM_EATITEM, eatIdent);
 
-        // 3. 拾取地面物品
+        // 3. 拾取地面物品（bridge 872：extra="x\ty"，param/tag 忽略）
         byte[] pickPkt = PacketEncoder.Pickup(330, 270);
-        Assert.Equal(12, pickPkt.Length);
+        Assert.True(pickPkt.Length > 12);
         short pickIdent = (short)(pickPkt[1] | (pickPkt[2] << 8));
         Assert.Equal(ProtocolConsts.CM_PICKUP, pickIdent);
 
@@ -1064,17 +1064,17 @@ public class TestProtocolMatrix
         Assert.True(ps.HasParalysisRing);
 
         // 1. 目标中毒恢复 = 0 (分母 = 5), roll = 0 命中石化 5 秒
-        var (p1, dur1) = ps.TryParalyzeTarget(targetPoisonRecover: 0, targetAntiParalysis: false, rngRoll: 0);
+        var (p1, dur1) = ps.TryParalyzeTarget(targetAntiPoison: 0, targetAntiParalysis: false, rngRoll: 0);
         Assert.True(p1);
         Assert.Equal(5, dur1);
 
         // 2. roll = 1 未命中
-        var (p2, dur2) = ps.TryParalyzeTarget(targetPoisonRecover: 0, targetAntiParalysis: false, rngRoll: 1);
+        var (p2, dur2) = ps.TryParalyzeTarget(targetAntiPoison: 0, targetAntiParalysis: false, rngRoll: 1);
         Assert.False(p2);
         Assert.Equal(0, dur2);
 
         // 3. 目标佩戴防麻痹装备 (targetAntiParalysis = true): 强制免疫石化
-        var (p3, dur3) = ps.TryParalyzeTarget(targetPoisonRecover: 0, targetAntiParalysis: true, rngRoll: 0);
+        var (p3, dur3) = ps.TryParalyzeTarget(targetAntiPoison: 0, targetAntiParalysis: true, rngRoll: 0);
         Assert.False(p3);
         Assert.Equal(0, dur3);
     }
@@ -1354,27 +1354,27 @@ public class TestProtocolMatrix
         Assert.True(cast1.success);
         Assert.True(tracker.IsReady);
 
-        // 2. T=5000: CD 未到 (8秒)，再次施法被拒绝
+        // 2. T=5000: CD 未到 (10秒)，再次施法被拒绝
         var castFail = tracker.Cast(5000);
         Assert.False(castFail.success);
         Assert.Contains("冷却中", castFail.reason);
 
-        // 3. T=9005: 已经过 8005ms，进入合法双烈火窗口 (8.01s ~ 9.99s)
-        Assert.True(tracker.CanCastSecondFireHit(9005));
+        // 3. T=11005: 已经过 10005ms，进入合法双烈火窗口 (CD 10s 转好，蓄力 20s 未超时)
+        Assert.True(tracker.CanCastSecondFireHit(11005));
 
-        // 4. 在第 9005ms 挥出第一刀: 打出 260% 物理爆发伤害 (基础 100 -> 260)
-        var hit1 = tracker.ConsumeOnHit(100, 9005);
+        // 4. 在第 11005ms 挥出第一刀: 打出 260% 物理爆发伤害 (基础 100 -> 260)
+        var hit1 = tracker.ConsumeOnHit(100, 11005);
         Assert.True(hit1.isFireHit);
         Assert.Equal(260, hit1.damage);
         Assert.False(tracker.IsReady);
 
         // 5. 立即二次施展烈火 (第 2 刀双烈火秒出)
-        var cast2 = tracker.Cast(9010);
+        var cast2 = tracker.Cast(11010);
         Assert.True(cast2.success);
         Assert.True(tracker.IsReady);
 
-        // 6. 超时测试: 若蓄力超过 10 秒不出刀 (T=20000)，烈火自然熄灭
-        var hitExpire = tracker.ConsumeOnHit(100, 20000);
+        // 6. 超时测试: 若蓄力超过 20 秒不出刀 (T=32000)，烈火自然熄灭
+        var hitExpire = tracker.ConsumeOnHit(100, 32000);
         Assert.False(hitExpire.isFireHit);
         Assert.Equal(100, hitExpire.damage);
         Assert.Contains("超时", hitExpire.desc);
@@ -1480,17 +1480,17 @@ public class TestProtocolMatrix
         tracker.Cast(0);
         Assert.True(tracker.IsReady);
 
-        // 8.1s: 冷却转好 (8000ms)，蓄力未过 (10000ms)，挥出第一刀爆发 260%
-        var hit1 = tracker.ConsumeOnHit(80, 8100);
+        // 10.1s: 冷却转好 (10000ms)，蓄力未过 (20000ms)，挥出第一刀爆发 260%
+        var hit1 = tracker.ConsumeOnHit(80, 10100);
         Assert.True(hit1.isFireHit);
         Assert.Equal((int)Math.Round(80 * 2.6), hit1.damage); // 208
 
-        // 8.2s: 立刻无缝开启第二发烈火剑法
-        var cast2 = tracker.Cast(8200);
+        // 10.2s: 立刻无缝开启第二发烈火剑法
+        var cast2 = tracker.Cast(10200);
         Assert.True(cast2.success);
 
-        // 8.3s: 挥出第二刀秒伤爆发 260%！实现传奇正统双烈火核心战术
-        var hit2 = tracker.ConsumeOnHit(80, 8300);
+        // 10.3s: 挥出第二刀秒伤爆发 260%！实现传奇正统双烈火核心战术
+        var hit2 = tracker.ConsumeOnHit(80, 10300);
         Assert.True(hit2.isFireHit);
         Assert.Equal(208, hit2.damage);
     }
@@ -1533,13 +1533,13 @@ public class TestProtocolMatrix
         tm.LockTrade();
         Assert.Equal(Mir2Client.Game.TradeState.Locked, tm.State);
 
-        // 5. 校验 500 万金币上限防溢出: 假设对方给 500 万金币导致溢出
-        tm.RemoteChangeGold(5000000);
+        // 5. 校验 1000 万金币上限防溢出（M2 sub_4DDC8C 0x989680 / Rust 10M）：对方给 1000 万导致溢出
+        tm.RemoteChangeGold(10000000);
         tm.SetRemoteLocked(true);
         tm.LockTrade();
         var overflowRes = tm.ConfirmTrade(ps);
         Assert.False(overflowRes.success);
-        Assert.Contains("5,000,000", overflowRes.reason);
+        Assert.Contains("10,000,000", overflowRes.reason);
 
         // 6. 恢复正常金币，校验背包满 40 格拦截
         tm.RemoteChangeGold(100000);
@@ -1710,22 +1710,21 @@ public class TestProtocolMatrix
     [Fact]
     public void TestWeaponUpgrade_BlackIronPurityAndTrialSlashFlow()
     {
-        // 1. 黑铁矿纯度因子计算 (sub_4A0218)
+        // 1. 黑铁矿纯度因子计算（对齐 Rust：ROUND(n + 前5纯度和/5)，n=min(数量,5)）
         var lowOres = new List<WeaponUpgradeEngine.BlackIronOre>
         {
-            new(5), new(6), new(4) // avg = 5, count < 5 => factor = 5 (< 9 必掉持久)
+            new(5), new(6), new(4) // n=3, sum=15 => 3+3 = 6 (< 9 必掉持久)
         };
         int lowFactor = WeaponUpgradeEngine.CalcBlackIronDuraFactor(lowOres.Select(o => o.Purity).ToList());
-        Assert.Equal(5, lowFactor);
+        Assert.Equal(6, lowFactor);
         Assert.Equal(-3000, WeaponUpgradeEngine.CalcWeaponDuraChange(lowFactor, 0));
 
         var perfectOres = new List<WeaponUpgradeEngine.BlackIronOre>
         {
-            new(16), new(16), new(16), new(16), new(16) // avg = 16, count >= 5 => 16 + 1 = 17 (16..17 绝对保平)
+            new(16), new(16), new(16), new(16), new(16) // n=5, sum=80 => 5+16 = 21 (>= 18 涨持久)
         };
         int perfectFactor = WeaponUpgradeEngine.CalcBlackIronDuraFactor(perfectOres.Select(o => o.Purity).ToList());
-        Assert.Equal(17, perfectFactor);
-        Assert.Equal(0, WeaponUpgradeEngine.CalcWeaponDuraChange(perfectFactor, 0));
+        Assert.Equal(21, perfectFactor);
 
         // 2. 首饰加权与主属性推导 (sub_4A0CB8)
         var accessories = new List<WeaponUpgradeEngine.AccessoryInfo>

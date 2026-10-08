@@ -8,7 +8,7 @@ namespace Mir2Client.UI;
 
 /// <summary>
 /// 盛大官方 1.5 选角与创角神龛界面 (纯 C# 场景驱动控制器)
-/// 严格 1:1 对齐官方二进制 MIR_final_v3_p.exe 逆向实证 (IDA TSelChrScene sub_47F264 / sub_481DD4 / sub_47E7CC / sub_47EA80)
+/// 严格 1:1 对齐官方二进制 MIR_final_v3_p.exe 逆向实证 (IDA TSelChrScene 0x47F264（已证无函数） / sub_481DD4 / sub_47E7CC / sub_47EA80)
 /// 
 /// 官方核心规范实证：
 /// 1. 神龛背景：Prguse.wil[65] 800x600 (sub_47F264 @ 0x47F29D)

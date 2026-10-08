@@ -1,0 +1,1322 @@
+[
+  {
+    "ea": "0x401250",
+    "name": "ExitProcess",
+    "range": [
+      "0x401250",
+      "0x401256"
+    ]
+  },
+  {
+    "ea": "0x4060d4",
+    "name": "GetCurrentProcessId",
+    "range": [
+      "0x4060d4",
+      "0x4060da"
+    ]
+  },
+  {
+    "ea": "0x406724",
+    "name": "GetWindowThreadProcessId",
+    "range": [
+      "0x406724",
+      "0x40672a"
+    ]
+  },
+  {
+    "ea": "0x45f198",
+    "name": "TFrmMain_FormCreate",
+    "range": [
+      "0x45f198",
+      "0x45fafa"
+    ]
+  },
+  {
+    "ea": "0x45fc68",
+    "name": "TFrmMain_FormDestroy",
+    "range": [
+      "0x45fc68",
+      "0x45ffca"
+    ]
+  },
+  {
+    "ea": "0x460010",
+    "name": "TFrmMain_DXDraw1Initialize",
+    "range": [
+      "0x460010",
+      "0x4609c2"
+    ]
+  },
+  {
+    "ea": "0x4609dc",
+    "name": "TFrmMain_DXDraw1Finalize",
+    "range": [
+      "0x4609dc",
+      "0x4609ec"
+    ]
+  },
+  {
+    "ea": "0x4609ec",
+    "name": "TFrmMain_FormClose",
+    "range": [
+      "0x4609ec",
+      "0x4609ff"
+    ]
+  },
+  {
+    "ea": "0x461dec",
+    "name": "TFrmMain_FormKeyDown",
+    "range": [
+      "0x461dec",
+      "0x46226a"
+    ]
+  },
+  {
+    "ea": "0x4622f0",
+    "name": "TFrmMain_FormKeyPress",
+    "range": [
+      "0x4622f0",
+      "0x462617"
+    ]
+  },
+  {
+    "ea": "0x4630f4",
+    "name": "TFrmMain_DXDraw1MouseMove",
+    "range": [
+      "0x4630f4",
+      "0x46330d"
+    ]
+  },
+  {
+    "ea": "0x463310",
+    "name": "TFrmMain_DXDraw1MouseDown",
+    "range": [
+      "0x463310",
+      "0x463354"
+    ]
+  },
+  {
+    "ea": "0x463bfc",
+    "name": "TFrmMain_DXDraw1DblClick",
+    "range": [
+      "0x463bfc",
+      "0x463c2b"
+    ]
+  },
+  {
+    "ea": "0x463c94",
+    "name": "TFrmMain_DXDraw1MouseUp",
+    "range": [
+      "0x463c94",
+      "0x463cd3"
+    ]
+  },
+  {
+    "ea": "0x463cd4",
+    "name": "TFrmMain_DXDraw1Click",
+    "range": [
+      "0x463cd4",
+      "0x463d03"
+    ]
+  },
+  {
+    "ea": "0x463d04",
+    "name": "TFrmMain_MouseTimerTimer",
+    "range": [
+      "0x463d04",
+      "0x463e98"
+    ]
+  },
+  {
+    "ea": "0x463eac",
+    "name": "TFrmMain_WaitMsgTimerTimer",
+    "range": [
+      "0x463eac",
+      "0x463fc0"
+    ]
+  },
+  {
+    "ea": "0x463fc0",
+    "name": "TFrmMain_SelChrWaitTimerTimer",
+    "range": [
+      "0x463fc0",
+      "0x463fe8"
+    ]
+  },
+  {
+    "ea": "0x464014",
+    "name": "TFrmMain_CmdTimerTimer",
+    "range": [
+      "0x464014",
+      "0x4641ae"
+    ]
+  },
+  {
+    "ea": "0x464600",
+    "name": "TFrmMain_CSocketConnect",
+    "range": [
+      "0x464600",
+      "0x464884"
+    ]
+  },
+  {
+    "ea": "0x4648a4",
+    "name": "TFrmMain_CSocketDisconnect",
+    "range": [
+      "0x4648a4",
+      "0x46490a"
+    ]
+  },
+  {
+    "ea": "0x464930",
+    "name": "TFrmMain_CSocketError",
+    "range": [
+      "0x464930",
+      "0x464954"
+    ]
+  },
+  {
+    "ea": "0x464954",
+    "name": "TFrmMain_CSocketRead",
+    "range": [
+      "0x464954",
+      "0x464a33"
+    ]
+  },
+  {
+    "ea": "0x4671b0",
+    "name": "TFrmMain_Timer1Timer",
+    "range": [
+      "0x4671b0",
+      "0x4673df"
+    ]
+  },
+  {
+    "ea": "0x467920",
+    "name": "ProcessServerMessage",
+    "range": [
+      "0x467920",
+      "0x46af50"
+    ]
+  },
+  {
+    "ea": "0x46e88c",
+    "name": "TFrmMain_MinTimerTimer",
+    "range": [
+      "0x46e88c",
+      "0x46e975"
+    ]
+  },
+  {
+    "ea": "0x46e978",
+    "name": "TFrmMain_CheckHackTimerTimer",
+    "range": [
+      "0x46e978",
+      "0x46e988"
+    ]
+  },
+  {
+    "ea": "0x46eb94",
+    "name": "TFrmMain_SendTimeTimerTimer",
+    "range": [
+      "0x46eb94",
+      "0x46eba4"
+    ]
+  },
+  {
+    "ea": "0x47ddbc",
+    "name": "MsgProcessor_CmLogin",
+    "range": [
+      "0x47ddbc",
+      "0x47dddb"
+    ]
+  },
+  {
+    "ea": "0x48198c",
+    "name": "TFrmDlg_FormCreate",
+    "range": [
+      "0x48198c",
+      "0x481c59"
+    ]
+  },
+  {
+    "ea": "0x481c5c",
+    "name": "TFrmDlg_FormDestroy",
+    "range": [
+      "0x481c5c",
+      "0x481cea"
+    ]
+  },
+  {
+    "ea": "0x486730",
+    "name": "TFrmDlg_DBackgroundBackgroundClick",
+    "range": [
+      "0x486730",
+      "0x486830"
+    ]
+  },
+  {
+    "ea": "0x486858",
+    "name": "TFrmDlg_DBackgroundMouseDown",
+    "range": [
+      "0x486858",
+      "0x486887"
+    ]
+  },
+  {
+    "ea": "0x486964",
+    "name": "TFrmDlg_DBottomMouseDown",
+    "range": [
+      "0x486964",
+      "0x486b18"
+    ]
+  },
+  {
+    "ea": "0x487540",
+    "name": "TFrmDlg_DMsgDlgOkClick",
+    "range": [
+      "0x487540",
+      "0x4875e9"
+    ]
+  },
+  {
+    "ea": "0x4875ec",
+    "name": "TFrmDlg_DMsgDlgKeyDown",
+    "range": [
+      "0x4875ec",
+      "0x487722"
+    ]
+  },
+  {
+    "ea": "0x487724",
+    "name": "TFrmDlg_DMsgDlgOkDirectPaint",
+    "range": [
+      "0x487724",
+      "0x4877ce"
+    ]
+  },
+  {
+    "ea": "0x4877d0",
+    "name": "TFrmDlg_DMsgDlgDirectPaint",
+    "range": [
+      "0x4877d0",
+      "0x487a6c"
+    ]
+  },
+  {
+    "ea": "0x487a6c",
+    "name": "TFrmDlg_OnLoginPanel_Paint",
+    "range": [
+      "0x487a6c",
+      "0x487af9"
+    ]
+  },
+  {
+    "ea": "0x487afc",
+    "name": "TFrmDlg_OnNewAccountBtn_Click",
+    "range": [
+      "0x487afc",
+      "0x487b1d"
+    ]
+  },
+  {
+    "ea": "0x487b20",
+    "name": "TFrmDlg_OnLoginBtn_Click",
+    "range": [
+      "0x487b20",
+      "0x487b41"
+    ]
+  },
+  {
+    "ea": "0x487b44",
+    "name": "TFrmDlg_OnCloseBtn_Click",
+    "range": [
+      "0x487b44",
+      "0x487b65"
+    ]
+  },
+  {
+    "ea": "0x487b68",
+    "name": "TFrmDlg_OnChgPasswordBtn_Click",
+    "range": [
+      "0x487b68",
+      "0x487b89"
+    ]
+  },
+  {
+    "ea": "0x487bf4",
+    "name": "TFrmDlg_DSelServerDlgDirectPaint",
+    "range": [
+      "0x487bf4",
+      "0x488025"
+    ]
+  },
+  {
+    "ea": "0x488028",
+    "name": "TFrmDlg_DSServer1Click",
+    "range": [
+      "0x488028",
+      "0x488380"
+    ]
+  },
+  {
+    "ea": "0x488380",
+    "name": "TFrmDlg_DEngServer1Click",
+    "range": [
+      "0x488380",
+      "0x488406"
+    ]
+  },
+  {
+    "ea": "0x48841c",
+    "name": "TFrmDlg_DSSrvCloseClick",
+    "range": [
+      "0x48841c",
+      "0x48844d"
+    ]
+  },
+  {
+    "ea": "0x488450",
+    "name": "TFrmDlg_DNewAccountOkClick",
+    "range": [
+      "0x488450",
+      "0x488471"
+    ]
+  },
+  {
+    "ea": "0x488474",
+    "name": "TFrmDlg_DNewAccountCloseClick",
+    "range": [
+      "0x488474",
+      "0x488495"
+    ]
+  },
+  {
+    "ea": "0x488498",
+    "name": "TFrmDlg_DNewAccountDirectPaint",
+    "range": [
+      "0x488498",
+      "0x4885f7"
+    ]
+  },
+  {
+    "ea": "0x4885f8",
+    "name": "TFrmDlg_DChgpwOkClick",
+    "range": [
+      "0x4885f8",
+      "0x488641"
+    ]
+  },
+  {
+    "ea": "0x488644",
+    "name": "TFrmDlg_DscSelect1DirectPaint",
+    "range": [
+      "0x488644",
+      "0x4886bd"
+    ]
+  },
+  {
+    "ea": "0x4886c0",
+    "name": "TFrmDlg_DscSelect1Click",
+    "range": [
+      "0x4886c0",
+      "0x48878b"
+    ]
+  },
+  {
+    "ea": "0x48878c",
+    "name": "TFrmDlg_DccCloseDirectPaint",
+    "range": [
+      "0x48878c",
+      "0x4889be"
+    ]
+  },
+  {
+    "ea": "0x4889c0",
+    "name": "TFrmDlg_DccCloseClick",
+    "range": [
+      "0x4889c0",
+      "0x488af1"
+    ]
+  },
+  {
+    "ea": "0x488af4",
+    "name": "TFrmDlg_DStateWinDirectPaint",
+    "range": [
+      "0x488af4",
+      "0x489fdf"
+    ]
+  },
+  {
+    "ea": "0x48a0f0",
+    "name": "TFrmDlg_DSWLightDirectPaint",
+    "range": [
+      "0x48a0f0",
+      "0x48a6a1"
+    ]
+  },
+  {
+    "ea": "0x48a6a4",
+    "name": "TFrmDlg_DStateWinClick",
+    "range": [
+      "0x48a6a4",
+      "0x48a77a"
+    ]
+  },
+  {
+    "ea": "0x48a77c",
+    "name": "TFrmDlg_DCloseStateClick",
+    "range": [
+      "0x48a77c",
+      "0x48a7a1"
+    ]
+  },
+  {
+    "ea": "0x48a7a4",
+    "name": "TFrmDlg_DPrevStateDirectPaint",
+    "range": [
+      "0x48a7a4",
+      "0x48a831"
+    ]
+  },
+  {
+    "ea": "0x48a93c",
+    "name": "TFrmDlg_DPrevStateClick",
+    "range": [
+      "0x48a93c",
+      "0x48a97b"
+    ]
+  },
+  {
+    "ea": "0x48a97c",
+    "name": "TFrmDlg_DNextStateClick",
+    "range": [
+      "0x48a97c",
+      "0x48a9b9"
+    ]
+  },
+  {
+    "ea": "0x48a9bc",
+    "name": "TFrmDlg_DSWWeaponClick",
+    "range": [
+      "0x48a9bc",
+      "0x48ae2b"
+    ]
+  },
+  {
+    "ea": "0x48ae2c",
+    "name": "TFrmDlg_DSWWeaponMouseMove",
+    "range": [
+      "0x48ae2c",
+      "0x48af79"
+    ]
+  },
+  {
+    "ea": "0x48af7c",
+    "name": "TFrmDlg_DStateWinMouseMove",
+    "range": [
+      "0x48af7c",
+      "0x48af99"
+    ]
+  },
+  {
+    "ea": "0x48af9c",
+    "name": "TFrmDlg_DStMag1DirectPaint",
+    "range": [
+      "0x48af9c",
+      "0x48b0e0"
+    ]
+  },
+  {
+    "ea": "0x48b0e0",
+    "name": "TFrmDlg_DStMag1Click",
+    "range": [
+      "0x48b0e0",
+      "0x48b239"
+    ]
+  },
+  {
+    "ea": "0x48b23c",
+    "name": "TFrmDlg_DStPageUpClick",
+    "range": [
+      "0x48b23c",
+      "0x48b2a0"
+    ]
+  },
+  {
+    "ea": "0x48b2a0",
+    "name": "TFrmDlg_DBottomDirectPaint",
+    "range": [
+      "0x48b2a0",
+      "0x48ba70"
+    ]
+  },
+  {
+    "ea": "0x48ba74",
+    "name": "TFrmDlg_DBottomInRealArea",
+    "range": [
+      "0x48ba74",
+      "0x48bac9"
+    ]
+  },
+  {
+    "ea": "0x48bacc",
+    "name": "TFrmDlg_DMyStateDirectPaint",
+    "range": [
+      "0x48bacc",
+      "0x48bb60"
+    ]
+  },
+  {
+    "ea": "0x48bb60",
+    "name": "TFrmDlg_DBotGroupDirectPaint",
+    "range": [
+      "0x48bb60",
+      "0x48bc5c"
+    ]
+  },
+  {
+    "ea": "0x48bc5c",
+    "name": "TFrmDlg_DBotPlusAbilDirectPaint",
+    "range": [
+      "0x48bc5c",
+      "0x48bde9"
+    ]
+  },
+  {
+    "ea": "0x48bdec",
+    "name": "TFrmDlg_DMyStateClick",
+    "range": [
+      "0x48bdec",
+      "0x48be6e"
+    ]
+  },
+  {
+    "ea": "0x48be70",
+    "name": "TFrmDlg_DOptionClick",
+    "range": [
+      "0x48be70",
+      "0x48be80"
+    ]
+  },
+  {
+    "ea": "0x48be80",
+    "name": "TFrmDlg_DBelt1DirectPaint",
+    "range": [
+      "0x48be80",
+      "0x48bfd2"
+    ]
+  },
+  {
+    "ea": "0x48bfd4",
+    "name": "TFrmDlg_DBelt1MouseMove",
+    "range": [
+      "0x48bfd4",
+      "0x48c02a"
+    ]
+  },
+  {
+    "ea": "0x48c02c",
+    "name": "TFrmDlg_DBelt1Click",
+    "range": [
+      "0x48c02c",
+      "0x48c187"
+    ]
+  },
+  {
+    "ea": "0x48c188",
+    "name": "TFrmDlg_DBelt1DblClick",
+    "range": [
+      "0x48c188",
+      "0x48c227"
+    ]
+  },
+  {
+    "ea": "0x48dc24",
+    "name": "TFrmDlg_DItemBagDirectPaint",
+    "range": [
+      "0x48dc24",
+      "0x48deba"
+    ]
+  },
+  {
+    "ea": "0x48debc",
+    "name": "TFrmDlg_DRepairItemInRealArea",
+    "range": [
+      "0x48debc",
+      "0x48df0d"
+    ]
+  },
+  {
+    "ea": "0x48df10",
+    "name": "TFrmDlg_DRepairItemDirectPaint",
+    "range": [
+      "0x48df10",
+      "0x48df9c"
+    ]
+  },
+  {
+    "ea": "0x48df9c",
+    "name": "TFrmDlg_DCloseBagDirectPaint",
+    "range": [
+      "0x48df9c",
+      "0x48e02a"
+    ]
+  },
+  {
+    "ea": "0x48e02c",
+    "name": "TFrmDlg_DCloseBagClick",
+    "range": [
+      "0x48e02c",
+      "0x48e051"
+    ]
+  },
+  {
+    "ea": "0x48e054",
+    "name": "TFrmDlg_DItemGridGridMouseMove",
+    "range": [
+      "0x48e054",
+      "0x48e117"
+    ]
+  },
+  {
+    "ea": "0x48e118",
+    "name": "TFrmDlg_DItemGridGridSelect",
+    "range": [
+      "0x48e118",
+      "0x48e33c"
+    ]
+  },
+  {
+    "ea": "0x48e33c",
+    "name": "TFrmDlg_DItemGridDblClick",
+    "range": [
+      "0x48e33c",
+      "0x48e457"
+    ]
+  },
+  {
+    "ea": "0x48e458",
+    "name": "TFrmDlg_DItemGridGridPaint",
+    "range": [
+      "0x48e458",
+      "0x48e561"
+    ]
+  },
+  {
+    "ea": "0x48e564",
+    "name": "TFrmDlg_DGoldClick",
+    "range": [
+      "0x48e564",
+      "0x48e603"
+    ]
+  },
+  {
+    "ea": "0x48eac0",
+    "name": "TFrmDlg_DMerchantDlgDirectPaint",
+    "range": [
+      "0x48eac0",
+      "0x48ef5b"
+    ]
+  },
+  {
+    "ea": "0x48ef90",
+    "name": "TFrmDlg_DMerchantDlgCloseClick",
+    "range": [
+      "0x48ef90",
+      "0x48efad"
+    ]
+  },
+  {
+    "ea": "0x48f020",
+    "name": "TFrmDlg_DMenuDlgDirectPaint",
+    "range": [
+      "0x48f020",
+      "0x48f5cb"
+    ]
+  },
+  {
+    "ea": "0x48f658",
+    "name": "TFrmDlg_DMenuDlgClick",
+    "range": [
+      "0x48f658",
+      "0x48f9e0"
+    ]
+  },
+  {
+    "ea": "0x48f9ec",
+    "name": "TFrmDlg_DMenuDlgMouseMove",
+    "range": [
+      "0x48f9ec",
+      "0x48fa7d"
+    ]
+  },
+  {
+    "ea": "0x48fa80",
+    "name": "TFrmDlg_DMenuBuyClick",
+    "range": [
+      "0x48fa80",
+      "0x48fc11"
+    ]
+  },
+  {
+    "ea": "0x48fc14",
+    "name": "TFrmDlg_DMenuPrevClick",
+    "range": [
+      "0x48fc14",
+      "0x48fcb3"
+    ]
+  },
+  {
+    "ea": "0x48fcb4",
+    "name": "TFrmDlg_DMenuNextClick",
+    "range": [
+      "0x48fcb4",
+      "0x48fd2c"
+    ]
+  },
+  {
+    "ea": "0x48fec4",
+    "name": "TFrmDlg_DMenuCloseClick",
+    "range": [
+      "0x48fec4",
+      "0x48fee9"
+    ]
+  },
+  {
+    "ea": "0x48feec",
+    "name": "TFrmDlg_DMerchantDlgClick",
+    "range": [
+      "0x48feec",
+      "0x49000f"
+    ]
+  },
+  {
+    "ea": "0x490010",
+    "name": "TFrmDlg_DMerchantDlgMouseDown",
+    "range": [
+      "0x490010",
+      "0x49011c"
+    ]
+  },
+  {
+    "ea": "0x49011c",
+    "name": "TFrmDlg_DMerchantDlgMouseUp",
+    "range": [
+      "0x49011c",
+      "0x49013e"
+    ]
+  },
+  {
+    "ea": "0x490140",
+    "name": "TFrmDlg_DSellDlgDirectPaint",
+    "range": [
+      "0x490140",
+      "0x4902bf"
+    ]
+  },
+  {
+    "ea": "0x4902f4",
+    "name": "TFrmDlg_DSellDlgCloseClick",
+    "range": [
+      "0x4902f4",
+      "0x490311"
+    ]
+  },
+  {
+    "ea": "0x490314",
+    "name": "TFrmDlg_DSellDlgSpotClick",
+    "range": [
+      "0x490314",
+      "0x49045f"
+    ]
+  },
+  {
+    "ea": "0x490460",
+    "name": "TFrmDlg_DSellDlgSpotDirectPaint",
+    "range": [
+      "0x490460",
+      "0x49051d"
+    ]
+  },
+  {
+    "ea": "0x490520",
+    "name": "TFrmDlg_DSellDlgSpotMouseMove",
+    "range": [
+      "0x490520",
+      "0x49054f"
+    ]
+  },
+  {
+    "ea": "0x490550",
+    "name": "TFrmDlg_DSellDlgOkClick",
+    "range": [
+      "0x490550",
+      "0x4906ab"
+    ]
+  },
+  {
+    "ea": "0x4907d8",
+    "name": "TFrmDlg_DKeySelDlgDirectPaint",
+    "range": [
+      "0x4907d8",
+      "0x490901"
+    ]
+  },
+  {
+    "ea": "0x490920",
+    "name": "TFrmDlg_DKsIconDirectPaint",
+    "range": [
+      "0x490920",
+      "0x4909a0"
+    ]
+  },
+  {
+    "ea": "0x4909a0",
+    "name": "TFrmDlg_DKsF1DirectPaint",
+    "range": [
+      "0x4909a0",
+      "0x490b50"
+    ]
+  },
+  {
+    "ea": "0x490b50",
+    "name": "TFrmDlg_DKsOkClick",
+    "range": [
+      "0x490b50",
+      "0x490b75"
+    ]
+  },
+  {
+    "ea": "0x490b78",
+    "name": "TFrmDlg_DKsF1Click",
+    "range": [
+      "0x490b78",
+      "0x490c7e"
+    ]
+  },
+  {
+    "ea": "0x490c80",
+    "name": "TFrmDlg_DBotMiniMapClick",
+    "range": [
+      "0x490c80",
+      "0x490d03"
+    ]
+  },
+  {
+    "ea": "0x490d04",
+    "name": "TFrmDlg_DBotTradeClick",
+    "range": [
+      "0x490d04",
+      "0x490d46"
+    ]
+  },
+  {
+    "ea": "0x490d48",
+    "name": "TFrmDlg_DBotGuildClick",
+    "range": [
+      "0x490d48",
+      "0x490dae"
+    ]
+  },
+  {
+    "ea": "0x490db0",
+    "name": "TFrmDlg_DBotGroupClick",
+    "range": [
+      "0x490db0",
+      "0x490dcd"
+    ]
+  },
+  {
+    "ea": "0x490dfc",
+    "name": "TFrmDlg_DGroupDlgDirectPaint",
+    "range": [
+      "0x490dfc",
+      "0x490fdd"
+    ]
+  },
+  {
+    "ea": "0x490fe0",
+    "name": "TFrmDlg_DGrpDlgCloseClick",
+    "range": [
+      "0x490fe0",
+      "0x491005"
+    ]
+  },
+  {
+    "ea": "0x491008",
+    "name": "TFrmDlg_DGrpAllowGroupDirectPaint",
+    "range": [
+      "0x491008",
+      "0x491103"
+    ]
+  },
+  {
+    "ea": "0x491104",
+    "name": "TFrmDlg_DGrpAllowGroupClick",
+    "range": [
+      "0x491104",
+      "0x49115f"
+    ]
+  },
+  {
+    "ea": "0x491160",
+    "name": "TFrmDlg_DGrpCreateClick",
+    "range": [
+      "0x491160",
+      "0x49123b"
+    ]
+  },
+  {
+    "ea": "0x491264",
+    "name": "TFrmDlg_DGrpAddMemClick",
+    "range": [
+      "0x491264",
+      "0x49133f"
+    ]
+  },
+  {
+    "ea": "0x491368",
+    "name": "TFrmDlg_DGrpDelMemClick",
+    "range": [
+      "0x491368",
+      "0x491443"
+    ]
+  },
+  {
+    "ea": "0x491474",
+    "name": "TFrmDlg_DBotLogoutClick",
+    "range": [
+      "0x491474",
+      "0x4914fb"
+    ]
+  },
+  {
+    "ea": "0x491520",
+    "name": "TFrmDlg_DBotExitClick",
+    "range": [
+      "0x491520",
+      "0x4915a7"
+    ]
+  },
+  {
+    "ea": "0x4915cc",
+    "name": "TFrmDlg_DBotPlusAbilClick",
+    "range": [
+      "0x4915cc",
+      "0x4915eb"
+    ]
+  },
+  {
+    "ea": "0x491710",
+    "name": "TFrmDlg_DDealOkClick",
+    "range": [
+      "0x491710",
+      "0x491798"
+    ]
+  },
+  {
+    "ea": "0x491798",
+    "name": "TFrmDlg_DDealCloseClick",
+    "range": [
+      "0x491798",
+      "0x4917d0"
+    ]
+  },
+  {
+    "ea": "0x4917d0",
+    "name": "TFrmDlg_DDealRemoteDlgDirectPaint",
+    "range": [
+      "0x4917d0",
+      "0x491951"
+    ]
+  },
+  {
+    "ea": "0x491954",
+    "name": "TFrmDlg_DDealDlgDirectPaint",
+    "range": [
+      "0x491954",
+      "0x491ae0"
+    ]
+  },
+  {
+    "ea": "0x491b3c",
+    "name": "TFrmDlg_DDGridGridSelect",
+    "range": [
+      "0x491b3c",
+      "0x491cb5"
+    ]
+  },
+  {
+    "ea": "0x491cb8",
+    "name": "TFrmDlg_DDGridGridPaint",
+    "range": [
+      "0x491cb8",
+      "0x491dbb"
+    ]
+  },
+  {
+    "ea": "0x491dbc",
+    "name": "TFrmDlg_DDGridGridMouseMove",
+    "range": [
+      "0x491dbc",
+      "0x491e11"
+    ]
+  },
+  {
+    "ea": "0x491e14",
+    "name": "TFrmDlg_DDRGridGridPaint",
+    "range": [
+      "0x491e14",
+      "0x491f17"
+    ]
+  },
+  {
+    "ea": "0x491f18",
+    "name": "TFrmDlg_DDRGridGridMouseMove",
+    "range": [
+      "0x491f18",
+      "0x491f6d"
+    ]
+  },
+  {
+    "ea": "0x491fb0",
+    "name": "TFrmDlg_DDGoldClick",
+    "range": [
+      "0x491fb0",
+      "0x492174"
+    ]
+  },
+  {
+    "ea": "0x49219c",
+    "name": "TFrmDlg_DUserState1DirectPaint",
+    "range": [
+      "0x49219c",
+      "0x49282e"
+    ]
+  },
+  {
+    "ea": "0x492840",
+    "name": "TFrmDlg_DUserState1MouseDown",
+    "range": [
+      "0x492840",
+      "0x4929c6"
+    ]
+  },
+  {
+    "ea": "0x4929c8",
+    "name": "TFrmDlg_DUserState1MouseMove",
+    "range": [
+      "0x4929c8",
+      "0x4929e5"
+    ]
+  },
+  {
+    "ea": "0x4929e8",
+    "name": "TFrmDlg_DWeaponUS1MouseMove",
+    "range": [
+      "0x4929e8",
+      "0x492ae6"
+    ]
+  },
+  {
+    "ea": "0x492ae8",
+    "name": "TFrmDlg_DCloseUS1Click",
+    "range": [
+      "0x492ae8",
+      "0x492b0d"
+    ]
+  },
+  {
+    "ea": "0x492b10",
+    "name": "TFrmDlg_DNecklaceUS1DirectPaint",
+    "range": [
+      "0x492b10",
+      "0x49309f"
+    ]
+  },
+  {
+    "ea": "0x493844",
+    "name": "TFrmDlg_DGuildDlgDirectPaint",
+    "range": [
+      "0x493844",
+      "0x493a48"
+    ]
+  },
+  {
+    "ea": "0x493a48",
+    "name": "TFrmDlg_DGDUpClick",
+    "range": [
+      "0x493a48",
+      "0x493a8a"
+    ]
+  },
+  {
+    "ea": "0x493a8c",
+    "name": "TFrmDlg_DGDDownClick",
+    "range": [
+      "0x493a8c",
+      "0x493ac9"
+    ]
+  },
+  {
+    "ea": "0x493acc",
+    "name": "TFrmDlg_DGDCloseClick",
+    "range": [
+      "0x493acc",
+      "0x493afb"
+    ]
+  },
+  {
+    "ea": "0x493afc",
+    "name": "TFrmDlg_DGDHomeClick",
+    "range": [
+      "0x493afc",
+      "0x493b48"
+    ]
+  },
+  {
+    "ea": "0x493b48",
+    "name": "TFrmDlg_DGDListClick",
+    "range": [
+      "0x493b48",
+      "0x493b94"
+    ]
+  },
+  {
+    "ea": "0x493b94",
+    "name": "TFrmDlg_DGDAddMemClick",
+    "range": [
+      "0x493b94",
+      "0x493c24"
+    ]
+  },
+  {
+    "ea": "0x493c50",
+    "name": "TFrmDlg_DGDDelMemClick",
+    "range": [
+      "0x493c50",
+      "0x493ce0"
+    ]
+  },
+  {
+    "ea": "0x493d0c",
+    "name": "TFrmDlg_DGDEditNoticeClick",
+    "range": [
+      "0x493d0c",
+      "0x493d3b"
+    ]
+  },
+  {
+    "ea": "0x493d58",
+    "name": "TFrmDlg_DGDEditGradeClick",
+    "range": [
+      "0x493d58",
+      "0x493d87"
+    ]
+  },
+  {
+    "ea": "0x493dd8",
+    "name": "TFrmDlg_DGDAllyClick",
+    "range": [
+      "0x493dd8",
+      "0x493e15"
+    ]
+  },
+  {
+    "ea": "0x493f58",
+    "name": "TFrmDlg_DGuildEditNoticeDirectPaint",
+    "range": [
+      "0x493f58",
+      "0x49402e"
+    ]
+  },
+  {
+    "ea": "0x494030",
+    "name": "TFrmDlg_DGECloseClick",
+    "range": [
+      "0x494030",
+      "0x494078"
+    ]
+  },
+  {
+    "ea": "0x494078",
+    "name": "TFrmDlg_DGEOkClick",
+    "range": [
+      "0x494078",
+      "0x4940af"
+    ]
+  },
+  {
+    "ea": "0x49415c",
+    "name": "TFrmDlg_DGDChatClick",
+    "range": [
+      "0x49415c",
+      "0x4941d8"
+    ]
+  },
+  {
+    "ea": "0x4941d8",
+    "name": "TFrmDlg_DGoldDirectPaint",
+    "range": [
+      "0x4941d8",
+      "0x49425e"
+    ]
+  },
+  {
+    "ea": "0x494260",
+    "name": "TFrmDlg_DAdjustAbilCloseClick",
+    "range": [
+      "0x494260",
+      "0x494294"
+    ]
+  },
+  {
+    "ea": "0x494304",
+    "name": "TFrmDlg_DAdjustAbilityDirectPaint",
+    "range": [
+      "0x494304",
+      "0x494eb6"
+    ]
+  },
+  {
+    "ea": "0x494f5c",
+    "name": "TFrmDlg_DPlusDCClick",
+    "range": [
+      "0x494f5c",
+      "0x4950a0"
+    ]
+  },
+  {
+    "ea": "0x4950a0",
+    "name": "TFrmDlg_DMinusDCClick",
+    "range": [
+      "0x4950a0",
+      "0x4952a7"
+    ]
+  },
+  {
+    "ea": "0x4952a8",
+    "name": "TFrmDlg_DAdjustAbilOkClick",
+    "range": [
+      "0x4952a8",
+      "0x4952e7"
+    ]
+  },
+  {
+    "ea": "0x4952e8",
+    "name": "TFrmDlg_DAdjustAbilityMouseMove",
+    "range": [
+      "0x4952e8",
+      "0x4953df"
+    ]
+  },
+  {
+    "ea": "0x4953e0",
+    "name": "TFrmDlg_DSServer1DirectPaint",
+    "range": [
+      "0x4953e0",
+      "0x4955b5"
+    ]
+  }
+]

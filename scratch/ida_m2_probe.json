@@ -1,0 +1,30 @@
+{
+  "targets": [
+    {
+      "ea": "0x4c1ef4",
+      "is_func": false,
+      "seg": "0x401000-0x940000 .text"
+    },
+    {
+      "ea": "0x4c7720",
+      "is_func": false,
+      "seg": "0x401000-0x940000 .text"
+    },
+    {
+      "ea": "0x4c03b0",
+      "is_func": false,
+      "seg": "0x401000-0x940000 .text"
+    },
+    {
+      "ea": "0x401000",
+      "is_func": false,
+      "seg": "0x401000-0x940000 .text"
+    },
+    {
+      "ea": "0x401168",
+      "is_func": false,
+      "seg": "0x401000-0x940000 .text"
+    }
+  ],
+  "func_count_sample": 0
+}

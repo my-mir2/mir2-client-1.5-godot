@@ -1,0 +1,51 @@
+[
+  {
+    "ea": "0x483e8c",
+    "is_func": true,
+    "name": "sub_481DD4",
+    "range": [
+      "0x481dd4",
+      "0x48647a"
+    ]
+  },
+  {
+    "ea": "0x484391",
+    "is_func": true,
+    "name": "sub_481DD4",
+    "range": [
+      "0x481dd4",
+      "0x48647a"
+    ]
+  },
+  {
+    "ea": "0x4892c2",
+    "is_func": true,
+    "name": "TFrmDlg_DStateWinDirectPaint",
+    "range": [
+      "0x488af4",
+      "0x489fdf"
+    ]
+  },
+  {
+    "ea": "0x48a000",
+    "is_func": false
+  },
+  {
+    "ea": "0x48c3c8",
+    "is_func": true,
+    "name": "sub_48C3C8",
+    "range": [
+      "0x48c3c8",
+      "0x48d93d"
+    ]
+  },
+  {
+    "ea": "0x48e458",
+    "is_func": true,
+    "name": "TFrmDlg_DItemGridGridPaint",
+    "range": [
+      "0x48e458",
+      "0x48e561"
+    ]
+  }
+]

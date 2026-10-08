@@ -71,11 +71,16 @@ public static class PacketEncoder
     public static byte[] Run(short x, short y, short dir) =>
         MakePacket(ProtocolConsts.CM_RUN, (x << 16) | (y & 0xFFFF), dir, 0);
 
+    // 转向：param=dir&7（bridge 814：只认 param，坐标由服务端会话维护，recog 置零）。
     public static byte[] TurnDirection(short x, short y, short dir) =>
-        MakePacket(ProtocolConsts.CM_TURNDIRECTION, (x << 16) | (y & 0xFFFF), dir, 0);
+        MakePacket(ProtocolConsts.CM_TURNDIRECTION, 0, dir, 0);
 
+    // 普攻：recog=目标实体 UID（bridge 823：recog!=0 即 target_id；坐标由服务端会话推导，旧坐标打包已废）。
     public static byte[] Hit(short dir, short targetX, short targetY) =>
-        MakePacket(ProtocolConsts.CM_HIT, (targetX << 16) | (targetY & 0xFFFF), dir, 0);
+        Hit(dir, 0);
+
+    public static byte[] Hit(short dir, int targetUid) =>
+        MakePacket(ProtocolConsts.CM_HIT, targetUid, dir, 0);
 
     public static byte[] Spell(short magicId, short targetX, short targetY, int targetUid = 0) =>
         MakePacket(ProtocolConsts.CM_SPELL, targetUid, magicId, (short)((targetX << 8) | (targetY & 0xFF)), Encoding.UTF8.GetBytes($"{targetX}\t{targetY}"));
@@ -137,14 +142,21 @@ public static class PacketEncoder
     public static byte[] MakeMine(short dir = 0, int resourceUid = 0) =>
         MakePacket(ProtocolConsts.CM_BIGHIT, resourceUid, dir);
 
+    // 捡物：extra="x\ty"（bridge 872：只读 extra，param/tag 忽略；无坐标则服务端按脚下拾取）。
     public static byte[] Pickup(short tx = -1, short ty = -1) =>
-        (tx >= 0 && ty >= 0) ? MakePacket(ProtocolConsts.CM_PICKUP, 0, tx, ty) : MakePacket(ProtocolConsts.CM_PICKUP, 0, 0, 0);
+        (tx >= 0 && ty >= 0)
+            ? MakePacket(ProtocolConsts.CM_PICKUP, 0, 0, 0, Encoding.UTF8.GetBytes($"{tx}\t{ty}"))
+            : MakePacket(ProtocolConsts.CM_PICKUP, 0, 0, 0);
 
     public static byte[] ButchItem(int targetUid, short tx = 0, short ty = 0) =>
         MakePacket(ProtocolConsts.CM_BUTCHITEM, targetUid, tx, ty);
 
+    // 丢弃：recog=背包槽位，extra=物品名（bridge 977；count 放 param，服务端当前忽略，保留）。
     public static byte[] DropItem(int uid, short count) =>
-        MakePacket(ProtocolConsts.CM_DROPITEM, uid, count);
+        DropItem(uid, string.Empty, count);
+
+    public static byte[] DropItem(int slot, string itemName, short count = 1) =>
+        MakePacket(ProtocolConsts.CM_DROPITEM, slot, count, 0, Encoding.UTF8.GetBytes(itemName));
 
     public static byte[] DropGold(int amount) =>
         MakePacket(ProtocolConsts.CM_DROPGOLD, amount);
@@ -154,23 +166,40 @@ public static class PacketEncoder
             ? MakePacket(ProtocolConsts.CM_EATITEM, slotOrUid)
             : MakePacket(ProtocolConsts.CM_EATITEM, slotOrUid, 0, 0, Encoding.UTF8.GetBytes(itemName));
 
+    // 穿戴：recog=背包槽位，param=装备位，extra=物品名（bridge 957）。
     public static byte[] WearItem(short slot, short equipPos) =>
-        MakePacket(ProtocolConsts.CM_WEARITEM, slot, equipPos);
+        WearItem(slot, equipPos, string.Empty);
+
+    public static byte[] WearItem(short slot, short equipPos, string itemName) =>
+        MakePacket(ProtocolConsts.CM_WEARITEM, slot, equipPos, 0, Encoding.UTF8.GetBytes(itemName));
 
     public static byte[] TakeOffItem(short slot) =>
         MakePacket(ProtocolConsts.CM_TAKEOFFITEM, 0, slot);
 
+    // 商店买入：param=数量，extra=物品名（bridge 1092：param 取数、extra 取名；旧三参版名缺省为索引 URI，待商店面板传真名）。
     public static byte[] BuyFromShop(int npcUid, short count, short itemIndex) =>
-        MakePacket(ProtocolConsts.CM_USERBUYITEM, npcUid, count, itemIndex);
+        BuyFromShop(ShopIndexToName(npcUid, itemIndex), count);
 
+    public static byte[] BuyFromShop(string itemName, int count = 1) =>
+        MakePacket(ProtocolConsts.CM_USERBUYITEM, 0, (short)Math.Max(1, count), 0, Encoding.UTF8.GetBytes(itemName));
+
+    // 商店出售：recog=槽位/物品标识，extra=物品名（bridge 1099）。
     public static byte[] SellToShop(int npcUid, int itemUid) =>
-        MakePacket(ProtocolConsts.CM_USERSELLITEM, itemUid, (short)npcUid);
+        MakePacket(ProtocolConsts.CM_USERSELLITEM, itemUid, 0, 0);
 
+    // 普通修理：recog=槽位（bridge 1027：1023|47）。
     public static byte[] RepairItem(int npcUid, int itemUid) =>
-        MakePacket(ProtocolConsts.CM_USERREPAIRITEM, itemUid, (short)npcUid);
+        MakePacket(ProtocolConsts.CM_USERREPAIRITEM, itemUid, 0, 0);
 
+    // 特殊修理：recog=槽位（bridge 1032：CM_REPAIRSPECIAL=48）。
     public static byte[] RepairSpecial(int npcUid, int itemUid) =>
-        MakePacket(ProtocolConsts.CM_REPAIRSPECIAL, npcUid, (short)itemUid);
+        MakePacket(ProtocolConsts.CM_REPAIRSPECIAL, itemUid, 0, 0);
+
+    private static string ShopIndexToName(int npcUid, int itemIndex) => $"shop://{npcUid}/{itemIndex}";
+
+    // NPC 选项：recog=NPC id，param=选项序号，extra=NPC 名（bridge 903：61|1011 双栈）。
+    public static byte[] NpcSelect(int npcUid, string npcName, int option) =>
+        MakePacket(ProtocolConsts.CM_NPCSELECT, npcUid, (short)option, 0, Encoding.UTF8.GetBytes(npcName));
 
     public static byte[] ClickNpc(string npcName) =>
         MakePacket(ProtocolConsts.CM_MERCHANTHOMEPAGE, 0, 0, 0, Encoding.UTF8.GetBytes(npcName));
@@ -195,8 +224,12 @@ public static class PacketEncoder
     public static byte[] Heartbeat() =>
         MakePacket(ProtocolConsts.CM_HEARTBEAT, 0);
 
+    // 仓库存入：recog=背包槽位，extra=物品名（bridge 1012；旧单参版名空，待仓库面板传真名）。
     public static byte[] DepositStorage(int slot) =>
-        MakePacket(ProtocolConsts.CM_USERSTORAGEDEPOSIT, slot);
+        DepositStorage(slot, string.Empty);
+
+    public static byte[] DepositStorage(int slot, string itemName) =>
+        MakePacket(ProtocolConsts.CM_USERSTORAGEDEPOSIT, slot, 0, 0, Encoding.UTF8.GetBytes(itemName));
 
     public static byte[] WithdrawStorage(int slot) =>
         MakePacket(ProtocolConsts.CM_USERSTORAGEWITHDRAW, slot);
@@ -241,4 +274,43 @@ public static class PacketEncoder
 
     public static byte[] QuerySellPrice(int slot) =>
         MakePacket(ProtocolConsts.CM_QUERYSELLPRICE, slot);
+
+    public static byte[] GuildOpenPage(short page) =>
+        MakePacket(ProtocolConsts.CM_GUILD_OPEN_PAGE, 0, page);
+
+    public static byte[] GuildMemberList(short page = 0) =>
+        MakePacket(ProtocolConsts.CM_GUILD_MEMBER_LIST, 0, page);
+
+    public static byte[] GuildNoticeUpdate(string notice) =>
+        MakePacket(ProtocolConsts.CM_GUILD_NOTICE_UPDATE, 0, 0, 0, Encoding.UTF8.GetBytes(notice));
+
+    // 宣战无网关 CM 入口（bridge 无映射，仅 GM @guildwar；1038=官方 ADDMEMBER 禁发）：
+    // 走 SAY 聊天指令，GM 权限服务端受理，普通玩家服务端拒绝，无害。
+    public static byte[] GuildApplyWar(string guildName) =>
+        Say($"@guildwar {guildName}");
+
+    public static byte[] GuildAllyRequest(string guildName) =>
+        MakePacket(ProtocolConsts.CM_GUILD_ALLY_REQUEST, 0, 0, 0, Encoding.UTF8.GetBytes(guildName));
+
+    public static byte[] GuildBreakAlly(string guildName) =>
+        MakePacket(ProtocolConsts.CM_GUILD_BREAK_ALLY, 0, 0, 0, Encoding.UTF8.GetBytes(guildName));
+
+    public static byte[] GuildKickMember(string memberName) =>
+        MakePacket(ProtocolConsts.CM_GUILD_KICK_MEMBER, 0, 0, 0, Encoding.UTF8.GetBytes(memberName));
+
+    // 职位任免：recog=职位 id(u8)，extra=成员名（bridge 1153-1156）。
+    public static byte[] GuildUpdateRank(string memberName, byte rankId) =>
+        MakePacket(ProtocolConsts.CM_GUILD_UPDATE_RANK, rankId, 0, 0, Encoding.UTF8.GetBytes(memberName));
+
+    // 兼容旧签名的字符串封号（服务端不认，仅本地调试用，禁发线上）。
+    public static byte[] GuildUpdateRank(string memberName, string rankName) =>
+        GuildUpdateRank(memberName, RankNameToId(rankName));
+
+    private static byte RankNameToId(string rankName) => rankName switch
+    {
+        "掌门人" => 1,
+        "副掌门" => 2,
+        "堂主" => 3,
+        _ => 0,
+    };
 }

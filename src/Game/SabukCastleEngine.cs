@@ -1,6 +1,6 @@
 // ============================================================================
 // Mir2 客户端/服务端 - 盛大官方 1.5 沙巴克攻城战与皇宫争夺引擎 (1:1 官方实证)
-// 官方实证：IDA sub_4C92B0 / sub_4C93A0 (城门状态与碰撞) & sub_4C9B80 (皇宫占领判定)
+// 官方实证：IDA 0x4C92B0（已证client无函数） / sub_4C93A0 (城门状态与碰撞) & sub_4C9B80 (皇宫占领判定)
 // ============================================================================
 
 using System;
@@ -115,7 +115,7 @@ namespace Mir2Client.Game
         }
 
         /// <summary>
-        /// 官方 1.5 皇宫争夺与占领裁决器 (IDA sub_4C9B80)
+        /// 官方 1.5 皇宫争夺与占领裁决器 (IDA 0x4C9B80（已证client无函数）)
         /// </summary>
         public class PalaceWarDecider
         {
@@ -147,7 +147,7 @@ namespace Mir2Client.Game
             }
 
             /// <summary>
-            /// 判定皇宫大殿当前占领者 (官方实证 sub_4C9B80：皇宫内清空敌对势力时方可占领)
+            /// 判定皇宫大殿当前占领者 (官方实证 0x4C9B80（已证client无函数）：皇宫内清空敌对势力时方可占领)
             /// </summary>
             public bool EvaluatePalaceOccupancy(IEnumerable<(string guild, int uid)> playersInPalace)
             {

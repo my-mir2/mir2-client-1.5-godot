@@ -166,10 +166,10 @@ namespace Mir2Client.Game
                 return (false, "自身携带金币不足以支付交易金额！");
             }
 
-            // 2. 校验金币 500 万上限防溢出
+            // 2. 校验金币 1000 万上限防溢出（M2 sub_4DDC8C 0x989680 / Rust MAX_GOLD_CAP，对齐服务端权威值）
             if ((long)player.Gold - LocalGold + RemoteGold > PlayerState.MaxGoldLimit)
             {
-                return (false, "交易完成后金币将超出单人 5,000,000 上限，无法完成交易！");
+                return (false, "交易完成后金币将超出单人 10,000,000 上限，无法完成交易！");
             }
 
             // 3. 校验背包剩余空格

@@ -12,9 +12,10 @@ namespace Mir2Client.Game;
 public static class WarriorCombatEngine
 {
     // ==================== 1. 烈火剑法 (FireHit, MagicId = 26) ====================
-    public const int FireHitReadyDurationMs = 10000; // 蓄力持续 10 秒
-    public const int FireHitCooldownMs = 8000;       // 技能 CD 8 秒
-    public const double FireHitDamageMultiplier = 2.6; // 官方 260% 物理伤害爆发
+    // 对齐 Rust combat.rs：DEFAULT_COOLDOWN 200 ticks=10s，LIFESPAN 400 ticks=20s（@20TPS）。
+    public const int FireHitReadyDurationMs = 20000; // 蓄力持续 20 秒
+    public const int FireHitCooldownMs = 10000;      // 技能 CD 10 秒
+    public const double FireHitDamageMultiplier = 2.6; // 满级 260% 物理伤害爆发
 
     public sealed class FireHitTracker
     {
@@ -23,7 +24,7 @@ public static class WarriorCombatEngine
         public long LastCastTime { get; private set; }
 
         /// <summary>
-        /// 施放烈火剑法凝聚火焰 (CD 8 秒，蓄力状态维持 10 秒)
+        /// 施放烈火剑法凝聚火焰 (CD 10 秒，蓄力状态维持 20 秒)
         /// </summary>
         public (bool success, string reason) Cast(long nowTick)
         {
@@ -49,7 +50,7 @@ public static class WarriorCombatEngine
                 return (false, baseDamage, "普通物理攻击");
             }
 
-            // 检查是否在 10 秒蓄力有效窗口内
+            // 检查是否在 20 秒蓄力有效窗口内
             if (nowTick - ReadyStartTime <= FireHitReadyDurationMs)
             {
                 IsReady = false;
@@ -63,13 +64,13 @@ public static class WarriorCombatEngine
         }
 
         /// <summary>
-        /// 判定当前是否处于合法的 "双烈火" 施法窗口期 (第 8.01 ~ 9.99 秒)
+        /// 判定当前是否处于合法的 "双烈火" 施法窗口期 (CD 转好 10s 后、蓄力 20s 超时前，对齐 Rust is_double_fire_hit_window)
         /// </summary>
         public bool CanCastSecondFireHit(long nowTick)
         {
             if (!IsReady) return false;
             long elapsed = nowTick - ReadyStartTime;
-            // 技能冷却已转好 (>= 8000ms) 且第一刀蓄力尚未超时 (<= 10000ms)
+            // 技能冷却已转好 (>= 10000ms) 且第一刀蓄力尚未超时 (<= 20000ms)
             return elapsed >= FireHitCooldownMs && elapsed <= FireHitReadyDurationMs;
         }
     }
@@ -107,19 +108,30 @@ public static class WarriorCombatEngine
 
         /// <summary>
         /// 刺杀剑术伤害结算:
-        /// 若为隔位第 2 格且开启刺杀，无视目标物理防御 AC 与法师魔法盾减伤
+        /// 若为隔位第 2 格且开启刺杀，无视目标物理防御 AC 与法师魔法盾减伤；
+        /// 剑气按修炼等级缩放（对齐 Rust calc_stabbing_sec_power：Round(raw/(trainLv+2)*(skillLv+2))，trainLv 缺省 3）。
         /// </summary>
         public static (int finalDamage, bool isArmorPiercing, string desc) CalculateDamage(
             int rawDamage, HitDistanceType distType, bool autoStab, int targetAc, double targetShieldReduction = 0.0)
         {
+            return CalculateDamage(rawDamage, distType, autoStab, targetAc, 3, 3, targetShieldReduction);
+        }
+
+        public static (int finalDamage, bool isArmorPiercing, string desc) CalculateDamage(
+            int rawDamage, HitDistanceType distType, bool autoStab, int targetAc,
+            int trainLevel, int skillLevel, double targetShieldReduction = 0.0)
+        {
             if (distType == HitDistanceType.StabbingFar && autoStab)
             {
-                // 隔位剑气：完全无视防御与护盾
-                return (rawDamage, true, "刺杀剑气穿透！完全无视物理防御与魔法盾！");
+                // 隔位剑气：完全无视防御与护盾，但按等级缩放（0级/train3=40%，满级=100%）
+                int divisor = Math.Max(1, trainLevel + 2);
+                int multiplier = Math.Clamp(skillLevel, 0, 3) + 2;
+                int thrust = Math.Max(1, (int)Math.Round((double)rawDamage / divisor * multiplier));
+                return (thrust, true, "刺杀剑气穿透！完全无视物理防御与魔法盾！");
             }
 
-            // 常规结算：扣减物理防御，并受魔法盾减免
-            int defDmg = Math.Max(1, rawDamage - targetAc);
+            // 常规结算：扣减物理防御，并受魔法盾减免（服务端最小 0，见 Rust calc_hit_struck_damage）
+            int defDmg = Math.Max(0, rawDamage - targetAc);
             if (targetShieldReduction > 0.0 && targetShieldReduction < 1.0)
             {
                 defDmg = (int)Math.Round(defDmg * (1.0 - targetShieldReduction));
@@ -134,7 +146,7 @@ public static class WarriorCombatEngine
     {
         public const int CooldownMs = 3000;       // 冷却 3 秒
         public const int MpCost = 10;             // 蓝耗 10 点
-        public const float StunDurationSec = 1.0f; // 眩晕硬直 1 秒
+        public const float StunDurationSec = 0.8f; // 每格硬直 0.8 秒（Rust SHORT_WEAPON_STUN_PER_STEP_MS）
 
         public sealed class DashResult
         {
@@ -146,6 +158,7 @@ public static class WarriorCombatEngine
             public int TargetFinalY { get; set; }
             public bool SelfStunned { get; set; }
             public float StunSec { get; set; }
+            public int SelfDamage { get; set; } // 撞墙反噬自伤（Rust calc_short_weapon_self_damage）
             public string Message { get; set; } = string.Empty;
         }
 
@@ -155,16 +168,21 @@ public static class WarriorCombatEngine
         public static DashResult ExecuteDash(
             int selfLevel, int selfX, int selfY, int dir,
             (bool hasEntity, int level, int x, int y)? obstacleEntity,
-            Func<int, int, bool> isTileBlocked)
+            Func<int, int, bool> isTileBlocked,
+            int skillLevel = 0, int roll20 = 0, int rollExtraDamage = 0)
         {
+            // 对齐 Rust combat.rs 野蛮三式：
+            // 距离 Max(2, sl+1)；推动阈值 diff+3*sl+6（roll20<[0,20) 成功）；
+            // 硬直 800ms/格；撞墙自伤 5*(sl+1)+rollExtra。
+            // 缺省 skillLevel=0/roll20=0 时退化为旧二格确定性行为（兼容既有调用）。
+            int sl = Math.Clamp(skillLevel, 0, 3);
+            int steps = Math.Max(2, sl + 1);
             var offset = PlayerAuditEngine.DirOffsets[dir & 7];
-            int step1X = selfX + offset.X;
-            int step1Y = selfY + offset.Y;
-            int step2X = selfX + offset.X * 2;
-            int step2Y = selfY + offset.Y * 2;
 
-            // 1. 检查第 1 格是否有地形阻挡 (撞墙反弹)
-            if (isTileBlocked(step1X, step1Y))
+            bool TileFree(int s) => !isTileBlocked(selfX + offset.X * s, selfY + offset.Y * s);
+
+            // 1. 第 1 格地形阻挡：撞墙反弹 + 自伤
+            if (!TileFree(1))
             {
                 return new DashResult
                 {
@@ -172,27 +190,28 @@ public static class WarriorCombatEngine
                     SelfFinalX = selfX,
                     SelfFinalY = selfY,
                     SelfStunned = true,
-                    StunSec = StunDurationSec,
+                    StunSec = 0.8f,
+                    SelfDamage = 5 * (sl + 1) + Math.Max(0, rollExtraDamage),
                     Message = "冲撞撞击墙体障碍！受到碰撞反作用力陷入顿挫硬直！"
                 };
             }
 
-            // 2. 检查第 1 格是否有实体
+            // 2. 第 1 格有实体：等级压制 + 概率推动
             if (obstacleEntity != null && obstacleEntity.Value.hasEntity)
             {
                 var target = obstacleEntity.Value;
-                // 实体在第 1 格
-                if (target.x == step1X && target.y == step1Y)
+                if (target.x == selfX + offset.X && target.y == selfY + offset.Y)
                 {
-                    // 等级比拼: Self.Level > Target.Level 才能撞开
-                    if (selfLevel > target.level)
+                    int diff = selfLevel - target.level;
+                    int threshold = diff + 3 * sl + 6;
+                    if (diff > 0 && roll20 < threshold)
                     {
-                        // 目标被推到第 2 格，自身进入第 1 格
-                        int targetPushX = step2X;
-                        int targetPushY = step2Y;
-
-                        // 目标背后若受阻挡，目标就位第 1 格受撞硬直，自身保持原地
-                        if (isTileBlocked(targetPushX, targetPushY))
+                        // 目标沿冲撞方向被推至第 steps 格（遇阻则停前一格），自身进第 steps-1 格
+                        int targetStep = steps;
+                        while (targetStep > 1 && !TileFree(targetStep)) targetStep--;
+                        int selfStep = Math.Max(1, targetStep - 1);
+                        while (selfStep > 1 && !TileFree(selfStep)) selfStep--;
+                        if (targetStep <= 1)
                         {
                             return new DashResult
                             {
@@ -200,9 +219,10 @@ public static class WarriorCombatEngine
                                 SelfFinalX = selfX,
                                 SelfFinalY = selfY,
                                 TargetPushed = false,
-                                TargetFinalX = step1X,
-                                TargetFinalY = step1Y,
+                                TargetFinalX = selfX + offset.X,
+                                TargetFinalY = selfY + offset.Y,
                                 SelfStunned = false,
+                                StunSec = 0.8f,
                                 Message = "目标身后受墙壁阻挡无法后退，撞击造成目标原地硬直！"
                             };
                         }
@@ -210,50 +230,38 @@ public static class WarriorCombatEngine
                         return new DashResult
                         {
                             Success = true,
-                            SelfFinalX = step1X,
-                            SelfFinalY = step1Y,
+                            SelfFinalX = selfX + offset.X * selfStep,
+                            SelfFinalY = selfY + offset.Y * selfStep,
                             TargetPushed = true,
-                            TargetFinalX = targetPushX,
-                            TargetFinalY = targetPushY,
+                            TargetFinalX = selfX + offset.X * targetStep,
+                            TargetFinalY = selfY + offset.Y * targetStep,
                             SelfStunned = false,
-                            StunSec = StunDurationSec,
-                            Message = $"等级压制成功！将目标撞飞至 ({targetPushX}, {targetPushY}) 并造成眩晕！"
+                            StunSec = 0.8f * targetStep,
+                            Message = $"等级压制成功！将目标撞飞至 ({selfX + offset.X * targetStep}, {selfY + offset.Y * targetStep}) 并造成眩晕！"
                         };
                     }
-                    else
+
+                    return new DashResult
                     {
-                        // 等级不足或相等：自身反弹顿挫
-                        return new DashResult
-                        {
-                            Success = false,
-                            SelfFinalX = selfX,
-                            SelfFinalY = selfY,
-                            SelfStunned = true,
-                            StunSec = StunDurationSec,
-                            Message = "目标等级不低于自身，冲撞撞击失败！自身陷入反弹硬直！"
-                        };
-                    }
+                        Success = false,
+                        SelfFinalX = selfX,
+                        SelfFinalY = selfY,
+                        SelfStunned = true,
+                        StunSec = 0.8f,
+                        Message = "目标等级不低于自身，冲撞撞击失败！自身陷入反弹硬直！"
+                    };
                 }
             }
 
-            // 3. 无障碍物：顺畅位移 2 格 (若第 2 格阻挡则停在第 1 格)
-            if (isTileBlocked(step2X, step2Y))
-            {
-                return new DashResult
-                {
-                    Success = true,
-                    SelfFinalX = step1X,
-                    SelfFinalY = step1Y,
-                    Message = "顺畅位移 1 格到达障碍边缘"
-                };
-            }
-
+            // 3. 无障碍物：顺畅位移 steps 格（遇阻停前一格）
+            int go = steps;
+            while (go > 1 && !TileFree(go)) go--;
             return new DashResult
             {
                 Success = true,
-                SelfFinalX = step2X,
-                SelfFinalY = step2Y,
-                Message = $"野蛮冲撞狂暴突进！瞬间位移至 ({step2X}, {step2Y})！"
+                SelfFinalX = selfX + offset.X * go,
+                SelfFinalY = selfY + offset.Y * go,
+                Message = go >= steps ? $"顺畅位移 {steps} 格" : "顺畅位移 1 格到达障碍边缘"
             };
         }
     }

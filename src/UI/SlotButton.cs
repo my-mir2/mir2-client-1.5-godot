@@ -28,6 +28,22 @@ public partial class SlotButton : Button
 
     private TextureRect? _iconRect;
     private Texture2D? _itemTexture;
+    private ColorRect? _lowDuraBorder;
+    private bool _lowDuraWarning = false;
+    private double _flashTimer = 0.0;
+
+    public bool LowDurabilityWarning
+    {
+        get => _lowDuraWarning;
+        set
+        {
+            _lowDuraWarning = value;
+            if (_lowDuraBorder != null)
+            {
+                _lowDuraBorder.Visible = value;
+            }
+        }
+    }
 
     public Texture2D? ItemTexture
     {
@@ -93,6 +109,28 @@ public partial class SlotButton : Button
                 _iconRect.OffsetBottom = 0;
             }
         };
+
+        // 官方低持久危急红色闪烁边框
+        _lowDuraBorder = new ColorRect
+        {
+            Name = "__LowDuraBorder__",
+            Color = new Color(1.0f, 0.15f, 0.15f, 0.4f),
+            MouseFilter = MouseFilterEnum.Ignore,
+            Visible = _lowDuraWarning
+        };
+        AddChild(_lowDuraBorder);
+        _lowDuraBorder.SetAnchorsPreset(LayoutPreset.FullRect);
+    }
+
+    public override void _Process(double delta)
+    {
+        base._Process(delta);
+        if (_lowDuraWarning && _lowDuraBorder != null)
+        {
+            _flashTimer += delta;
+            float alpha = (Mathf.Sin((float)_flashTimer * 8.0f) + 1.0f) * 0.25f + 0.15f;
+            _lowDuraBorder.Color = new Color(1.0f, 0.15f, 0.15f, alpha);
+        }
     }
 
     [Signal]

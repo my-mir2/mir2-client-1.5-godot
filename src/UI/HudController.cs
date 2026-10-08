@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Mir2Client.Audio;
 using Mir2Client.Utils;
 
 namespace Mir2Client.UI;
@@ -163,6 +164,9 @@ public partial class HudController : CanvasLayer
 
     [Signal]
     public delegate void NpcActionSelectedEventHandler(string actionTag);
+
+    [Signal]
+    public delegate void NpcOptionSelectedEventHandler(int index);
 
     /// <summary>快捷键 Ctrl+H 攻击模式循环切换 (全体 -> 和平 -> 夫妻/组队 -> 行会)</summary>
     public void CycleNextAttackMode()
@@ -741,6 +745,11 @@ public partial class HudController : CanvasLayer
                 }
                 EmitSignal(SignalName.NpcActionSelected, actionTag);
             };
+            // NPC 数字选项直通服务端（bridge 903：CM 61|1011，recog=NPC id，param=选项序号）。
+            _npcDialogView.OptionSelected += (index) =>
+            {
+                EmitSignal(SignalName.NpcOptionSelected, index);
+            };
         }
         _deathScreenView = GetNodeOrNull<DeathScreenView>("DeathScreen");
 
@@ -1080,6 +1089,9 @@ public partial class HudController : CanvasLayer
             if (_quickSlotCounts[slot] != null)
                 _quickSlotCounts[slot].Text = _quickSlotAmounts[slot] > 1 ? _quickSlotAmounts[slot].ToString() : "";
         }
+
+        // 播放经典吃药音效 (药水吞咽音: 官方 sound 107, 对齐 Delphi SoundUtil.pas:s_eat_drug)
+        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.EatDrug);
 
         GD.Print($"[HudController] 使用快捷药水栏 {slot + 1} 物品: {itemName}, 剩余数量: {_quickSlotAmounts[slot]}");
         QuickItemUsed?.Invoke(slot, itemName);
@@ -1642,6 +1654,7 @@ public partial class HudController : CanvasLayer
                     break;
                 }
                 case Key.Tab:
+                case Key.V:
                 {
                     _minimapView?.CycleMode();
                     GetViewport().SetInputAsHandled();
@@ -1671,6 +1684,11 @@ public partial class HudController : CanvasLayer
 
     public bool CloseTopDialog()
     {
+        if (_minimapView != null && _minimapView.CurrentMode == MinimapView.MinimapMode.Big)
+        {
+            _minimapView.SetMode(MinimapView.MinimapMode.Closed);
+            return true;
+        }
         var closed = _stackManager.CloseTopDialog();
         if (closed != null)
         {
@@ -1804,6 +1822,35 @@ public partial class HudController : CanvasLayer
             if (equipSlot == 0 && !string.IsNullOrEmpty(iconFile)) UpdateDollVisuals(iconFile, null, null);
             else if (equipSlot == 1 && !string.IsNullOrEmpty(iconFile)) UpdateDollVisuals(null, iconFile, null);
             else if (equipSlot == 4 && !string.IsNullOrEmpty(iconFile)) UpdateDollVisuals(null, null, iconFile);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 装备低持久红字报警与危急频闪 (IDA sub_488AF4 / DStateWinDirectPaint)
+    /// 当持久低于 3 点时启动槽位红色呼吸警报；持久降为 0 时提示即将碎裂。
+    /// </summary>
+    public void UpdateEquipDurability(int equipSlot, int curDura, int maxDura)
+    {
+        if (equipSlot < 0 || equipSlot >= 9) return;
+        var btn = _equipSlots[equipSlot];
+        if (btn == null) return;
+
+        if (curDura <= 2)
+        {
+            btn.LowDurabilityWarning = true;
+            string eqName = _equipItemDetails[equipSlot]?.Name ?? "装备";
+            if (curDura == 0)
+            {
+                AddChat("装备", $"[装备] 危险：您的【{eqName}】持久已降为 0，继续受到物理攻击将可能彻底碎裂！", new Color(1f, 0.2f, 0.2f));
+            }
+            else
+            {
+                AddChat("装备", $"[装备] 警告：您的【{eqName}】持久仅剩 {curDura}/{maxDura} 点，请尽快修理！", new Color(1f, 0.7f, 0.2f));
+            }
+        }
+        else
+        {
+            btn.LowDurabilityWarning = false;
         }
     }
 
@@ -2025,7 +2072,7 @@ public partial class HudController : CanvasLayer
     }
 
     /// <summary>
-    /// 交易栏物品取回背包 (IDA sub_4DD958: 锁定防作弊门禁与背包回退)
+    /// 交易栏物品取回背包 (IDA 0x4DD958（已证client无函数）: 锁定防作弊门禁与背包回退)
     /// </summary>
     public void TakeTradeItemToBagSlot(int tradeSlot, int targetBagSlot)
     {
@@ -2291,6 +2338,7 @@ public partial class HudController : CanvasLayer
 
         // 派发穿戴请求信号
         EmitSignal(SignalName.WearItemRequested, bagSlot, equipSlot);
+        PlayEquipSlotSound(equipSlot);
 
         var curEquip = _equipItemDetails[equipSlot];
         var btnBag = _bagSlots[bagSlot];
@@ -2363,6 +2411,7 @@ public partial class HudController : CanvasLayer
 
         // 派发脱装请求信号
         EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
+        PlayEquipSlotSound(equipSlot);
 
         var btnEquip = _equipSlots[equipSlot];
         var btnBag = _bagSlots[destSlot];
@@ -2379,6 +2428,21 @@ public partial class HudController : CanvasLayer
         else if (equipSlot == 4) UpdateDollVisuals(null, null, "");
 
         AddChat("系统", $"[系统] 卸下装备 [{equipItem.Value.Name}] 至背包 #{destSlot + 1} 格。", new Color(1f, 0.9f, 0.4f));
+    }
+
+    private static void PlayEquipSlotSound(int equipSlot)
+    {
+        int sid = equipSlot switch
+        {
+            0 => AudioManager.SoundId.ClickArmor,
+            1 => AudioManager.SoundId.ClickWeapon,
+            3 => AudioManager.SoundId.ClickNecklace,
+            4 => AudioManager.SoundId.ClickHelmet,
+            5 or 6 => AudioManager.SoundId.ClickArmring,
+            7 or 8 => AudioManager.SoundId.ClickRing,
+            _ => AudioManager.SoundId.ItemClick
+        };
+        AudioManager.Instance?.PlaySoundId(sid);
     }
 
     /// <summary>

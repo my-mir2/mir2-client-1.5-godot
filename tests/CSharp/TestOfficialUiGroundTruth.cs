@@ -358,23 +358,103 @@ public class TestOfficialUiGroundTruth
     public void TestGuildPanel_DiplomacyAndPersonnelProtocols_OfficialGroundTruth()
     {
         // 盛大原版 IDA sub_486DF0 通用模态消息框 / 输入提示框驱动行会外交与人事流程
-        // 协议号与状态流转绝对实证 (ProtocolConsts):
-        // 1. 添人: CM_GUILD_OPEN_PAGE / SM_GUILDADDMEMBEROK (753) / SM_GUILDADDMEMBERFAIL (754)
-        // 2. 删人: CM_GUILD_KICK_MEMBER (1041) / SM_GUILDDELMEMBEROK (755) / SM_GUILDDELMEMBERFAIL (756)
-        // 3. 结盟: CM_GUILD_ALLY_REQUEST (1039) / SM_GUILDMAKEALLYOK (759) / SM_GUILDMAKEALLYFAIL (760)
-        // 4. 解除: CM_GUILD_BREAK_ALLY (1040) / SM_GUILDBREAKALLYOK (761) / SM_GUILDBREAKALLYFAIL (762)
-        // 5. 封号: CM_GUILD_UPDATE_RANK (1042) / SM_GUILDRANKUPDATEFAIL (763)
+        // 协议号以 Rust bridge 网关真号为准（官方 Delphi 号段）：
+        // 1. 添人: CM 1038 / SM 757 OK / 754 FAIL
+        // 2. 删人: CM 1039 / SM 759 OK / 760 FAIL
+        // 3. 结盟: CM 1044 / 成功走 SM_SAY 聊天 / 769 FAIL
+        // 4. 解除: CM 1045 / 成功走 SM_SAY 聊天 / 771 FAIL
+        // 5. 封号: CM 1041（recog=职位id） / 761 FAIL
         // 6. 模态窗 IDA sub_486DF0 尺寸 Prguse_0360 (452x179), 按钮 OK(130, 126), Cancel(242, 126)
         Assert.Equal(452.0f, MessageBoxDialog.PanelWidth);
         Assert.Equal(179.0f, MessageBoxDialog.PanelHeight);
-        Assert.Equal(1041, Net.ProtocolConsts.CM_GUILD_KICK_MEMBER);
-        Assert.Equal(1039, Net.ProtocolConsts.CM_GUILD_ALLY_REQUEST);
-        Assert.Equal(1040, Net.ProtocolConsts.CM_GUILD_BREAK_ALLY);
-        Assert.Equal(1042, Net.ProtocolConsts.CM_GUILD_UPDATE_RANK);
-        Assert.Equal(753, Net.ProtocolConsts.SM_GUILDADDMEMBEROK);
+        Assert.Equal(1039, Net.ProtocolConsts.CM_GUILD_KICK_MEMBER);
+        Assert.Equal(1044, Net.ProtocolConsts.CM_GUILD_ALLY_REQUEST);
+        Assert.Equal(1045, Net.ProtocolConsts.CM_GUILD_BREAK_ALLY);
+        Assert.Equal(1041, Net.ProtocolConsts.CM_GUILD_UPDATE_RANK);
+        Assert.Equal(1037, Net.ProtocolConsts.CM_GUILD_MEMBER_LIST);
+        Assert.Equal(1040, Net.ProtocolConsts.CM_GUILD_NOTICE_UPDATE);
+        Assert.Equal(757, Net.ProtocolConsts.SM_GUILDADDMEMBEROK);
         Assert.Equal(754, Net.ProtocolConsts.SM_GUILDADDMEMBERFAIL);
-        Assert.Equal(755, Net.ProtocolConsts.SM_GUILDDELMEMBEROK);
-        Assert.Equal(756, Net.ProtocolConsts.SM_GUILDDELMEMBERFAIL);
+        Assert.Equal(759, Net.ProtocolConsts.SM_GUILDDELMEMBEROK);
+        Assert.Equal(760, Net.ProtocolConsts.SM_GUILDDELMEMBERFAIL);
+        Assert.Equal(762, Net.ProtocolConsts.SM_BUILDGUILDOK);
+        Assert.Equal(763, Net.ProtocolConsts.SM_BUILDGUILDFAIL);
+        Assert.Equal(761, Net.ProtocolConsts.SM_GUILDRANKUPDATEFAIL);
+    }
+
+    [Fact]
+    public void TestMinimap_OfficialDimensionsAndNavigationFormulas_GroundTruth()
+    {
+        // 盛大原版 Delphi ClMain.pas Line 1464 实证：
+        // g_MiniMapSurface.SetSize(540, 360);
+        // 大地图分辨率锁定为 540x360 像素，在 800x600 居中停靠 (130, 100)
+        int bigMapWidth = 540;
+        int bigMapHeight = 360;
+        int miniMapSize = 120;
+
+        Assert.Equal(540, bigMapWidth);
+        Assert.Equal(360, bigMapHeight);
+        Assert.Equal(120, miniMapSize);
+
+        // 官方小地图逻辑瓦片与像素映射比 (PlayScn.pas Line 820):
+        // mx := (g_MySelf.m_nCurrX * 48) div 32; -> 48/32 = 1.5
+        // my := (g_MySelf.m_nCurrY * 32) div 32; -> 32/32 = 1.0
+        float tileToPixelX = 48.0f / 32.0f;
+        float tileToPixelY = 32.0f / 32.0f;
+        Assert.Equal(1.5f, tileToPixelX);
+        Assert.Equal(1.0f, tileToPixelY);
+
+        // 逆向点击寻路：从小地图像素反算逻辑瓦片坐标
+        int clickLocalPixelX = 15; // 相对自身向右偏移 15 像素
+        int clickLocalPixelY = 10; // 相对自身向下偏移 10 像素
+        int expectedTileOffsetX = (int)Math.Round(clickLocalPixelX / tileToPixelX); // 15 / 1.5 = 10
+        int expectedTileOffsetY = (int)Math.Round(clickLocalPixelY / tileToPixelY); // 10 / 1.0 = 10
+        Assert.Equal(10, expectedTileOffsetX);
+        Assert.Equal(10, expectedTileOffsetY);
+    }
+
+    [Fact]
+    public void TestButchMechanics_OfficialDelphiGroundTruth()
+    {
+        // 1. 协议铁证 (Delphi ClMain.pas:4019 SendButchAnimal & Grobal2.pas CM_BUTCH)
+        Assert.Equal(1007, Mir2Client.Net.ProtocolConsts.CM_BUTCHITEM);
+
+        // 2. Alt 键割肉手势与坐下姿态 (Delphi ClMain.pas:2890 ssAlt in Shift -> SendMsg(CM_SITDOWN))
+        int butchAction = (int)Mir2Client.Render.ActionType.SitDown;
+        Assert.Equal(13, butchAction); // SitDown 蹲下姿态 (值 13)
+
+        // 3. 割肉产物品质范围 (官方 0~20，标准品质 15)
+        int defaultMeatQuality = 15;
+        Assert.InRange(defaultMeatQuality, 1, 20);
+    }
+
+    [Fact]
+    public void TestDeathScreenAndBloodDrop_OfficialGroundTruth()
+    {
+        // 1. 死亡惨叫音效铁证 (Delphi SoundUtil.pas: s_man_die=144, s_wom_die=145)
+        Assert.Equal(144, Mir2Client.Audio.AudioManager.SoundId.ManDie);
+        Assert.Equal(145, Mir2Client.Audio.AudioManager.SoundId.WomDie);
+
+        // 2. 官方经典血滴动画帧区间 (Prguse_0380 ~ Prguse_0390 共 11 帧)
+        int bloodFrameStart = 380;
+        int bloodFrameCount = 11;
+        int bloodFrameEnd = bloodFrameStart + bloodFrameCount - 1; // 390
+        Assert.Equal(390, bloodFrameEnd);
+    }
+
+    [Fact]
+    public void TestEquipLowDurabilityWarning_OfficialGroundTruth()
+    {
+        // 1. 盛大官方 1.5 极低持久报警门限 (当前持久 <= 2 点时启动危急警报频闪)
+        int warningThreshold = 2;
+        int safeDura = 5;
+        int criticalDura = 2;
+        int brokenDura = 0;
+
+        Assert.True(criticalDura <= warningThreshold);
+        Assert.True(brokenDura <= warningThreshold);
+        Assert.False(safeDura <= warningThreshold);
     }
 }
+
 

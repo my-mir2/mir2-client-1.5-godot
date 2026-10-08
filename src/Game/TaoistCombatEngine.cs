@@ -3,7 +3,7 @@ using System;
 namespace Mir2Client.Game;
 
 /// <summary>
-/// 盛大官方 1.5 原版道士核心战斗与召唤兽引擎 (IDA sub_49350C / sub_4C7720 / sub_4BDEB8 / sub_4D35B0 权威实证)
+/// 盛大官方 1.5 原版道士核心战斗与召唤兽引擎 (IDA 0x49350C（已证client无函数） / sub_4C7720 / sub_4BDEB8 / sub_4D35B0 权威实证)
 /// 严格 1:1 比特级还原:
 ///   1. 施毒术 (Poisoning, MagicId = 6): 
 ///      - 槽位道具 StdMode=25 检定 (Shape 1: 绿毒, Shape 2: 红毒)
@@ -33,7 +33,7 @@ public static class TaoistCombatEngine
     }
 
     /// <summary>
-    /// 施毒命中判定 (sub_49350C @ 0x493F7B)
+    /// 施毒命中判定 (0x49350C（已证client无函数） @ 0x493F7B)
     /// 核心不等式: RandInt(targetAntiPoison + 7) <= 6
     /// </summary>
     public static bool CheckPoisonHit(int targetAntiPoison, Random? rnd = null)
@@ -44,21 +44,39 @@ public static class TaoistCombatEngine
     }
 
     /// <summary>
-    /// 计算施毒持续时间 (秒)
-    /// 绿毒 = 30 + 2 * SC; 红毒 = 40 + 2 * SC
+    /// 计算施毒持续时间 (秒)（对齐 Rust calc_poison_base/total_duration）：
+    /// base = Round(defPower + (a1-a1/3)/(trainLv+1)*(sl+1) + a1/3)，a1=绿30/红40；
+    /// total = base + max(0,SC)*2，最低 绿10/红15 秒。
     /// </summary>
     public static int CalculatePoisonDurationSec(PoisonType type, int taoistSc)
     {
-        int baseSec = type == PoisonType.Green ? GreenPoisonBaseSec : RedPoisonBaseSec;
-        return baseSec + 2 * Math.Max(0, taoistSc);
+        return CalculatePoisonDurationSec(type, taoistSc, 3, 3, 0);
+    }
+
+    public static int CalculatePoisonDurationSec(PoisonType type, int taoistSc, int skillLevel, int trainLevel, int defPower)
+    {
+        double a1 = type == PoisonType.Green ? 30.0 : 40.0;
+        double v5 = a1 / 3.0;
+        double v4 = a1 - v5;
+        double scaled = (v4 / (trainLevel + 1.0)) * (Math.Clamp(skillLevel, 0, 3) + 1.0);
+        int baseSecs = (int)Math.Round(defPower + scaled + v5);
+        int total = baseSecs + 2 * Math.Max(0, taoistSc);
+        int floor = type == PoisonType.Green ? 10 : 15;
+        return Math.Max(floor, total);
     }
 
     /// <summary>
-    /// 绿毒单跳扣血伤害计算 (每 2500ms 一跳)
+    /// 绿毒单跳扣血伤害计算（对齐 Rust：pval=(sl+1)+(sc/10)，伤害=pval+1）。
     /// </summary>
     public static int CalculateGreenPoisonTickDamage(int taoistSc)
     {
-        return Math.Max(1, taoistSc / 3) + 1;
+        return CalculateGreenPoisonTickDamage(3, taoistSc);
+    }
+
+    public static int CalculateGreenPoisonTickDamage(int skillLevel, int taoistSc)
+    {
+        int pval = (Math.Clamp(skillLevel, 0, 3) + 1) + Math.Max(0, taoistSc) / 10;
+        return Math.Max(1, pval) + 1;
     }
 
     /// <summary>

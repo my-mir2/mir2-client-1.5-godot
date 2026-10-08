@@ -35,7 +35,7 @@ public partial class SkillPanelView : Control, IManagedWindow
     {
         Visible = false;
         Size = new Vector2(PanelWidth, PanelHeight);
-        Position = new Vector2(800 - PanelWidth * 2, 0); // 盛大官方 1.5 IDA sub_484468 停靠装备面板左侧 (336, 0)
+        Position = new Vector2(800 - PanelWidth * 2, 0); // 盛大官方 1.5 IDA sub_481DD4 内偏移 0x484468：技能窗停靠装备面板左侧 (336, 0)
 
         _panel = new Panel
         {

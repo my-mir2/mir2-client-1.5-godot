@@ -18,25 +18,66 @@ public static class ResPath
         }
 
         string clean = rel.StartsWith("res://") ? rel[6..] : (rel.StartsWith('/') ? rel[1..] : rel);
-        string[] candidates =
-        [
-            ProjectSettings.GlobalizePath("res://" + clean),
-            Path.Combine("/Users/mac/Documents/github/mir2-client1.5-delphi", clean),
-            Path.Combine(AppContext.BaseDirectory, clean),
-            Path.Combine(AppContext.BaseDirectory, "../Resources", clean),
-            Path.Combine(AppContext.BaseDirectory, "../Resources/resources", clean.StartsWith("resources/") ? clean[10..] : clean),
-            clean
-        ];
+        string projectRoot = FindProjectRoot();
 
-        foreach (var c in candidates)
+        string candidate1 = Path.Combine(projectRoot, clean);
+        if (File.Exists(candidate1) || Directory.Exists(candidate1)) return candidate1;
+
+        string candidate2 = Path.Combine(AppContext.BaseDirectory, clean);
+        if (File.Exists(candidate2) || Directory.Exists(candidate2)) return candidate2;
+
+        string candidate3 = Path.Combine(AppContext.BaseDirectory, "../Resources", clean);
+        if (File.Exists(candidate3) || Directory.Exists(candidate3)) return candidate3;
+
+        string candidate4 = Path.Combine(AppContext.BaseDirectory, "../Resources/resources", clean.StartsWith("resources/") ? clean[10..] : clean);
+        if (File.Exists(candidate4) || Directory.Exists(candidate4)) return candidate4;
+
+        try
         {
-            if (File.Exists(c) || Directory.Exists(c))
-            {
-                return c;
-            }
+            string globalized = ProjectSettings.GlobalizePath("res://" + clean);
+            if (File.Exists(globalized) || Directory.Exists(globalized)) return globalized;
+        }
+        catch
+        {
+            // 忽略非 Godot 进程主线程环境（如 xUnit 测试运行器）中的 interop 异常
         }
 
         return rel;
+    }
+
+    private static string? _cachedProjectRoot;
+    private static string FindProjectRoot()
+    {
+        if (_cachedProjectRoot != null) return _cachedProjectRoot;
+
+        string current = AppContext.BaseDirectory;
+        while (!string.IsNullOrEmpty(current))
+        {
+            if (File.Exists(Path.Combine(current, "project.godot")))
+            {
+                _cachedProjectRoot = current;
+                return current;
+            }
+            string? parent = Directory.GetParent(current)?.FullName;
+            if (parent == null || parent == current) break;
+            current = parent;
+        }
+
+        current = Directory.GetCurrentDirectory();
+        while (!string.IsNullOrEmpty(current))
+        {
+            if (File.Exists(Path.Combine(current, "project.godot")))
+            {
+                _cachedProjectRoot = current;
+                return current;
+            }
+            string? parent = Directory.GetParent(current)?.FullName;
+            if (parent == null || parent == current) break;
+            current = parent;
+        }
+
+        _cachedProjectRoot = Directory.GetCurrentDirectory();
+        return _cachedProjectRoot;
     }
 
     public static ImageTexture? LoadImageTexture(string rel)

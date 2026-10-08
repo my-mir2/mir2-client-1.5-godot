@@ -6,8 +6,8 @@ namespace Mir2Client.UI;
 
 /// <summary>
 /// 盛大热血传奇 1.5 官方玩家交易系统 (DDealDlg & DDealRemoteDlg, 纯 C# 实现)
-/// 严格 1:1 对齐官方双面板并列防大世界假死模型 (IDA sub_4857C7 / sub_485905)
-/// 严格遵循防作弊防偷换锁定状态机 (IDA sub_4DDC8C / sub_4DD79C)
+/// 严格 1:1 对齐官方双面板并列防大世界假死模型 (IDA sub_481DD4 内偏移 0x4857C7 / 0x485905)
+/// 严格遵循防作弊防偷换锁定状态机 (IDA 0x4DDC8C / 0x4DD79C 非函数，乃状态字段引用，逻辑以 TradeManager 状态机为准)
 /// </summary>
 public partial class TradePanelView : Control, IManagedWindow
 {
@@ -50,6 +50,7 @@ public partial class TradePanelView : Control, IManagedWindow
     private int _remoteGold = 0;
     private bool _isMyLocked = false;
     private bool _isRemoteLocked = false;
+    private ulong _lastConfirmTickMsec = 0;
 
     private Texture2D? _texConfirmNormal;
     private Texture2D? _texConfirmPressed;
@@ -450,6 +451,13 @@ public partial class TradePanelView : Control, IManagedWindow
     private void OnConfirm()
     {
         if (_isMyLocked) return;
+        // 对齐服务端 20 tick（1000ms@20TPS）防连点：重复确认直接吞掉（Rust trade.rs sub_4DDC8C 0x4DDCF5）
+        ulong now = Time.GetTicksMsec();
+        if (now - _lastConfirmTickMsec < 1000)
+        {
+            return;
+        }
+        _lastConfirmTickMsec = now;
         SetLocked(true, true);
         EmitSignal(SignalName.EndDealConfirmed);
     }

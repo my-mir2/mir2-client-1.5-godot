@@ -9,8 +9,8 @@ namespace Mir2Client.Game;
 /// 逆向实证锚点:
 /// - 黑铁矿纯度与持久升降: IDA sub_4A0218 @ 0x4A0218..0x4A03F0
 /// - 首饰极值与升级属性推导: IDA sub_4A0CB8 @ 0x4A0CB8..0x4A0F48
-/// - 成功率与 +1/+2/+3 暴击跳点: IDA sub_4A0F48..0x4A0F8C
-/// - 第一刀砍人试刀与碎刀判定: IDA sub_4C27C0 & sub_4C2854
+/// - 成功率与 +1/+2/+3 暴击跳点: IDA 0x4A0F48（已证client无函数）..0x4A0F8C
+/// - 第一刀砍人试刀与碎刀判定: IDA 0x4C27C0（已证client无函数） & sub_4C2854
 /// </summary>
 public static class WeaponUpgradeEngine
 {
@@ -46,26 +46,31 @@ public static class WeaponUpgradeEngine
     );
 
     /// <summary>
-    /// 计算黑铁矿纯度因子 (sub_4A0218)
-    /// dura_factor = sum(purity) / count + (count >= 5 ? 1 : 0)
+    /// 计算黑铁矿纯度因子（对齐 Rust calc_black_iron_dura_factor / Delphi sub_4A0218 @0x4A0803）：
+    /// 取纯度前 5 高，ROUND(n + sum/5.0)，n=min(数量,5)。
     /// </summary>
     public static int CalcBlackIronDuraFactor(IReadOnlyList<int> purities)
     {
         if (purities == null || purities.Count == 0) return 0;
-        int sum = purities.Sum();
-        int avg = sum / purities.Count;
-        int bonus = purities.Count >= 5 ? 1 : 0;
-        return avg + bonus;
+        var top = purities.OrderByDescending(p => p).Take(5).ToList();
+        int n = top.Count;
+        double val = n + top.Sum() / 5.0;
+        return (int)Math.Round(val);
     }
 
     /// <summary>
-    /// 计算持久升降量 (点数转换: 1点持久 = 1000 dura)
-    /// factor < 9: -3000 (必掉3点)
-    /// 9..15: 几率掉 1000~2000
-    /// 16..17: 0 (绝对保平)
-    /// >= 18: 几率 +1000~3000
+    /// 计算持久升降量（对齐 Rust calc_weapon_dura_change，点数转换 1点=1000 dura）：
+    /// factor &lt; 9：-3000；
+    /// 9..15：roll9_15 &lt; 6 掉 1000，否则不变；
+    /// 16..17：0 不变；
+    /// &gt;= 18：v8=roll-1，&lt;4 → +1000，&lt;7 → +2000，否则 +4000。
     /// </summary>
     public static int CalcWeaponDuraChange(int duraFactor, int rngRoll)
+    {
+        return CalcWeaponDuraChange(duraFactor, rngRoll, rngRoll);
+    }
+
+    public static int CalcWeaponDuraChange(int duraFactor, int roll9_15, int rollGe18)
     {
         if (duraFactor < 9)
         {
@@ -73,18 +78,16 @@ public static class WeaponUpgradeEngine
         }
         if (duraFactor < 16)
         {
-            // 9..15 掉持久
-            int drop = (rngRoll % 2 + 1) * 1000;
-            return -drop;
+            return roll9_15 < 6 ? -1000 : 0;
         }
         if (duraFactor < 18)
         {
-            // 16..17 绝对不变
             return 0;
         }
-        // >= 18 增加持久
-        int gain = (rngRoll % 3 + 1) * 1000;
-        return gain;
+        int v8 = rollGe18 - 1;
+        if (v8 < 4) return 1000;
+        if (v8 < 7) return 2000;
+        return 4000;
     }
 
     /// <summary>
@@ -202,7 +205,7 @@ public static class WeaponUpgradeEngine
     }
 
     /// <summary>
-    /// 执行沙巴克/铁匠铺取回武器并在开刀试刀时触发最终结算 (sub_4C27C0 & sub_4C2854)
+    /// 执行沙巴克/铁匠铺取回武器并在开刀试刀时触发最终结算 (0x4C27C0（已证client无函数） & sub_4C2854)
     /// </summary>
     public static TrialResult ExecuteTrialSlash(
         EquipItem weapon,

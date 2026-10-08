@@ -28,11 +28,11 @@ public class TestCombatSkillsMatrix
     }
 
     [Fact]
-    public void TestGoldLimit_Exact5000000()
+    public void TestGoldLimit_Exact10000000()
     {
         var player = new PlayerState();
-        player.Gold = 6_000_000;
-        Assert.Equal(5_000_000, player.Gold); // 严格钳制 500 万
+        player.Gold = 11_000_000;
+        Assert.Equal(10_000_000, player.Gold); // 对齐服务端权威值（M2 0x989680 / Rust 10M）
 
         player.Gold = -50;
         Assert.Equal(0, player.Gold);
@@ -91,4 +91,70 @@ public class TestCombatSkillsMatrix
         int diagCost = 14;
         Assert.Equal(24, straightCost + diagCost);
     }
+
+    [Fact]
+    public void TestAudioManager_OfficialWavRiffParser_GroundTruth()
+    {
+        string wavPath = Utils.ResPath.Resolve("resources/wav/1.wav");
+        if (System.IO.File.Exists(wavPath))
+        {
+            byte[] fileBytes = System.IO.File.ReadAllBytes(wavPath);
+            var info = Audio.AudioManager.ParseWavRiff(fileBytes);
+            Assert.NotNull(info);
+            Assert.Equal(44100, info.Value.SampleRate); // 1.wav 官方实证采样率为 44100 Hz
+            Assert.Equal(16, info.Value.BitsPerSample); // 16-bit
+            Assert.NotNull(info.Value.PcmData);
+            Assert.True(info.Value.PcmData.Length > 0);
+        }
+    }
+
+    [Fact]
+    public void TestShoulderDash_ObstacleStunAndSelfDamage_GroundTruth()
+    {
+        // 官方 1.5 铁证机制 (IDA sub_49BC20 / combat.rs):
+        // 场景 1: 第 1 格遇到不可通行地形 (城墙/巨石)，冲撞受挫
+        var wallDash = WarriorCombatEngine.ShoulderDash.ExecuteDash(
+            selfLevel: 35, selfX: 100, selfY: 100, dir: 2, // 向右冲撞
+            obstacleEntity: null,
+            isTileBlocked: (x, y) => x == 101 && y == 100, // (101, 100) 为墙壁
+            skillLevel: 2, roll20: 0, rollExtraDamage: 3
+        );
+
+        Assert.False(wallDash.Success, "撞墙应当判定冲撞失败");
+        Assert.True(wallDash.SelfStunned, "撞墙自身必须陷入顿挫硬直");
+        Assert.Equal(0.8f, wallDash.StunSec);
+        Assert.Equal(100, wallDash.SelfFinalX); // 原地弹回
+        Assert.Equal(100, wallDash.SelfFinalY);
+        Assert.Equal(5 * (2 + 1) + 3, wallDash.SelfDamage); // 撞墙自伤反噬公式: 5 * (sl + 1) + extra = 18
+
+        // 场景 2: 撞击高等级目标 (自身 35 级 vs 目标 40 级)
+        var highLevelTarget = ((bool, int, int, int)?)(true, 40, 101, 100);
+        var highLevelDash = WarriorCombatEngine.ShoulderDash.ExecuteDash(
+            selfLevel: 35, selfX: 100, selfY: 100, dir: 2,
+            obstacleEntity: highLevelTarget,
+            isTileBlocked: (x, y) => false,
+            skillLevel: 3
+        );
+
+        Assert.False(highLevelDash.Success, "撞击高等级目标应当失败");
+        Assert.True(highLevelDash.SelfStunned, "撞击高等级目标自身必须陷入反弹硬直");
+        Assert.False(highLevelDash.TargetPushed, "高等级目标不得被推移");
+
+        // 场景 3: 等级压制推动 (自身 35 级 vs 目标 25 级)
+        var lowLevelTarget = ((bool, int, int, int)?)(true, 25, 101, 100);
+        var crushDash = WarriorCombatEngine.ShoulderDash.ExecuteDash(
+            selfLevel: 35, selfX: 100, selfY: 100, dir: 2,
+            obstacleEntity: lowLevelTarget,
+            isTileBlocked: (x, y) => false,
+            skillLevel: 3, roll20: 5
+        );
+
+        Assert.True(crushDash.Success, "等级压制应当成功推动");
+        Assert.True(crushDash.TargetPushed, "目标应当被推移");
+        Assert.False(crushDash.SelfStunned, "自身不应陷入硬直");
+        Assert.True(crushDash.TargetFinalX > 101, "目标应当被击退至少 1 格");
+    }
 }
+
+
+
