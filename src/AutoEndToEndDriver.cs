@@ -1947,7 +1947,71 @@ public partial class AutoEndToEndDriver : Node
 
             case 118:
             {
-                GD.Print("[AutoE2E] ALL 118 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 选服列表、脱装回滚、估价耐久与油灯持久 (SM 520/523/524/528/620/640/642/654/655/663/704/709/712) ===");
+                    // 1. 模拟选服与角色查询/删角
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_SERVERLIST,
+                        1, 0, 0, Array.Empty<byte>()
+                    ));
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_QUERYCHAR_OK,
+                        1, 0, 0, Array.Empty<byte>()
+                    ));
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_DELCHAR_FAIL_DELPHI,
+                        0, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 2. 模拟脱装失败原子回滚 (SM_TAKEOFF_FAIL 620, slot=1 衣服)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_TAKEOFF_FAIL,
+                        0, 1, 0, Array.Empty<byte>()
+                    ));
+
+                    // 3. 模拟商店估价与物品持久 (SM_QUERYPRICE_REC 640, SM_DURACHANGE_REC 642)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_QUERYPRICE_REC,
+                        25000, 0, 0, Array.Empty<byte>()
+                    ));
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_DURACHANGE_REC,
+                        12000, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 4. 模拟油灯蜡烛持久消耗 (SM_LAMPCHANGEDURA 655, dura=320)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_LAMPCHANGEDURA,
+                        320, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 5. 模拟踢出组员成功 (SM_KICKMEMBER_OK 663)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_KICKMEMBER_OK,
+                        0, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 6. 模拟仓库物品列表刷新 (SM_USERSTORAGE_ITEMS 704)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_USERSTORAGE_ITEMS,
+                        0, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 7. 模拟技能遗忘删除 (SM_DELUSERMAGIC_DELPHI 709, magicId=12)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_DELUSERMAGIC_DELPHI,
+                        12, 0, 0, Array.Empty<byte>()
+                    ));
+                }
+                RequestCapture("step118_serverlist_takeoff_dura_storage_protocols");
+                break;
+            }
+
+            case 119:
+            {
+                GD.Print("[AutoE2E] ALL 119 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

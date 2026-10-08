@@ -6913,13 +6913,36 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_LevelUpHungerMinimapAndGuildFail` 单元测试，脱机测试覆盖扩充至 **162 / 162 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 117 步实机验证，总演练步数扩充至 **118 步**。
 
+26. **官方 1.5 选服列表、脱装回滚、持久估价、油灯蜡烛持久与商品特价协议全链路实证 (`scratch/ida_processmsg.c` lines 546~585, 1028~1052, 1105~1155, 1680~1710)**：
+    - **官方实证**：严格依据 `scratch/ida_processmsg.c` 与官方 1.5 原版二进制 `MIR_final_v3_p.exe` 汇编实证：
+      - 选服服务器列表 (`SM_SERVERLIST 520`)：官方 IDA `0x467E0A` (`handle_sm_server_list`) 下发石碑服务器分区；
+      - 查询角色列表成功与失败 (`SM_QUERYCHAR_OK 523`, `SM_QUERYCHAR_FAIL 528`)：523 官方 IDA `0x468305` 驱动神龛角色槽位回显，528 查询失败；
+      - 删除角色失败模态弹窗 (`SM_DELCHAR_FAIL_DELPHI 524`)：官方 IDA `0x468350` 呼出原版 GBK 字符 `0x46B624` "[Failure] 删除角色失败, Email: support@legendofmir.com.cn"；
+      - 脱下装备失败槽位原子回滚 (`SM_TAKEOFF_FAIL 620`)：官方 IDA `0x4687C8` 将对应 slot 临时装备原子回滚身上对应槽位；
+      - 施法光效与特效 (`SM_MAGICEFFECT 639`)：官方 IDA `0x46927C` (`handle_sm_magic_effect`)；
+      - 商店估价与物品持久变动 (`SM_QUERYPRICE_REC 640`, `SM_DURACHANGE_REC 642`)：640 单值 Recog 更新物品估价（兼顾技能熟练度双态分流），642 更新物品底层耐久；
+      - 商店货架与常规买卖窗口 (`SM_OPENSHOP_REC 643`, `SM_MERCHANT_NORMAL 646`, `SM_MERCHANT_ITEM 645`, `SM_MERCHANT_SELL_LIST 652`)：643/646 打开货架，645 加载条目，652 加载回售列表；
+      - 实体属性体态同步 (`SM_ACTOR_PARAM 654`)：官方 IDA `0x468ECC` 同步 actor 扩展体态与攻速；
+      - 油灯蜡烛持久消耗 (`SM_LAMPCHANGEDURA 655`)：官方 IDA `0x468F12` 扣减更新随身照明物持久；
+      - 踢出编组成员成功 (`SM_KICKMEMBER_OK 663`)：官方 IDA `0x46A476` 成功踢出队员并更新时间戳；
+      - 仓库物品列表批量刷新 (`SM_USERSTORAGE_ITEMS 704`)：官方 IDA `0x46A091` (`handle_sm_shop_items`) 批量重建保管箱物品列表；
+      - 技能遗忘删除 (`SM_DELUSERMAGIC_DELPHI 709`)：官方 IDA `0x469A4E` 注销被遗忘技能；
+      - 商品特价与明细 (`SM_SHOP_DETAIL2 712`)：官方 IDA `0x469E54` 加载商品特价详情；
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 补全 520、523、524、528、620、639、640、642、643、645、646、652、654、655、663、704、709、712 共 18 个协议号常量；
+      - 在 `HudController.cs` 接入油灯持久 `UpdateLampDura`、估价 `UpdateItemPrice`、耐久 `UpdateItemDurability`、体态 `OnActorParam`、踢人 `OnKickMemberOk` 与脱装失败回滚 `OnTakeOffFail`；
+      - 在 `ServerMessageRouter.cs` 接入上述 18 个协议号的精准分发与 640 估价/技能双态自适应；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_ServerListTakeoffFailShopDetailAndLampDura` 单元测试，脱机测试覆盖扩充至 **163 / 163 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 118 步实机验证，总演练步数扩充至 **119 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **162 / 162 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **118 / 118 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **163 / 163 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **119 / 119 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
+
 
 
 

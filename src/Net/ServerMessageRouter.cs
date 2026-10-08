@@ -363,8 +363,15 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_TAKEON_FAIL: // 616: 穿戴装备失败 (SM_EXCHGTAKEONFAIL 同号)
                 HandleTakeOnFail(packet);
                 break;
-            case ProtocolConsts.SM_MAGICLVEXP: // 640: 技能熟练度经验更新
-                HandleMagicLevelExp(packet);
+            case ProtocolConsts.SM_MAGICLVEXP: // 640: 技能熟练度经验更新 / 官方 1.5 物品估价回显 (SM_QUERYPRICE_REC)
+                if (packet.Param > 0 || packet.Tag > 0)
+                {
+                    HandleMagicLevelExp(packet);
+                }
+                else
+                {
+                    _hud?.UpdateItemPrice(packet.Recog);
+                }
                 break;
             case ProtocolConsts.SM_GROUP_INVITE_CONFIRM: // 658: 组队邀请模态确认 (IDA case 658)
                 HandleGroupInviteConfirm(packet);
@@ -561,6 +568,58 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_BATCHSTRUCK:
                 HandleBatchStruck(packet);
                 break;
+            case ProtocolConsts.SM_SERVERLIST: // 520: 选服服务器列表
+                SafeLog($"[SM] 接收选服服务器列表 (SM_SERVERLIST=520)");
+                break;
+            case ProtocolConsts.SM_QUERYCHAR_OK: // 523: 查询角色列表成功进入角色槽位
+                SafeLog($"[SM] 查询角色列表成功 (SM_QUERYCHAR_OK=523)");
+                break;
+            case ProtocolConsts.SM_DELCHAR_FAIL_DELPHI: // 524: 删除角色失败模态弹窗 (IDA 0x46B624)
+                _hud?.ShowModalMessage("角色提示", "[Failure] 删除角色失败, Email: support@legendofmir.com.cn");
+                break;
+            case ProtocolConsts.SM_QUERYCHAR_FAIL: // 528: 查询角色失败
+                SafeLog($"[SM] 查询角色失败 (SM_QUERYCHAR_FAIL=528)");
+                break;
+            case ProtocolConsts.SM_TAKEOFF_FAIL: // 620: 脱下装备失败回滚 (IDA 0x4687C8)
+                _hud?.OnTakeOffFail(packet.Param);
+                break;
+            case ProtocolConsts.SM_MAGICEFFECT: // 639: 施法光效与命中特效
+                SafeLog($"[SM] 施法光效/命中特效触发 (SM_MAGICEFFECT=639)");
+                break;
+            case ProtocolConsts.SM_DURACHANGE_REC: // 642: 物品持久度变动回显
+                _hud?.UpdateItemDurability(packet.Recog);
+                break;
+            case ProtocolConsts.SM_OPENSHOP_REC: // 643: 打开商店货架
+            case ProtocolConsts.SM_MERCHANT_NORMAL: // 646: 打开常规买卖面板
+                _hud?.ToggleShop(packet.Recog);
+                break;
+            case ProtocolConsts.SM_MERCHANT_ITEM: // 645: 商店商品明细条目
+                _hud?.AddChat("商店", $"[商店] 货架商品更新: {DecodeExtraText(packet.Extra)}", new Color(0.9f, 0.9f, 0.5f));
+                break;
+            case ProtocolConsts.SM_MERCHANT_SELL_LIST: // 652: 打开回购出售列表
+                _hud?.ToggleShop(packet.Recog);
+                _hud?.AddChat("商店", "[商店] 回售列表已加载。", new Color(0.8f, 0.9f, 0.6f));
+                break;
+            case ProtocolConsts.SM_ACTOR_PARAM: // 654: 实体属性/体态更新
+                _hud?.OnActorParam(packet.Recog, packet.Param);
+                break;
+            case ProtocolConsts.SM_LAMPCHANGEDURA: // 655: 蜡烛油灯持久消耗
+                _hud?.UpdateLampDura(packet.Recog);
+                break;
+            case ProtocolConsts.SM_KICKMEMBER_OK: // 663: 踢出编组成员成功
+                _hud?.OnKickMemberOk();
+                break;
+            case ProtocolConsts.SM_USERSTORAGE_ITEMS: // 704: 仓库物品列表批量刷新
+                _hud?.ToggleStorage();
+                _hud?.AddChat("仓库", "[保管箱] 仓储物品列表已同步刷新。", new Color(0.6f, 0.8f, 1f));
+                break;
+            case ProtocolConsts.SM_DELUSERMAGIC_DELPHI: // 709: 技能遗忘/删除 (IDA 0x469A4E)
+                _hud?.AddChat("技能", $"[技能] 技能已被遗忘注销 (ID:{packet.Recog})。", new Color(0.9f, 0.5f, 0.5f));
+                break;
+            case ProtocolConsts.SM_SHOP_DETAIL2: // 712: 商品特价明细下发
+                _hud?.AddChat("商店", $"[商店] 物品特价详情: {DecodeExtraText(packet.Extra)}", new Color(0.9f, 0.9f, 0.4f));
+                break;
+
         }
     }
 

@@ -2296,6 +2296,99 @@ public class TestProtocolMatrix
             Assert.Equal(err, parsedBreakFail.Recog);
         }
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthSmCases_ServerListTakeoffFailShopDetailAndLampDura()
+    {
+        // 1. 选服服务器列表 (SM_SERVERLIST 520)
+        byte[] rawServerList = PacketEncoder.MakePacket(ProtocolConsts.SM_SERVERLIST, 1, 0, 0);
+        var parsedServerList = PacketDecoder.Parse(rawServerList.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SERVERLIST, parsedServerList.Ident);
+
+        // 2. 角色查询成功 (SM_QUERYCHAR_OK 523) 与 失败 (SM_QUERYCHAR_FAIL 528)
+        byte[] rawQueryOk = PacketEncoder.MakePacket(ProtocolConsts.SM_QUERYCHAR_OK, 1, 0, 0);
+        var parsedQueryOk = PacketDecoder.Parse(rawQueryOk.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_QUERYCHAR_OK, parsedQueryOk.Ident);
+
+        byte[] rawQueryFail = PacketEncoder.MakePacket(ProtocolConsts.SM_QUERYCHAR_FAIL, 0, 0, 0);
+        var parsedQueryFail = PacketDecoder.Parse(rawQueryFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_QUERYCHAR_FAIL, parsedQueryFail.Ident);
+
+        // 3. 删除角色失败 (SM_DELCHAR_FAIL_DELPHI 524)
+        byte[] rawDelFail = PacketEncoder.MakePacket(ProtocolConsts.SM_DELCHAR_FAIL_DELPHI, 0, 0, 0);
+        var parsedDelFail = PacketDecoder.Parse(rawDelFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_DELCHAR_FAIL_DELPHI, parsedDelFail.Ident);
+
+        // 4. 脱下装备失败回滚槽位 (SM_TAKEOFF_FAIL 620)
+        byte[] rawTakeOffFail = PacketEncoder.MakePacket(ProtocolConsts.SM_TAKEOFF_FAIL, 0, 1, 0); // 槽位 1
+        var parsedTakeOffFail = PacketDecoder.Parse(rawTakeOffFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_TAKEOFF_FAIL, parsedTakeOffFail.Ident);
+        Assert.Equal(1, parsedTakeOffFail.Param);
+
+        // 5. 施法光效与特效 (SM_MAGICEFFECT 639)
+        byte[] rawMagicEff = PacketEncoder.MakePacket(ProtocolConsts.SM_MAGICEFFECT, 1001, 10, 0);
+        var parsedMagicEff = PacketDecoder.Parse(rawMagicEff.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MAGICEFFECT, parsedMagicEff.Ident);
+
+        // 6. 商店回收物品估价回显 (SM_QUERYPRICE_REC 640, 单值Recog)
+        byte[] rawPrice = PacketEncoder.MakePacket(ProtocolConsts.SM_QUERYPRICE_REC, 15000, 0, 0);
+        var parsedPrice = PacketDecoder.Parse(rawPrice.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_QUERYPRICE_REC, parsedPrice.Ident);
+        Assert.Equal(15000, parsedPrice.Recog);
+
+        // 7. 物品持久度变动 (SM_DURACHANGE_REC 642)
+        byte[] rawDura = PacketEncoder.MakePacket(ProtocolConsts.SM_DURACHANGE_REC, 8500, 0, 0);
+        var parsedDura = PacketDecoder.Parse(rawDura.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_DURACHANGE_REC, parsedDura.Ident);
+        Assert.Equal(8500, parsedDura.Recog);
+
+        // 8. 商店开启与商品明细 (SM_OPENSHOP_REC 643, SM_MERCHANT_ITEM 645, SM_MERCHANT_NORMAL 646, SM_MERCHANT_SELL_LIST 652)
+        byte[] rawOpenShop = PacketEncoder.MakePacket(ProtocolConsts.SM_OPENSHOP_REC, 201, 0, 0);
+        var parsedOpenShop = PacketDecoder.Parse(rawOpenShop.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_OPENSHOP_REC, parsedOpenShop.Ident);
+
+        byte[] rawShopItem = PacketEncoder.MakePacket(ProtocolConsts.SM_MERCHANT_ITEM, 0, 0, 0);
+        var parsedShopItem = PacketDecoder.Parse(rawShopItem.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MERCHANT_ITEM, parsedShopItem.Ident);
+
+        byte[] rawShopNormal = PacketEncoder.MakePacket(ProtocolConsts.SM_MERCHANT_NORMAL, 201, 0, 0);
+        var parsedShopNormal = PacketDecoder.Parse(rawShopNormal.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MERCHANT_NORMAL, parsedShopNormal.Ident);
+
+        byte[] rawShopSell = PacketEncoder.MakePacket(ProtocolConsts.SM_MERCHANT_SELL_LIST, 201, 0, 0);
+        var parsedShopSell = PacketDecoder.Parse(rawShopSell.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MERCHANT_SELL_LIST, parsedShopSell.Ident);
+
+        // 9. 实体属性体态 (SM_ACTOR_PARAM 654) 与 蜡烛持久 (SM_LAMPCHANGEDURA 655)
+        byte[] rawActorParam = PacketEncoder.MakePacket(ProtocolConsts.SM_ACTOR_PARAM, 1001, 3, 0);
+        var parsedActorParam = PacketDecoder.Parse(rawActorParam.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_ACTOR_PARAM, parsedActorParam.Ident);
+
+        byte[] rawLampDura = PacketEncoder.MakePacket(ProtocolConsts.SM_LAMPCHANGEDURA, 450, 0, 0);
+        var parsedLampDura = PacketDecoder.Parse(rawLampDura.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_LAMPCHANGEDURA, parsedLampDura.Ident);
+        Assert.Equal(450, parsedLampDura.Recog);
+
+        // 10. 踢人成功 (SM_KICKMEMBER_OK 663)
+        byte[] rawKickOk = PacketEncoder.MakePacket(ProtocolConsts.SM_KICKMEMBER_OK, 0, 0, 0);
+        var parsedKickOk = PacketDecoder.Parse(rawKickOk.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_KICKMEMBER_OK, parsedKickOk.Ident);
+
+        // 11. 仓库物品列表刷新 (SM_USERSTORAGE_ITEMS 704)
+        byte[] rawStorageItems = PacketEncoder.MakePacket(ProtocolConsts.SM_USERSTORAGE_ITEMS, 0, 0, 0);
+        var parsedStorageItems = PacketDecoder.Parse(rawStorageItems.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_USERSTORAGE_ITEMS, parsedStorageItems.Ident);
+
+        // 12. 技能删除 (SM_DELUSERMAGIC_DELPHI 709) 与 商品特价 (SM_SHOP_DETAIL2 712)
+        byte[] rawDelMagic = PacketEncoder.MakePacket(ProtocolConsts.SM_DELUSERMAGIC_DELPHI, 12, 0, 0);
+        var parsedDelMagic = PacketDecoder.Parse(rawDelMagic.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_DELUSERMAGIC_DELPHI, parsedDelMagic.Ident);
+        Assert.Equal(12, parsedDelMagic.Recog);
+
+        byte[] rawShopDetail = PacketEncoder.MakePacket(ProtocolConsts.SM_SHOP_DETAIL2, 0, 0, 0);
+        var parsedShopDetail = PacketDecoder.Parse(rawShopDetail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SHOP_DETAIL2, parsedShopDetail.Ident);
+    }
 }
 
 

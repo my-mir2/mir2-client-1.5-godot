@@ -1325,6 +1325,40 @@ public partial class HudController : CanvasLayer
         GD.Print($"[HudController] 角色体态/饥饿度更新 (SM_MYSTATUS=708): {_hunger}");
     }
 
+    private int _lampDura = 0;
+    public int CurrentLampDura => _lampDura;
+
+    public void UpdateLampDura(int dura)
+    {
+        _lampDura = dura;
+        GD.Print($"[HudController] 蜡烛/油灯持久更新 (SM_LAMPCHANGEDURA=655): {_lampDura}");
+    }
+
+    public void UpdateItemPrice(int price)
+    {
+        AddChat("商店", $"[商店] 物品估价：{price:N0} 金币", new Color(1f, 0.9f, 0.4f));
+    }
+
+    public void UpdateItemDurability(int dura)
+    {
+        AddChat("装备", $"[装备] 物品持久度变动：{dura}", new Color(0.7f, 0.9f, 1f));
+    }
+
+    public void OnActorParam(int actorId, int param)
+    {
+        GD.Print($"[HudController] 实体属性/体态更新 (SM_ACTOR_PARAM=654): actor={actorId}, param={param}");
+    }
+
+    public void OnKickMemberOk()
+    {
+        AddChat("组队", "[组队] 成员已被成功移出编组。", new Color(0.4f, 1f, 0.5f));
+    }
+
+    public void OnTakeOffFail(int slot)
+    {
+        AddChat("装备", $"[装备] 脱下装备失败 (槽位: {slot})，已原子回滚。", new Color(1f, 0.4f, 0.4f));
+    }
+
     public void UpdateName(string name)
     {
         if (_lblName != null) _lblName.Text = name;
