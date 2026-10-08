@@ -27,6 +27,7 @@ public partial class MessageBoxDialog : Control, IManagedWindow
     private TextureButton? _btnOk;
     private TextureButton? _btnCancel;
     private Action<string>? _inputCallback;
+    private Action? _confirmCallback;
     private bool _isInputMode = false;
 
     public string WindowName => "MessageBoxDialog";
@@ -154,6 +155,12 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         Visible = true;
     }
 
+    public void ShowMessage(string message, bool hasCancel, Action? onConfirm)
+    {
+        _confirmCallback = onConfirm;
+        ShowMessage(message, hasCancel);
+    }
+
     public void ShowInput(string prompt, string defaultValue = "", Action<string>? onConfirm = null, bool isPassword = false)
     {
         ZIndex = 200;
@@ -196,6 +203,8 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         }
         else
         {
+            _confirmCallback?.Invoke();
+            _confirmCallback = null;
             EmitSignal(SignalName.Confirmed);
         }
     }

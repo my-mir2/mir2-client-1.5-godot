@@ -549,6 +549,23 @@ namespace Mir2Client.UI
                     _net?.SendPacket(PacketEncoder.SoftClose());
                 };
 
+                // 官方 1.5 退出游戏确认与发包 (对齐 IDA TFrmDlg_DBotExitClick 0x491520)
+                HudInstance.ExitGameRequested += () =>
+                {
+                    _net?.SendPacket(PacketEncoder.SoftClose());
+                    if (HudInstance.MessageBox != null)
+                    {
+                        HudInstance.MessageBox.ShowMessage("确定要退出游戏吗？", true, () =>
+                        {
+                            GetTree().Quit();
+                        });
+                    }
+                    else
+                    {
+                        GetTree().Quit();
+                    }
+                };
+
                 // 官方 1.5 组队面板交互发包 (CM_CREATEGROUP 1020 / CM_ADDGROUPMEMBER 1021 / CM_DELGROUPMEMBER 1022 / CM_GROUPMODE 1019)
                 if (HudInstance.GroupPanel != null)
                 {

@@ -6851,6 +6851,13 @@
       - 在 `ToggleTrade` 中补充 `sub_4915EC` 的官方背包联动展示逻辑；
       - `AutoEndToEndDriver.cs` 扩充第 113 步实机验证，总演练步数扩充至 **114 步**。
 
+21. **官方 1.5 底栏退出游戏信号与模态确认框闭环 (`TFrmDlg_DBotExitClick` 0x491520)**：
+    - **官方实证**：依据 `docs/ida_evidence/dialog_truth_table.md` 提取：官方原版在点击底栏退出按钮 (`TFrmDlg_DBotExitClick` 0x491520) 时，客户端向服务端发送 `CM_SOFTCLOSE (1009)` 软注销封包，并弹出官方模态确认框（"确定要退出游戏吗？"），确认后平滑退出进程；
+    - **精准重构**：
+      - 在 `MessageBoxDialog.cs` 中实现带确认回调委托的 `ShowMessage(string, bool, Action)` 拓展重载；
+      - 在 `GameView.cs` 中挂接 `HudInstance.ExitGameRequested` 信号至软注销发包与官方模态确认退出流程；
+      - 实机端对端演练验证通过，保持 0 缺陷闭环。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
