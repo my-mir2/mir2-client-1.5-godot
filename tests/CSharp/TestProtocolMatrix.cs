@@ -2295,6 +2295,29 @@ public class TestProtocolMatrix
             Assert.Equal(ProtocolConsts.SM_GUILDBREAKALLYFAIL, parsedBreakFail.Ident);
             Assert.Equal(err, parsedBreakFail.Recog);
         }
+
+        // 10. 官方 1.5 行会创建失败 (SM_BUILDGUILDFAIL 763, Recog = -1 ~ -3) 与施法光效结算 (SM_SPELLEFFECT_DELPHI 614)
+        for (int err = -1; err >= -3; err--)
+        {
+            byte[] rawBuildFail = PacketEncoder.MakePacket(ProtocolConsts.SM_BUILDGUILDFAIL, err, 0, 0);
+            var parsedBuildFail = PacketDecoder.Parse(rawBuildFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_BUILDGUILDFAIL, parsedBuildFail.Ident);
+            Assert.Equal(err, parsedBuildFail.Recog);
+        }
+
+        byte[] rawSpellEffect = PacketEncoder.MakePacket(ProtocolConsts.SM_SPELLEFFECT_DELPHI, 0, 100, 200);
+        var parsedSpellEffect = PacketDecoder.Parse(rawSpellEffect.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SPELLEFFECT_DELPHI, parsedSpellEffect.Ident);
+        Assert.Equal(100, parsedSpellEffect.Param);
+        Assert.Equal(200, parsedSpellEffect.Tag);
+
+        // 路由派发验证零崩溃
+        var router = new ServerMessageRouter(null);
+        router.OnPacket(parsedSpellEffect);
+        for (int err = -1; err >= -3; err--)
+        {
+            router.OnPacket(new ServerPacket(ProtocolConsts.SM_BUILDGUILDFAIL, err, 0, 0, Array.Empty<byte>()));
+        }
     }
 
     [Fact]

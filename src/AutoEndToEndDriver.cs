@@ -7,6 +7,7 @@ using Mir2Client.Game;
 using Mir2Client.Render;
 using Mir2Client.UI;
 using Mir2Client.Utils;
+using Mir2Client.Net;
 
 namespace Mir2Client;
 
@@ -2148,7 +2149,33 @@ public partial class AutoEndToEndDriver : Node
 
             case 124:
             {
-                GD.Print("[AutoE2E] ALL 124 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 行会与组队物理模态弹窗与施法光效 (SM_BUILDGUILDFAIL/SM_SPELLEFFECT_DELPHI) ===");
+                    var router = gameView.ServerMessageRouterInstance;
+                    if (router != null)
+                    {
+                        // 1. 模拟收到官方 1.5 施法光效与受击结算 (SM_SPELLEFFECT_DELPHI 614)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_SPELLEFFECT_DELPHI, 0, 100, 200, Array.Empty<byte>()));
+
+                        // 2. 模拟收到官方 1.5 创建行会失败 Recog = -2 (缺少创建费用 0x46BE18)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_BUILDGUILDFAIL, -2, 0, 0, Array.Empty<byte>()));
+
+                        // 3. 模拟收到官方 1.5 组队邀请失败 Recog = -2 (这个被加进编组的名字是不正确的 0x46B9C0)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_MAPDESCRIPTION, -2, 0, 0, Array.Empty<byte>()));
+
+                        // 4. 模拟收到官方 1.5 创建编组失败 Recog = -4 (对方不允许编组 0x46BA28)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_CREATEGROUP_FAIL, -4, 0, 0, Array.Empty<byte>()));
+                    }
+                }
+                RequestCapture("step124_guild_group_truth_modals");
+                break;
+            }
+
+            case 125:
+            {
+                GD.Print("[AutoE2E] ALL 125 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

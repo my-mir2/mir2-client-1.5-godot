@@ -6998,11 +6998,29 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_GuildWarAndCancelWar`、`TestOfficialGroundTruth_EntityManager_GetEntityAt`、`TestOfficialGroundTruth_QueryUsernameAndNpcClick` 3 项测试，脱机测试覆盖扩充至 **170 / 170 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 123 步实机验证，总演练步数扩充至 **124 步**。
 
+32. **盛大官方 1.5 原版二进制行会与组队物理真值错误码与模态提示全量对齐及 614 施法光效路由闭环 (`scratch/ida_processmsg.c:331-410, 667-820, 1173-1175`, `MIR_final_v3_p - Copy.exe: 0x46B800~0x46BE50`)**：
+    - **官方实证**：
+      - 彻底清除此前依据“猜测/推断”编写的行会与组队失败提示文案，直接通过 PE 解析穿透盛大官方 1.5 原版二进制 (`MIR_final_v3_p - Copy.exe`)，从 `0x46B800~0x46BE50` 提取 100% Delphi 原生中文字符串常量：
+        - 行会创建失败 (`SM_BUILDGUILDFAIL 763`)：-1 已经加入行会 (`0x46BE00`)、-2 缺少创建费用 (`0x46BE18`)、-3 你没有准备好需要的全部物品 (`0x46BE30`)；成功时弹出模态框 `0x46BDE8` "行会正确建立。"；
+        - 入会申请失败 (`SM_GUILDJOINFAIL 758`)：1 你没有权利使用这个命令。 (`0x46BB28`)、2 想加入进来的成员应该来面对掌门人。 (`0x46BB4C`)、3 他已经加入我们的行会。 (`0x46BB78`)、4 已经加入其他行会。 (`0x46BB98`)、5 对方不允许加入行会。 (`0x46BBB4`)；
+        - 开除行会成员失败 (`SM_GUILDDELMEMBERFAIL 760`)：1 你没有权利使用这个命令。 (`0x46BB28`)、2  不是我们的行会成员。 (`0x46BBD4`)、3 行会掌门人不能撤消他自己。 (`0x46BBF4`)、4 不能使用命令。 (`0x46BC18`)；
+        - 更改封号/任命失败 (`SM_GUILDRANKUPDATEFAIL 761`)：-2 [任命错误]  掌门人位置是空的。 (`0x46BC30`)、-3 [任命错误] 掌门人的职位是空的。 (`0x46BC58`)、-4 [任命错误]一个行会只能有两个掌门人 (`0x46BC80`)、-5 [任命错误] 新的行会掌门人已经被传位。 (`0x46BCAC`)、-6 [任命错误] 不能添加成员/删除成员 (`0x46BCDC`)、-7 [任命错误] 职位重复或者出错。 (`0x46BD08`)；
+        - 结盟申请失败 (`SM_GUILDMAKEALLYFAIL 768/769`)：-1 你没有权利。 (`0x46BD30`)、-2 联盟失败。 (`0x46BD48`)、-3 你应该面对你想要结盟的行会掌门人。 (`0x46BD5C`)、-4 对方行会掌门人不允许结盟。 (`0x46BD88`)；
+        - 解除结盟失败 (`SM_GUILDBREAKALLYFAIL 770/771`)：-1 你没有权利。 (`0x46BD30`)、-2 你不在行会联盟中。 (`0x46BDAC`)、-3 这不是一个现有的行会。 (`0x46BDC8`)；
+        - 组队邀请失败与创建/离开失败 (661, 664, 665)：-1 已经加入编组. (`0x46B9A8`)、-2 这个被加进编组的名字是不正确的。 (`0x46B9C0`)、-3 你想邀请加入编组的这个用户已经是其他组的成员了。 (`0x46B9EC`)、-4 对方不允许编组。 (`0x46BA28`)、-5 成员上限已经达到。 (`0x46BA88`)、-1 编组还未成立或者你还不够等级创建。 (`0x46BA44`)、-3 你仍旧不在编组中。 (`0x46BAA4`)；
+        - 施法光效与受击结算 (`SM_SPELLEFFECT_DELPHI 614`)：对齐官方原版二进制 `scratch/ida_processmsg.c` case 614 (`handle_sm_spell_effect`)，纠偏原先误占位的 `SM_CLOSEDOOR`，并在 `ServerMessageRouter` 中正式打通路由分发。
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 增加 `SM_SPELLEFFECT_DELPHI = 614` 常量，注释对齐官方 IDA case 614；
+      - 在 `ServerMessageRouter.cs` 更新 `HandleBuildGuildResult`、`HandleGuildJoinFail`、`HandleGuildKickFail`、`HandleGuildRankFail`、`HandleGuildAllyFail`、`HandleGuildBreakAllyFail`、`HandleGroupInviteFail`、`HandleCreateGroupFail`、`HandleLeaveGroupFail` 中的所有 switch 分支文本为 Delphi 物理真值；
+      - 在 `ServerMessageRouter.cs` 路由分支中增加 `case ProtocolConsts.SM_SPELLEFFECT_DELPHI:`；
+      - 在 `TestProtocolMatrix.cs` 扩充 `SM_BUILDGUILDFAIL` (-1~-3) 与 `SM_SPELLEFFECT_DELPHI` (614) 的单元测试断言与路由分发验证；
+      - 在 `AutoEndToEndDriver.cs` 增加第 124 步实机验证，总演练步数扩充至 **125 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
 - **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **170 / 170 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **124 / 124 阶段全生命周期 0 缺陷通过**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **125 / 125 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

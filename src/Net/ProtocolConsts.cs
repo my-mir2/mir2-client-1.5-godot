@@ -167,7 +167,8 @@ public static class ProtocolConsts
     public const short SM_UPDATEITEM             = 603;  // 物品持久度变动
     public const short SM_EAT_OK                 = 606;  // 药水使用确认
     public const short SM_OPENDOOR               = 612;  // 石门开启
-    public const short SM_CLOSEDOOR              = 614;  // 石门关闭
+    public const short SM_CLOSEDOOR              = 614;  // 石门关闭 (历史兼容)
+    public const short SM_SPELLEFFECT_DELPHI      = 614;  // 盛大官方 1.5 施法光效与受击结算 (IDA sub_467920 case 614 @ 0x469B56)
     public const short SM_TAKEON_OK              = 615;  // 穿戴装备成功
     public const short SM_TAKEON_FAIL            = 616;  // 穿戴装备失败
     public const short SM_TAKEOFF_OK             = 619;  // 脱下装备成功

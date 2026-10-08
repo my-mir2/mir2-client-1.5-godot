@@ -583,8 +583,9 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_TAKEOFF_FAIL: // 620: 脱下装备失败回滚 (IDA 0x4687C8)
                 _hud?.OnTakeOffFail(packet.Param);
                 break;
+            case ProtocolConsts.SM_SPELLEFFECT_DELPHI: // 614: 官方 1.5 施法光效与受击结算 (IDA sub_467920 case 614 @ 0x469B56)
             case ProtocolConsts.SM_MAGICEFFECT: // 639: 施法光效与命中特效
-                SafeLog($"[SM] 施法光效/命中特效触发 (SM_MAGICEFFECT=639)");
+                SafeLog($"[SM] 施法光效/命中特效触发 (ident={packet.Ident})");
                 break;
             case ProtocolConsts.SM_DURACHANGE_REC: // 642: 物品持久度变动回显
                 _hud?.UpdateItemDurability(packet.Recog);
@@ -679,11 +680,11 @@ public sealed class ServerMessageRouter
     {
         string msg = pkt.Recog switch
         {
-            1 => "对方拒绝加入行会。",     // 0x46BB28
-            2 => "对方已经加入了其他行会。", // 0x46BB4C
-            3 => "行会人数已达到上限。",   // nullsub_13
-            4 => "你没有邀请他人入会的权限。", // 0x46BB98
-            5 => "对方等级不符合入会要求。", // 0x46BBB4
+            1 => "你没有权利使用这个命令。.",             // 官方 IDA 0x46BB28
+            2 => "想加入进来的成员应该来面对掌门人。",     // 官方 IDA 0x46BB4C
+            3 => "他已经加入我们的行会。",                 // 官方 IDA 0x46BB78 (nullsub_13)
+            4 => "已经加入其他行会。",                     // 官方 IDA 0x46BB98
+            5 => "对方不允许加入行会。",                   // 官方 IDA 0x46BBB4
             _ => "加入行会申请失败。"
         };
         _hud?.ShowModalMessage("行会提示", msg);
@@ -694,10 +695,10 @@ public sealed class ServerMessageRouter
     {
         string msg = pkt.Recog switch
         {
-            1 => "你没有开除成员的权限。",     // 0x46BB28
-            2 => "该玩家不在此行会中。",       // 0x46BBD4
-            3 => "不能开除行会掌门人。",       // 0x46BBF4
-            4 => "开除行会成员失败。",        // 0x46BC18
+            1 => "你没有权利使用这个命令。.",             // 官方 IDA 0x46BB28
+            2 => " 不是我们的行会成员。",                 // 官方 IDA 0x46BBD4
+            3 => "行会掌门人不能撤消他自己。",             // 官方 IDA 0x46BBF4
+            4 => "不能使用命令。",                         // 官方 IDA 0x46BC18
             _ => "踢出行会失败。"
         };
         _hud?.ShowModalMessage("行会提示", msg);
@@ -708,12 +709,12 @@ public sealed class ServerMessageRouter
     {
         string msg = pkt.Recog switch
         {
-            -2 => "封号长度不符合规定。",       // 0x46BC30
-            -3 => "封号中包含非法字符。",       // 0x46BC58
-            -4 => "你没有更改封号的权限。",     // 0x46BC80
-            -5 => "目标玩家不存在。",          // 0x46BCAC
-            -6 => "此封号已经被使用。",         // 0x46BCDC
-            -7 => "更改封号请求超时。",         // 0x46BD08
+            -2 => "[任命错误]  掌门人位置是空的。",         // 官方 IDA 0x46BC30
+            -3 => "[任命错误] 掌门人的职位是空的。",       // 官方 IDA 0x46BC58
+            -4 => "[任命错误]一个行会只能有两个掌门人",     // 官方 IDA 0x46BC80
+            -5 => "[任命错误] 新的行会掌门人已经被传位。", // 官方 IDA 0x46BCAC
+            -6 => "[任命错误] 不能添加成员/删除成员",       // 官方 IDA 0x46BCDC
+            -7 => "[任命错误] 职位重复或者出错。",         // 官方 IDA 0x46BD08
             _ => "更改封号失败。"
         };
         _hud?.ShowModalMessage("行会提示", msg);
@@ -724,10 +725,10 @@ public sealed class ServerMessageRouter
     {
         string msg = pkt.Recog switch
         {
-            -1 => "你没有结盟权限。",           // 0x46BD30
-            -2 => "对方行会拒绝结盟请求。",     // 0x46BD48
-            -3 => "对方行会已经与其他行会结盟。", // 0x46BD5C
-            -4 => "结盟行会数量已达到上限。",   // 0x46BD88
+            -1 => "你没有权利。",                          // 官方 IDA 0x46BD30
+            -2 => "联盟失败。",                            // 官方 IDA 0x46BD48
+            -3 => "你应该面对你想要结盟的行会掌门人。",     // 官方 IDA 0x46BD5C
+            -4 => "对方行会掌门人不允许结盟。",             // 官方 IDA 0x46BD88
             _ => "行会结盟申请失败。"
         };
         _hud?.ShowModalMessage("行会提示", msg);
@@ -738,9 +739,9 @@ public sealed class ServerMessageRouter
     {
         string msg = pkt.Recog switch
         {
-            -1 => "你没有解除同盟的权限。",     // 0x46BD30
-            -2 => "该行会不是你的同盟行会。",   // 0x46BDAC
-            -3 => "解除结盟操作失败。",         // 0x46BDC8
+            -1 => "你没有权利。",                          // 官方 IDA 0x46BD30
+            -2 => "你不在行会联盟中。",                     // 官方 IDA 0x46BDAC
+            -3 => "这不是一个现有的行会。",                 // 官方 IDA 0x46BDC8
             _ => "解除结盟失败。"
         };
         _hud?.ShowModalMessage("行会提示", msg);
@@ -1175,20 +1176,31 @@ public sealed class ServerMessageRouter
         }
     }
 
-    // 行会结果系回包：分发器归属待 IDA 确认（不在 ProcessServerMessage 140 case 内），
-    // 暂按 M2Server 语义接入本地面板与聊天，L2。
+    // 官方 1.5 行会创建结果回显 (IDA ProcessServerMessage 0x467920 case 762/763 @ 0x46A8DE)
     private void HandleBuildGuildResult(ServerPacket pkt)
     {
         bool ok = pkt.Ident == ProtocolConsts.SM_BUILDGUILDOK;
         string text = DecodeExtraText(pkt.Extra);
-        if (string.IsNullOrEmpty(text)) text = ok ? "行会正确建立。" : "行会创建失败！";
-        _hud?.AddChat("行会", $"[行会] {text}", new Color(0.4f, 1f, 0.5f));
         if (ok)
         {
-            _hud?.ShowModalMessage("行会提示", "行会正确建立。"); // 官方 IDA 0x46BDB0 "行会正确建立。" 模态弹窗
+            if (string.IsNullOrEmpty(text)) text = "行会正确建立。"; // 官方 IDA 0x46BDE8 "行会正确建立。" 模态弹窗
+            _hud?.AddChat("行会", $"[行会] {text}", new Color(0.4f, 1f, 0.5f));
+            _hud?.ShowModalMessage("行会提示", text);
             _hud?.ToggleGuild();
         }
-        else _hud?.ShowModalMessage("行会提示", text);
+        else
+        {
+            // 官方 IDA 0x467920 case 763 (@ 0x46A8DE): 根据 Recog 错误码弹出精确模态提示
+            string failMsg = pkt.Recog switch
+            {
+                -1 => "已经加入行会。",                     // 官方 IDA 0x46BE00
+                -2 => "缺少创建费用。",                     // 官方 IDA 0x46BE18
+                -3 => "你没有准备好需要的全部物品。",         // 官方 IDA 0x46BE30
+                _ => !string.IsNullOrEmpty(text) ? text : "行会创建失败！"
+            };
+            _hud?.AddChat("行会", $"[行会] {failMsg}", new Color(1f, 0.4f, 0.4f));
+            _hud?.ShowModalMessage("行会提示", failMsg);
+        }
     }
 
     private void HandleGuildMemberChange(ServerPacket pkt)
@@ -1402,10 +1414,10 @@ public sealed class ServerMessageRouter
     {
         string errMsg = pkt.Recog switch
         {
-            -1 => "已经加入编组.",                                           // 0x46B9A8
-            -2 => "不能加入编组。",                                          // 0x46B9C0
-            -3 => "你想邀请加入编组的这个用户已经是其他组的成员了。",          // 0x46B9EC
-            -4 => "邀请加入编组失败。",                                      // 0x46BA28
+            -1 => "已经加入编组.",                                           // 官方 IDA 0x46B9A8
+            -2 => "这个被加进编组的名字是不正确的。",                          // 官方 IDA 0x46B9C0
+            -3 => "你想邀请加入编组的这个用户已经是其他组的成员了。",          // 官方 IDA 0x46B9EC
+            -4 => "对方不允许编组。",                                        // 官方 IDA 0x46BA28 (sub_46BA28)
             _ => "邀请组队失败。"
         };
         _hud?.ShowModalMessage("组队提示", errMsg);
@@ -1420,11 +1432,11 @@ public sealed class ServerMessageRouter
     {
         string errMsg = pkt.Recog switch
         {
-            -1 => "编组还未成立或者你还不够等级创建。", // 0x46BA44
-            -2 => "不能创建编组。",                  // 0x46B9C0
-            -3 => "你已经在编组中了。",              // 0x46BA70
-            -4 => "创建编组失败。",                  // 0x46BA28
-            -5 => "成员上限已经达到。",              // 0x46BA88
+            -1 => "编组还未成立或者你还不够等级创建。", // 官方 IDA 0x46BA44
+            -2 => "这个被加进编组的名字是不正确的。",    // 官方 IDA 0x46B9C0
+            -3 => "已经加入编组。",                    // 官方 IDA 0x46BA70 (sub_46BA70)
+            -4 => "对方不允许编组。",                  // 官方 IDA 0x46BA28 (sub_46BA28)
+            -5 => "成员上限已经达到。",                // 官方 IDA 0x46BA88
             _ => "创建编组失败。"
         };
         _hud?.ShowModalMessage("组队提示", errMsg);
@@ -1439,9 +1451,9 @@ public sealed class ServerMessageRouter
     {
         string errMsg = pkt.Recog switch
         {
-            -1 => "编组还未成立。",   // 0x46BA44
-            -2 => "不能执行该操作。", // 0x46B9C0
-            -3 => "你仍旧不在编组中。", // 0x46BAA4
+            -1 => "编组还未成立或者你还不够等级创建。", // 官方 IDA 0x46BA44
+            -2 => "这个被加进编组的名字是不正确的。",    // 官方 IDA 0x46B9C0
+            -3 => "你仍旧不在编组中。",                 // 官方 IDA 0x46BAA4
             _ => "组队操作失败。"
         };
         _hud?.ShowModalMessage("组队提示", errMsg);
