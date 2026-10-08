@@ -536,6 +536,18 @@ namespace Mir2Client.UI
                     _net?.SendPacket(PacketEncoder.HalfMoonOnOff(enabled));
                 };
 
+                // 官方 1.5 背包金币丢弃发包 (CM_DROPGOLD 1016, 对齐 IDA TFrmDlg_DGoldClick 0x48e564)
+                HudInstance.DropGoldRequested += (amount) =>
+                {
+                    _net?.SendPacket(PacketEncoder.DropGold(amount));
+                };
+
+                // 官方 1.5 角色小退换人发包 (CM_SOFTCLOSE 1009, 对齐 IDA TFrmDlg_DBotLogoutClick 0x491474)
+                HudInstance.SoftCloseRequested += () =>
+                {
+                    _net?.SendPacket(PacketEncoder.SoftClose());
+                };
+
                 // 官方 1.5 组队面板交互发包 (CM_CREATEGROUP 1020 / CM_ADDGROUPMEMBER 1021 / CM_DELGROUPMEMBER 1022 / CM_GROUPMODE 1019)
                 if (HudInstance.GroupPanel != null)
                 {
@@ -1131,7 +1143,7 @@ namespace Mir2Client.UI
 
         public void PerformButcher(int tx, int ty, int dir)
         {
-            if (PlayerInstance.IsStunned || PlayerInstance.IsDead) return;
+            if (PlayerInstance == null || PlayerInstance.IsStunned || PlayerInstance.IsDead) return;
 
             // 1. 角色转向并进入割肉/蹲下姿势 (Delphi ClMain.pas:2890 ssAlt in Shift -> SendButchAnimal)
             PlayerInstance.Direction = dir;

@@ -1944,6 +1944,65 @@ public class TestProtocolMatrix
         Assert.Equal(ProtocolConsts.SM_DONATEOK, parsedDonate.Ident);
         Assert.Equal("捐献 100000 金币成功", parsedDonate.ExtraStr);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthSmCases_TakeOnFailMagicExpMapDescAndNotices()
+    {
+        // 1. 穿戴装备失败 (SM_TAKEON_FAIL 616)
+        byte[] rawFail = PacketEncoder.MakePacket(ProtocolConsts.SM_TAKEON_FAIL, 0, 0, 0, Encoding.UTF8.GetBytes("负重力不足"));
+        var parsedFail = PacketDecoder.Parse(rawFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_TAKEON_FAIL, parsedFail.Ident);
+        Assert.Equal("负重力不足", parsedFail.ExtraStr);
+
+        // 2. 技能经验更新 (SM_MAGICLVEXP 640)
+        byte[] rawExp = PacketEncoder.MakePacket(ProtocolConsts.SM_MAGICLVEXP, 2, 3, 500, Encoding.UTF8.GetBytes("1200"));
+        var parsedExp = PacketDecoder.Parse(rawExp.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MAGICLVEXP, parsedExp.Ident);
+        Assert.Equal(2, parsedExp.Recog); // magicId
+        Assert.Equal(3, parsedExp.Param); // level
+        Assert.Equal(500, parsedExp.Tag); // curTrain
+        Assert.Equal("1200", parsedExp.ExtraStr); // maxTrain
+
+        // 3. 地图描述公告 (SM_MAPDESCRIPTION 661)
+        byte[] rawMapDesc = PacketEncoder.MakePacket(ProtocolConsts.SM_MAPDESCRIPTION, 0, 0, 0, Encoding.UTF8.GetBytes("比奇省 - 玛法大陆王城"));
+        var parsedMapDesc = PacketDecoder.Parse(rawMapDesc.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MAPDESCRIPTION, parsedMapDesc.Ident);
+        Assert.Equal("比奇省 - 玛法大陆王城", parsedMapDesc.ExtraStr);
+
+        // 4. 全服系统公告 (SM_SENDNOTICE 662)
+        byte[] rawNotice = PacketEncoder.MakePacket(ProtocolConsts.SM_SENDNOTICE, 0, 0, 0, Encoding.UTF8.GetBytes("沙巴克攻城战即将于 20:00 开启!"));
+        var parsedNotice = PacketDecoder.Parse(rawNotice.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SENDNOTICE, parsedNotice.Ident);
+        Assert.Equal("沙巴克攻城战即将于 20:00 开启!", parsedNotice.ExtraStr);
+
+        // 5. 魔法释放与失败回显 (SM_MAGICFIRE 802 / SM_MAGICFIREFAIL 803)
+        byte[] rawMagicFire = PacketEncoder.MakePacket(ProtocolConsts.SM_MAGICFIRE, 1001, 335, 275);
+        var parsedMagicFire = PacketDecoder.Parse(rawMagicFire.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MAGICFIRE, parsedMagicFire.Ident);
+        Assert.Equal(1001, parsedMagicFire.Recog);
+        Assert.Equal(335, parsedMagicFire.Param);
+        Assert.Equal(275, parsedMagicFire.Tag);
+
+        byte[] rawMagicFail = PacketEncoder.MakePacket(ProtocolConsts.SM_MAGICFIREFAIL, 0, 0, 0, Encoding.UTF8.GetBytes("魔法力不足"));
+        var parsedMagicFail = PacketDecoder.Parse(rawMagicFail.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MAGICFIREFAIL, parsedMagicFail.Ident);
+        Assert.Equal("魔法力不足", parsedMagicFail.ExtraStr);
+
+        // 6. 深度查名与丢弃金币上行协议 (CM_QUERYUSERNAME_EXT 82 / CM_DROPGOLD 1016 / CM_SOFTCLOSE 1009)
+        byte[] rawQueryExt = PacketEncoder.QueryUsernameExt(777);
+        var parsedQueryExt = PacketDecoder.Parse(rawQueryExt.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_QUERYUSERNAME_EXT, parsedQueryExt.Ident);
+        Assert.Equal(777, parsedQueryExt.Recog);
+
+        byte[] rawDropGold = PacketEncoder.DropGold(20000);
+        var parsedDropGold = PacketDecoder.Parse(rawDropGold.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_DROPGOLD, parsedDropGold.Ident);
+        Assert.Equal(20000, parsedDropGold.Recog);
+
+        byte[] rawSoftClose = PacketEncoder.SoftClose();
+        var parsedSoftClose = PacketDecoder.Parse(rawSoftClose.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_SOFTCLOSE, parsedSoftClose.Ident);
+    }
 }
 
 

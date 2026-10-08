@@ -213,8 +213,12 @@
 | 67 | `120` | `SM_CHARLIST` | 角色形象与状态数据下发 (case 120) | `SelectCharView.cs:98` | `bridge.rs:1239` | `[L3 1:1]` | 驱动 SelectCharView 动态绑定角色名称、职业、等级与形象 |
 | 68 | `208` | `SM_LOGICSTATE` | 主角逻辑坐标与视野朝向设定 (208) | `ServerMessageRouter.cs:224` | `bridge.rs:1340` | `[L3 1:1]` | 设定主角在比奇省安全区的绝对逻辑坐标与 8 方向朝向 |
 | 69 | `210` / `220` / `230` | `SM_SPAWN` | 视野内玩家/怪物/NPC 进入 (210/220/230) | `ServerMessageRouter.cs:549` | `bridge.rs:1394` | `[L3 1:1]` | 驱动 EntityManager.AddEntity 动态追踪视野实体，联动雷达红黄蓝点 |
-| 70 | `211` / `221` / `231` | `SM_DELETE` | 视野内玩家/怪物/NPC 移出 (211/221/231) | `ServerMessageRouter.cs:557` | `bridge.rs:1421` | `[L3 1:1]` | 驱动 EntityManager.RemoveEntity 销毁实体并清理雷达标注 |
-| 71 | `810` | `SM_CLEAROBJECTS` | 跨地图与视野清空 (case 810) | `ServerMessageRouter.cs:572` | `bridge.rs:1330` | `[L3 1:1]` | 驱动 EntityManager.Clear 清除所有视野实体 |
+| 71 | `810` | `SM_CLEAROBJECTS` / `SM_TIMECHECKMSG` | 官方时间同步校准与跨地图视野清空 (case 810) | `ServerMessageRouter.cs:181` | `bridge.rs:1330` | `[L3 1:1]` | 驱动 EntityManager.Clear 与系统时间戳校准 |
+| 72 | `640` | `SM_MAGICLVEXP` | 技能熟练度经验动态更新 (case 640) | `ServerMessageRouter.cs:351` | `bridge.rs:198` | `[L3 1:1]` | 驱动 SkillPanelView.UpdateSkillExp 经验增长与魔法书刷新 |
+| 73 | `661` | `SM_MAPDESCRIPTION` | 地图描述与区域公告提示 (case 661) | `ServerMessageRouter.cs:354` | `bridge.rs:2485` | `[L3 1:1]` | 驱动 HudController.AddChat 显示安全区/PK区区域说明 |
+| 74 | `662` | `SM_SENDNOTICE` | 全服系统滚动公告跑马灯 (case 662) | `ServerMessageRouter.cs:357` | `bridge.rs:1882` | `[L3 1:1]` | 驱动全局跑马灯与金色高亮聊天框广播 |
+| 75 | `802` | `SM_MAGICFIRE` | 魔法施放成功服务端回显 (case 802) | `ServerMessageRouter.cs:361` | `bridge.rs:1890` | `[L3 1:1]` | 驱动施法者施法光效与施法状态确认 |
+| 76 | `803` | `SM_MAGICFIREFAIL` | 魔法施放失败提示 (case 803) | `ServerMessageRouter.cs:364` | `bridge.rs:1895` | `[L3 1:1]` | 驱动蓝耗不足/冷却中红色警告提示与施法复位 |
 
 ---
 

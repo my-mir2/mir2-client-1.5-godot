@@ -174,6 +174,15 @@ public partial class HudController : CanvasLayer
     [Signal]
     public delegate void ToggleHalfMoonRequestedEventHandler(bool enabled);
 
+    [Signal]
+    public delegate void DropGoldRequestedEventHandler(int amount);
+
+    [Signal]
+    public delegate void SoftCloseRequestedEventHandler();
+
+    [Signal]
+    public delegate void ExitGameRequestedEventHandler();
+
     private bool _isThrusting = true;
     private bool _isHalfMoon = false;
     public bool IsThrustingEnabled => _isThrusting;
@@ -212,6 +221,26 @@ public partial class HudController : CanvasLayer
         };
         AddChat("系统", $"[系统] 切换为{modeDesc}。", new Color(1f, 1f, 0f));
         EmitSignal(SignalName.ChangeAttackModeRequested, nextMode);
+    }
+
+    /// <summary>官方 1.5 小退/换人 (IDA TFrmDlg_DBotLogoutClick 0x491474, 发包 CM_SOFTCLOSE 1009)</summary>
+    public void RequestSoftClose()
+    {
+        AddChat("系统", "[系统] 正在注销当前角色并返回选角神龛...", new Color(1f, 0.8f, 0.4f));
+        EmitSignal(SignalName.SoftCloseRequested);
+    }
+
+    /// <summary>官方 1.5 退出游戏 (IDA TFrmDlg_DBotExitClick 0x491520)</summary>
+    public void RequestExitGame()
+    {
+        EmitSignal(SignalName.ExitGameRequested);
+    }
+
+    /// <summary>官方 1.5 丢弃金币 (IDA TFrmDlg_DGoldClick 0x48e564, 发包 CM_DROPGOLD 1007)</summary>
+    public void RequestDropGold(int amount)
+    {
+        AddChat("系统", $"[系统] 丢弃金币 {amount} 枚至地面。", new Color(1f, 1f, 0.4f));
+        EmitSignal(SignalName.DropGoldRequested, amount);
     }
 
     /// <summary>服务端 SM_ATTACKMODECHANGED (766, IDA sub_467920 case 766 @ 0x468A2B) 驱动回显</summary>
@@ -497,7 +526,15 @@ public partial class HudController : CanvasLayer
                 Position = new Vector2(10, 190),
                 Size = new Vector2(36, 21),
                 Texture = texGoldBag,
-                MouseFilter = Control.MouseFilterEnum.Pass
+                MouseFilter = Control.MouseFilterEnum.Stop
+            };
+            goldIcon.GuiInput += (ev) =>
+            {
+                if (ev is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+                {
+                    // 官方 1.5 IDA TFrmDlg_DGoldClick (0x48e564): 点击背包金币丢弃到地面
+                    RequestDropGold(100);
+                }
             };
             _bagPanel.AddChild(goldIcon);
 

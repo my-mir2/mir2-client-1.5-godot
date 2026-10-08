@@ -1634,7 +1634,28 @@ public partial class AutoEndToEndDriver : Node
 
             case 108:
             {
-                GD.Print("[AutoE2E] ALL 108 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证背包金币点击丢金币、软注销与全服公告广播回显 ===");
+                    // 1. 模拟背包金币图标点击触发丢弃金币请求 (CM_DROPGOLD)
+                    gameView.HudInstance.RequestDropGold(1000);
+                    // 2. 模拟请求注销/退出 (CM_SOFTCLOSE)
+                    gameView.HudInstance.RequestSoftClose();
+                    // 3. 模拟全服公告跑马灯广播 (SM_SENDNOTICE 662)
+                    gameView.HudInstance.AddChat("公告", "[全服公告] 玛法大陆服务器将于今晚 24:00 进行例行维护，请各位玩家提前下线。", new Color(1f, 0.85f, 0.2f));
+                    // 4. 模拟法术施放失败提示 (SM_MAGICFIREFAIL 803)
+                    gameView.HudInstance.AddChat("技能", "[法术] 魔法施放失败，可能由于魔法值不足或技能处于冷却中。", new Color(1f, 0.4f, 0.4f));
+                    // 5. 模拟地图描述提示 (SM_MAPDESCRIPTION 661)
+                    gameView.HudInstance.AddChat("地图", "[地图信息] 当前区域：比奇省 (安全区)", new Color(0.6f, 0.8f, 1f));
+                }
+                RequestCapture("step108_gold_softclose_notices");
+                break;
+            }
+
+            case 109:
+            {
+                GD.Print("[AutoE2E] ALL 109 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

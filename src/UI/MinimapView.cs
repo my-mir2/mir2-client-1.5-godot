@@ -147,7 +147,7 @@ public partial class MinimapView : Control, IManagedWindow
         AddChild(_lblHoverCoord);
 
         // 官方右上角关闭红叉按钮 (Prguse_0064 16x23)
-        var closeTex = ResPath.LoadImageTexture("resources/wil/png/prguse/prguse_0064.png");
+        var closeTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0064.png");
         _btnClose = new TextureButton
         {
             Name = "BtnClose",

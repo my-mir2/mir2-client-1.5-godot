@@ -38,7 +38,7 @@ public sealed class ServerMessageRouter
     public const short SM_OBJECT_DISAPPEAR       = 29;   // 实体消除 (Delphi 29)
     public const short SM_TURNDIRECTION_DELPHI   = 204;  // 实体转向 (204)
     public const short SM_NEWMAP_DELPHI          = 521;  // 地图切换/初始化黑屏转场 (521)
-    public const short SM_CLEAROBJECTS           = 810;  // 清空视野实体 (810)
+    public const short SM_CLEAROBJECTS           = ProtocolConsts.SM_TIMECHECKMSG;  // 清空视野实体 / 官方时间同步 (810)
     public const short SM_ADDITEM                = 200;  // 背包添加物品
     public const short SM_SENDUSERMAGIC          = 201;  // 角色已学技能列表批量下发
     public const short SM_DELITEM                = 202;  // 背包移除物品
@@ -178,8 +178,9 @@ public sealed class ServerMessageRouter
             case SM_DEATH:
                 HandleEntityDead(packet);
                 break;
-            case SM_CLEAROBJECTS:
+            case SM_CLEAROBJECTS: // 810: SM_CLEAROBJECTS 与官方 SM_TIMECHECKMSG 同号
                 _entityManager?.Clear();
+                SafeLog($"[SM] 官方时间同步与视野重置 tick={packet.Recog}");
                 break;
             case SM_ADDITEM:
                 HandleAddItem(packet);
@@ -319,7 +320,7 @@ public sealed class ServerMessageRouter
                 break;
             // 边缘动作包（bridge 34/36/37/750/764/765）：飞斧/破土/潜地/改名/捐献，L2。
             case 34: // SM_FLYAXE：recog=投掷者，param/tag=目标。无抛射体 API，日志留痕。
-                GD.Print($"[SM] 飞斧投掷 caster={packet.Recog} target=({packet.Param},{packet.Tag})");
+                SafeLog($"[SM] 飞斧投掷 caster={packet.Recog} target=({packet.Param},{packet.Tag})");
                 break;
             case 36: // SM_DIGUP：recog=实体，param/tag=出土点。实体缺席则按怪补生。
                 HandleDigUpDown(packet, true);
@@ -344,6 +345,24 @@ public sealed class ServerMessageRouter
                 break;
             case ProtocolConsts.SM_SPACEMOVESHOW: // 801: 空间传送出现
                 HandleSpaceMove(packet, true);
+                break;
+            case ProtocolConsts.SM_TAKEON_FAIL: // 616: 穿戴装备失败 (SM_EXCHGTAKEONFAIL 同号)
+                HandleTakeOnFail(packet);
+                break;
+            case ProtocolConsts.SM_MAGICLVEXP: // 640: 技能熟练度经验更新
+                HandleMagicLevelExp(packet);
+                break;
+            case ProtocolConsts.SM_MAPDESCRIPTION: // 661: 地图描述与区域公告
+                HandleMapDescription(packet);
+                break;
+            case ProtocolConsts.SM_SENDNOTICE: // 662: 全服系统公告跑马灯
+                HandleSendNotice(packet);
+                break;
+            case ProtocolConsts.SM_MAGICFIRE: // 802: 魔法释放回显
+                HandleMagicFireAck(packet);
+                break;
+            case ProtocolConsts.SM_MAGICFIREFAIL: // 803: 魔法释放失败
+                HandleMagicFireFail(packet);
                 break;
             case ProtocolConsts.SM_GUILDMESSAGE: // 764: 行会消息与捐献成功 (SM_DONATEOK 同号)
                 if (packet.Recog > 0)
@@ -944,13 +963,77 @@ public sealed class ServerMessageRouter
             {
                 _entityManager.UpdateMove(pkt.Recog, pkt.Param, pkt.Tag, ent.Direction);
             }
-            GD.Print($"[SM] 空间传送现身 uid={pkt.Recog} pos=({pkt.Param},{pkt.Tag})");
+            SafeLog($"[SM] 空间传送现身 uid={pkt.Recog} pos=({pkt.Param},{pkt.Tag})");
         }
         else
         {
             _entityManager.RemoveEntity(pkt.Recog);
-            GD.Print($"[SM] 空间传送隐去 uid={pkt.Recog}");
+            SafeLog($"[SM] 空间传送隐去 uid={pkt.Recog}");
         }
+    }
+
+    // 官方 1.5 穿戴装备失败提示与解锁 (IDA ProcessServerMessage case 616)
+    private void HandleTakeOnFail(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (string.IsNullOrEmpty(text)) text = "穿戴装备失败，可能由于等级、职业要求或负重不足。";
+        _hud?.AddChat("提示", $"[系统] {text}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    // 官方 1.5 技能经验与熟练度更新 (IDA ProcessServerMessage case 640)
+    private void HandleMagicLevelExp(ServerPacket pkt)
+    {
+        int magicId = pkt.Recog;
+        int level = pkt.Param;
+        int curTrain = pkt.Tag;
+        int maxTrain = 1000;
+        if (!string.IsNullOrEmpty(pkt.ExtraStr) && int.TryParse(pkt.ExtraStr.Trim(), out var max) && max > 0)
+        {
+            maxTrain = max;
+        }
+        _hud?.SkillPanel?.UpdateSkillExp(magicId, level, curTrain, maxTrain);
+        _hud?.AddChat("技能", $"[技能] 技能熟练度提升：Lv.{level} ({curTrain}/{maxTrain})。", new Color(1f, 0.9f, 0.4f));
+    }
+
+    // 官方 1.5 进入地图描述公告 (IDA ProcessServerMessage case 661)
+    private void HandleMapDescription(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(text))
+        {
+            _hud?.AddChat("地图", $"[地图] {text}", new Color(0.6f, 1f, 0.8f));
+        }
+    }
+
+    // 官方 1.5 全服系统滚动公告跑马灯 (IDA ProcessServerMessage case 662)
+    private void HandleSendNotice(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(text))
+        {
+            _hud?.AddChat("公告", $"[全服公告] {text}", new Color(1f, 0.85f, 0.2f));
+        }
+    }
+
+    // 官方 1.5 施放魔法成功回显 (IDA ProcessServerMessage case 802)
+    private void HandleMagicFireAck(ServerPacket pkt)
+    {
+        int casterUid = pkt.Recog;
+        int targetX = pkt.Param;
+        int targetY = pkt.Tag;
+        SafeLog($"[SM] 魔法释放成功 caster={casterUid} pos=({targetX},{targetY})");
+    }
+
+    // 官方 1.5 施放魔法失败提示 (IDA ProcessServerMessage case 803)
+    private void HandleMagicFireFail(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (string.IsNullOrEmpty(text)) text = "魔法施放失败，可能由于魔法值不足或技能处于冷却中。";
+        _hud?.AddChat("技能", $"[法术] {text}", new Color(1f, 0.4f, 0.4f));
     }
 
     // 行会更名/加入/退出（750，extra=新行会名，空=无行会）。
@@ -1311,5 +1394,10 @@ public sealed class ServerMessageRouter
         {
             return string.Empty;
         }
+    }
+
+    private static void SafeLog(string msg)
+    {
+        System.Diagnostics.Debug.WriteLine(msg);
     }
 }

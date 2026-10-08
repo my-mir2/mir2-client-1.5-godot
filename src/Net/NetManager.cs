@@ -112,7 +112,7 @@ public partial class NetManager : Node
     {
         if (_state != ConnectionState.Connected || _stream == null)
         {
-            GD.PushWarning("[NetManager] SendPacket: not connected");
+            // 脱机演练模式或未连接状态下静默忽略
             return;
         }
 

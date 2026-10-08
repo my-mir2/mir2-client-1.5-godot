@@ -215,6 +215,9 @@ public static class PacketEncoder
     public static byte[] QueryUsername(int uid) =>
         MakePacket(ProtocolConsts.CM_QUERYUSERNAME, uid);
 
+    public static byte[] QueryUsernameExt(int uid) =>
+        MakePacket(ProtocolConsts.CM_QUERYUSERNAME_EXT, uid);
+
     public static byte[] SitDown() =>
         MakePacket(ProtocolConsts.CM_SITDOWN, 0);
 
