@@ -31,6 +31,11 @@ public partial class StatusPanelView : Control, IManagedWindow
     private readonly Dictionary<string, Label> _statLabels = new();
     private Label? _lblDetail;
 
+    [Signal]
+    public delegate void SwitchToEquipRequestedEventHandler();
+
+    public TextureButton? BtnStatusToEquip { get; private set; }
+
     public override void _Ready()
     {
         Size = PanelSize;
@@ -65,6 +70,22 @@ public partial class StatusPanelView : Control, IManagedWindow
         };
         btnClose.Pressed += () => Visible = false;
         AddChild(btnClose);
+
+        // 3. 原生切回装备面板按钮 (Prguse_0398/0399 @ 213, 113, 12x21, IDA sub_481dd4 [0x484325..0x48439b] / 0x48a93c)
+        var texUpNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0398.png");
+        var texUpPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0399.png");
+        var btnToEquip = new TextureButton
+        {
+            Name = "BtnStatusToEquip",
+            Position = new Vector2(213, 113),
+            Size = new Vector2(12, 21),
+            TextureNormal = texUpNormal,
+            TexturePressed = texUpPressed,
+            FocusMode = FocusModeEnum.None
+        };
+        btnToEquip.Pressed += () => EmitSignal(SignalName.SwitchToEquipRequested);
+        BtnStatusToEquip = btnToEquip;
+        AddChild(btnToEquip);
 
         // 4. 七大属性数值槽位 (官方 Prguse_0370 底板自带中文艺术字标题"攻击/魔御/攻击力/魔法/道术/生命/魔法")
         // 数值显示在纯黑长条内胆右侧: X=107, W=72, H=14

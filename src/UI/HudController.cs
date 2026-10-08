@@ -159,6 +159,7 @@ public partial class HudController : CanvasLayer
     public TextureButton? BtnHudExit => _btnHudExit;
     public TextureButton? BtnHudMyState => _btnHudMyState;
     public TextureButton? BtnHudOption => _btnHudOption;
+    public TextureButton? BtnEquipToStatus { get; private set; }
     private TextureRect? _attackModeIcon;
 
     private int _currentAttackMode = 1;
@@ -628,6 +629,22 @@ public partial class HudController : CanvasLayer
             btnEquipClose.Pressed += () => _equipPanel.Visible = false;
             _equipPanel.AddChild(btnEquipClose);
 
+            // 绑定装备面板原生向下翻页切至状态面板按钮 (Prguse_0396/0397 @ 213, 143, 12x21, IDA sub_481dd4 [0x484325..0x48439b] / 0x48a97c)
+            var texDownNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0396.png");
+            var texDownPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0397.png");
+            var btnEquipToStatus = new TextureButton
+            {
+                Name = "BtnEquipToStatus",
+                Position = new Vector2(213, 143),
+                Size = new Vector2(12, 21),
+                TextureNormal = texDownNormal,
+                TexturePressed = texDownPressed,
+                FocusMode = Control.FocusModeEnum.None
+            };
+            btnEquipToStatus.Pressed += SwitchEquipToStatus;
+            BtnEquipToStatus = btnEquipToStatus;
+            _equipPanel.AddChild(btnEquipToStatus);
+
             // 纸娃娃裸身底板 Prguse_0376.png (168x199 男角色立绘与槽位，IDA sub_488AF4 [0x488c09..0x488c15]: Left+38, Top+52)
             _dollBackground = _equipPanel.GetNodeOrNull<TextureRect>("DollBackground");
             var texDoll = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0376.png");
@@ -846,6 +863,7 @@ public partial class HudController : CanvasLayer
         AddChild(_skillPanelView);
 
         _statusPanelView = new StatusPanelView();
+        _statusPanelView.SwitchToEquipRequested += SwitchStatusToEquip;
         AddChild(_statusPanelView);
 
         _groupPanelView = new GroupPanelView();

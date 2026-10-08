@@ -6827,11 +6827,18 @@
       - 补齐 `ToggleMinimap()`、`ToggleAdjustAbil()`、`ToggleStatus()`、`RequestSoftClose()`、`RequestExitGame()` 底栏事件全链路响应；
       - `AutoEndToEndDriver.cs` 扩充第 110 步与 111 步实机演练，验证底栏原生按钮与事件。
 
+18. **官方 1.5 角色装备与属性面板双向翻页切页闭环 (`TFrmDlg_DNextStateClick` 0x48a97c / `TFrmDlg_DPrevStateClick` 0x48a93c)**：
+    - **官方实证**：依据 `docs/ida_evidence/dialog_truth_table.md` 提取：官方原版装备面板与角色属性面板支持通过右上侧翻页按键相互无缝切换：`TFrmDlg_DNextStateClick` (0x48a97c，贴图 `Prguse_0396/0397` @ 213, 143) 翻至状态面板，`TFrmDlg_DPrevStateClick` (0x48a93c，贴图 `Prguse_0398/0399` @ 213, 113) 翻回装备面板；
+    - **精准重构**：
+      - 在 `StatusPanelView.cs` 中增加 `SwitchToEquipRequested` 信号和 `BtnStatusToEquip` 按钮；
+      - 在 `HudController.cs` 中给 `_equipPanel` 挂载 `BtnEquipToStatus` 按钮，并建立 `SwitchStatusToEquip` 双向状态流转；
+      - `AutoEndToEndDriver.cs` 扩充第 111 步实机验证，总演练步数扩充至 **112 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
 - **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **158 / 158 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **111 / 111 阶段全生命周期 0 缺陷通过**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **112 / 112 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

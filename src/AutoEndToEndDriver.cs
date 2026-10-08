@@ -1697,7 +1697,24 @@ public partial class AutoEndToEndDriver : Node
 
             case 111:
             {
-                GD.Print("[AutoE2E] ALL 111 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 装备面板与角色属性面板双向翻页 (TFrmDlg_DNextStateClick / TFrmDlg_DPrevStateClick) ===");
+                    // 1. 打开装备面板
+                    gameView.HudInstance.ToggleEquip();
+                    // 2. 点击装备面板下翻按钮 (BtnEquipToStatus -> 装备面板关闭，角色状态面板打开)
+                    gameView.HudInstance.BtnEquipToStatus?.EmitSignal(BaseButton.SignalName.Pressed);
+                    // 3. 点击角色状态面板上翻按钮 (BtnStatusToEquip -> 角色状态面板关闭，装备面板重新打开)
+                    gameView.HudInstance.StatusPanel?.BtnStatusToEquip?.EmitSignal(BaseButton.SignalName.Pressed);
+                }
+                RequestCapture("step111_equip_status_page_switch");
+                break;
+            }
+
+            case 112:
+            {
+                GD.Print("[AutoE2E] ALL 112 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }
