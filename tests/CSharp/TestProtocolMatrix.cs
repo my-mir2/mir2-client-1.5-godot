@@ -2888,6 +2888,92 @@ public class TestProtocolMatrix
         Assert.False(Mir2Client.UI.HudController.IsConsumableItem("裁决之杖"));
         Assert.False(Mir2Client.UI.HudController.IsConsumableItem(null!));
     }
+
+    [Fact]
+    public void TestEquipSlotOptimisticTransactionAndRollback()
+    {
+        var tx = new Mir2Client.Game.EquipTransactionManager();
+        long now = 100000;
+
+        // 1. 发起穿戴事务 (背包0 -> 装备1: 裁决之杖)
+        bool wearStarted = tx.TryBeginWear(
+            bagSlot: 0,
+            equipSlot: 1,
+            bagName: "裁决之杖",
+            bagDesc: "攻击 0-30",
+            curEquipName: null,
+            curEquipDesc: null,
+            nowTick: now
+        );
+        Assert.True(wearStarted);
+        Assert.Equal(1, tx.PendingCount);
+        Assert.True(tx.HasPending(1));
+
+        var pendingWear = tx.GetPending(1);
+        Assert.NotNull(pendingWear);
+        Assert.Equal(Mir2Client.Game.EquipTransactionManager.ActionType.Wear, pendingWear.Value.Type);
+        Assert.Equal(0, pendingWear.Value.BagSlot);
+        Assert.Equal(1, pendingWear.Value.EquipSlot);
+        Assert.Equal("裁决之杖", pendingWear.Value.BagItemName);
+        Assert.Null(pendingWear.Value.EquipItemName);
+
+        // 2. 防重入互斥校验: 2000ms 内重复对槽位 1 发起穿戴，必须被拦截 (返回 false)
+        bool wearAgainSameSlot = tx.TryBeginWear(
+            bagSlot: 2,
+            equipSlot: 1,
+            bagName: "乌木剑",
+            bagDesc: "攻击 4-8",
+            curEquipName: "裁决之杖",
+            curEquipDesc: "攻击 0-30",
+            nowTick: now + 500 // 500ms 后重复连点
+        );
+        Assert.False(wearAgainSameSlot);
+        Assert.Equal(1, tx.PendingCount); // 事务数未变
+
+        // 3. 模拟服务端下发穿戴失败 (SM_TAKEON_FAIL 616 -> tx.Rollback(1))
+        var rollbackWear = tx.Rollback(1);
+        Assert.NotNull(rollbackWear);
+        Assert.Equal(0, tx.PendingCount); // 事务结束，互斥锁解除
+        Assert.Equal(Mir2Client.Game.EquipTransactionManager.ActionType.Wear, rollbackWear.Value.Type);
+        Assert.Equal("裁决之杖", rollbackWear.Value.BagItemName); // 确认可根据快照将裁决之杖原路归还背包
+        Assert.Null(rollbackWear.Value.EquipItemName);           // 确认原装备槽置空
+
+        // 4. 模拟正常穿戴并在收到成功确认后提交 (SM_TAKEON_OK 615 -> tx.Commit(1))
+        bool wearNormal = tx.TryBeginWear(0, 1, "裁决之杖", "攻击 0-30", null, null, now + 1000);
+        Assert.True(wearNormal);
+        Assert.Equal(1, tx.PendingCount);
+        tx.Commit(1); // 成功确认提交
+        Assert.Equal(0, tx.PendingCount);
+        Assert.False(tx.HasPending(1));
+
+        // 5. 发起脱下事务 (装备1 -> 背包0)
+        bool takeOffStarted = tx.TryBeginTakeOff(
+            equipSlot: 1,
+            destBagSlot: 0,
+            equipName: "裁决之杖",
+            equipDesc: "攻击 0-30",
+            nowTick: now + 2000
+        );
+        Assert.True(takeOffStarted);
+        Assert.Equal(1, tx.PendingCount);
+        var pendingTakeOff = tx.GetPending(1);
+        Assert.NotNull(pendingTakeOff);
+        Assert.Equal(Mir2Client.Game.EquipTransactionManager.ActionType.TakeOff, pendingTakeOff.Value.Type);
+        Assert.Equal(0, pendingTakeOff.Value.BagSlot);
+        Assert.Equal("裁决之杖", pendingTakeOff.Value.EquipItemName);
+
+        // 6. 防重入互斥校验: 2000ms 内重复脱下同一槽位被拦截
+        bool takeOffAgain = tx.TryBeginTakeOff(1, 0, "裁决之杖", "攻击 0-30", now + 2500);
+        Assert.False(takeOffAgain);
+
+        // 7. 模拟服务端下发脱下失败 (SM_TAKEOFF_FAIL 620 -> tx.Rollback(1))
+        var rollbackTakeOff = tx.Rollback(1);
+        Assert.NotNull(rollbackTakeOff);
+        Assert.Equal(0, tx.PendingCount);
+        Assert.Equal(Mir2Client.Game.EquipTransactionManager.ActionType.TakeOff, rollbackTakeOff.Value.Type);
+        Assert.Equal("裁决之杖", rollbackTakeOff.Value.EquipItemName); // 确认可原位穿回身上
+        Assert.Equal(0, rollbackTakeOff.Value.BagSlot);              // 确认清空临时占用的背包 0 格
+    }
 }
 
 

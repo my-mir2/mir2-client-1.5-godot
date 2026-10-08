@@ -7738,15 +7738,29 @@
       - 在 `ServerMessageRouter.cs` 中打通 `SM_DEALLOCKED` 对方锁定路由分发与 `HandleDealAddItemOk` 的回调；
       - 在 `GameView.cs` 中新增组队/交易开关/探测项链/攻击模式等 4 组聊天指令优先拦截与状态翻转；
       - 在 `TestGuildTradeEncoderMatrix.cs` 中新增官方协议真值与解耦路由单元测试，脱机测试总数提升至 **208 / 208 项 100% 全部通过**；
+  - [x] **65. 盛大官方 1.5 装备槽位乐观事务锁与服务端失败原子回滚机制实证 (SM_TAKEON_FAIL 616 / SM_TAKEOFF_FAIL 620)** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据 `scratch/ida_processmsg.c` 行 1136~1139 (`case 616: sub_49F874(); byte_4F93DC = 0; break;`) 与 `sub_4687C8`：
+        1. 穿戴失败与脱装失败物理原子回滚：
+           官方原版在穿戴失败 (`SM_TAKEON_FAIL 616`) 时，调用 `sub_49F874()` 释放鼠标拖拽手持物品并原位归还槽位，解除锁定状态；在脱下失败 (`SM_TAKEOFF_FAIL 620`) 时调用 `sub_4687C8` 回滚装备栏指针与背包格状态。
+        2. 高延迟 (RTT > 500ms) 或频繁双击竞态防御：
+           此前客户端直接将背包格置空并乐观更新装备栏，一旦网络高延迟或丢包/失败，会导致装备消失或产生虚影幽灵装备；
+        3. 纯 C# 脱机解耦状态机：
+           抽象出 `EquipTransactionManager`，引入 2000ms 防重入互斥时间锁，记录 `TransactionSnapshot`（包含原背包格索引、装备槽位、物品名称与描述），实现成功提交 (`Commit`) 与失败回滚 (`Rollback`) 的严格原子操作。
+    - **精准重构**：
+      - 新建 `src/Game/EquipTransactionManager.cs`，实现脱机零依赖的装备乐观事务管理器；
+      - 在 `src/UI/HudController.cs` 中集成事务快照与 2000ms 防重入拦截，完善 `OnTakeOnFail` 与 `OnTakeOffFail` 的完整物理回滚（恢复装备栏、背包格、按钮图标与纸娃娃立绘）；
+      - 在 `tests/CSharp/TestProtocolMatrix.cs` 中增加 `TestEquipSlotOptimisticTransactionAndRollback` 闭环单元测试，脱机测试总数提升至 **210 / 210 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **208 / 208 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **210 / 210 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
+
 
 
 

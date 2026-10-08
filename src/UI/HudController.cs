@@ -114,6 +114,21 @@ public partial class HudController : CanvasLayer
     private bool _isStunned = false;
     private bool _isFrozen = false;
 
+    /// <summary>盛大官方 1.5 装备槽位挂起事务 (网络防重入互斥与原子回滚快照)</summary>
+    public struct PendingEquipAction
+    {
+        public enum ActionType { Wear, TakeOff }
+        public ActionType Type;
+        public int BagSlot;
+        public int EquipSlot;
+        public (string Name, string Desc)? OriginalBagItem;
+        public (string Name, string Desc)? OriginalEquipItem;
+        public Texture2D? OriginalBagTex;
+        public Texture2D? OriginalEquipTex;
+        public long Timestamp;
+    }
+    private readonly Dictionary<int, PendingEquipAction> _pendingEquipActions = new();
+
     public int CurrentHp => _currentHp;
     public int MaxHp => _maxHp;
     public bool IsDead => _currentHp <= 0;
@@ -142,6 +157,15 @@ public partial class HudController : CanvasLayer
     public DeathScreenView? DeathScreen => _deathScreenView;
     public MinimapView? Minimap => _minimapView;
     public ItemTooltipView? ItemTooltip => _itemTooltipView;
+
+    public int PendingEquipActionCount => _pendingEquipActions.Count;
+    public PendingEquipAction? GetPendingEquipAction(int slot) =>
+        _pendingEquipActions.TryGetValue(slot, out var act) ? act : null;
+    public void ClearPendingEquipActions() => _pendingEquipActions.Clear();
+    public (string Name, string Desc)? GetBagItemDetail(int slot) =>
+        slot >= 0 && slot < 40 ? _bagItemDetails[slot] : null;
+    public (string Name, string Desc)? GetEquipItemDetail(int slot) =>
+        slot >= 0 && slot < 9 ? _equipItemDetails[slot] : null;
 
     // 官方 1.5 血球魔球控件 (Prguse_0004 @ (39, 440) 相对屏幕，相对 HUD @ (39, 91))
     private TextureRect? _orbBgTextureRect;
@@ -1479,16 +1503,95 @@ public partial class HudController : CanvasLayer
         AddChat("组队", "[组队] 成员已被成功移出编组。", new Color(0.4f, 1f, 0.5f));
     }
 
+    /// <summary>盛大官方 1.5 脱下装备失败与手持状态原子回滚 (SM_TAKEOFF_FAIL 620, IDA sub_4687C8)</summary>
     public void OnTakeOffFail(int slot)
     {
-        AddChat("装备", $"[装备] 脱下装备失败 (槽位: {slot})，已原子回滚。", new Color(1f, 0.4f, 0.4f));
+        int targetSlot = slot >= 0 && slot < 9 ? slot : -1;
+        if (targetSlot == -1 && _pendingEquipActions.Count > 0)
+        {
+            foreach (var kvp in _pendingEquipActions)
+            {
+                if (kvp.Value.Type == PendingEquipAction.ActionType.TakeOff)
+                {
+                    targetSlot = kvp.Key;
+                    break;
+                }
+            }
+        }
+
+        if (targetSlot >= 0 && _pendingEquipActions.TryGetValue(targetSlot, out var act) && act.Type == PendingEquipAction.ActionType.TakeOff)
+        {
+            // 恢复装备回身上
+            _equipItemDetails[act.EquipSlot] = act.OriginalEquipItem;
+            var btnEquip = _equipSlots[act.EquipSlot];
+            if (btnEquip != null) btnEquip.ItemTexture = act.OriginalEquipTex;
+
+            // 清空临时放入背包的槽位
+            if (act.BagSlot >= 0 && act.BagSlot < 40)
+            {
+                _bagItemDetails[act.BagSlot] = null;
+                var btnBag = _bagSlots[act.BagSlot];
+                if (btnBag != null) btnBag.ItemTexture = null;
+            }
+
+            // 恢复纸娃娃立绘图层
+            if (act.EquipSlot == 0) _dollCloth?.SetVisible(true);
+            else if (act.EquipSlot == 1) _dollWeapon?.SetVisible(true);
+            else if (act.EquipSlot == 4) _dollHelm?.SetVisible(true);
+
+            _pendingEquipActions.Remove(targetSlot);
+            AddChat("装备", $"[装备] 脱下装备失败 (槽位: {act.EquipSlot})，已原子回滚至原位。", new Color(1f, 0.4f, 0.4f));
+        }
+        else
+        {
+            AddChat("装备", $"[装备] 脱下装备失败 (槽位: {slot})，已安全复位。", new Color(1f, 0.4f, 0.4f));
+        }
     }
 
-    /// <summary>盛大官方 1.5 穿戴装备失败与手持状态复位 (SM_TAKEON_FAIL 616, IDA sub_49F874)</summary>
+    /// <summary>盛大官方 1.5 穿戴装备失败与手持状态原子回滚 (SM_TAKEON_FAIL 616, IDA sub_49F874)</summary>
     public void OnTakeOnFail(int slot)
     {
-        string slotDesc = slot >= 0 ? $" (槽位: {slot})" : "";
-        AddChat("装备", $"[装备] 穿戴装备失败{slotDesc}，已解除锁定并原位归还。", new Color(1f, 0.4f, 0.4f));
+        int targetSlot = slot >= 0 && slot < 9 ? slot : -1;
+        if (targetSlot == -1 && _pendingEquipActions.Count > 0)
+        {
+            foreach (var kvp in _pendingEquipActions)
+            {
+                if (kvp.Value.Type == PendingEquipAction.ActionType.Wear)
+                {
+                    targetSlot = kvp.Key;
+                    break;
+                }
+            }
+        }
+
+        if (targetSlot >= 0 && _pendingEquipActions.TryGetValue(targetSlot, out var act) && act.Type == PendingEquipAction.ActionType.Wear)
+        {
+            // 回滚装备栏为原来的装备
+            _equipItemDetails[act.EquipSlot] = act.OriginalEquipItem;
+            var btnEquip = _equipSlots[act.EquipSlot];
+            if (btnEquip != null) btnEquip.ItemTexture = act.OriginalEquipTex;
+
+            // 回滚背包格为原来的物品
+            if (act.BagSlot >= 0 && act.BagSlot < 40)
+            {
+                _bagItemDetails[act.BagSlot] = act.OriginalBagItem;
+                var btnBag = _bagSlots[act.BagSlot];
+                if (btnBag != null) btnBag.ItemTexture = act.OriginalBagTex;
+            }
+
+            // 回滚纸娃娃立绘图层
+            if (act.EquipSlot == 0) _dollCloth?.SetVisible(act.OriginalEquipItem != null);
+            else if (act.EquipSlot == 1) _dollWeapon?.SetVisible(act.OriginalEquipItem != null);
+            else if (act.EquipSlot == 4) _dollHelm?.SetVisible(act.OriginalEquipItem != null);
+
+            _pendingEquipActions.Remove(targetSlot);
+            AddChat("装备", $"[装备] 穿戴装备失败 (槽位: {act.EquipSlot})，已解除锁定并原子归还原位。", new Color(1f, 0.4f, 0.4f));
+        }
+        else
+        {
+            string slotDesc = slot >= 0 ? $" (槽位: {slot})" : "";
+            AddChat("装备", $"[装备] 穿戴装备失败{slotDesc}，已解除锁定并原位归还。", new Color(1f, 0.4f, 0.4f));
+        }
     }
 
     /// <summary>盛大官方 1.5 小地图雷达标记 (SM_MAPMARK_DELPHI 612)</summary>
@@ -2421,6 +2524,7 @@ public partial class HudController : CanvasLayer
     public void SetEquipSlot(int equipSlot, string? itemName, string? iconFile, string? desc)
     {
         if (equipSlot < 0 || equipSlot >= 9) return;
+        _pendingEquipActions.Remove(equipSlot); // 确认成功，提交事务，解除互斥锁定
         if (string.IsNullOrEmpty(itemName))
         {
             _equipItemDetails[equipSlot] = null;
@@ -2987,9 +3091,13 @@ public partial class HudController : CanvasLayer
             return;
         }
 
-        // 派发穿戴请求信号
-        EmitSignal(SignalName.WearItemRequested, bagSlot, equipSlot);
-        PlayEquipSlotSound(equipSlot);
+        // 防重入互斥锁校验: 若该装备槽位正在等待服务端回执且未超时 (2000ms)，阻止重复穿戴
+        long now = (long)Time.GetTicksMsec();
+        if (_pendingEquipActions.TryGetValue(equipSlot, out var pending) && now - pending.Timestamp < 2000)
+        {
+            AddChat("系统", "[系统] 正在等待服务端穿戴确认，请勿频繁操作。", new Color(1f, 0.6f, 0.2f));
+            return;
+        }
 
         var curEquip = _equipItemDetails[equipSlot];
         var btnBag = _bagSlots[bagSlot];
@@ -2997,6 +3105,23 @@ public partial class HudController : CanvasLayer
 
         var bagTex = btnBag?.ItemTexture;
         var equipTex = btnEquip?.ItemTexture;
+
+        // 记录原子回滚快照
+        _pendingEquipActions[equipSlot] = new PendingEquipAction
+        {
+            Type = PendingEquipAction.ActionType.Wear,
+            BagSlot = bagSlot,
+            EquipSlot = equipSlot,
+            OriginalBagItem = bagItem,
+            OriginalEquipItem = curEquip,
+            OriginalBagTex = bagTex,
+            OriginalEquipTex = equipTex,
+            Timestamp = now
+        };
+
+        // 派发穿戴请求信号
+        EmitSignal(SignalName.WearItemRequested, bagSlot, equipSlot);
+        PlayEquipSlotSound(equipSlot);
 
         // 互换或装上
         _equipItemDetails[equipSlot] = bagItem;
@@ -3065,12 +3190,33 @@ public partial class HudController : CanvasLayer
             return;
         }
 
-        // 派发脱装请求信号
-        EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
-        PlayEquipSlotSound(equipSlot);
+        // 防重入互斥锁校验: 若该装备槽位正在等待服务端脱装回执且未超时 (2000ms)，阻止重复脱装
+        long now = (long)Time.GetTicksMsec();
+        if (_pendingEquipActions.TryGetValue(equipSlot, out var pending) && now - pending.Timestamp < 2000)
+        {
+            AddChat("系统", "[系统] 正在等待服务端卸下确认，请勿频繁操作。", new Color(1f, 0.6f, 0.2f));
+            return;
+        }
 
         var btnEquip = _equipSlots[equipSlot];
         var btnBag = _bagSlots[destSlot];
+
+        // 记录原子回滚快照
+        _pendingEquipActions[equipSlot] = new PendingEquipAction
+        {
+            Type = PendingEquipAction.ActionType.TakeOff,
+            BagSlot = destSlot,
+            EquipSlot = equipSlot,
+            OriginalBagItem = null,
+            OriginalEquipItem = equipItem,
+            OriginalBagTex = null,
+            OriginalEquipTex = btnEquip?.ItemTexture,
+            Timestamp = now
+        };
+
+        // 派发脱装请求信号
+        EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
+        PlayEquipSlotSound(equipSlot);
 
         _bagItemDetails[destSlot] = equipItem;
         if (btnBag != null) btnBag.ItemTexture = btnEquip?.ItemTexture;
