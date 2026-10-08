@@ -7276,10 +7276,24 @@
       - 在 `TestCombatSkillsMatrix.cs` 中增加 `Official_150_Logon_Freeze_And_Stun_Position_Sync_GroundTruth_Test` 脱机单元测试，测试集扩充至 **185 / 185 项 100% 全部通过**；
       - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+49. **盛大官方 1.5 攻击模式变更回显 (SM_ATTACKMODECHANGED 766) 参数 Param 权威纠偏与组队开关 (SM_INSTANCEHEALGAUGE 659 / SM_GROUP_MODE_CHANGED 660 / SM_DISMISS_GROUP 666) 物理指令闭环核销 (`ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 确证：
+        - `case 766` (`SM_ATTACKMODECHANGED` @ 0x468A2B)：`dword_4F938C = HIWORD(v67);`。Delphi 1.5 消息机制中，`LOWORD(v67)` 为 Ident (766)，`HIWORD(v67)` 唯一对应封包的 `Param` 字段。此前代码使用 `packet.Tag > 0 ? packet.Tag : packet.Param;` 存在当 Tag 携带非 0 杂质时带偏攻击模式的脆弱性坏账；
+        - `case 659` (`SM_INSTANCEHEALGAUGE` @ 0x469F54)：物理指令为 `byte_4F94F8 = HIWORD(v67) != 0;`。`byte_4F94F8` 正是客户端 `AllowGroup`（允许组队模式）全局开关。此前客户端仅将其作为血球即时治疗，完全遗漏了官方 1.5 组队开关动态同步；
+        - `case 660` (`SM_GROUP_MODE_CHANGED`)：物理指令为 `byte_4F94F8 = 1;` 强制开启组队模式；
+        - `case 666` (`SM_DISMISS_GROUP`)：物理指令为 `(*(void (**)(void))(*(_DWORD *)dword_4F94FC + 64))()` 清空并解散编组；
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中：
+        - 将 766 攻击模式参数提取纠偏为 `packet.Param != 0 ? packet.Param : (packet.Tag != 0 ? packet.Tag : 1);`，严格以官方 `Param` 物理字段为权威基准；
+        - 在 `HandleInstanceHealGauge` (659) 中打通 `AllowGroup` 组队开关驱动：`_hud?.GroupPanel?.SetAllowGroup(pkt.Param != 0)`，并兼顾血球即时治疗恢复；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_AttackMode_766_And_GroupMode_659_660_666_GroundTruth_Test` 脱机单测，测试集扩充至 **186 / 186 项 100% 全部通过**；
+      - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **185 / 185 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **186 / 186 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

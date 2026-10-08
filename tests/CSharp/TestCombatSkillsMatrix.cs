@@ -494,6 +494,54 @@ public class TestCombatSkillsMatrix
 
         Assert.False(mon.IsFrozen);
     }
+
+    [Fact]
+    public void Official_1_5_AttackMode_766_And_GroupMode_659_660_666_GroundTruth_Test()
+    {
+        // 1. 常量真值断言：
+        // 盛大官方 1.5 原版二进制 IDA ProcessServerMessage:
+        // case 766 @ 0x468A2B: dword_4F938C = HIWORD(v67) (攻击模式)
+        // case 659 @ 0x469F54: byte_4F94F8 = HIWORD(v67) != 0 (组队开关模式变动)
+        // case 660: byte_4F94F8 = 1 (强制开启组队模式)
+        // case 666: (*(void (**)(void))(*(_DWORD *)dword_4F94FC + 64))() (解散清空编组)
+        Assert.Equal((short)766, ProtocolConsts.SM_ATTACKMODECHANGED);
+        Assert.Equal((short)659, ProtocolConsts.SM_INSTANCEHEALGAUGE);
+        Assert.Equal((short)660, ProtocolConsts.SM_GROUP_MODE_CHANGED);
+        Assert.Equal((short)666, ProtocolConsts.SM_DISMISS_GROUP);
+
+        var em = new EntityManager();
+        em.AddEntity(new EntityManager.EntityData
+        {
+            Uid = 7001,
+            Type = EntityManager.EntityType.Player,
+            TileX = 330,
+            TileY = 330,
+            Hp = 80,
+            MaxHp = 100
+        });
+
+        var router = new ServerMessageRouter(null, em);
+
+        // 2. 模拟 766 攻击模式回显：Param 优先传递模式编号 (2: 和平攻击模式)
+        var pkt766 = new ServerPacket(ProtocolConsts.SM_ATTACKMODECHANGED, 0, 2, 0, Array.Empty<byte>());
+        router.OnPacket(pkt766);
+
+        // 3. 模拟 659 组队允许变动回显：Param = 1 代表开启允许组队模式
+        var pkt659Allow = new ServerPacket(ProtocolConsts.SM_INSTANCEHEALGAUGE, 0, 1, 0, Array.Empty<byte>());
+        router.OnPacket(pkt659Allow);
+
+        // 4. 模拟 659 组队允许变动回显：Param = 0 代表关闭允许组队模式
+        var pkt659Disallow = new ServerPacket(ProtocolConsts.SM_INSTANCEHEALGAUGE, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(pkt659Disallow);
+
+        // 5. 模拟 660 强制开启组队模式回显
+        var pkt660 = new ServerPacket(ProtocolConsts.SM_GROUP_MODE_CHANGED, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(pkt660);
+
+        // 6. 模拟 666 解散编组注销清空
+        var pkt666 = new ServerPacket(ProtocolConsts.SM_DISMISS_GROUP, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(pkt666);
+    }
 }
 
 

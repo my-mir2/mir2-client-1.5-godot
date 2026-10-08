@@ -318,8 +318,8 @@ public sealed class ServerMessageRouter
                 HandleOpenGuildDlg(packet);
                 break;
             case SM_ATTACKMODECHANGED:
-                // 官方 1.5 IDA 0x467920 case 766 @ 0x468A2B: dword_4F938C = HIWORD(v67)
-                int attackMode = packet.Tag > 0 ? packet.Tag : packet.Param;
+                // 盛大官方 1.5 原版二进制 IDA 0x467920 case 766 @ 0x468A2B: dword_4F938C = HIWORD(v67) (即 packet.Param)
+                int attackMode = packet.Param != 0 ? packet.Param : (packet.Tag != 0 ? packet.Tag : 1);
                 _hud?.OnServerAttackModeChanged(attackMode);
                 break;
             case SM_NEEDPASSWORD:
@@ -1547,9 +1547,15 @@ public sealed class ServerMessageRouter
         }
     }
 
-    // 官方 1.5 即时治疗/血球回显指示 (IDA ProcessServerMessage case 659)
+    // 官方 1.5 组队模式开关变动与即时治疗回显指示 (IDA ProcessServerMessage case 659 @ 0x469F54: byte_4F94F8 = HIWORD(v67) != 0)
     private void HandleInstanceHealGauge(ServerPacket pkt)
     {
+        // 盛大官方 1.5 原版二进制中 case 659: byte_4F94F8 = HIWORD(v67) != 0; (即 AllowGroup 组队开关由 Param 驱动)
+        bool allowGroup = pkt.Param != 0;
+        _hud?.GroupPanel?.SetAllowGroup(allowGroup);
+        _hud?.AddChat("组队", allowGroup ? "[组队] 已开启允许组队模式。" : "[组队] 已关闭允许组队模式。", new Color(0.4f, 1f, 0.5f));
+
+        // 兼容血球即时治疗变体 (Param 作为治疗增量)
         int healAmount = pkt.Param;
         if (healAmount > 0)
         {
