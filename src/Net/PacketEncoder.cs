@@ -281,6 +281,11 @@ public static class PacketEncoder
     public static byte[] UserGetDetailItem(string itemName) =>
         MakePacket(ProtocolConsts.CM_USERGETDETAILITEM, 0, 0, 0, Encoding.UTF8.GetBytes(itemName));
 
+    public static byte[] UserGetDetailItem(int slot, string itemName = "") =>
+        string.IsNullOrEmpty(itemName)
+            ? MakePacket(ProtocolConsts.CM_USERGETDETAILITEM, slot)
+            : MakePacket(ProtocolConsts.CM_USERGETDETAILITEM, slot, 0, 0, Encoding.UTF8.GetBytes(itemName));
+
     public static byte[] AdjustBonus(short bonusType) =>
         MakePacket(ProtocolConsts.CM_ADJUST_BONUS, bonusType);
 

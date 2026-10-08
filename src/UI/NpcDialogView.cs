@@ -210,18 +210,19 @@ public partial class NpcDialogView : Control, IManagedWindow
         string triggeredTag = "";
         if (int.TryParse(metaStr, out int idx))
         {
-            EmitSignal(SignalName.OptionSelected, idx);
-            if (idx >= 0 && idx < _optionActions.Count)
+            if (idx >= 0 && idx < _optionActions.Count && !string.IsNullOrEmpty(_optionActions[idx]))
             {
                 triggeredTag = _optionActions[idx];
                 EmitSignal(SignalName.ActionTriggered, triggeredTag);
+            }
+            else
+            {
+                EmitSignal(SignalName.OptionSelected, idx);
             }
         }
         else
         {
             triggeredTag = metaStr;
-            int foundIdx = _optionActions.IndexOf(metaStr);
-            EmitSignal(SignalName.OptionSelected, foundIdx >= 0 ? foundIdx : 0);
             EmitSignal(SignalName.ActionTriggered, metaStr);
         }
 

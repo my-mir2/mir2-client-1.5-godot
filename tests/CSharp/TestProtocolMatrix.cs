@@ -2421,6 +2421,44 @@ public class TestProtocolMatrix
         Assert.Equal(1033, parsedMinimap.Ident);
         Assert.Equal(ProtocolConsts.CM_WANTMINIMAP, parsedMinimap.Ident);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthCmCases_ShopDetailBuySellAndNpcSelect()
+    {
+        // 1. 官方 1.5 仓库/商店物品详情查询 (CM_USERGETDETAILITEM 1034)
+        Assert.Equal(1034, ProtocolConsts.CM_USERGETDETAILITEM);
+        Assert.Equal(1013, ProtocolConsts.CM_USERGETDETAILITEM_ALT);
+        byte[] rawDetail = PacketEncoder.UserGetDetailItem(3, "屠龙刀");
+        var parsedDetail = PacketDecoder.Parse(rawDetail.AsSpan(1))!.Value;
+        Assert.Equal(1034, parsedDetail.Ident);
+        Assert.Equal(3, parsedDetail.Recog);
+        Assert.Equal("屠龙刀", parsedDetail.ExtraStr);
+
+        // 2. 官方 1.5 商店买入与出售协议真值 (CM_USERBUYITEM 45/1014, CM_USERSELLITEM 46/1013)
+        Assert.Equal(45, ProtocolConsts.CM_USERBUYITEM);
+        Assert.Equal(1014, ProtocolConsts.CM_USERBUYITEM_ALT);
+        Assert.Equal(46, ProtocolConsts.CM_USERSELLITEM);
+        Assert.Equal(1013, ProtocolConsts.CM_USERSELLITEM_ALT);
+
+        byte[] rawBuy = PacketEncoder.BuyFromShop("超级金创药", 5);
+        var parsedBuy = PacketDecoder.Parse(rawBuy.AsSpan(1))!.Value;
+        Assert.Equal(45, parsedBuy.Ident);
+        Assert.Equal(5, parsedBuy.Param);
+        Assert.Equal("超级金创药", parsedBuy.ExtraStr);
+
+        byte[] rawSell = PacketEncoder.SellToShop(101, 7);
+        var parsedSell = PacketDecoder.Parse(rawSell.AsSpan(1))!.Value;
+        Assert.Equal(46, parsedSell.Ident);
+        Assert.Equal(7, parsedSell.Recog);
+
+        // 3. 官方 1.5 NPC 选项选择发包 (CM_NPCSELECT 1011)
+        byte[] rawNpcSel = PacketEncoder.NpcSelect(2001, 2, "@buy");
+        var parsedNpcSel = PacketDecoder.Parse(rawNpcSel.AsSpan(1))!.Value;
+        Assert.Equal(1011, parsedNpcSel.Ident);
+        Assert.Equal(2001, parsedNpcSel.Recog);
+        Assert.Equal(2, parsedNpcSel.Param);
+        Assert.Equal("@buy", parsedNpcSel.ExtraStr);
+    }
 }
 
 

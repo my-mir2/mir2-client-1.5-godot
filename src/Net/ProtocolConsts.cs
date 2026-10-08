@@ -51,9 +51,12 @@ public static class ProtocolConsts
     public const short CM_QUERYUSERNAME_EXT      = 82;   // 双击Shift深度查名
     public const short CM_DROPGOLD               = 1016; // 丢弃金币到地面（bridge CM_DROPGOLD；旧 1002=OPENDOOR，扔金会开门）
     public const short CM_MERCHANTHOMEPAGE       = 1010; // NPC 对话主页请求
-    public const short CM_USERBUYITEM            = 45; // 商店购买物品
-    public const short CM_USERGETDETAILITEM      = 1013; // 商店物品详细属性查询
-    public const short CM_USERSELLITEM           = 46; // 商店出售物品
+    public const short CM_USERBUYITEM            = 45;   // 商店购买物品主码 (bridge 45 | 1014)
+    public const short CM_USERBUYITEM_ALT        = 1014; // 官方 1.5 扩展协议码
+    public const short CM_USERGETDETAILITEM      = 1034; // 官方 1.5 仓库/商店物品详细属性查询 (bridge 1112 / IDA)
+    public const short CM_USERGETDETAILITEM_ALT  = 1013; // 历史误标兼容别名 (防撞 1013 CM_SELLITEM)
+    public const short CM_USERSELLITEM           = 46;   // 商店出售物品主码 (bridge 46 | 1013)
+    public const short CM_USERSELLITEM_ALT       = 1013; // 官方 1.5 扩展协议码
     public const short CM_USERREPAIRITEM         = 1023; // 铁匠铺普通修理
     public const short CM_USERSTORAGEDEPOSIT     = 1031; // 仓库保管箱存入物品
     public const short CM_USERSTORAGEWITHDRAW    = 1032; // 仓库保管箱取回物品

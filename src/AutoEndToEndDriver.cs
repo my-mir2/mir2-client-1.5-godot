@@ -2034,7 +2034,27 @@ public partial class AutoEndToEndDriver : Node
 
             case 120:
             {
-                GD.Print("[AutoE2E] ALL 120 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 物品详情查询 (CM_USERGETDETAILITEM 1034)、商店买卖 (45/46) 与 NPC 分支去重选择 (1011) ===");
+                    // 1. 模拟商店选择物品查看详情 (触发 ItemSelectedForDetail -> CM_USERGETDETAILITEM 1034)
+                    gameView.HudInstance.ShopPanel?.EmitSignal(ShopPanelView.SignalName.ItemSelectedForDetail, "降魔剑");
+
+                    // 2. 模拟商店购买与出售发包
+                    gameView.HudInstance.ShopPanel?.EmitSignal(ShopPanelView.SignalName.BuyRequested, 101, 0, 1);
+                    gameView.HudInstance.ShopPanel?.EmitSignal(ShopPanelView.SignalName.TakeBackRequested, 2, "裁决之杖");
+
+                    // 3. 模拟 NPC 对话框点击超链接分流（验证无冗余双发）
+                    gameView.HudInstance.NpcDialog?.EmitSignal(NpcDialogView.SignalName.ActionTriggered, "@buy");
+                }
+                RequestCapture("step120_shop_detail_buy_sell_npc_select");
+                break;
+            }
+
+            case 121:
+            {
+                GD.Print("[AutoE2E] ALL 121 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

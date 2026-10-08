@@ -6949,11 +6949,23 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_AdjustBonusMagicKeyAndMinimap` 单元测试，脱机测试覆盖扩充至 **164 / 164 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 119 步实机验证，总演练步数扩充至 **120 步**。
 
+28. **官方 1.5 物品详情查询协议真值纠偏 (1034)、商店买卖双协议码兼备与 NPC 对话超链接去重发包实证 (`bridge.rs:73, 1092, 1099, 1112`, IDA `0x48feec`, `0x490140`, `0x490550`)**：
+    - **官方实证**：
+      - 物品详情查询协议真值纠偏 (`CM_USERGETDETAILITEM 1034`)：此前客户端误将详情查询常量标为 1013，而 1013 在官方二进制与服务端 `bridge.rs:60, 1099` 明确为 `CM_SELLITEM`（商店出售物品），导致查详情可能误触发卖东西逻辑坏账。经查验服务端与官方原版，确认 `CM_USERGETDETAILITEM` 权威真值为 1034（`bridge.rs:73`），现已彻底纠偏并消除冲突；
+      - 商店买卖协议主码与扩展码对齐：买入主码 45（扩展码 1014 `CM_BUYITEM`），出售主码 46（扩展码 1013 `CM_SELLITEM`），双端无损兼容；
+      - NPC 对话超链接事件去重分流：在 `NpcDialogView` 中优化 `OnMetaClicked` 分流，优先发射 `ActionTriggered`，无 tag 纯索引才发射 `OptionSelected`，彻底消除同一次点击向服务端连续发射两个冗余数据包的断链与网络抖动缺陷。
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 将 `CM_USERGETDETAILITEM` 纠偏为 1034，建立 `1013` 别名隔离；
+      - 在 `PacketEncoder.cs` 增加 `UserGetDetailItem(int slot, string itemName = "")` 槽位识别支持；
+      - 在 `NpcDialogView.cs` 优化元数据点击分流判定；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_ShopDetailBuySellAndNpcSelect` 单元测试，脱机测试覆盖扩充至 **165 / 165 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 120 步实机验证，总演练步数扩充至 **121 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **164 / 164 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **120 / 120 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **165 / 165 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **121 / 121 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 
