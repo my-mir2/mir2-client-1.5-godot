@@ -103,6 +103,19 @@ public partial class HudController : CanvasLayer
     private KeySelectDialogView? _keySelectDialogView;
     private MessageBoxDialog? _messageBoxDialog;
     private ItemTooltipView? _itemTooltipView;
+    private int _currentHp = 100;
+    private int _maxHp = 100;
+    private bool _isStunned = false;
+    private bool _isFrozen = false;
+
+    public int CurrentHp => _currentHp;
+    public int MaxHp => _maxHp;
+    public bool IsDead => _currentHp <= 0;
+    public bool IsStunned => _isStunned;
+    public bool IsFrozen => _isFrozen;
+
+    public void SetStunned(bool stunned) => _isStunned = stunned;
+    public void SetFrozen(bool frozen) => _isFrozen = frozen;
 
     public Panel? EquipPanel => _equipPanel;
     public SkillPanelView? SkillPanel => _skillPanelView;
@@ -1252,6 +1265,17 @@ public partial class HudController : CanvasLayer
         if (slot < 0 || slot >= 6) return;
         if (_quickSlotAmounts[slot] <= 0 || string.IsNullOrEmpty(_quickSlotItems[slot])) return;
 
+        if (IsDead)
+        {
+            AddChat("系统", "[系统] 角色已经死亡，无法使用物品。", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
+        if (IsStunned || IsFrozen)
+        {
+            AddChat("系统", "[系统] 当前处于眩晕/麻痹硬直状态，无法使用物品。", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
+
         string itemName = _quickSlotItems[slot];
         _quickSlotAmounts[slot]--;
         if (_quickSlotAmounts[slot] <= 0)
@@ -1275,12 +1299,24 @@ public partial class HudController : CanvasLayer
 
     public void UpdateHp(int hp, int maxHp)
     {
+        _currentHp = hp;
+        _maxHp = maxHp;
         if (_lblHp != null) _lblHp.Text = $"{hp}/{maxHp}";
         if (_orbShaderMat != null)
         {
             float ratio = maxHp > 0 ? Mathf.Clamp((float)hp / maxHp, 0f, 1f) : 0f;
             _orbShaderMat.SetShaderParameter("hp_ratio", ratio);
         }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 即时治愈血量增量驱动 (SM_INSTANCEHEALGAUGE 659)
+    /// </summary>
+    public void ApplyHeal(int amount)
+    {
+        if (amount <= 0 || IsDead) return;
+        int newHp = Math.Min(_currentHp + amount, _maxHp);
+        UpdateHp(newHp, _maxHp);
     }
 
     public void UpdateMp(int mp, int maxMp)
@@ -2652,6 +2688,11 @@ public partial class HudController : CanvasLayer
     public void WearBagItemToEquipSlot(int bagSlot, int equipSlot)
     {
         if (bagSlot < 0 || bagSlot >= 40 || equipSlot < 0 || equipSlot >= 9) return;
+        if (IsDead)
+        {
+            AddChat("系统", "[系统] 角色已经死亡，无法更换装备。", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
         var bagItem = _bagItemDetails[bagSlot];
         if (bagItem == null) return;
 
@@ -2710,6 +2751,11 @@ public partial class HudController : CanvasLayer
     public void TakeoffEquipSlotToBag(int equipSlot, int targetBagSlot)
     {
         if (equipSlot < 0 || equipSlot >= 9) return;
+        if (IsDead)
+        {
+            AddChat("系统", "[系统] 角色已经死亡，无法卸下装备。", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
         var equipItem = _equipItemDetails[equipSlot];
         if (equipItem == null) return;
 
@@ -2909,7 +2955,7 @@ public partial class HudController : CanvasLayer
         else
         {
             // 装备穿戴
-            int bestEquipSlot = GetBestEquipSlotForItem(itemName);
+            int bestEquipSlot = GetBestEquipSlotForBagItem(itemName);
             if (bestEquipSlot >= 0)
             {
                 WearBagItemToEquipSlot(bagSlot, bestEquipSlot);
@@ -2919,6 +2965,25 @@ public partial class HudController : CanvasLayer
                 AddChat("系统", $"[系统] 该物品 [{itemName}] 无法直接装备。", new Color(1f, 0.4f, 0.4f));
             }
         }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 智能成对槽位判定：如果左手镯/左戒指已有装备且右手镯/右戒指为空，优先穿戴至右侧空槽
+    /// </summary>
+    public int GetBestEquipSlotForBagItem(string itemName)
+    {
+        int baseSlot = GetBestEquipSlotForItem(itemName);
+        if (baseSlot == 5) // 手镯
+        {
+            if (_equipSlots[5]?.HasItem == true && (_equipSlots[6] == null || !_equipSlots[6]!.HasItem))
+                return 6;
+        }
+        else if (baseSlot == 7) // 戒指
+        {
+            if (_equipSlots[7]?.HasItem == true && (_equipSlots[8] == null || !_equipSlots[8]!.HasItem))
+                return 8;
+        }
+        return baseSlot;
     }
 
     public static bool IsConsumableItem(string itemName)
@@ -2949,6 +3014,18 @@ public partial class HudController : CanvasLayer
     public void ConsumeBagItem(int bagSlot, string itemName)
     {
         if (bagSlot < 0 || bagSlot >= 40) return;
+
+        if (IsDead)
+        {
+            AddChat("系统", "[系统] 角色已经死亡，无法使用物品。", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
+        if (IsStunned || IsFrozen)
+        {
+            AddChat("系统", "[系统] 当前处于眩晕/麻痹硬直状态，无法使用物品。", new Color(1f, 0.4f, 0.4f));
+            return;
+        }
+
         // 播放经典吃药吞咽音效 (官方 sound 107, SoundId.EatDrug)
         AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.EatDrug);
         

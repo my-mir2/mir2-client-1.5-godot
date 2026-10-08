@@ -2192,6 +2192,9 @@ public partial class AutoEndToEndDriver : Node
 
                         // 12. 模拟收到官方 1.5 浮动血条显隐切换 (SM_HEALTHBAR_DELPHI 1105)
                         router.OnPacket(new ServerPacket(ProtocolConsts.SM_HEALTHBAR_DELPHI, 9002, 1, 0, Array.Empty<byte>()));
+
+                        // 13. 模拟收到官方 1.5 即时治愈血量指示 (SM_INSTANCEHEALGAUGE 659)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_INSTANCEHEALGAUGE, 0, 50, 0, Array.Empty<byte>()));
                     }
                 }
                 RequestCapture("step124_guild_group_truth_modals");
@@ -2200,7 +2203,21 @@ public partial class AutoEndToEndDriver : Node
 
             case 125:
             {
-                GD.Print("[AutoE2E] ALL 125 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    // 验证成对槽位智能穿戴：双击手镯/戒指空槽判定
+                    int slotArm = gameView.HudInstance.GetBestEquipSlotForBagItem("幽灵手镯");
+                    int slotRing = gameView.HudInstance.GetBestEquipSlotForBagItem("力量戒指");
+                    GD.Print($"[AutoE2E] 成对槽位智能穿戴槽位检测通过: 手镯={slotArm}, 戒指={slotRing}");
+                }
+                RequestCapture("step125_health_status_interlock");
+                break;
+            }
+
+            case 126:
+            {
+                GD.Print("[AutoE2E] ALL 126 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

@@ -117,4 +117,48 @@ public class TestDoubleClickAndNpcCloseGroundTruth
         byte[] fullPkt = PacketEncoder.MakePacket(ProtocolConsts.SM_OUTOFCONNECTION, 0, 0, 0);
         router.OnPacket(ProtocolConsts.SM_OUTOFCONNECTION, fullPkt.AsSpan(1..^1).ToArray());
     }
+
+    [Fact]
+    public void TestEntityManager_And_Router_HealthStatusInterlock_GroundTruth()
+    {
+        // 8. 验证 EntityManager 本地玩家 UID 管理与实体状态
+        var em = new Mir2Client.Game.EntityManager();
+        Assert.Equal(0, em.LocalPlayerUid);
+
+        em.AddEntity(10086, "无涯", Mir2Client.Game.EntityManager.EntityType.Player, 330, 270);
+
+        // 9. 验证 ServerMessageRouter 绑定 LocalPlayerUid 与状态下发
+        var router = new ServerMessageRouter(null, em);
+
+        // 模拟 SM_STARTPLAY (20) 绑定主角 UID 10086
+        byte[] startPlayPkt = PacketEncoder.MakePacket(ProtocolConsts.SM_STARTPLAY, 10086, 0, 0);
+        router.OnPacket(ProtocolConsts.SM_STARTPLAY, startPlayPkt.AsSpan(1..^1).ToArray());
+        Assert.Equal(10086, em.LocalPlayerUid);
+
+        // 模拟对主角施加麻痹 (SM_CHAR_FREEZE_START 1100)
+        byte[] freezeStartPkt = PacketEncoder.MakePacket(ProtocolConsts.SM_CHAR_FREEZE_START, 10086, 0, 0);
+        router.OnPacket(ProtocolConsts.SM_CHAR_FREEZE_START, freezeStartPkt.AsSpan(1..^1).ToArray());
+        var ent = em.GetEntity(10086);
+        Assert.NotNull(ent);
+        Assert.True(ent.IsFrozen);
+
+        // 模拟主角解除麻痹 (SM_CHAR_FREEZE_END 1101)
+        byte[] freezeEndPkt = PacketEncoder.MakePacket(ProtocolConsts.SM_CHAR_FREEZE_END, 10086, 0, 0);
+        router.OnPacket(ProtocolConsts.SM_CHAR_FREEZE_END, freezeEndPkt.AsSpan(1..^1).ToArray());
+        Assert.False(ent.IsFrozen);
+
+        // 模拟主角受到击晕 (SM_CHAR_STUN 1103)
+        byte[] stunPkt = PacketEncoder.MakePacket(ProtocolConsts.SM_CHAR_STUN, 10086, 0, 0);
+        router.OnPacket(ProtocolConsts.SM_CHAR_STUN, stunPkt.AsSpan(1..^1).ToArray());
+        Assert.True(ent.StunExpireTick > 0);
+
+        // 模拟 SM_LOGON_DELPHI (50) 重新绑定主角 UID
+        byte[] logonPkt = PacketEncoder.MakePacket(ProtocolConsts.SM_LOGON_DELPHI, 88888, 0, 0);
+        router.OnPacket(ProtocolConsts.SM_LOGON_DELPHI, logonPkt.AsSpan(1..^1).ToArray());
+        Assert.Equal(88888, em.LocalPlayerUid);
+
+        // 模拟即时治愈 (SM_INSTANCEHEALGAUGE 659) 分发正常执行不报错
+        byte[] healPkt = PacketEncoder.MakePacket(ProtocolConsts.SM_INSTANCEHEALGAUGE, 0, 35, 0);
+        router.OnPacket(ProtocolConsts.SM_INSTANCEHEALGAUGE, healPkt.AsSpan(1..^1).ToArray());
+    }
 }

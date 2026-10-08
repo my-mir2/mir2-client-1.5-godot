@@ -45,6 +45,8 @@ public partial class SlotButton : Button
         }
     }
 
+    public bool HasItem => _itemTexture != null;
+
     public Texture2D? ItemTexture
     {
         get => _itemTexture;

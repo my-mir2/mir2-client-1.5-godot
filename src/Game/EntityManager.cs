@@ -72,6 +72,9 @@ public class EntityManager
 
     private readonly Dictionary<int, EntityData> _entities = new();
 
+    /// <summary>本地主角实体的权威 UID (由 SM_STARTPLAY / SM_LOGON_DELPHI 绑定)</summary>
+    public int LocalPlayerUid { get; set; } = 0;
+
     public int Count => _entities.Count;
     public IEnumerable<EntityData> AllEntities => _entities.Values;
 

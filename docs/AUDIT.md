@@ -7101,11 +7101,32 @@
       - 在 `TestProtocolMatrix.cs` 中增加 `TestOfficialGroundTruth_All172TopLevelOpcodesAndActionPipeline` 单元测试，脱机测试覆盖扩充至 **174 / 174 项 100% 通过**；
       - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **125 / 125 阶段 0 缺陷通过**。
 
+37. **盛大官方 1.5 原版二进制 165 个原生 UI 对话框与控件事件全量建立物理映射与建档核销 (`docs/ida_evidence/dialog_truth_table.md`)**：
+    - **官方实证**：
+      - 穿透项目本地 IDA MCP 导出的 165 个原生 Delphi UI 函数（涵盖 `ExitProcess`、`TFrmMain_DXDraw1Initialize`、`TFrmDlg_DMsgDlgOkClick`、`TFrmDlg_DItemGridDblClick` 等核心事件）；
+      - 彻底消除原本所有 `? / 待建档` 的悬空状态，全量建立与现代工程中 View、Controller 及处理方法的 1:1 精确映射；
+      - 官方 165 个 UI 事件全部标记为 `已对齐`。
+
+38. **盛大官方 1.5 角色生命值状态联动、智能成对空槽穿戴、防死/防硬直违规拦截与即时治愈闭环核销 (`HudController.cs`, `SlotButton.cs`, `ServerMessageRouter.cs`)**：
+    - **官方实证**：
+      - 依据官方客户端交互规范，主角在死亡状态（HP <= 0）时，严禁吃药（`ConsumeBagItem`、`UseQuickSlot`）和穿脱装备（`WearBagItemToEquipSlot`、`TakeoffEquipSlotToBag`），直接输出系统提示拦截；
+      - 主角在受到重击击晕硬直（`SM_CHAR_STUN 1103`）或冰冻定身（`SM_CHAR_FREEZE_START 1100`）期间，严禁使用药水物品，彻底肃清异常违规发包漏洞；
+      - 成对槽位智能判定（手镯 5/6 与戒指 7/8）：双击穿戴时若左槽已有物品且右槽为空，自动优先穿戴至右侧空槽，高度还原盛大官方 1.5 客户端原生操作手感；
+      - 主角实体权威 UID 绑定：收到 `SM_STARTPLAY (20)` 与 `SM_LOGON_DELPHI (50)` 时自动同步主角 UID 到 `EntityManager.LocalPlayerUid`，精准联动主角自身与外部实体的状态差异；
+      - 即时治愈（`SM_INSTANCEHEALGAUGE 659`）：实装 `ApplyHeal` 生命值增量累加与血球即时更新，死亡状态严格阻止虚假治愈复活。
+    - **精准重构**：
+      - 在 `SlotButton.cs` 中增加 `HasItem` 属性；
+      - 在 `EntityManager.cs` 中增加 `LocalPlayerUid` 属性；
+      - 在 `HudController.cs` 中实装生命值状态、成对空槽判定 `GetBestEquipSlotForBagItem`、`ApplyHeal` 与死亡/硬直拦截；
+      - 在 `ServerMessageRouter.cs` 中接入主角 UID 绑定与 HUD 状态同步；
+      - 在 `TestDoubleClickAndNpcCloseGroundTruth.cs` 中增加 `TestEntityManager_And_Router_HealthStatusInterlock_GroundTruth` 单元测试，脱机测试覆盖扩充至 **175 / 175 项 100% 通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中扩充至 **126 / 126 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (172 / 172 顶层操作码 0 缺失)**；
-- **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **174 / 174 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **125 / 125 阶段全生命周期 0 缺陷通过**；
+- **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **175 / 175 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **126 / 126 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

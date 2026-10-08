@@ -625,10 +625,18 @@ public sealed class ServerMessageRouter
                 SafeLog($"[SM] 账号登录成功进入选服 (SM_LOGINSUCCESS=530)");
                 break;
             case ProtocolConsts.SM_LOGON_DELPHI: // 50: 主角色进入世界并绑定 (IDA case 50)
-                SafeLog($"[SM] 主角色进入世界绑定 (SM_LOGON_DELPHI=50)");
+                if (_entityManager != null && packet.Recog > 0)
+                {
+                    _entityManager.LocalPlayerUid = packet.Recog;
+                }
+                SafeLog($"[SM] 主角色进入世界绑定 (SM_LOGON_DELPHI=50, uid={packet.Recog})");
                 break;
             case ProtocolConsts.SM_STARTPLAY: // 20: 角色确认进入世界 / 实体登场 (IDA case 20)
-                SafeLog($"[SM] 进入游戏世界确认 (SM_STARTPLAY=20)");
+                if (_entityManager != null && packet.Recog > 0)
+                {
+                    _entityManager.LocalPlayerUid = packet.Recog;
+                }
+                SafeLog($"[SM] 进入游戏世界确认 (SM_STARTPLAY=20, uid={packet.Recog})");
                 break;
             case 31: // 31: 实体位移平滑移动 (IDA case 31)
                 HandleEntityMove(packet);
@@ -722,10 +730,20 @@ public sealed class ServerMessageRouter
                 break;
             case ProtocolConsts.SM_CHAR_FREEZE_START: // 1100: 实体麻痹/定身开始 (IDA case 0x44C)
                 _entityManager?.SetActorFrozen(packet.Recog, true);
+                if (_entityManager != null && packet.Recog == _entityManager.LocalPlayerUid)
+                {
+                    _hud?.SetFrozen(true);
+                    _hud?.AddChat("状态", "[状态] 你被麻痹定身了，无法移动或使用物品！", new Color(0.3f, 0.8f, 1f));
+                }
                 SafeLog($"[SM] 实体 UID={packet.Recog} 进入麻痹/定身状态 (SM_CHAR_FREEZE_START=1100)");
                 break;
             case ProtocolConsts.SM_CHAR_FREEZE_END: // 1101: 实体麻痹/定身解除 (IDA case 0x44D)
                 _entityManager?.SetActorFrozen(packet.Recog, false);
+                if (_entityManager != null && packet.Recog == _entityManager.LocalPlayerUid)
+                {
+                    _hud?.SetFrozen(false);
+                    _hud?.AddChat("状态", "[状态] 麻痹定身状态已解除。", new Color(0.4f, 1f, 0.5f));
+                }
                 SafeLog($"[SM] 实体 UID={packet.Recog} 解除麻痹/定身状态 (SM_CHAR_FREEZE_END=1101)");
                 break;
             case ProtocolConsts.SM_BREAK_WEAPON: // 1102: 武器试刀破碎损毁 (IDA case 0x44E)
@@ -733,6 +751,11 @@ public sealed class ServerMessageRouter
                 break;
             case ProtocolConsts.SM_CHAR_STUN: // 1103: 受到重击击晕硬直 (IDA case 0x44F)
                 _entityManager?.SetActorStunned(packet.Recog, 2000);
+                if (_entityManager != null && packet.Recog == _entityManager.LocalPlayerUid)
+                {
+                    _hud?.SetStunned(true);
+                    _hud?.AddChat("状态", "[状态] 你受到重击陷入击晕硬直！", new Color(1f, 0.4f, 0.2f));
+                }
                 SafeLog($"[SM] 实体 UID={packet.Recog} 受到击晕硬直 2000ms (SM_CHAR_STUN=1103)");
                 break;
             case ProtocolConsts.SM_HEALTHBAR_DELPHI: // 1105: 浮动血条显隐切换 (IDA case 0x451)
@@ -1448,6 +1471,7 @@ public sealed class ServerMessageRouter
         int healAmount = pkt.Param;
         if (healAmount > 0)
         {
+            _hud?.ApplyHeal(healAmount);
             _hud?.AddChat("提示", $"[治愈] 恢复生命值 +{healAmount} 点。", new Color(0.4f, 1f, 0.4f));
         }
     }
