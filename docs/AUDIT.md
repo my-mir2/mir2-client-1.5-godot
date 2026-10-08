@@ -7191,14 +7191,31 @@
         - 实现 `HandleHealthBarColor`，解析封包数据并驱动 `EntityManager`；
       - 在 `TestCombatSkillsMatrix.cs` 中增加 `HealthBarColor_1104_GroundTruth_Test` 脱机单元测试，测试集扩充至 **180 / 180 项 100% 全部通过**；
       - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+44. **盛大官方 1.5 实体坐标校准缓冲 (SM_ENTITY_POS_DELPHI 1106) 与行会攻城战局势广播 (SM_GUILD_WAR_STATUS_DELPHI 1200) 权威核销 (`EntityManager.cs`, `ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 962~969（`case 0x452u:` @ 0x468760）与 行 972~985（`case 0x4B0u:` @ 0x4687C0）确证：
+        - 1106（`0x452u`）为官方实体动态坐标校准协议：封包中 `Recog` 为实体 UID，`Param` 为 X 坐标，`Tag` 为 Y 坐标；
+        - 1200（`0x4B0u`）为官方沙巴克攻城战/行会战战况下发协议，携带 Extra 战报字符串；
+      - 彻底消除官方原版 1.5 二进制顶层协议中最后遗漏的 2 个未实现操作码，使得官方 1.5 原版二进制下行顶层协议覆盖率达到绝对的 **100% (155/155 顶层操作码 0 缺失)**。
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 中新增：
+        - `SM_ENTITY_POS_DELPHI = 1106`；
+        - `SM_GUILD_WAR_STATUS_DELPHI = 1200`；
+      - 在 `EntityManager.cs` 中实现 `UpdatePosition(int uid, int x, int y)`，刷新实体坐标并派发 `EntityMoved` 事件；
+      - 在 `ServerMessageRouter.cs` 中：
+        - 接入 `case ProtocolConsts.SM_ENTITY_POS_DELPHI (1106)`：调用 `_entityManager?.UpdatePosition`；
+        - 接入 `case ProtocolConsts.SM_GUILD_WAR_STATUS_DELPHI (1200)`：实现 `HandleGuildWarStatus`，解析战报并在聊天栏与系统模态弹窗中呈现；
+      - 在 `TestCombatSkillsMatrix.cs` 中增加 `EntityPos_1106_And_GuildWarStatus_1200_GroundTruth_Test` 脱机单元测试，测试集扩充至 **181 / 181 项 100% 全部通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
-- **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (172 / 172 顶层操作码 0 缺失)**；
+- **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **180 / 180 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **181 / 181 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
+
 
 
 

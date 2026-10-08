@@ -170,6 +170,19 @@ public class EntityManager
         }
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 实体坐标校准更新 (SM_ENTITY_POS_DELPHI 1106, IDA case 0x452u @ 0x468760)
+    /// </summary>
+    public void UpdatePosition(int uid, int x, int y)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.TileX = x;
+            ent.TileY = y;
+            EntityMoved?.Invoke(uid, x, y, ent.Direction);
+        }
+    }
+
     public void UpdateStepMove(int uid, int x, int y, byte dir, bool isRun)
     {
         if (_entities.TryGetValue(uid, out var ent))

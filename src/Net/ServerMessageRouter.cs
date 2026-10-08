@@ -784,6 +784,12 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_HEALTHBAR_DELPHI: // 1105: 浮动血条显隐切换 (IDA case 0x451)
                 _entityManager?.ToggleFloatingHealthBar(packet.Recog, packet.Param != 0);
                 break;
+            case ProtocolConsts.SM_ENTITY_POS_DELPHI: // 1106: 官方 1.5 实体坐标校准缓冲 (IDA case 0x452u)
+                _entityManager?.UpdatePosition(packet.Recog, packet.Param, packet.Tag);
+                break;
+            case ProtocolConsts.SM_GUILD_WAR_STATUS_DELPHI: // 1200: 官方 1.5 行会战/攻城战战况广播 (IDA case 0x4B0u)
+                HandleGuildWarStatus(packet);
+                break;
             case ProtocolConsts.SM_CHANGEPASS_FAIL: // 503: 官方改密失败模态框 (IDA case 503)
             {
                 string msg = packet.Recog switch
@@ -2224,6 +2230,15 @@ public sealed class ServerMessageRouter
             color = c;
         }
         _entityManager?.UpdateHealthBarColor(uid, hp, maxHp, color);
+    }
+
+    private void HandleGuildWarStatus(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        string msg = !string.IsNullOrEmpty(text) ? text : "沙巴克行会战战况局势已更新！";
+        _hud?.AddChat("行会", $"[行会战] {msg}", new Color(1f, 0.3f, 0.3f));
+        _hud?.ShowModalMessage("行会战况", msg);
     }
 
     private static string DecodeExtraText(byte[]? extra)

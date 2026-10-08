@@ -278,7 +278,60 @@ public class TestCombatSkillsMatrix
         Assert.Equal(1000, pig.MaxHp);
         Assert.Equal(255, pig.NameColor);
     }
+
+    [Fact]
+    public void EntityPos_1106_And_GuildWarStatus_1200_GroundTruth_Test()
+    {
+        // 1. 验证 ProtocolConsts 常量真值
+        Assert.Equal(1106, ProtocolConsts.SM_ENTITY_POS_DELPHI);
+        Assert.Equal(1200, ProtocolConsts.SM_GUILD_WAR_STATUS_DELPHI);
+
+        var em = new EntityManager();
+        em.AddEntity(new EntityManager.EntityData
+        {
+            Uid = 3001,
+            Name = "白野猪",
+            TileX = 100,
+            TileY = 200,
+            Direction = 3
+        });
+
+        int movedFired = 0;
+        int moveX = 0, moveY = 0;
+        byte moveDir = 0;
+        em.EntityMoved += (uid, x, y, dir) =>
+        {
+            if (uid == 3001)
+            {
+                movedFired++;
+                moveX = x;
+                moveY = y;
+                moveDir = dir;
+            }
+        };
+
+        // 2. 模拟路由接收 1106 封包 (recog=3001, param=105, tag=208)
+        var router = new ServerMessageRouter(null, em);
+        var posPkt = new ServerPacket(ProtocolConsts.SM_ENTITY_POS_DELPHI, 3001, 105, 208, Array.Empty<byte>());
+        router.OnPacket(posPkt);
+
+        Assert.Equal(1, movedFired);
+        Assert.Equal(105, moveX);
+        Assert.Equal(208, moveY);
+        Assert.Equal(3, moveDir);
+
+        var ent = em.GetEntity(3001);
+        Assert.NotNull(ent);
+        Assert.Equal(105, ent.TileX);
+        Assert.Equal(208, ent.TileY);
+
+        // 3. 模拟接收 1200 行会战况封包 (验证不抛异常、安全回退与分发)
+        byte[] warBytes = Encoding.UTF8.GetBytes("沙巴克城门已被攻破！");
+        var warPkt = new ServerPacket(ProtocolConsts.SM_GUILD_WAR_STATUS_DELPHI, 0, 0, 0, warBytes);
+        router.OnPacket(warPkt);
+    }
 }
+
 
 
 

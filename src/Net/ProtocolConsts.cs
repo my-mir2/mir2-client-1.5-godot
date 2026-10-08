@@ -202,6 +202,8 @@ public static class ProtocolConsts
     public const short SM_GROUPMEMBERS           = 667;  // 队伍成员列表
     public const short SM_USERNAME               = 751;  // 查名回显
     public const short SM_HEALTHBAR_COLOR_DELPHI = 1104; // 浮动血条与变色
+    public const short SM_ENTITY_POS_DELPHI      = 1106; // 盛大官方 1.5 实体坐标与状态缓冲同步 (IDA case 0x452u @ 0x468760)
+    public const short SM_GUILD_WAR_STATUS_DELPHI = 1200; // 盛大官方 1.5 行会战/攻城战局势广播与指令通知 (IDA case 0x4B0u @ 0x4687C0)
     public const short SM_ABILITY                 = 648;  // 基础能力
     public const short SM_ADJUSTBONUS             = 811;  // 属性点反馈
     public const short SM_BAGITEMS                = 600;  // 背包物品
