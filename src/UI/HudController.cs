@@ -46,6 +46,12 @@ public partial class HudController : CanvasLayer
     public delegate void TradeCancelRequestedEventHandler();
 
     [Signal]
+    public delegate void StorageDepositRequestedEventHandler(int bagSlot, string itemName);
+
+    [Signal]
+    public delegate void StorageWithdrawRequestedEventHandler(int storageSlot);
+
+    [Signal]
     public delegate void MinimapToggledEventHandler();
 
     public enum ChatChannel
@@ -973,23 +979,20 @@ public partial class HudController : CanvasLayer
         _shopPanelView = new ShopPanelView();
         _shopPanelView.TakeBackRequested += (storageSlot, itemName) =>
         {
-            // 取回仓库物品：加入背包并下发系统提示
-            AddBagItem(itemName, "Items_0059.png", "屠龙");
-            AddChat("系统", $"[系统] 成功从仓库取回保管物品 [{itemName}]。", new Color(1f, 1f, 0f));
-            GD.Print($"[HudController] 仓库取回成功: slot={storageSlot}, item={itemName}");
+            // 向外界派发官方取回仓库物品事件 (CM_USERSTORAGEWITHDRAW 1032)
+            EmitSignal(SignalName.StorageWithdrawRequested, storageSlot);
+            AddChat("系统", $"[系统] 正在申请从仓库取回保管物品 [{itemName}]...", new Color(1f, 1f, 0f));
+            GD.Print($"[HudController] 仓库取回请求: slot={storageSlot}, item={itemName}");
         };
         AddChild(_shopPanelView);
 
         _repairPanelView = new RepairPanelView();
         _repairPanelView.StorageDepositConfirmed += (bagSlot, itemName) =>
         {
-            // 存入仓库：清空该格背包物品并发送系统提示
-            if (bagSlot >= 0 && bagSlot < 40)
-            {
-                ClearBagItem(bagSlot);
-            }
-            AddChat("系统", $"[系统] 物品 [{itemName}] 已成功交付仓库保管员保管。", new Color(1f, 1f, 0f));
-            GD.Print($"[HudController] 仓库保管成功: slot={bagSlot}, item={itemName}");
+            // 向外界派发官方存入仓库物品事件 (CM_USERSTORAGEDEPOSIT 1031)
+            EmitSignal(SignalName.StorageDepositRequested, bagSlot, itemName);
+            AddChat("系统", $"[系统] 正在向仓库申请寄存物品 [{itemName}]...", new Color(1f, 1f, 0f));
+            GD.Print($"[HudController] 仓库寄存请求: slot={bagSlot}, item={itemName}");
         };
         AddChild(_repairPanelView);
 
@@ -1778,6 +1781,47 @@ public partial class HudController : CanvasLayer
             _shopPanelView.OpenForStorage(items, npcUid);
             _stackManager.PushWindow(_shopPanelView);
         }
+    }
+
+    /// <summary>
+    /// 官方 1.5 仓库数据驱动开启与列表刷新 (SM_USERSTORAGE_ITEMS 704)
+    /// </summary>
+    public void OpenStorageList(IEnumerable<Mir2Client.Net.StorageItemInfo> items, int npcUid = 0)
+    {
+        if (_shopPanelView != null)
+        {
+            _shopPanelView.OpenForStorage(items, npcUid);
+            _stackManager.PushWindow(_shopPanelView);
+        }
+    }
+
+    /// <summary>
+    /// 清空仓库物品列表 (SM_STORAGE_CLEARITEMS_DELPHI 709)
+    /// </summary>
+    public void ClearStorageList()
+    {
+        _shopPanelView?.ClearItems();
+    }
+
+    /// <summary>
+    /// 官方 1.5 存入仓库成功权威确认 (SM_SAVEITEM_OK 701)
+    /// </summary>
+    public void OnServerStorageDepositOk(int bagSlot)
+    {
+        if (bagSlot >= 0 && bagSlot < 40)
+        {
+            ClearBagItem(bagSlot);
+        }
+        AddChat("保管箱", $"[保管箱] 物品寄存成功 (背包槽位:{bagSlot})。", new Color(0.5f, 1f, 0.5f));
+    }
+
+    /// <summary>
+    /// 官方 1.5 取回仓库物品成功权威确认 (SM_TAKEBACKITEM_OK 705)
+    /// </summary>
+    public void OnServerStorageWithdrawOk(int storageSlot)
+    {
+        _shopPanelView?.RemoveItemAt(storageSlot);
+        AddChat("保管箱", $"[保管箱] 物品取回成功 (仓库槽位:{storageSlot})。", new Color(0.5f, 1f, 0.5f));
     }
 
     public void ToggleRepair()

@@ -56,3 +56,22 @@ public readonly struct ServerPacket
         }
     }
 }
+
+/// <summary>
+/// 盛大官方 1.5 仓库保管箱物品条目 (IDA sub_46DB28)
+/// </summary>
+public struct StorageItemInfo
+{
+    public string Name;
+    public int Dura;
+    public int MaxDura;
+    public int ItemIndex;
+
+    public StorageItemInfo(string name, int dura, int maxDura, int itemIndex = 0)
+    {
+        Name = name;
+        Dura = dura;
+        MaxDura = maxDura;
+        ItemIndex = itemIndex;
+    }
+}

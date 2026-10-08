@@ -326,4 +326,59 @@ public sealed class TestGuildTradeEncoderMatrix
         AssertWellformed(PacketEncoder.WithdrawStorage(0), ProtocolConsts.CM_USERSTORAGEWITHDRAW);
         Assert.Equal((short)1032, Ident(PacketEncoder.WithdrawStorage(0)));
     }
+
+    [Fact]
+    public void StorageProtocolMatrix_DecodeAndClear_OfficialAlignment()
+    {
+        // 1. 验证 704 与 709 官方 1.5 IDA 物理真值常量对齐 (IDA case 704 / case 709 handle_sm_delete_item)
+        Assert.Equal((short)704, ProtocolConsts.SM_USERSTORAGE_ITEMS);
+        Assert.Equal((short)709, ProtocolConsts.SM_STORAGE_CLEARITEMS_DELPHI);
+        Assert.Equal((short)701, ProtocolConsts.SM_SAVEITEM_OK);
+        Assert.Equal((short)702, ProtocolConsts.SM_SAVEITEM_FULL);
+        Assert.Equal((short)703, ProtocolConsts.SM_SAVEITEM_FAIL);
+        Assert.Equal((short)705, ProtocolConsts.SM_TAKEBACKITEM_OK);
+        Assert.Equal((short)706, ProtocolConsts.SM_TAKEBACKITEM_FAIL);
+        Assert.Equal((short)707, ProtocolConsts.SM_TAKEBACKITEM_FULL);
+
+        // 2. 模拟 Rust bridge 真实下发的 704 Extra 格式: "name\tdura\tmaxDura\titemIndex\n"
+        string samplePayload = "屠龙\t35\t35\t100\r\n雷霆战甲(男)\t40\t40\t101\n圣战戒指\t5\t5\t102\n";
+        var items = PacketDecoder.DecodeStorageItems(samplePayload);
+        Assert.Equal(3, items.Count);
+
+        Assert.Equal("屠龙", items[0].Name);
+        Assert.Equal(35, items[0].Dura);
+        Assert.Equal(35, items[0].MaxDura);
+        Assert.Equal(100, items[0].ItemIndex);
+
+        Assert.Equal("雷霆战甲(男)", items[1].Name);
+        Assert.Equal(40, items[1].Dura);
+        Assert.Equal(40, items[1].MaxDura);
+        Assert.Equal(101, items[1].ItemIndex);
+
+        Assert.Equal("圣战戒指", items[2].Name);
+        Assert.Equal(5, items[2].Dura);
+        Assert.Equal(5, items[2].MaxDura);
+        Assert.Equal(102, items[2].ItemIndex);
+
+        // 3. 边界鲁棒性：空串、仅空格、不完整字段容错
+        Assert.Empty(PacketDecoder.DecodeStorageItems(""));
+        Assert.Empty(PacketDecoder.DecodeStorageItems("   \r\n\t   "));
+        var singleIncomplete = PacketDecoder.DecodeStorageItems("金创药(特)\n");
+        Assert.Single(singleIncomplete);
+        Assert.Equal("金创药(特)", singleIncomplete[0].Name);
+        Assert.Equal(0, singleIncomplete[0].Dura);
+        Assert.Equal(0, singleIncomplete[0].MaxDura);
+
+        // 4. 脱机路由分发无崩溃安全断言 (HUD=null 时绝不抛出 NullReferenceException)
+        var router = new ServerMessageRouter(null, null);
+        var pkt704 = new ServerPacket(ProtocolConsts.SM_USERSTORAGE_ITEMS, 0, 0, 0, Encoding.UTF8.GetBytes(samplePayload));
+        var pkt709 = new ServerPacket(ProtocolConsts.SM_STORAGE_CLEARITEMS_DELPHI, 0, 0, 0, Array.Empty<byte>());
+        var pkt701 = new ServerPacket(ProtocolConsts.SM_SAVEITEM_OK, 5, 0, 0, Array.Empty<byte>());
+        var pkt705 = new ServerPacket(ProtocolConsts.SM_TAKEBACKITEM_OK, 2, 0, 0, Array.Empty<byte>());
+
+        router.OnPacket(pkt704);
+        router.OnPacket(pkt709);
+        router.OnPacket(pkt701);
+        router.OnPacket(pkt705);
+    }
 }

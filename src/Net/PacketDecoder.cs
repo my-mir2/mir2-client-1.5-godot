@@ -39,4 +39,38 @@ public static class PacketDecoder
 
         return new ServerPacket(ident, recog, param, tag, extraDecoded);
     }
+
+    /// <summary>
+    /// 解析官方 1.5 仓库物品列表 (SM_USERSTORAGE_ITEMS 704)
+    /// 格式：制表符与换行符分隔条目 (name \t dura \t maxDura [\t itemIndex])
+    /// </summary>
+    public static System.Collections.Generic.List<StorageItemInfo> DecodeStorageItems(string extraText)
+    {
+        var list = new System.Collections.Generic.List<StorageItemInfo>();
+        if (string.IsNullOrWhiteSpace(extraText))
+            return list;
+
+        var lines = extraText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            var parts = trimmed.Split('\t');
+            string name = parts[0].Trim();
+            int dura = 0;
+            int maxDura = 0;
+            int index = 0;
+            if (parts.Length > 1 && int.TryParse(parts[1], out int d))
+                dura = d;
+            if (parts.Length > 2 && int.TryParse(parts[2], out int md))
+                maxDura = md;
+            if (parts.Length > 3 && int.TryParse(parts[3], out int idx))
+                index = idx;
+
+            list.Add(new StorageItemInfo(name, dura, maxDura, index));
+        }
+        return list;
+    }
 }

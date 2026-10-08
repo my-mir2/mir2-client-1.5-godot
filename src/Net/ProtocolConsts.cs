@@ -307,7 +307,8 @@ public static class ProtocolConsts
     public const short SM_LAMPCHANGEDURA          = 655;  // 蜡烛油灯持久消耗 (IDA case 655)
     public const short SM_KICKMEMBER_OK           = 663;  // 踢出编组成员成功 (IDA case 663)
     public const short SM_USERSTORAGE_ITEMS       = 704;  // 仓库物品列表批量刷新 (IDA case 704 handle_sm_shop_items)
-    public const short SM_DELUSERMAGIC_DELPHI     = 709;  // 技能遗忘/删除 (IDA case 709 handle_sm_delete_item)
+    public const short SM_STORAGE_CLEARITEMS_DELPHI = 709; // 仓库物品清理/清空 (IDA case 709 handle_sm_delete_item, 对齐 bridge.rs)
+    public const short SM_DELUSERMAGIC_DELPHI     = 709;  // 兼容别名
     public const short SM_SHOP_DETAIL2            = 712;  // 商品特价明细下发 (IDA case 712 handle_sm_shop_detail)
     public const short SM_TAKEON_NOOP1            = 617;  // 官方空占位 (IDA case 617)
     public const short SM_TAKEON_NOOP2            = 618;  // 官方空占位 (IDA case 618)

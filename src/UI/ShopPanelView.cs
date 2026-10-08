@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Mir2Client.Net;
 using Mir2Client.Utils;
 
 namespace Mir2Client.UI;
@@ -280,6 +281,49 @@ public partial class ShopPanelView : Control, IManagedWindow
         SetMode(ShopMode.Storage);
         SetItems(items);
         Visible = true;
+    }
+
+    /// <summary>
+    /// 官方 1.5 仓库物品列表数据驱动开启 (SM_USERSTORAGE_ITEMS 704)
+    /// </summary>
+    public void OpenForStorage(IEnumerable<StorageItemInfo> items, int npcUid = 0)
+    {
+        var entries = new List<ShopItemEntry>();
+        if (items != null)
+        {
+            foreach (var it in items)
+            {
+                entries.Add(ShopItemEntry.Stored(it.Name, it.Dura, it.MaxDura));
+            }
+        }
+        OpenForStorage(entries, npcUid);
+    }
+
+    /// <summary>
+    /// 清空仓库/货架列表 (SM_STORAGE_CLEARITEMS_DELPHI 709)
+    /// </summary>
+    public void ClearItems()
+    {
+        _items.Clear();
+        _selectedIndex = -1;
+        _pageIndex = 0;
+        RefreshPageDisplay();
+    }
+
+    /// <summary>
+    /// 取回成功后从列表中移除指定索引条目 (SM_TAKEBACKITEM_OK 705)
+    /// </summary>
+    public void RemoveItemAt(int index)
+    {
+        if (index >= 0 && index < _items.Count)
+        {
+            _items.RemoveAt(index);
+            if (_selectedIndex >= _items.Count)
+            {
+                _selectedIndex = _items.Count - 1;
+            }
+            RefreshPageDisplay();
+        }
     }
 
     /// <summary>

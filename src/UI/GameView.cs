@@ -508,6 +508,16 @@ namespace Mir2Client.UI
                     _net?.SendPacket(PacketEncoder.DealCancel());
                 };
 
+                // 官方 1.5 仓库保管箱存取发包 (CM_USERSTORAGEDEPOSIT 1031 / CM_USERSTORAGEWITHDRAW 1032)
+                HudInstance.StorageDepositRequested += (bagSlot, itemName) =>
+                {
+                    _net?.SendPacket(PacketEncoder.DepositStorage(bagSlot, itemName));
+                };
+                HudInstance.StorageWithdrawRequested += (storageSlot) =>
+                {
+                    _net?.SendPacket(PacketEncoder.WithdrawStorage(storageSlot));
+                };
+
                 // 官方攻击模式变更发包 (CM_CHANGEATTACKMODE 1019)
                 HudInstance.ChangeAttackModeRequested += (mode) =>
                 {

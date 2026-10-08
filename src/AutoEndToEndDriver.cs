@@ -2217,7 +2217,28 @@ public partial class AutoEndToEndDriver : Node
 
             case 126:
             {
-                GD.Print("[AutoE2E] ALL 126 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    // 演示官方 1.5 仓库服务端协议 (704 下发 / 701 存入成功 / 705 取回成功 / 709 清空列表) 数据驱动流
+                    var sampleItems = new List<Mir2Client.Net.StorageItemInfo>
+                    {
+                        new Mir2Client.Net.StorageItemInfo("屠龙", 35, 35, 100),
+                        new Mir2Client.Net.StorageItemInfo("雷霆战甲(男)", 40, 40, 101),
+                        new Mir2Client.Net.StorageItemInfo("圣战戒指", 5, 5, 102)
+                    };
+                    gameView.HudInstance.OpenStorageList(sampleItems);
+                    gameView.HudInstance.OnServerStorageWithdrawOk(1);
+                    gameView.HudInstance.OnServerStorageDepositOk(0);
+                    GD.Print("[AutoE2E] 官方 1.5 仓库 704 动态列表驱动与 701/705/709 双向通信流演练通过！");
+                }
+                RequestCapture("step126_storage_protocol_driven");
+                break;
+            }
+
+            case 127:
+            {
+                GD.Print("[AutoE2E] ALL 127 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

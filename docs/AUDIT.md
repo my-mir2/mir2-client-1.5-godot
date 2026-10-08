@@ -7120,13 +7120,30 @@
       - 在 `HudController.cs` 中实装生命值状态、成对空槽判定 `GetBestEquipSlotForBagItem`、`ApplyHeal` 与死亡/硬直拦截；
       - 在 `ServerMessageRouter.cs` 中接入主角 UID 绑定与 HUD 状态同步；
       - 在 `TestDoubleClickAndNpcCloseGroundTruth.cs` 中增加 `TestEntityManager_And_Router_HealthStatusInterlock_GroundTruth` 单元测试，脱机测试覆盖扩充至 **175 / 175 项 100% 通过**；
-      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中扩充至 **126 / 126 阶段全生命周期 0 缺陷通过**。
+39. **盛大官方 1.5 仓库保管箱 700~714 协议族拨乱反正、数据驱动动态列表刷新与双端存取通信流闭环 (`PacketModels.cs`, `PacketDecoder.cs`, `ProtocolConsts.cs`, `ShopPanelView.cs`, `HudController.cs`, `ServerMessageRouter.cs`, `GameView.cs`)**：
+    - **官方实证**：
+      - 依据官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 546~571 与服务端 `bridge.rs:228` 实证：
+        - `704 (SM_USERSTORAGE_ITEMS)` 真实下发格式为带有制表符与换行符的保管箱物品集合字符串（`name\tdura\tdura_max\titem_index\n`）；
+        - `709 (SM_STORAGE_CLEARITEMS_DELPHI)` 在官方反编译中对应 `case 709: handle_sm_delete_item()`，实为仓库列表清理/清空协议，而非误定义的魔法遗忘；
+        - `701 (SM_SAVEITEM_OK)` 权威确认背包槽位物品存入成功并通知客户端清除背包格子；
+        - `705 (SM_TAKEBACKITEM_OK)` 权威确认仓库槽位物品取出成功并从仓库列表中移除条目；
+        - 上行发包 `CM_USERSTORAGEDEPOSIT (1031)` 与 `CM_USERSTORAGEWITHDRAW (1032)` 与服务端 Rust 网关 1:1 精确握手。
+    - **精准重构**：
+      - 在 `PacketModels.cs` 中增加纯 C# 数据模型 `StorageItemInfo`；
+      - 在 `PacketDecoder.cs` 中增加纯 C# 离线解析器 `DecodeStorageItems`，支持多行制表符切分与边界容错；
+      - 在 `ProtocolConsts.cs` 中将 709 主常量命名修正为 `SM_STORAGE_CLEARITEMS_DELPHI` 并保留别名兼容；
+      - 在 `ShopPanelView.cs` 中实现 `OpenForStorage(IEnumerable<StorageItemInfo>)` 重载、`ClearItems` 清空与 `RemoveItemAt` 动态移除；
+      - 在 `HudController.cs` 中声明 `StorageDepositRequested` 与 `StorageWithdrawRequested` 信号，实装 `OpenStorageList`、`ClearStorageList`、`OnServerStorageDepositOk` 与 `OnServerStorageWithdrawOk`；
+      - 在 `GameView.cs` 中打通 `StorageDepositRequested` -> `CM_USERSTORAGEDEPOSIT (1031)` 与 `StorageWithdrawRequested` -> `CM_USERSTORAGEWITHDRAW (1032)` 网络发包；
+      - 在 `ServerMessageRouter.cs` 中将 704 接入多行解析与数据驱动刷新，将 709 接入仓库清空，将 701/705 接入 HUD 数据更新；
+      - 在 `TestGuildTradeEncoderMatrix.cs` 中增加 `StorageProtocolMatrix_DecodeAndClear_OfficialAlignment` 单元测试，脱机测试覆盖扩充至 **176 / 176 项 100% 通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中扩充至 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (172 / 172 顶层操作码 0 缺失)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **175 / 175 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **126 / 126 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **176 / 176 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

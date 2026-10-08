@@ -502,7 +502,7 @@ public sealed class ServerMessageRouter
                 _hud?.AddChat("系统", $"[服药] {DecodeExtraText(packet.Extra)}", new Color(1f, 1f, 0.6f));
                 break;
             case ProtocolConsts.SM_SAVEITEM_OK: // 701: 寄存物品成功
-                _hud?.AddChat("保管箱", "[保管箱] 物品寄存成功。", new Color(0.5f, 1f, 0.5f));
+                _hud?.OnServerStorageDepositOk(packet.Recog);
                 break;
             case ProtocolConsts.SM_SAVEITEM_FULL: // 702: 个人包袱已满 (IDA 0x46B85C)
                 _hud?.ShowModalMessage("保管箱提示", "你的个人包袱已经满了，你不能再寄存任何东西了。");
@@ -511,7 +511,7 @@ public sealed class ServerMessageRouter
                 _hud?.ShowModalMessage("保管箱提示", "你不能寄存。");
                 break;
             case ProtocolConsts.SM_TAKEBACKITEM_OK: // 705: 取回物品成功
-                _hud?.AddChat("保管箱", "[保管箱] 物品取回成功。", new Color(0.5f, 1f, 0.5f));
+                _hud?.OnServerStorageWithdrawOk(packet.Recog);
                 break;
             case ProtocolConsts.SM_TAKEBACKITEM_FAIL: // 706: 不能取回 (IDA 0x46B8CC)
                 _hud?.ShowModalMessage("保管箱提示", "你不能取回。");
@@ -686,12 +686,15 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_KICKMEMBER_OK: // 663: 踢出编组成员成功
                 _hud?.OnKickMemberOk();
                 break;
-            case ProtocolConsts.SM_USERSTORAGE_ITEMS: // 704: 仓库物品列表批量刷新
-                _hud?.ToggleStorage();
-                _hud?.AddChat("仓库", "[保管箱] 仓储物品列表已同步刷新。", new Color(0.6f, 0.8f, 1f));
+            case ProtocolConsts.SM_USERSTORAGE_ITEMS: // 704: 仓库物品列表批量刷新 (IDA case 704 handle_sm_shop_items)
+                var rawStorageText = DecodeExtraText(packet.Extra);
+                var storageItems = PacketDecoder.DecodeStorageItems(rawStorageText);
+                _hud?.OpenStorageList(storageItems);
+                _hud?.AddChat("仓库", $"[保管箱] 仓储物品列表已同步刷新 (共 {storageItems.Count} 件)。", new Color(0.6f, 0.8f, 1f));
                 break;
-            case ProtocolConsts.SM_DELUSERMAGIC_DELPHI: // 709: 技能遗忘/删除 (IDA 0x469A4E)
-                _hud?.AddChat("技能", $"[技能] 技能已被遗忘注销 (ID:{packet.Recog})。", new Color(0.9f, 0.5f, 0.5f));
+            case ProtocolConsts.SM_STORAGE_CLEARITEMS_DELPHI: // 709: 仓库物品清理/清空 (IDA case 709 handle_sm_delete_item)
+                _hud?.ClearStorageList();
+                _hud?.AddChat("仓库", "[保管箱] 仓储物品列表已清空注销。", new Color(0.9f, 0.5f, 0.5f));
                 break;
             case ProtocolConsts.SM_SHOP_DETAIL2: // 712: 商品特价明细下发
                 _hud?.AddChat("商店", $"[商店] 物品特价详情: {DecodeExtraText(packet.Extra)}", new Color(0.9f, 0.9f, 0.4f));
