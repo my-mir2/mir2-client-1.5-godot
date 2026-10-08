@@ -7261,11 +7261,25 @@
         - 在 `QuickItemUsed` 触发时增加 `_net?.SendPacket(PacketEncoder.EatItem(slot, item));`，彻底打通快捷药水栏的网络通信闭环；
       - 在 `TestCombatSkillsMatrix.cs` 中增加 `Official_150_EatItem_Packet_And_GridSelect_GroundTruth_Test` 脱机单元测试，验证 CM_EATITEM 的 6-bit 编码与还原，测试集扩充至 **184 / 184 项 100% 全部通过**；
       - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+48. **盛大官方 1.5 主角出生点 (SM_LOGON_DELPHI 50) 与麻痹/击晕 (SM_CHAR_FREEZE_START 1100 / SM_CHAR_STUN 1103) 坐标纠偏与硬直解除闭环 (`ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译客户端 `scratch/ida_processmsg.c` 行 958~990 实证：
+        - `case 0x44Cu` (1100, `SM_CHAR_FREEZE_START`)：非主角实体在被麻痹定身时，若携带坐标则严格执行 `*(_WORD *)(v71 + 60) = HIWORD(v67); *(_WORD *)(v71 + 64) = v68;` 实体坐标校准；
+        - `case 0x44Du` (1101, `SM_CHAR_FREEZE_END`)：解除定身状态；此前本地主角客户端漏解了 `_hud.SetFrozen(false)` 导致麻痹硬直锁残留；
+        - `case 0x44Fu` (1103, `SM_CHAR_STUN`)：实体受到野蛮冲撞撞退或重击击晕硬直 2000ms 时，严格执行 `*(_WORD *)(v71 + 60) = HIWORD(v67); *(_WORD *)(v71 + 64) = v68;` 将实体被击退后的落点坐标纠偏同步；
+        - `case 50` (`SM_LOGON_DELPHI`)：主角色进入游戏世界时，`Param` 与 `Tag` 携带出生点绝对坐标 `(x, y)`，此前客户端仅绑定 UID 未同步坐标。
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中：
+        - 在 `SM_LOGON_DELPHI (50)` 中增加 `UpdatePosition(packet.Recog, packet.Param, packet.Tag)`；
+        - 在 `SM_CHAR_FREEZE_START (1100)` 中为非主角实体补齐 `UpdatePosition` 纠偏，在 `SM_CHAR_FREEZE_END (1101)` 中为本地主角解除 `_hud.SetFrozen(false)`；
+        - 在 `SM_CHAR_STUN (1103)` 中为被击晕实体补齐击退落点 `UpdatePosition` 纠偏；
+      - 在 `TestCombatSkillsMatrix.cs` 中增加 `Official_150_Logon_Freeze_And_Stun_Position_Sync_GroundTruth_Test` 脱机单元测试，测试集扩充至 **185 / 185 项 100% 全部通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **184 / 184 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **185 / 185 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

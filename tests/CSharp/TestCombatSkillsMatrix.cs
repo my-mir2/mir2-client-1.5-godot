@@ -429,7 +429,73 @@ public class TestCombatSkillsMatrix
         short fallbackIdent = (short)(fallbackPkt[1] | (fallbackPkt[2] << 8));
         Assert.Equal(ProtocolConsts.CM_EATITEM, fallbackIdent);
     }
+
+    [Fact]
+    public void Official_150_Logon_Freeze_And_Stun_Position_Sync_GroundTruth_Test()
+    {
+        var em = new EntityManager();
+
+        // 注册测试实体 6001 (怪物) 与 6002 (本地玩家)
+        em.AddEntity(new EntityManager.EntityData
+        {
+            Uid = 6001,
+            Type = EntityManager.EntityType.Monster,
+            TileX = 300,
+            TileY = 300,
+            Direction = 2,
+            Hp = 1000,
+            MaxHp = 1000
+        });
+
+        em.AddEntity(new EntityManager.EntityData
+        {
+            Uid = 6002,
+            Type = EntityManager.EntityType.Player,
+            TileX = 100,
+            TileY = 100,
+            Direction = 0,
+            Hp = 500,
+            MaxHp = 500
+        });
+
+        var router = new ServerMessageRouter(null, em);
+
+        // 1. 模拟接收 50 (SM_LOGON_DELPHI)：绑定主角并同步绝对出生点坐标 (330, 270)
+        var logonPkt = new ServerPacket(ProtocolConsts.SM_LOGON_DELPHI, 6002, 330, 270, Array.Empty<byte>());
+        router.OnPacket(logonPkt);
+
+        Assert.Equal(6002, em.LocalPlayerUid);
+        var player = em.GetEntity(6002);
+        Assert.NotNull(player);
+        Assert.Equal(330, player.TileX);
+        Assert.Equal(270, player.TileY);
+
+        // 2. 模拟接收 1100 (SM_CHAR_FREEZE_START)：实体 6001 麻痹定身，并纠偏坐标至 (305, 305)
+        var freezePkt = new ServerPacket(ProtocolConsts.SM_CHAR_FREEZE_START, 6001, 305, 305, Array.Empty<byte>());
+        router.OnPacket(freezePkt);
+
+        var mon = em.GetEntity(6001);
+        Assert.NotNull(mon);
+        Assert.True(mon.IsFrozen);
+        Assert.Equal(305, mon.TileX);
+        Assert.Equal(305, mon.TileY);
+
+        // 3. 模拟接收 1103 (SM_CHAR_STUN)：实体 6001 受到重击击晕硬直 2000ms，位移至 (310, 310)
+        var stunPkt = new ServerPacket(ProtocolConsts.SM_CHAR_STUN, 6001, 310, 310, Array.Empty<byte>());
+        router.OnPacket(stunPkt);
+
+        Assert.True(mon.StunExpireTick > 0);
+        Assert.Equal(310, mon.TileX);
+        Assert.Equal(310, mon.TileY);
+
+        // 4. 模拟接收 1101 (SM_CHAR_FREEZE_END)：解除实体 6001 麻痹定身
+        var unfreezePkt = new ServerPacket(ProtocolConsts.SM_CHAR_FREEZE_END, 6001, 0, 0, Array.Empty<byte>());
+        router.OnPacket(unfreezePkt);
+
+        Assert.False(mon.IsFrozen);
+    }
 }
+
 
 
 

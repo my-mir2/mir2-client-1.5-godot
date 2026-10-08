@@ -659,6 +659,10 @@ public sealed class ServerMessageRouter
                 if (_entityManager != null && packet.Recog > 0)
                 {
                     _entityManager.LocalPlayerUid = packet.Recog;
+                    if (packet.Param > 0 && packet.Tag > 0)
+                    {
+                        _entityManager.UpdatePosition(packet.Recog, packet.Param, packet.Tag);
+                    }
                 }
                 SafeLog($"[SM] 主角色进入世界绑定 (SM_LOGON_DELPHI=50, uid={packet.Recog})");
                 break;
@@ -764,6 +768,10 @@ public sealed class ServerMessageRouter
                 break;
             case ProtocolConsts.SM_CHAR_FREEZE_START: // 1100: 实体麻痹/定身开始 (IDA case 0x44C)
                 _entityManager?.SetActorFrozen(packet.Recog, true);
+                if (packet.Param > 0 && packet.Tag > 0 && _entityManager != null && packet.Recog != _entityManager.LocalPlayerUid)
+                {
+                    _entityManager.UpdatePosition(packet.Recog, packet.Param, packet.Tag);
+                }
                 if (_entityManager != null && packet.Recog == _entityManager.LocalPlayerUid)
                 {
                     _hud?.SetFrozen(true);
@@ -785,6 +793,10 @@ public sealed class ServerMessageRouter
                 break;
             case ProtocolConsts.SM_CHAR_STUN: // 1103: 受到重击击晕硬直 (IDA case 0x44F)
                 _entityManager?.SetActorStunned(packet.Recog, 2000);
+                if (packet.Param > 0 && packet.Tag > 0)
+                {
+                    _entityManager?.UpdatePosition(packet.Recog, packet.Param, packet.Tag);
+                }
                 if (_entityManager != null && packet.Recog == _entityManager.LocalPlayerUid)
                 {
                     _hud?.SetStunned(true);
