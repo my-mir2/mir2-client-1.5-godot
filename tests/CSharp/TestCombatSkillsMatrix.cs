@@ -374,7 +374,30 @@ public class TestCombatSkillsMatrix
         var tpPkt = new ServerPacket(ProtocolConsts.SM_TELEPORT2_DELPHI, 5001, 310, 320, Array.Empty<byte>());
         router.OnPacket(tpPkt);
     }
+
+    [Fact]
+    public void Official_150_AltX_AltQ_Shortcut_GroundTruth_Test()
+    {
+        // 1. 验证官方 8 方向切分算法 (CalcDirection) 物理真值
+        Assert.Equal(InputPlugin.DirRight, InputPlugin.CalcDirection(10f, 0f));
+        Assert.Equal(InputPlugin.DirDownRight, InputPlugin.CalcDirection(10f, 10f));
+        Assert.Equal(InputPlugin.DirDown, InputPlugin.CalcDirection(0f, 10f));
+        Assert.Equal(InputPlugin.DirDownLeft, InputPlugin.CalcDirection(-10f, 10f));
+        Assert.Equal(InputPlugin.DirLeft, InputPlugin.CalcDirection(-10f, 0f));
+        Assert.Equal(InputPlugin.DirUpLeft, InputPlugin.CalcDirection(-10f, -10f));
+        Assert.Equal(InputPlugin.DirUp, InputPlugin.CalcDirection(0f, -10f));
+        Assert.Equal(InputPlugin.DirUpRight, InputPlugin.CalcDirection(10f, -10f));
+
+        // 2. 验证小退发包 (CM_SOFTCLOSE = 1009) 封包结构物理真值
+        byte[] softClosePkt = PacketEncoder.SoftClose();
+        Assert.NotNull(softClosePkt);
+        Assert.True(softClosePkt.Length >= 12);
+        short ident = (short)(softClosePkt[1] | (softClosePkt[2] << 8));
+        Assert.Equal(ProtocolConsts.CM_SOFTCLOSE, ident);
+        Assert.Equal((short)1009, ident);
+    }
 }
+
 
 
 

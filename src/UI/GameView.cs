@@ -454,6 +454,17 @@ namespace Mir2Client.UI
                 {
                     HandleEntityInteraction(targetUid, (EntityManager.EntityType)entityType, tileX, tileY, isShift);
                 };
+
+                // 官方 1.5 快捷键闭环连接 (Alt+X 退出, Alt+Q 小退, 各原生 UI 切换)
+                InputPluginInstance.QuitRequested += () => HudInstance?.RequestExitGame();
+                InputPluginInstance.LogoutRequested += () => HudInstance?.RequestSoftClose();
+                InputPluginInstance.BagToggleRequested += () => HudInstance?.ToggleBag();
+                InputPluginInstance.EquipToggleRequested += () => HudInstance?.ToggleEquip();
+                InputPluginInstance.SkillToggleRequested += () => HudInstance?.ToggleSkill();
+                InputPluginInstance.GroupToggleRequested += () => HudInstance?.ToggleGroup();
+                InputPluginInstance.GroupAllowToggleRequested += () => HudInstance?.GroupPanel?.ToggleAllowGroup();
+                InputPluginInstance.MinimapToggleRequested += () => HudInstance?.ToggleMinimap();
+                InputPluginInstance.EscapeRequested += () => HudInstance?.CloseTopDialog();
             }
 
             if (HudInstance != null)

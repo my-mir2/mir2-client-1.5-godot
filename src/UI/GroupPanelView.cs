@@ -184,6 +184,19 @@ public partial class GroupPanelView : Control, IManagedWindow
         Visible = !Visible;
     }
 
+    /// <summary>官方 1.5 快捷键 Ctrl+E 切换允许组队模式 (IDA sub_491104)</summary>
+    public void ToggleAllowGroup()
+    {
+        _groupModeEnabled = !_groupModeEnabled;
+        var btnAllowGroup = _panel?.GetNodeOrNull<TextureButton>("BtnAllowGroup");
+        if (btnAllowGroup != null)
+        {
+            var texCheckChecked = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0122.png");
+            btnAllowGroup.TextureNormal = _groupModeEnabled ? texCheckChecked : null;
+        }
+        EmitSignal(SignalName.GroupModeToggled, _groupModeEnabled);
+    }
+
     /// <summary>
     /// 盛大官方 1.5 组队成员绘制 (IDA sub_490DFC 绝对坐标实证):
     /// 1. 队长 (索引 0): (Left + 28, Top + 80), 银灰文字 0xC0C0C0;

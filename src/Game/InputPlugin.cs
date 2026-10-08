@@ -165,8 +165,8 @@ namespace Mir2Client.Game
                     {
                         switch (key.Keycode)
                         {
-                            case Key.X: EmitSignal(SignalName.LogoutRequested); break;
-                            case Key.Q: EmitSignal(SignalName.QuitRequested); break;
+                            case Key.X: EmitSignal(SignalName.QuitRequested); break;   // 官方 1.5 Alt+X: 退出游戏 (sub_461DEC @ 0x461244)
+                            case Key.Q: EmitSignal(SignalName.LogoutRequested); break; // 官方 1.5 Alt+Q: 小退换人 (sub_461DEC @ 0x461338)
                             case Key.W: EmitSignal(SignalName.GroupToggleRequested); break;
                         }
                     }
@@ -178,14 +178,6 @@ namespace Mir2Client.Game
                             case Key.H: EmitSignal(SignalName.PkModeToggleRequested); break;
                             case Key.E: EmitSignal(SignalName.GroupAllowToggleRequested); break;
                             case Key.B: EmitSignal(SignalName.BagToggleRequested); break;
-                        }
-                    }
-                    else if (key.ShiftPressed)
-                    {
-                        switch (key.Keycode)
-                        {
-                            case Key.X: EmitSignal(SignalName.QuitRequested); break;
-                            case Key.Q: EmitSignal(SignalName.LogoutRequested); break;
                         }
                     }
                     else
@@ -324,13 +316,13 @@ namespace Mir2Client.Game
             EmitSignal(SignalName.RunRequested, dir);
         }
 
-        public static int CalcDirection(Vector2 delta)
+        public static int CalcDirection(float dx, float dy)
         {
-            if (delta.Length() < 1.0f) return 0;
-            float angle = delta.Angle();
-            if (angle < 0) angle += Mathf.Tau;
+            if (dx * dx + dy * dy < 1.0f) return 0;
+            float angle = MathF.Atan2(dy, dx);
+            if (angle < 0) angle += MathF.PI * 2.0f;
 
-            int sector = (int)((angle + Mathf.Pi / 8.0f) / (Mathf.Pi / 4.0f)) % 8;
+            int sector = (int)((angle + MathF.PI / 8.0f) / (MathF.PI / 4.0f)) % 8;
             ReadOnlySpan<int> sectorToDir = stackalloc int[8]
             {
                 DirRight, DirDownRight, DirDown, DirDownLeft,
@@ -338,5 +330,7 @@ namespace Mir2Client.Game
             };
             return sectorToDir[sector];
         }
+
+        public static int CalcDirection(Vector2 delta) => CalcDirection(delta.X, delta.Y);
     }
 }

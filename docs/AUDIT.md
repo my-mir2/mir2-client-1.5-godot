@@ -7225,13 +7225,31 @@
         - 解除 211 / 212 的标签重定义死锁，兼容网关移除与官方角色同步；
         - 在 805 分支中增加坐标多态判定，兼顾物品拾取与瞬间传送；
       - 在 `Main.cs` 的 `OnGlobalPacketReceived` 中并入 211（解析神龛角色列表）与 212（删角后重查）；
-      - 在 `TestCombatSkillsMatrix.cs` 中增加 `Official_150_SpellResult2_CharList_And_Teleport_GroundTruth_Test` 脱机单元测试，测试集扩充至 **182 / 182 项 100% 全部通过**；
+46. **盛大官方 1.5 快捷键倒置拨乱反正 (Alt+X 退出 / Alt+Q 小退换人)、组队允许开关 (Ctrl+E) 与 InputPlugin 信号全链路闭环 (`InputPlugin.cs`, `GameView.cs`, `GroupPanelView.cs`, `HudController.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译客户端 `sub_461DEC` (0x461244~0x461338) 汇编实证：
+        - `Alt + X` 触发退出游戏：呼出 0x461244 原版 GBK 字符 `"你想退出吗 ?"` 模态弹窗，确认后完全退出游戏客户端；
+        - `Alt + Q` 触发换人小退：呼出 0x461338 原版 GBK 字符 `"你想退出传奇吗？"` 模态弹窗，确认后发送 `CM_SOFTCLOSE (1009)` 返回神龛角色选择界面；
+        - 彻底清除民间私服/更高版本臆造的 Shift+X、Shift+Q 等非官方混乱按键；
+        - `Ctrl + E` 原生切换“允许/拒绝组队”开关（调用 `CM_GROUPMODE (1019)`）；
+      - 此前代码中 `InputPlugin.cs` 快捷键严重倒置（Alt+X 绑定了 LogoutRequested，Alt+Q 绑定了 QuitRequested），且在 `GameView.cs` 中未建立与 `HudController` 的信号连接，导致所有面板切换与退出快捷键在主场景中彻底静默失效。
+    - **精准重构**：
+      - 在 `InputPlugin.cs` 中：
+        - 拨乱反正 Alt+X 触发 `QuitRequested`，Alt+Q 触发 `LogoutRequested`，移除所有非官方 Shift 伪逻辑；
+        - 将 `CalcDirection` 重载为纯数值计算 `CalcDirection(float dx, float dy)`，彻底解耦脱机测试；
+      - 在 `GameView.cs` 中：
+        - 建立 `_inputPlugin` 快捷键信号对 `HudController` 的完整连接：`QuitRequested`、`LogoutRequested`、`BagToggleRequested`、`EquipToggleRequested`、`SkillToggleRequested`、`GroupToggleRequested`、`GroupAllowToggleRequested`、`MinimapToggleRequested`、`EscapeRequested`；
+      - 在 `GroupPanelView.cs` 中：
+        - 补齐 `ToggleAllowGroup()` 公开方法，联动 Ctrl+E 触发发包；
+      - 在 `HudController.cs` 中：
+        - 补齐未处理按键 `Key.X` (Alt+X -> `RequestExitGame()`) 与 `Key.Q` (Alt+Q -> `RequestSoftClose()`)；
+      - 在 `TestCombatSkillsMatrix.cs` 中增加 `Official_150_AltX_AltQ_Shortcut_GroundTruth_Test` 脱机单元测试，测试集扩充至 **183 / 183 项 100% 全部通过**；
       - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **182 / 182 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **183 / 183 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

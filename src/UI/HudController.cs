@@ -2082,6 +2082,24 @@ public partial class HudController : CanvasLayer
                     }
                     break;
                 }
+                case Key.X: // 官方 1.5 Alt+X 退出游戏确认 (sub_461DEC @ 0x461244)
+                {
+                    if (keyEvent.AltPressed)
+                    {
+                        RequestExitGame();
+                        GetViewport().SetInputAsHandled();
+                    }
+                    break;
+                }
+                case Key.Q: // 官方 1.5 Alt+Q 小退换人确认 (sub_461DEC @ 0x461338)
+                {
+                    if (keyEvent.AltPressed)
+                    {
+                        RequestSoftClose();
+                        GetViewport().SetInputAsHandled();
+                    }
+                    break;
+                }
             }
         }
     }
