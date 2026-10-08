@@ -778,6 +778,9 @@ public sealed class ServerMessageRouter
                 }
                 SafeLog($"[SM] 实体 UID={packet.Recog} 受到击晕硬直 2000ms (SM_CHAR_STUN=1103)");
                 break;
+            case ProtocolConsts.SM_HEALTHBAR_COLOR_DELPHI: // 1104: 实体血条数值与变色 (IDA case 0x450u @ 0x469B70)
+                HandleHealthBarColor(packet);
+                break;
             case ProtocolConsts.SM_HEALTHBAR_DELPHI: // 1105: 浮动血条显隐切换 (IDA case 0x451)
                 _entityManager?.ToggleFloatingHealthBar(packet.Recog, packet.Param != 0);
                 break;
@@ -2206,6 +2209,21 @@ public sealed class ServerMessageRouter
         string notice = string.IsNullOrEmpty(pkt.ExtraStr) ? "您的游戏时间已到期，请充值后继续游戏。" : pkt.ExtraStr;
         _hud?.ShowModalMessage("计费通知", notice);
         _hud?.AddChat("系统", $"[系统] {notice}", new Color(1f, 0.3f, 0.3f));
+    }
+
+    private void HandleHealthBarColor(ServerPacket pkt)
+    {
+        int uid = pkt.Recog;
+        int hp = pkt.Param;
+        int maxHp = pkt.Tag > 0 ? pkt.Tag : 100;
+        int color = 0;
+        string extraStr = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(extraStr)) extraStr = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(extraStr) && int.TryParse(extraStr, out var c))
+        {
+            color = c;
+        }
+        _entityManager?.UpdateHealthBarColor(uid, hp, maxHp, color);
     }
 
     private static string DecodeExtraText(byte[]? extra)

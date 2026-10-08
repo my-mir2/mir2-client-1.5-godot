@@ -69,6 +69,7 @@ public class EntityManager
     public event Action<int, int>? EntityParamChanged;            // uid, actorParam (654)
     public event Action<int, int, int>? EntityEffectTriggered;    // uid, effectId, effectParam (657)
     public event Action<int, bool>? EntityHealthBarToggled;       // uid, visible (1105)
+    public event Action<int, int, int, int>? EntityHealthBarColorChanged; // uid, hp, maxHp, color (1104)
 
     private readonly Dictionary<int, EntityData> _entities = new();
 
@@ -410,6 +411,20 @@ public class EntityManager
         {
             ent.ShowHealthBar = visible;
             EntityHealthBarToggled?.Invoke(uid, visible);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体血条颜色与生命值变动 (SM_HEALTHBAR_COLOR_DELPHI 1104, IDA case 0x450u @ 0x469B70)
+    /// </summary>
+    public void UpdateHealthBarColor(int uid, int hp, int maxHp, int color)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            if (hp >= 0) ent.Hp = hp;
+            if (maxHp > 0) ent.MaxHp = maxHp;
+            if (color >= 0) ent.NameColor = color;
+            EntityHealthBarColorChanged?.Invoke(uid, ent.Hp, ent.MaxHp, ent.NameColor);
         }
     }
 }

@@ -230,6 +230,54 @@ public class TestCombatSkillsMatrix
         var paramPkt = new ServerPacket(ProtocolConsts.SM_ATTACKMODECHANGED, 0, 3, 0, Array.Empty<byte>());
         router.OnPacket(paramPkt);
     }
+
+    [Fact]
+    public void HealthBarColor_1104_GroundTruth_Test()
+    {
+        // 1. 常量断言：官方 1.5 实体血条颜色与生命值变动协议 (IDA case 0x450u @ 0x469B70)
+        Assert.Equal((short)1104, ProtocolConsts.SM_HEALTHBAR_COLOR_DELPHI);
+
+        var em = new EntityManager();
+        em.AddEntity(new EntityManager.EntityData
+        {
+            Uid = 2001,
+            Name = "白野猪",
+            Hp = 1000,
+            MaxHp = 1000,
+            NameColor = 0
+        });
+
+        int eventFiredCount = 0;
+        int lastHp = 0, lastMaxHp = 0, lastColor = 0;
+        em.EntityHealthBarColorChanged += (uid, hp, maxHp, color) =>
+        {
+            if (uid == 2001)
+            {
+                eventFiredCount++;
+                lastHp = hp;
+                lastMaxHp = maxHp;
+                lastColor = color;
+            }
+        };
+
+        // 2. 模拟路由接收 1104 封包 (recog=2001, param=650, tag=1000, extra="255")
+        var router = new ServerMessageRouter(null, em);
+        byte[] colorBytes = Encoding.UTF8.GetBytes("255");
+        var pkt = new ServerPacket(ProtocolConsts.SM_HEALTHBAR_COLOR_DELPHI, 2001, 650, 1000, colorBytes);
+        router.OnPacket(pkt);
+
+        // 3. 断言实体生命值与颜色数据联动生效
+        Assert.Equal(1, eventFiredCount);
+        Assert.Equal(650, lastHp);
+        Assert.Equal(1000, lastMaxHp);
+        Assert.Equal(255, lastColor);
+
+        var pig = em.GetEntity(2001);
+        Assert.NotNull(pig);
+        Assert.Equal(650, pig.Hp);
+        Assert.Equal(1000, pig.MaxHp);
+        Assert.Equal(255, pig.NameColor);
+    }
 }
 
 
