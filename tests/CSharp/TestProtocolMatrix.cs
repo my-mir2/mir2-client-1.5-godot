@@ -2321,6 +2321,35 @@ public class TestProtocolMatrix
     }
 
     [Fact]
+    public void TestOfficialGroundTruthSmCases_EntityNameColorGuildAndSysMsg()
+    {
+        var em = new EntityManager();
+        em.AddEntity(2001, "风云九哥", EntityManager.EntityType.Player, 330, 330);
+        var router = new ServerMessageRouter(null, em);
+
+        // 1. 实体名字颜色变动 (SM_CHANGENAMECOLOR 41)
+        byte[] rawColor = PacketEncoder.MakePacket(ProtocolConsts.SM_CHANGENAMECOLOR, 2001, 200, 0);
+        var parsedColor = PacketDecoder.Parse(rawColor.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_CHANGENAMECOLOR, parsedColor.Ident);
+        router.OnPacket(parsedColor);
+        Assert.Equal(200, em.GetEntity(2001)!.NameColor);
+
+        // 2. 实体行会与封号更新 (SM_GUILDNAME_DELPHI 42)
+        byte[] rawGuild = PacketEncoder.MakePacket(ProtocolConsts.SM_GUILDNAME_DELPHI, 2001, 0, 1, Encoding.UTF8.GetBytes("沙巴克/副会长"));
+        var parsedGuild = PacketDecoder.Parse(rawGuild.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_GUILDNAME_DELPHI, parsedGuild.Ident);
+        router.OnPacket(parsedGuild);
+        Assert.Equal("沙巴克", em.GetEntity(2001)!.GuildName);
+        Assert.Equal("副会长", em.GetEntity(2001)!.GuildRank);
+
+        // 3. 官方系统提示带音效广播 (SM_SYSMSG_DELPHI 100)
+        byte[] rawSysMsg = PacketEncoder.MakePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 106, 0, Encoding.UTF8.GetBytes("欢迎进入传奇世界"));
+        var parsedSysMsg = PacketDecoder.Parse(rawSysMsg.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_SYSMSG_DELPHI, parsedSysMsg.Ident);
+        router.OnPacket(parsedSysMsg);
+    }
+
+    [Fact]
     public void TestOfficialGroundTruthSmCases_ServerListTakeoffFailShopDetailAndLampDura()
     {
         // 1. 选服服务器列表 (SM_SERVERLIST 520)

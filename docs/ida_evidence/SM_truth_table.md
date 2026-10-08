@@ -30,24 +30,24 @@
 | 35 SM_LIGHTING | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 36 SM_DIGUP | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 37 SM_DIGDOWN | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 40 SM_GOLDCHANGED | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 41 SM_CHANGENAMECOLOR | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 42 SM_GUILDNAME_DELPHI | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 44 SM_LEVELUP | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 45 SM_EXPERIENCE | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 46 SM_CHANGELIGHT | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 50 SM_LOGON_DELPHI | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 52 SM_SENDUSERSTATE | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 53 SM_HEALTHSPELLCHANGED | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 54 SM_NPCDIALOG | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 100 SM_SYSMSG_DELPHI | NO | 定义 | 不在真值表（存疑/变体/错号） |
+| 40 SM_GOLDCHANGED | YES | 定义 | 在真值表 (IDA case '(' @ 0x46A140) |
+| 41 SM_CHANGENAMECOLOR | YES | 定义 | 在真值表 (IDA case ')' @ 0x46A157) |
+| 42 SM_GUILDNAME_DELPHI | YES | 定义 | 在真值表 (IDA case '*' @ 0x46A16F) |
+| 44 SM_LEVELUP | YES | 定义 | 在真值表 (IDA case ',' @ 0x46A18D) |
+| 45 SM_EXPERIENCE | YES | 定义 | 在真值表 (IDA case '-' @ 0x46A1B0) |
+| 46 SM_CHANGELIGHT | YES | 定义 | 在真值表 (IDA case '.' @ 0x46A1B8) |
+| 50 SM_LOGON_DELPHI | YES | 定义 | 在真值表 (IDA case 50 @ 0x46A1D0) |
+| 52 SM_SENDUSERSTATE | YES | 定义 | 在真值表 (IDA case '4' 52 @ 0x46A250) |
+| 53 SM_HEALTHSPELLCHANGED | YES | 定义 | 在真值表 (IDA case '5' 53 @ 0x46A275) |
+| 54 SM_NPCDIALOG | YES | 定义 | 在真值表 (IDA case '6' 54 @ 0x46A290) |
+| 100 SM_SYSMSG_DELPHI | YES | 定义 | 在真值表 (IDA 100~104 @ 0x46AF10) |
 | 114 SM_SERVERINDEX | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 120 SM_CHARLIST | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 200 SM_ADDITEM | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 201 SM_SENDUSERMAGIC | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 202 SM_DELITEM | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 203 SM_UPDATEUSERMAGIC | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 203 SM_ALLOWMOVE | NO | 定义 | 不在真值表（存疑/变体/错号） |
+| 200 SM_ADDITEM | YES | 定义 | 在真值表 (IDA case 200 @ 0x46A2B5) |
+| 201 SM_SENDUSERMAGIC | YES | 定义 | 在真值表 (IDA case 201 @ 0x46A2D0) |
+| 202 SM_DELITEM | YES | 定义 | 在真值表 (IDA case 202 @ 0x46A2F0) |
+| 203 SM_UPDATEUSERMAGIC | YES | 定义 | 在真值表 (IDA case 203 @ 0x46A310) |
+| 203 SM_ALLOWMOVE | YES | 定义 | 在真值表 (IDA case 203 @ 0x46A310) |
 | 204 SM_TURNDIRECTION | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 204 SM_TURNDIRECTION_DELPHI | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 211 SM_SENDMYMAGIC | NO | 定义 | 不在真值表（存疑/变体/错号） |

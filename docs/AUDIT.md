@@ -7016,10 +7016,23 @@
       - 在 `TestProtocolMatrix.cs` 扩充 `SM_BUILDGUILDFAIL` (-1~-3) 与 `SM_SPELLEFFECT_DELPHI` (614) 的单元测试断言与路由分发验证；
       - 在 `AutoEndToEndDriver.cs` 增加第 124 步实机验证，总演练步数扩充至 **125 步**。
 
+33. **盛大官方 1.5 实体名字变色 (41)、实体所属行会与封号更新 (42) 及带音效系统提示广播 (100) 全链路打通 (`scratch/ida_processmsg.c:1464-1478, 1520-1530`, `docs/ida_evidence/SM_truth_table.md`)**：
+    - **官方实证**：
+      - 彻底纠偏因 IDA 反编译器以 ASCII 字符输出 case 导致此前被误标记为“存疑/不在真值表”的下行协议号：
+        - `SM_CHANGENAMECOLOR (41)`: IDA ProcessServerMessage 0x467920 case ')' (0x29 = 41)，服务端下发实体 UID 与新名字颜色（红名/黄名/行会敌对蓝名变色）；
+        - `SM_GUILDNAME_DELPHI (42)`: IDA ProcessServerMessage 0x467920 case '*' (0x2A = 42)，服务端广播实体 UID、所属行会名与封号（通过 Delphi 字符串读取并设置到实体行会属性，支持 `/` 与 `\` 分隔符）；
+        - `SM_SYSMSG_DELPHI (100)`: IDA ProcessServerMessage 0x467920 100~104 范围分支，服务端广播全服系统提示并指定音效 ID（`play_sound` 播放指定音效并在聊天区显示）。
+    - **精准重构**：
+      - 在 `EntityManager.cs` 中给 `EntityData` 扩充 `GuildName`、`GuildRank`、`NameColor` 字段，并提供 `UpdateGuild` 与 `UpdateNameColor` 方法及对应变更通知事件；
+      - 在 `ServerMessageRouter.cs` switch 分发中接入 `SM_CHANGENAMECOLOR (41)`、`SM_GUILDNAME_DELPHI (42)`、`SM_SYSMSG_DELPHI (100)` 三大权威路由分支，并实现 `HandleChangeNameColor`、`HandleChangeEntityGuildName` 与 `HandleSysMsgDelphi`；
+      - 在 `docs/ida_evidence/SM_truth_table.md` 中修正 40~54、100、200~203 等 ASCII case 的物理真值判定状态为 YES；
+      - 在 `TestProtocolMatrix.cs` 增加 `TestOfficialGroundTruthSmCases_EntityNameColorGuildAndSysMsg` 单元测试，脱机测试覆盖扩充至 **171 / 171 项**；
+      - 在 `AutoEndToEndDriver.cs` 第 124 步实机验证中注入 41、42、100 号协议，端到端生命周期保持 **125 / 125 阶段 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **170 / 170 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **171 / 171 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **125 / 125 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

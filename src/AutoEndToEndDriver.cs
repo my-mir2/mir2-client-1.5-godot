@@ -2167,6 +2167,15 @@ public partial class AutoEndToEndDriver : Node
 
                         // 4. 模拟收到官方 1.5 创建编组失败 Recog = -4 (对方不允许编组 0x46BA28)
                         router.OnPacket(new ServerPacket(ProtocolConsts.SM_CREATEGROUP_FAIL, -4, 0, 0, Array.Empty<byte>()));
+
+                        // 5. 模拟收到官方 1.5 实体名字变色 (SM_CHANGENAMECOLOR 41)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_CHANGENAMECOLOR, 9002, 200, 0, Array.Empty<byte>()));
+
+                        // 6. 模拟收到官方 1.5 实体所属行会与封号更新 (SM_GUILDNAME_DELPHI 42)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_GUILDNAME_DELPHI, 9002, 0, 1, System.Text.Encoding.UTF8.GetBytes("沙巴克/副会长")));
+
+                        // 7. 模拟收到官方 1.5 系统提示与带音效广播 (SM_SYSMSG_DELPHI 100)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 106, 0, System.Text.Encoding.UTF8.GetBytes("盛大官方 1.5 行会战已正式打响！")));
                     }
                 }
                 RequestCapture("step124_guild_group_truth_modals");

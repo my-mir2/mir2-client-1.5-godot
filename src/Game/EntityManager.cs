@@ -43,6 +43,9 @@ public class EntityManager
         public int MasterUid { get; set; } = 0;  // 随从主人 UID
         public int PetLevel { get; set; } = 0;   // 随从等级 (0~7)
         public int PkPoint { get; set; } = 0;    // PK 善恶点数 (>=200 为红名)
+        public string GuildName { get; set; } = string.Empty; // 盛大官方 1.5 实体所属行会名 (SM_GUILDNAME_DELPHI 42)
+        public string GuildRank { get; set; } = string.Empty; // 实体行会封号/职位
+        public int NameColor { get; set; } = 0;  // 名字颜色值 (SM_CHANGENAMECOLOR 41)
     }
 
     public event Action<EntityData>? EntityAdded;
@@ -55,6 +58,8 @@ public class EntityManager
     public event Action<int>? EntityDied;
     public event Action<int, int>? EntityPoisonChanged; // uid, poisonMask
     public event Action<int, int>? EntityPkChanged;     // uid, pkPoint
+    public event Action<int, string, string>? EntityGuildChanged; // uid, guildName, guildRank
+    public event Action<int, int>? EntityNameColorChanged;         // uid, color
 
     private readonly Dictionary<int, EntityData> _entities = new();
 
@@ -301,6 +306,31 @@ public class EntityManager
         {
             ent.PkPoint = pkPoint;
             EntityPkChanged?.Invoke(uid, pkPoint);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 更新实体所属行会与封号 (SM_GUILDNAME_DELPHI 42, IDA case 42 @ 0x46A16F)
+    /// </summary>
+    public void UpdateGuild(int uid, string guildName, string rank)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.GuildName = guildName ?? string.Empty;
+            ent.GuildRank = rank ?? string.Empty;
+            EntityGuildChanged?.Invoke(uid, ent.GuildName, ent.GuildRank);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 更新实体名字颜色 (SM_CHANGENAMECOLOR 41, IDA case 41 @ 0x46A157)
+    /// </summary>
+    public void UpdateNameColor(int uid, int color)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.NameColor = color;
+            EntityNameColorChanged?.Invoke(uid, color);
         }
     }
 }

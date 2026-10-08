@@ -144,6 +144,15 @@ public sealed class ServerMessageRouter
             case SM_CHANGELIGHT:
                 HandleChangeLight(packet);
                 break;
+            case ProtocolConsts.SM_CHANGENAMECOLOR: // 41: 官方 1.5 实体名字颜色变动 (IDA case ')' @ 0x46A157)
+                HandleChangeNameColor(packet);
+                break;
+            case ProtocolConsts.SM_GUILDNAME_DELPHI: // 42: 官方 1.5 实体所属行会与封号变动 (IDA case '*' @ 0x46A16F)
+                HandleChangeEntityGuildName(packet);
+                break;
+            case ProtocolConsts.SM_SYSMSG_DELPHI: // 100: 官方 1.5 系统提示与带音效广播 (IDA 0x467920 100~104 @ 0x46AF10)
+                HandleSysMsgDelphi(packet);
+                break;
             case SM_LOGICSTATE:
                 HandleLogicState(packet);
                 break;
@@ -1553,6 +1562,65 @@ public sealed class ServerMessageRouter
         if (_hud?.GuildPanel != null && !string.IsNullOrEmpty(text))
             _hud.GuildPanel.SetGuildName(text);
         _hud?.AddChat("行会", string.IsNullOrEmpty(text) ? "[行会] 你已没有行会。" : $"[行会] 所在行会：{text}", new Color(0.6f, 0.85f, 1f));
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体名字颜色变动广播 (SM_CHANGENAMECOLOR 41, IDA case ')' @ 0x46A157)
+    /// </summary>
+    private void HandleChangeNameColor(ServerPacket pkt)
+    {
+        int uid = pkt.Recog;
+        int color = pkt.Param;
+        _entityManager?.UpdateNameColor(uid, color);
+        SafeLog($"[SM] 实体 UID={uid} 名字颜色变更为 {color} (SM_CHANGENAMECOLOR 41)");
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体所属行会与封号变动广播 (SM_GUILDNAME_DELPHI 42, IDA case '*' @ 0x46A16F)
+    /// </summary>
+    private void HandleChangeEntityGuildName(ServerPacket pkt)
+    {
+        int uid = pkt.Recog;
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        string guildName = text ?? string.Empty;
+        string rank = string.Empty;
+        if (!string.IsNullOrEmpty(text))
+        {
+            // 官方 Delphi 分隔符支持 '/' 与 '\'
+            int sep = text.IndexOfAny(new[] { '/', '\\' });
+            if (sep >= 0)
+            {
+                guildName = text.Substring(0, sep).Trim();
+                rank = text.Substring(sep + 1).Trim();
+            }
+        }
+
+        _entityManager?.UpdateGuild(uid, guildName, rank);
+
+        if (!string.IsNullOrEmpty(guildName))
+        {
+            _hud?.AddChat("行会", $"[行会] 实体(ID:{uid}) 所属行会已更新：{guildName} {rank}".Trim(), new Color(0.6f, 0.9f, 0.7f));
+        }
+        SafeLog($"[SM] 实体 UID={uid} 行会更新 guild={guildName} rank={rank} (SM_GUILDNAME_DELPHI 42)");
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 系统提示与带音效广播 (SM_SYSMSG_DELPHI 100~104, IDA 0x467920 100~104 @ 0x46AF10)
+    /// </summary>
+    private void HandleSysMsgDelphi(ServerPacket pkt)
+    {
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (pkt.Param > 0)
+        {
+            AudioManager.Instance?.PlaySoundId(pkt.Param);
+        }
+        if (!string.IsNullOrEmpty(text))
+        {
+            _hud?.AddChat("系统", $"[系统] {text}", new Color(1f, 0.9f, 0.4f));
+        }
+        SafeLog($"[SM] 官方系统提示: {text} sound={pkt.Param} (SM_SYSMSG_DELPHI 100)");
     }
 
     // 破土/潜地（36/37）：recog=实体，param/tag=坐标。
