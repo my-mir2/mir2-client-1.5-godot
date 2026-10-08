@@ -1877,7 +1877,77 @@ public partial class AutoEndToEndDriver : Node
 
             case 117:
             {
-                GD.Print("[AutoE2E] ALL 117 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 升级、饥饿度、小地图、掉落物消失与行会失败模态 (SM 653/657/708/710/805/758/760/761/769/771) ===");
+                    // 1. 模拟角色升级协议 (SM_LEVELUP_DELPHI 653, level=40)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_LEVELUP_DELPHI,
+                        40, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 2. 模拟角色饥饿度/体态变动 (SM_MYSTATUS 708, hunger=85)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_MYSTATUS,
+                        85, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 3. 模拟小地图雷达校准 (SM_READMINIMAP_OK 710)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_READMINIMAP_OK,
+                        1, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 4. 模拟实体增益/减益状态同步 (SM_CHARSTATUSCHANGED 657)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_CHARSTATUSCHANGED,
+                        1001, 10, 0, Array.Empty<byte>()
+                    ));
+
+                    // 5. 模拟地表掉落物拾取/消失 (SM_ITEMHIDE 805)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_ITEMHIDE,
+                        9999, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 6. 模拟加入行会失败模态 (SM_GUILDJOINFAIL 758, recog=2 对方已入其他行会)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_GUILDJOINFAIL,
+                        2, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 7. 模拟行会踢人失败模态 (SM_GUILDDELMEMBERFAIL 760, recog=3 不能开除掌门人)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_GUILDDELMEMBERFAIL,
+                        3, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 8. 模拟行会更改封号失败 (SM_GUILDRANKUPDATEFAIL 761, recog=-2 封号长度不符)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_GUILDRANKUPDATEFAIL,
+                        -2, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 9. 模拟行会结盟失败 (SM_GUILDMAKEALLYFAIL 769, recog=-2 对方拒绝结盟)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_GUILDMAKEALLYFAIL,
+                        -2, 0, 0, Array.Empty<byte>()
+                    ));
+
+                    // 10. 模拟行会解盟失败 (SM_GUILDBREAKALLYFAIL 771, recog=-2 该行会不是同盟行会)
+                    gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
+                        Mir2Client.Net.ProtocolConsts.SM_GUILDBREAKALLYFAIL,
+                        -2, 0, 0, Array.Empty<byte>()
+                    ));
+                }
+                RequestCapture("step117_levelup_hunger_minimap_guild_fail_modal");
+                break;
+            }
+
+            case 118:
+            {
+                GD.Print("[AutoE2E] ALL 118 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

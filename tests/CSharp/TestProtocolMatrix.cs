@@ -2227,6 +2227,75 @@ public class TestProtocolMatrix
         var parsedDismiss = PacketDecoder.Parse(rawDismiss.AsSpan(1))!.Value;
         Assert.Equal(ProtocolConsts.SM_DISMISS_GROUP, parsedDismiss.Ident);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthSmCases_LevelUpHungerMinimapAndGuildFail()
+    {
+        // 1. 官方 1.5 角色升级协议 (SM_LEVELUP_DELPHI 653)
+        byte[] rawLevelUp = PacketEncoder.MakePacket(ProtocolConsts.SM_LEVELUP_DELPHI, 35, 0, 0);
+        var parsedLevelUp = PacketDecoder.Parse(rawLevelUp.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_LEVELUP_DELPHI, parsedLevelUp.Ident);
+        Assert.Equal(35, parsedLevelUp.Recog);
+
+        // 2. 官方 1.5 角色饥饿度/体态变动 (SM_MYSTATUS 708)
+        byte[] rawStatus = PacketEncoder.MakePacket(ProtocolConsts.SM_MYSTATUS, 100, 0, 0);
+        var parsedStatus = PacketDecoder.Parse(rawStatus.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_MYSTATUS, parsedStatus.Ident);
+        Assert.Equal(100, parsedStatus.Recog);
+
+        // 3. 官方 1.5 小地图读取与雷达刷新 (SM_READMINIMAP_OK 710)
+        byte[] rawMinimap = PacketEncoder.MakePacket(ProtocolConsts.SM_READMINIMAP_OK, 1, 0, 0);
+        var parsedMinimap = PacketDecoder.Parse(rawMinimap.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_READMINIMAP_OK, parsedMinimap.Ident);
+
+        // 4. 官方 1.5 实体状态位图与攻速同步 (SM_CHARSTATUSCHANGED 657)
+        byte[] rawCharStatus = PacketEncoder.MakePacket(ProtocolConsts.SM_CHARSTATUSCHANGED, 1001, 10, 0);
+        var parsedCharStatus = PacketDecoder.Parse(rawCharStatus.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_CHARSTATUSCHANGED, parsedCharStatus.Ident);
+        Assert.Equal(1001, parsedCharStatus.Recog);
+
+        // 5. 官方 1.5 地面物品消失/拾取 (SM_ITEMHIDE 805)
+        byte[] rawItemHide = PacketEncoder.MakePacket(ProtocolConsts.SM_ITEMHIDE, 501, 0, 0);
+        var parsedItemHide = PacketDecoder.Parse(rawItemHide.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.SM_ITEMHIDE, parsedItemHide.Ident);
+        Assert.Equal(501, parsedItemHide.Recog);
+
+        // 6. 官方 1.5 入会申请失败 (SM_GUILDJOINFAIL 758, Recog = 1 ~ 5)
+        for (int err = 1; err <= 5; err++)
+        {
+            byte[] rawJoinFail = PacketEncoder.MakePacket(ProtocolConsts.SM_GUILDJOINFAIL, err, 0, 0);
+            var parsedJoinFail = PacketDecoder.Parse(rawJoinFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_GUILDJOINFAIL, parsedJoinFail.Ident);
+            Assert.Equal(err, parsedJoinFail.Recog);
+        }
+
+        // 7. 官方 1.5 更改封号失败 (SM_GUILDRANKUPDATEFAIL 761, Recog = -2 ~ -7)
+        for (int err = -2; err >= -7; err--)
+        {
+            byte[] rawRankFail = PacketEncoder.MakePacket(ProtocolConsts.SM_GUILDRANKUPDATEFAIL, err, 0, 0);
+            var parsedRankFail = PacketDecoder.Parse(rawRankFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_GUILDRANKUPDATEFAIL, parsedRankFail.Ident);
+            Assert.Equal(err, parsedRankFail.Recog);
+        }
+
+        // 8. 官方 1.5 结盟申请失败 (SM_GUILDMAKEALLYFAIL 769 / 768, Recog = -1 ~ -4)
+        for (int err = -1; err >= -4; err--)
+        {
+            byte[] rawAllyFail = PacketEncoder.MakePacket(ProtocolConsts.SM_GUILDMAKEALLYFAIL, err, 0, 0);
+            var parsedAllyFail = PacketDecoder.Parse(rawAllyFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_GUILDMAKEALLYFAIL, parsedAllyFail.Ident);
+            Assert.Equal(err, parsedAllyFail.Recog);
+        }
+
+        // 9. 官方 1.5 解除结盟失败 (SM_GUILDBREAKALLYFAIL 771 / 770, Recog = -1 ~ -3)
+        for (int err = -1; err >= -3; err--)
+        {
+            byte[] rawBreakFail = PacketEncoder.MakePacket(ProtocolConsts.SM_GUILDBREAKALLYFAIL, err, 0, 0);
+            var parsedBreakFail = PacketDecoder.Parse(rawBreakFail.AsSpan(1))!.Value;
+            Assert.Equal(ProtocolConsts.SM_GUILDBREAKALLYFAIL, parsedBreakFail.Ident);
+            Assert.Equal(err, parsedBreakFail.Recog);
+        }
+    }
 }
 
 

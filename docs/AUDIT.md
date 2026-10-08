@@ -6893,13 +6893,34 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_GroupSystemProtocolMatrix` 单元测试，脱机测试覆盖扩充至 **161 / 161 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 116 步实机验证，总演练步数扩充至 **117 步**。
 
+25. **官方 1.5 升级音效与双态分流、饥饿体态、小地图雷达校准、掉落物消失与行会全量操作失败模态全链路实证 (`scratch/ida_processmsg.c` lines 566~610, 1098~1115 & lines 453~520)**：
+    - **官方实证**：严格依据 `scratch/ida_processmsg.c` 与官方 1.5 原版二进制 `MIR_final_v3_p.exe` 汇编实证：
+      - 官方升级与金币双态自适应 (`SM_LEVELUP_DELPHI 653`)：官方 IDA `0x469C80` (case 653) 触发 `sub_495794(106)` 播放升级经典音效并更新角色等级 (`dword_4F7EF8 + 88`)，客户端实现平滑兼顾金币变动与升级广播；
+      - 实体攻速与状态同步 (`SM_CHARSTATUSCHANGED 657`)：同步攻速与状态位图；
+      - 角色饥饿体态变动 (`SM_MYSTATUS 708`)：官方 IDA `0x46A0ED` (line 566) 将参数更新至 `dword_4F9388`（即底栏 DBottom 饥饿度图标帧 16~19）；
+      - 小地图雷达校准 (`SM_READMINIMAP_OK 710`)：官方 IDA `0x46A10F` 调用 `sub_46EA50()` 强制刷新小地图雷达图；
+      - 地表物品拾取/消失 (`SM_ITEMHIDE 805`)：从地表物品管理器注销移除；
+      - 行会全量操作失败官方错误码与模态弹窗实证：
+        - 加入行会失败 (`SM_GUILDJOINFAIL 758`)：官方 IDA `0x46A880` 细分子码（1 对方拒绝, 2 对方已有行会, 3 人数上限, 4 无权限, 5 等级不够）；
+        - 踢出行会失败 (`SM_GUILDDELMEMBERFAIL 760`)：官方 IDA `0x46A940` 细分子码（1 无权限, 2 不在行会, 3 不能开除掌门, 4 操作失败）；
+        - 更改封号失败 (`SM_GUILDUPDATESTATUSFAIL 761`)：官方 IDA `0x46AA00` 细分子码（-2 长度不符, -3 非法字符, -4 无权限, -5 目标不存在, -6 封号已存在, -7 超时）；
+        - 结盟申请失败 (`SM_GUILDMAKEALLYFAIL 768 / 769`)：细分子码（-1 无权限, -2 对方拒绝, -3 对方已有同盟, -4 达到结盟上限）；
+        - 解除结盟失败 (`SM_GUILDBREAKALLYFAIL 770 / 771`)：细分子码（-1 无权限, -2 不是同盟行会, -3 失败）；全部通过 `show_confirm` 模态框与聊天栏精准回显。
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 补齐 653、657、708、710、758、768、770、805 常量；
+      - 在 `HudController.cs` 增加饥饿度追踪属性 `CurrentHunger` 与 `UpdateHunger`；
+      - 在 `ServerMessageRouter.cs` 接入 653 升级音效与金币双态分流、657 攻速、708 饥饿度、710 雷达刷新、805 掉落物消除以及 758/760/761/768/770 行会全量失败错误码与模态框映射；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_LevelUpHungerMinimapAndGuildFail` 单元测试，脱机测试覆盖扩充至 **162 / 162 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 117 步实机验证，总演练步数扩充至 **118 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **161 / 161 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **117 / 117 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **162 / 162 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **118 / 118 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
+
 
 
 

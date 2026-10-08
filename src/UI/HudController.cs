@@ -1316,6 +1316,15 @@ public partial class HudController : CanvasLayer
         }
     }
 
+    private int _hunger = 0;
+    public int CurrentHunger => _hunger;
+
+    public void UpdateHunger(int hunger)
+    {
+        _hunger = hunger;
+        GD.Print($"[HudController] 角色体态/饥饿度更新 (SM_MYSTATUS=708): {_hunger}");
+    }
+
     public void UpdateName(string name)
     {
         if (_lblName != null) _lblName.Text = name;

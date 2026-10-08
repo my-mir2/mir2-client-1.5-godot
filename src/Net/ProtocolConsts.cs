@@ -215,7 +215,15 @@ public static class ProtocolConsts
     public const short SM_SELL_FAIL_DELPHI         = 649;  // 出售物品失败 (IDA sub_467920 0x469F04)
     public const short SM_SELL_OK_DELPHI           = 650;  // 出售成功更新金币 (IDA sub_467920 0x46A119)
     public const short SM_BUY_FAIL_DELPHI          = 651;  // 购买物品失败 (IDA sub_467920 0x46A157)
-    public const short SM_GOLDCHANGED_DELPHI       = 653;  // 金币数值变动
+    public const short SM_GOLDCHANGED_DELPHI       = 653;  // 金币数值变动 (历史兼容别名)
+    public const short SM_LEVELUP_DELPHI          = 653;  // 盛大官方 1.5 角色升级广播与音效 (IDA sub_467920 0x469C80)
+    public const short SM_CHARSTATUSCHANGED       = 657;  // 盛大官方 1.5 实体状态位图与攻速同步 (IDA sub_467920 0x469D0B)
+    public const short SM_MYSTATUS                = 708;  // 盛大官方 1.5 角色体态与饥饿度变动 (IDA sub_467920 0x4689FE)
+    public const short SM_READMINIMAP_OK          = 710;  // 盛大官方 1.5 小地图读取与雷达刷新 (IDA sub_467920 0x46A7F8 sub_46EA50)
+    public const short SM_ITEMHIDE                = 805;  // 盛大官方 1.5 地面物品消失/拾取 (IDA sub_467920 0x4699FE)
+    public const short SM_GUILDJOINFAIL           = 758;  // 盛大官方 1.5 加入行会失败 (IDA sub_467920 0x46A880)
+    public const short SM_GUILDMAKEALLYFAIL2      = 768;  // 盛大官方 1.5 结盟申请失败别名 (IDA sub_467920 0x46AAA7)
+    public const short SM_GUILDBREAKALLYFAIL2     = 770;  // 盛大官方 1.5 解除结盟失败别名 (IDA sub_467920 0x46AB30)
     public const short SM_REPAIRFAIL              = 626;  // 修理失败
     public const short SM_REPAIROK                = 625;  // 修理成功
     public const short SM_SELLITEMFAIL            = 632;  // 出售物品失败

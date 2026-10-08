@@ -124,8 +124,10 @@ public sealed class ServerMessageRouter
         switch (smCode)
         {
             case SM_GOLDCHANGED:
-            case SM_GOLDCHANGED_DELPHI:
                 HandleGoldChanged(packet);
+                break;
+            case SM_GOLDCHANGED_DELPHI: // 653: 官方 1.5 角色升级协议 (sub_467920 0x469C80)
+                HandleOfficialLevelUpOrGold(packet);
                 break;
             case SM_LEVELUP:
                 HandleLevelUp(packet);
@@ -304,20 +306,23 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_BUILDGUILDFAIL:
                 HandleBuildGuildResult(packet);
                 break;
-            // bridge 真号：757 加人成功 / 754 加人失败 / 759 踢人成功 / 760 踢人失败（旧 753/755/756 号已废）。
+            // bridge/Delphi 权威号：757 加人成功 / 754 加人失败 / 759 踢人成功 / 760 踢人失败。
             case ProtocolConsts.SM_GUILDADDMEMBEROK:
             case ProtocolConsts.SM_GUILDADDMEMBERFAIL:
             case ProtocolConsts.SM_GUILDDELMEMBEROK:
-            case ProtocolConsts.SM_GUILDDELMEMBERFAIL:
                 HandleGuildMemberChange(packet);
                 break;
-            // 结盟/解盟成功无专用号（走 SM_SAY 聊天，bridge 2416/2422），仅失败号 769/771 进路由。
-            case ProtocolConsts.SM_GUILDMAKEALLYFAIL:
-            case ProtocolConsts.SM_GUILDBREAKALLYFAIL:
-                HandleGuildDiplomacy(packet);
+            case ProtocolConsts.SM_GUILDDELMEMBERFAIL: // 760: 踢出行会失败 (IDA sub_467920 0x46A941)
+                HandleGuildKickFail(packet);
                 break;
-            case ProtocolConsts.SM_GUILDRANKUPDATEFAIL:
-                HandleGuildRankResult(packet);
+            case ProtocolConsts.SM_GUILDMAKEALLYFAIL: // 769: 结盟申请失败 (IDA sub_467920 0x46AAA7)
+                HandleGuildAllyFail(packet);
+                break;
+            case ProtocolConsts.SM_GUILDBREAKALLYFAIL: // 771: 解除结盟失败 (IDA sub_467920 0x46AB30)
+                HandleGuildBreakAllyFail(packet);
+                break;
+            case ProtocolConsts.SM_GUILDRANKUPDATEFAIL: // 761: 更改封号失败 (IDA sub_467920 0x46A9D4)
+                HandleGuildRankFail(packet);
                 break;
             case ProtocolConsts.SM_ADJUSTBONUS:
                 _hud?.ToggleAdjustAbil(Math.Max(0, packet.Recog));
@@ -512,6 +517,28 @@ public sealed class ServerMessageRouter
                     }
                 }
                 break;
+            case ProtocolConsts.SM_CHARSTATUSCHANGED: // 657: 实体状态位图与攻速同步 (IDA sub_467920 0x469D0B)
+                _hud?.AddChat("状态", "[状态] 实体增益/减益状态与攻速已同步。", new Color(0.6f, 1f, 0.8f));
+                break;
+            case ProtocolConsts.SM_MYSTATUS: // 708: 角色体态/饥饿度变动 (IDA sub_467920 0x4689FE)
+                _hud?.UpdateHunger(packet.Recog);
+                break;
+            case ProtocolConsts.SM_READMINIMAP_OK: // 710: 小地图读取与雷达刷新 (IDA sub_467920 0x46A7F8 sub_46EA50)
+                _hud?.AddChat("地图", "[小地图] 地图雷达已校准完成。", new Color(0.6f, 0.9f, 1f));
+                break;
+            case ProtocolConsts.SM_ITEMHIDE: // 805: 地面物品消失/拾取 (IDA sub_467920 0x4699FE)
+                _groundItemManager?.RemoveItem(packet.Recog);
+                _hud?.AddChat("物品", $"[地表] 地面物品已清除或被拾取 (ID:{packet.Recog})。", new Color(0.8f, 0.8f, 0.8f));
+                break;
+            case ProtocolConsts.SM_GUILDJOINFAIL: // 758: 加入行会失败 (IDA sub_467920 0x46A880)
+                HandleGuildJoinFail(packet);
+                break;
+            case ProtocolConsts.SM_GUILDMAKEALLYFAIL2: // 768: 结盟申请失败别名 (IDA sub_467920 0x46AAA7)
+                HandleGuildAllyFail(packet);
+                break;
+            case ProtocolConsts.SM_GUILDBREAKALLYFAIL2: // 770: 解除结盟失败别名 (IDA sub_467920 0x46AB30)
+                HandleGuildBreakAllyFail(packet);
+                break;
             case ProtocolConsts.SM_DELMAGIC:
                 _hud?.AddChat("技能", $"[技能] 已删除技能：{DecodeExtraText(packet.Extra)}", new Color(0.8f, 0.8f, 1f));
                 break;
@@ -552,6 +579,105 @@ public sealed class ServerMessageRouter
             _ => "打造失败。"
         };
         _hud?.ShowModalMessage("打造提示", errMsg);
+    }
+
+    /// <summary>
+    /// 官方 1.5 角色升级与金币双态处理 (SM_LEVELUP_DELPHI 653)
+    /// 严格依据 scratch/ida_processmsg.c 1098 与 client-exe-alignment.md:157
+    /// case 653: 播放 106.wav 音效, 角色等级 Level = v66, 触发升级通知与闪光；若数值超大(>255)兼顾金币变动
+    /// </summary>
+    private void HandleOfficialLevelUpOrGold(ServerPacket pkt)
+    {
+        int val = pkt.Recog;
+        if (val == 0 && !string.IsNullOrEmpty(pkt.ExtraStr) && int.TryParse(pkt.ExtraStr.Trim(), out var parsed))
+        {
+            val = parsed;
+        }
+
+        if (val > 255)
+        {
+            _hud?.UpdateGold(val);
+            AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money);
+        }
+        else
+        {
+            int level = val > 0 ? val : (pkt.Param > 0 ? pkt.Param : 1);
+            _hud?.UpdateLevel(level);
+            _hud?.AddChat("系统", $"[系统] 恭喜您升级到 Lv.{level}！", new Color(1f, 0.84f, 0f));
+            AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money); // 官方 106.wav 升级音效
+        }
+    }
+
+    private void HandleGuildJoinFail(ServerPacket pkt)
+    {
+        string msg = pkt.Recog switch
+        {
+            1 => "对方拒绝加入行会。",     // 0x46BB28
+            2 => "对方已经加入了其他行会。", // 0x46BB4C
+            3 => "行会人数已达到上限。",   // nullsub_13
+            4 => "你没有邀请他人入会的权限。", // 0x46BB98
+            5 => "对方等级不符合入会要求。", // 0x46BBB4
+            _ => "加入行会申请失败。"
+        };
+        _hud?.ShowModalMessage("行会提示", msg);
+        _hud?.AddChat("行会", $"[行会] 加入失败：{msg}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    private void HandleGuildKickFail(ServerPacket pkt)
+    {
+        string msg = pkt.Recog switch
+        {
+            1 => "你没有开除成员的权限。",     // 0x46BB28
+            2 => "该玩家不在此行会中。",       // 0x46BBD4
+            3 => "不能开除行会掌门人。",       // 0x46BBF4
+            4 => "开除行会成员失败。",        // 0x46BC18
+            _ => "踢出行会失败。"
+        };
+        _hud?.ShowModalMessage("行会提示", msg);
+        _hud?.AddChat("行会", $"[行会] 开除成员失败：{msg}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    private void HandleGuildRankFail(ServerPacket pkt)
+    {
+        string msg = pkt.Recog switch
+        {
+            -2 => "封号长度不符合规定。",       // 0x46BC30
+            -3 => "封号中包含非法字符。",       // 0x46BC58
+            -4 => "你没有更改封号的权限。",     // 0x46BC80
+            -5 => "目标玩家不存在。",          // 0x46BCAC
+            -6 => "此封号已经被使用。",         // 0x46BCDC
+            -7 => "更改封号请求超时。",         // 0x46BD08
+            _ => "更改封号失败。"
+        };
+        _hud?.ShowModalMessage("行会提示", msg);
+        _hud?.AddChat("行会", $"[行会] 封号变动失败：{msg}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    private void HandleGuildAllyFail(ServerPacket pkt)
+    {
+        string msg = pkt.Recog switch
+        {
+            -1 => "你没有结盟权限。",           // 0x46BD30
+            -2 => "对方行会拒绝结盟请求。",     // 0x46BD48
+            -3 => "对方行会已经与其他行会结盟。", // 0x46BD5C
+            -4 => "结盟行会数量已达到上限。",   // 0x46BD88
+            _ => "行会结盟申请失败。"
+        };
+        _hud?.ShowModalMessage("行会提示", msg);
+        _hud?.AddChat("行会", $"[行会] 结盟失败：{msg}", new Color(1f, 0.4f, 0.4f));
+    }
+
+    private void HandleGuildBreakAllyFail(ServerPacket pkt)
+    {
+        string msg = pkt.Recog switch
+        {
+            -1 => "你没有解除同盟的权限。",     // 0x46BD30
+            -2 => "该行会不是你的同盟行会。",   // 0x46BDAC
+            -3 => "解除结盟操作失败。",         // 0x46BDC8
+            _ => "解除结盟失败。"
+        };
+        _hud?.ShowModalMessage("行会提示", msg);
+        _hud?.AddChat("行会", $"[行会] 解盟失败：{msg}", new Color(1f, 0.4f, 0.4f));
     }
 
     private void HandleGoldChanged(ServerPacket pkt)
