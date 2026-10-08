@@ -295,6 +295,7 @@ public partial class Main : Node
                 break;
             }
             case ProtocolConsts.SM_QUERYCHR: // 518
+            case ProtocolConsts.SM_CHARLIST_DELPHI: // 211: 盛大官方 1.5 原版角色列表下发 (IDA case 0xD3u @ 0x469AE0 handle_sm_char_list)
             case 120: // SM_CHARLIST (官方 1.5 桥接网关下发角色列表)
             {
                 var parsed = PacketDecoder.Parse(data);
@@ -331,6 +332,7 @@ public partial class Main : Node
             }
             case ProtocolConsts.SM_NEWCHR_SUCCESS: // 121
             case ProtocolConsts.SM_DELCHR_SUCCESS: // 123
+            case ProtocolConsts.SM_DELCHAR_DELPHI: // 212: 盛大官方 1.5 原版删角成功 (IDA case 0xD4u @ 0x469B00 handle_sm_char_list_del)
             case ProtocolConsts.SM_DELCHAR_SUCCESS_DELPHI: // 523: 盛大官方 1.5 删角成功重新查询
             {
                 GD.Print($"[Main] 角色创建/删除成功，重新向网关查询角色列表 (SM_{smCode})");

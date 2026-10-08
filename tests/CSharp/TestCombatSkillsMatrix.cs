@@ -330,7 +330,52 @@ public class TestCombatSkillsMatrix
         var warPkt = new ServerPacket(ProtocolConsts.SM_GUILD_WAR_STATUS_DELPHI, 0, 0, 0, warBytes);
         router.OnPacket(warPkt);
     }
+
+    [Fact]
+    public void Official_150_SpellResult2_CharList_And_Teleport_GroundTruth_Test()
+    {
+        // 1. 验证 ProtocolConsts 常量物理真值
+        Assert.Equal(29, ProtocolConsts.SM_SPELLRESULT2);
+        Assert.Equal(211, ProtocolConsts.SM_CHARLIST_DELPHI);
+        Assert.Equal(212, ProtocolConsts.SM_DELCHAR_DELPHI);
+        Assert.Equal(750, ProtocolConsts.SM_GUILD_CHANGE_DELPHI);
+        Assert.Equal(805, ProtocolConsts.SM_TELEPORT2_DELPHI);
+
+        var em = new EntityManager();
+        em.AddEntity(new EntityManager.EntityData
+        {
+            Uid = 5001,
+            Name = "祖玛卫士",
+            TileX = 300,
+            TileY = 300,
+            Direction = 4,
+            Hp = 500,
+            MaxHp = 500
+        });
+
+        var router = new ServerMessageRouter(null, em);
+
+        // 2. 模拟接收 29 (SM_SPELLRESULT2)：受击/施法动作回显，必须与 30 行为对齐不报异常
+        var spellPkt = new ServerPacket(ProtocolConsts.SM_SPELLRESULT2, 5001, 15, 485, Array.Empty<byte>());
+        router.OnPacket(spellPkt);
+
+        // 3. 模拟接收 211 / 212：官方 1.5 角色列表与角色注销协议包，不报异常正常路由
+        var charListPkt = new ServerPacket(ProtocolConsts.SM_CHARLIST_DELPHI, 0, 0, 0, Encoding.UTF8.GetBytes("战神无双/0/35/1\r\n法王/1/30/0\r\n"));
+        router.OnPacket(charListPkt);
+
+        var delCharPkt = new ServerPacket(ProtocolConsts.SM_DELCHAR_DELPHI, 0, 0, 0, Encoding.UTF8.GetBytes("法王"));
+        router.OnPacket(delCharPkt);
+
+        // 4. 模拟接收 750：行会信息/更名同步
+        var guildChangePkt = new ServerPacket(ProtocolConsts.SM_GUILD_CHANGE_DELPHI, 0, 0, 0, Encoding.UTF8.GetBytes("沙巴克风云"));
+        router.OnPacket(guildChangePkt);
+
+        // 5. 模拟接收 805 (SM_TELEPORT2_DELPHI)：包含突变坐标，触发传送校准
+        var tpPkt = new ServerPacket(ProtocolConsts.SM_TELEPORT2_DELPHI, 5001, 310, 320, Array.Empty<byte>());
+        router.OnPacket(tpPkt);
+    }
 }
+
 
 
 

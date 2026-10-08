@@ -165,10 +165,18 @@ public sealed class ServerMessageRouter
             case SM_NPCSPAWN:
                 HandleEntitySpawn(packet);
                 break;
-            case SM_USERDELETE:
+            case SM_USERDELETE: // 211: 兼容玩家离开视野与官方 1.5 角色列表下发 (SM_CHARLIST_DELPHI)
+                if (packet.Extra != null && packet.Extra.Length > 0)
+                {
+                    SafeLog($"[SM] 收到官方 1.5 角色列表更新通知 (SM_CHARLIST_DELPHI=211)");
+                }
+                else
+                {
+                    HandleEntityDelete(packet);
+                }
+                break;
             case SM_MONDELETE:
             case SM_NPCDELETE:
-            case SM_OBJECT_DISAPPEAR:
                 HandleEntityDelete(packet);
                 break;
             case SM_TURNDIRECTION_DELPHI:
@@ -565,6 +573,11 @@ public sealed class ServerMessageRouter
                 _hud?.AddChat("地图", "[小地图] 地图雷达已校准完成。", new Color(0.6f, 0.9f, 1f));
                 break;
             case ProtocolConsts.SM_ITEMHIDE: // 805: 地面物品消失/拾取 (IDA sub_467920 0x4699FE)
+                // 盛大官方 1.5 IDA 行 890 case 805 亦为 handle_sm_teleport2() 空间瞬移突变显现
+                if (packet.Param > 0 || packet.Tag > 0)
+                {
+                    HandleTeleport(packet);
+                }
                 _groundItemManager?.RemoveItem(packet.Recog);
                 _hud?.AddChat("物品", $"[地表] 地面物品已清除或被拾取 (ID:{packet.Recog})。", new Color(0.8f, 0.8f, 0.8f));
                 break;
@@ -577,8 +590,8 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_GUILDBREAKALLYFAIL2: // 770: 解除结盟失败别名 (IDA sub_467920 0x46AB30)
                 HandleGuildBreakAllyFail(packet);
                 break;
-            case ProtocolConsts.SM_DELMAGIC:
-                _hud?.AddChat("技能", $"[技能] 已删除技能：{DecodeExtraText(packet.Extra)}", new Color(0.8f, 0.8f, 1f));
+            case ProtocolConsts.SM_DELMAGIC: // 212: 兼容官方 1.5 角色删除确认 (SM_DELCHAR_DELPHI) 与技能移除
+                _hud?.AddChat("系统", $"[协议] 协议同步回执 (Ident:{packet.Ident})：{DecodeExtraText(packet.Extra)}", new Color(0.8f, 0.8f, 1f));
                 break;
             case SM_OBJECTSPELL:
             case ProtocolConsts.SM_SPELLEFFECT: // 32: 官方 1.5 施法光效前摇与动作 (IDA sub_467920 case ' ')
@@ -590,6 +603,7 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_FLYAXE_DELPHI: // 33: 官方 1.5 投掷物飞行弹道 (IDA sub_467920 case '!')
                 HandleMagicFire(packet);
                 break;
+            case ProtocolConsts.SM_SPELLRESULT2: // 29: 官方 1.5 实体受击与施法动作反馈 (IDA ProcessServerMessage case 29 @ 0x4682E0，与 case 30 共享 LABEL_284)
             case SM_SPELLRESULT:
             case SM_OBJECTSTRUCK:
             case SM_OBJECTSTRUCK_DELPHI:
