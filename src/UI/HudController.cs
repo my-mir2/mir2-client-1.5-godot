@@ -1851,6 +1851,14 @@ public partial class HudController : CanvasLayer
         }
     }
 
+    public void CloseRepairPanel()
+    {
+        if (_repairPanelView != null && _repairPanelView.Visible)
+        {
+            _stackManager.PopWindow(_repairPanelView);
+        }
+    }
+
     public void ToggleAdjustAbil(int points = 5)
     {
         if (_adjustAbilPanelView != null)

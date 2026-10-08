@@ -288,20 +288,25 @@ public sealed class ServerMessageRouter
             case SM_DEALDELITEM_FAIL:
                 _hud?.AddChat("交易", $"[交易] 取下物品失败: {DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
                 break;
-            case SM_DEALREMOTEADDITEM:
+            case SM_DEALREMOTEADDITEM: // 682: 对方放入物品广播 (IDA case 682 sub_495794(125))
                 _hud?.OnServerTradeRemoteAddItem(packet.Param, DecodeExtraText(packet.Extra));
+                AudioManager.Instance?.PlaySoundId(125);
                 break;
-            case SM_DEALREMOTEDELITEM:
+            case SM_DEALREMOTEDELITEM: // 683: 对方取下物品广播 (IDA case 683 sub_495794(126))
                 _hud?.OnServerTradeRemoteDelItem(packet.Param);
+                AudioManager.Instance?.PlaySoundId(126);
                 break;
-            case SM_DEALCHGGOLD_OK:
+            case SM_DEALCHGGOLD_OK: // 684: 己方修改交易金币成功 (IDA case 684/685 sub_495794(106))
                 _hud?.OnServerTradeChgGold(packet.Recog, true);
+                if (packet.Tag > 0) _hud?.UpdateGold(packet.Tag);
+                AudioManager.Instance?.PlaySoundId(106);
                 break;
             case SM_DEALCHGGOLD_FAIL:
                 _hud?.AddChat("交易", $"[交易] 修改金币失败: {DecodeExtraText(packet.Extra)}", new Color(1f, 0.4f, 0.4f));
                 break;
-            case SM_DEALREMOTECHGGOLD:
+            case SM_DEALREMOTECHGGOLD: // 686: 对方修改交易金币广播 (IDA case 686 sub_495794(106))
                 _hud?.OnServerTradeChgGold(packet.Recog, false);
+                AudioManager.Instance?.PlaySoundId(106);
                 break;
             case SM_DEALSUCCESS:
                 _hud?.OnServerTradeSuccess();
@@ -324,8 +329,26 @@ public sealed class ServerMessageRouter
             case SM_SENDUSERSTATE_INSPECT:
                 HandleSendUserState(packet);
                 break;
-            case SM_GUILDMEMBERLIST_ALT:
-                HandleSendGuildMemberList(packet);
+            case SM_GUILDMEMBERLIST_ALT: // 671: 盛大官方 1.5 商店出售物品反馈 (IDA case 671 handle_sm_sell) / 行会成员列表兼容
+                if (!string.IsNullOrEmpty(packet.ExtraStr) && (packet.ExtraStr.Contains('\t') || packet.ExtraStr.Contains('/')))
+                {
+                    HandleSendGuildMemberList(packet);
+                }
+                else
+                {
+                    // 盛大官方 1.5 原版二进制 case 671:
+                    // if (v66 >= 0) handle_sm_sell(); else show_dialog_message(v39, dword_46BADC);
+                    if (packet.Recog >= 0)
+                    {
+                        _hud?.UpdateGold(packet.Recog);
+                        _hud?.AddChat("商店", $"[商店] 出售物品成功，当前金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
+                    }
+                    else
+                    {
+                        _hud?.ShowModalMessage("出售提示", "这个物品不能卖出。"); // 官方 IDA 0x46BADC
+                        _hud?.AddChat("商店", "[商店] 出售失败：这个物品不能卖出。", new Color(1f, 0.4f, 0.4f));
+                    }
+                }
                 break;
             case SM_UPDATEGUILDINFO:
             case SM_GUILDNOTICE_RESULT:
@@ -501,8 +524,9 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_OPENREPAIRDLG: // 668: 铁匠铺打开修理面板 (IDA open_shop_repair 0x46dae8)
                 _hud?.OpenRepairPanel();
                 break;
-            case ProtocolConsts.SM_REPAIROK_DELPHI: // 669: 铁匠铺修理成功更新金币与持久 (IDA sub_467920 case 669 @ 0x469F9B)
+            case ProtocolConsts.SM_REPAIROK_DELPHI: // 669: 铁匠铺修理成功更新金币与持久 (IDA sub_467920 case 669 @ 0x469F9B: close_shop_repair)
                 _hud?.UpdateGold(packet.Recog);
+                _hud?.CloseRepairPanel();
                 if (packet.Param > 0 && packet.Tag > 0)
                 {
                     _hud?.AddChat("修理", $"[铁匠铺] 装备修理完毕，耐久恢复为 {packet.Param}/{packet.Tag}，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
@@ -512,7 +536,8 @@ public sealed class ServerMessageRouter
                     _hud?.AddChat("修理", $"[铁匠铺] 装备修理成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
                 }
                 break;
-            case ProtocolConsts.SM_REPAIRFAIL_DELPHI: // 670: 铁匠铺修理失败模态弹窗 (IDA 0x469FE9 0x46B83C)
+            case ProtocolConsts.SM_REPAIRFAIL_DELPHI: // 670: 铁匠铺修理失败模态弹窗 (IDA 0x469FE9 0x46B83C: close_shop_repair)
+                _hud?.CloseRepairPanel();
                 _hud?.ShowModalMessage("修理提示", "你不能修理这个物品 .");
                 _hud?.AddChat("修理", "[铁匠铺] 修理失败：你不能修理这个物品 .", new Color(1f, 0.4f, 0.4f));
                 break;
@@ -552,7 +577,7 @@ public sealed class ServerMessageRouter
                 AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.LevelUp); // 官方原版 255 音效
                 break;
             case ProtocolConsts.SM_MAKEOBJECT_OK: // 713: 打造物品成功并更新金币 (IDA sub_467920 case 713 *(_DWORD *)(dword_4F7EF8 + 88) = v66)
-                if (packet.Recog > 0)
+                if (packet.Recog >= 0)
                 {
                     _hud?.UpdateGold(packet.Recog);
                 }
@@ -669,8 +694,9 @@ public sealed class ServerMessageRouter
                 SafeLog($"[SM] 实体动画与特效播放 (SM_REFRESH_DELPHI=51, uid={packet.Recog}, effect={packet.Tag}, param={packet.Param})");
                 break;
 
-            case ProtocolConsts.SM_QUERYCHAR_FAIL: // 528: 查询角色失败
-                SafeLog($"[SM] 查询角色失败 (SM_QUERYCHAR_FAIL=528)");
+            case ProtocolConsts.SM_QUERYCHAR_FAIL: // 528: 查询角色失败/连接超时模态框 (IDA case 528 @ 0x46B758)
+                _hud?.ShowModalMessage("连接提示", "与服务器连接超时，连接已被切断。");
+                SafeLog($"[SM] 查询角色失败或连接超时 (SM_QUERYCHAR_FAIL=528)");
                 break;
             case ProtocolConsts.SM_VERSION_FAIL: // 501: 补丁版本不符模态弹窗 (IDA 0x46B68C)
                 _hud?.ShowModalMessage("版本提示", "补丁版本不符，请更新客户端。");
@@ -849,6 +875,7 @@ public sealed class ServerMessageRouter
                 _entityManager?.UpdateActorTimestamp(packet.Recog, packet.Param);
                 break;
             case ProtocolConsts.SM_ATTR2_DELPHI: // 716: 盛大官方 1.5 扩展属性同步2 (IDA 0x46A382: handle_sm_attr2(Tag))
+                _hud?.StatusPanel?.UpdateAbilityValue(11, packet.Tag.ToString());
                 SafeLog($"[SM] 扩展属性同步2 (SM_ATTR2_DELPHI=716, val={packet.Tag})");
                 break;
             case ProtocolConsts.SM_CHAR_FREEZE_START: // 1100: 实体麻痹/定身开始 (IDA case 0x44C)

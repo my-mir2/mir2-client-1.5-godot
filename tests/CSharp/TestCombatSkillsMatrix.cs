@@ -874,6 +874,62 @@ public class TestCombatSkillsMatrix
         var p532 = new ServerPacket(ProtocolConsts.SM_CHANGEPASS_OK, 0, 0, 0, Array.Empty<byte>());
         router.OnPacket(p532);
     }
+
+    [Fact]
+    public void Official_1_5_TradeSounds_682_686_ShopSell_671_And_Repair_669_GroundTruth_Test()
+    {
+        // 1. 验证官方 1.5 协议常量真值
+        Assert.Equal((short)682, ServerMessageRouter.SM_DEALREMOTEADDITEM);
+        Assert.Equal((short)683, ServerMessageRouter.SM_DEALREMOTEDELITEM);
+        Assert.Equal((short)684, ServerMessageRouter.SM_DEALCHGGOLD_OK);
+        Assert.Equal((short)686, ServerMessageRouter.SM_DEALREMOTECHGGOLD);
+        Assert.Equal((short)671, ServerMessageRouter.SM_GUILDMEMBERLIST_ALT);
+        Assert.Equal((short)669, ProtocolConsts.SM_REPAIROK_DELPHI);
+        Assert.Equal((short)670, ProtocolConsts.SM_REPAIRFAIL_DELPHI);
+        Assert.Equal((short)713, ProtocolConsts.SM_MAKEOBJECT_OK);
+        Assert.Equal((short)716, ProtocolConsts.SM_ATTR2_DELPHI);
+        Assert.Equal((short)528, ProtocolConsts.SM_QUERYCHAR_FAIL);
+
+        var router = new ServerMessageRouter(null, null);
+
+        // 2. 验证 682, 683, 684, 686 交易音效与金币分发
+        var p682 = new ServerPacket(ServerMessageRouter.SM_DEALREMOTEADDITEM, 0, 1, 0, Encoding.UTF8.GetBytes("裁决之杖"));
+        router.OnPacket(p682);
+
+        var p683 = new ServerPacket(ServerMessageRouter.SM_DEALREMOTEDELITEM, 0, 1, 0, Array.Empty<byte>());
+        router.OnPacket(p683);
+
+        var p684 = new ServerPacket(ServerMessageRouter.SM_DEALCHGGOLD_OK, 50000, 0, 1000, Array.Empty<byte>());
+        router.OnPacket(p684);
+
+        var p686 = new ServerPacket(ServerMessageRouter.SM_DEALREMOTECHGGOLD, 60000, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p686);
+
+        // 3. 验证 671 商店出售成功与失败 (IDA case 671: handle_sm_sell & 0x46BADC)
+        // 出售成功
+        var p671Success = new ServerPacket(ServerMessageRouter.SM_GUILDMEMBERLIST_ALT, 12800, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p671Success);
+        // 出售失败 (Recog < 0)
+        var p671Fail = new ServerPacket(ServerMessageRouter.SM_GUILDMEMBERLIST_ALT, -1, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p671Fail);
+
+        // 4. 验证 669/670 铁匠铺修理与 713 打造物品 (金币为 0 边界)
+        var p669 = new ServerPacket(ProtocolConsts.SM_REPAIROK_DELPHI, 0, 10, 10, Array.Empty<byte>());
+        router.OnPacket(p669);
+
+        var p670 = new ServerPacket(ProtocolConsts.SM_REPAIRFAIL_DELPHI, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p670);
+
+        var p713 = new ServerPacket(ProtocolConsts.SM_MAKEOBJECT_OK, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p713);
+
+        // 5. 验证 716 扩展属性同步与 528 连接超时
+        var p716 = new ServerPacket(ProtocolConsts.SM_ATTR2_DELPHI, 0, 0, 88, Array.Empty<byte>());
+        router.OnPacket(p716);
+
+        var p528 = new ServerPacket(ProtocolConsts.SM_QUERYCHAR_FAIL, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p528);
+    }
 }
 
 

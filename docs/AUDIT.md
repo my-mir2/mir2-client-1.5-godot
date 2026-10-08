@@ -7580,10 +7580,54 @@
       - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_StartPlay_20_Turn_14_UserState_52_ChangePass_506_GroundTruth_Test` 脱机单测，单测总数提升至 **195 / 195 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+  - [x] **58. 盛大官方 1.5 交易音效分发、商店出售反馈与修理面板物理关闭实证** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA ProcessServerMessage 0x467920 反编译真值（`scratch/ida_processmsg.c` 行 448~475、506~524、573、1215~1222）：
+        ```c
+        // 682/683/686: 交易放物/取物/金币原版音效
+        case 682: sub_46E988(); sub_495794(125); goto LABEL_486; // 放入物品音效 125
+        case 683: sub_46E9EC(); sub_495794(126); goto LABEL_486; // 取下物品音效 126
+        case 686: dword_4F9184 = v66; sub_495794(106); goto LABEL_486; // 交易金币变动音效 106
+        case 684: case 685: dword_4F9180 = v66; *(_DWORD *)(dword_4F7EF8 + 88) = GetInteger(); goto LABEL_486;
+
+        // 671: 商店出售物品反馈 (handle_sm_sell)
+        case 671:
+          if ( byte_4F92D4 ) {
+            if ( v66 >= 0 ) { ResetReadPtr(); handle_sm_sell(); }
+            else { show_dialog_message(v39, dword_46BADC); }
+          }
+          goto LABEL_486;
+
+        // 669/670: 铁匠铺修理成功/失败关闭修理面板 (close_shop_repair)
+        case 669: handle_sm_repair(); close_shop_repair(); goto LABEL_486;
+        case 670: close_shop_repair(); show_dialog_message(v40, dword_46BAB8); goto LABEL_486;
+
+        // 716: 官方扩展属性同步2 (handle_sm_attr2)
+        if ( (unsigned __int16)v67 == 716 ) handle_sm_attr2((unsigned __int16)v68);
+
+        // 528: 选角查询超时断开模态框 (0x46B758)
+        case 0x210u: show_dialog_message(v3, dword_46B758); WindowCloseHandler(v84, v23); goto LABEL_486;
+        ```
+      - 此前客户端坏账：
+        1. 交易协议 682/683/686 未接入 `AudioManager.PlaySoundId(125/126/106)`，丢失了官方 1.5 原版交易音效交互；
+        2. 671 仅作为行会成员列表占位，缺失了商店出售物品成功更新金币与失败模态弹窗（0x46BADC: "这个物品不能卖出。"）；
+        3. 铁匠铺修理 669/670 在修理完成后面板未自动关闭（丢失了 `close_shop_repair()` 物理调用）；
+        4. 716 仅有 SafeLog 未驱动 `StatusPanel.UpdateAbilityValue`；
+        5. 528 仅有 SafeLog 未弹出超时断开提示框。
+    - **精准重构**：
+      - 在 `HudController.cs` 增加 `CloseRepairPanel()`；
+      - 在 `ServerMessageRouter.cs` 为 682/683/684/686 接入官方音效 125/126/106；
+      - 将 671 升级为支持行会成员列表与商店出售物品双重甄别（Recog >= 0 刷新金币，Recog < 0 弹窗）；
+      - 在 669/670 接入 `_hud.CloseRepairPanel()` 物理关闭面板；
+      - 716 驱动能力页第 11 栏扩展属性；
+      - 528 接入官方超时断开模态框；
+      - 在 `TestCombatSkillsMatrix.cs` 新增 `Official_1_5_TradeSounds_682_686_ShopSell_671_And_Repair_669_GroundTruth_Test` 脱机单测，单测总数提升至 **196 / 196 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **195 / 195 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **196 / 196 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
