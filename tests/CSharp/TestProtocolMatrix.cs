@@ -2508,6 +2508,82 @@ public class TestProtocolMatrix
         Assert.Equal(1019, parsedMode.Ident);
         Assert.Equal(1, parsedMode.Recog);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthCmCases_GuildWarAndCancelWar()
+    {
+        // 1. 官方 1.5 行会宣战发包：走 CM_SAY 文本指令 @guildwar
+        byte[] rawWar = PacketEncoder.GuildApplyWar("邪恶之眼");
+        var parsedWar = PacketDecoder.Parse(rawWar.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_SAY, parsedWar.Ident);
+        Assert.Equal("@guildwar 邪恶之眼", parsedWar.ExtraStr);
+
+        // 2. 官方 1.5 行会停战发包：走 CM_SAY 文本指令 @cancelwar
+        byte[] rawCancelWar = PacketEncoder.GuildCancelWar("邪恶之眼");
+        var parsedCancelWar = PacketDecoder.Parse(rawCancelWar.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_SAY, parsedCancelWar.Ident);
+        Assert.Equal("@cancelwar 邪恶之眼", parsedCancelWar.ExtraStr);
+    }
+
+    [Fact]
+    public void TestOfficialGroundTruth_EntityManager_GetEntityAt()
+    {
+        var em = new Mir2Client.Game.EntityManager();
+        em.AddEntity(1001, "白日门药剂师", Mir2Client.Game.EntityManager.EntityType.Npc, 300, 300);
+        em.AddEntity(1002, "无敌战士", Mir2Client.Game.EntityManager.EntityType.Player, 305, 305);
+        em.AddEntity(1003, "尸王", Mir2Client.Game.EntityManager.EntityType.Monster, 310, 310);
+
+        // 1. 坐标命中测试
+        var npc = em.GetEntityAt(300, 300);
+        Assert.NotNull(npc);
+        Assert.Equal(1001, npc.Uid);
+        Assert.Equal("白日门药剂师", npc.Name);
+        Assert.Equal(Mir2Client.Game.EntityManager.EntityType.Npc, npc.Type);
+
+        var player = em.GetEntityAt(305, 305);
+        Assert.NotNull(player);
+        Assert.Equal(1002, player.Uid);
+        Assert.Equal("无敌战士", player.Name);
+
+        // 2. 空地块返回 null
+        Assert.Null(em.GetEntityAt(999, 999));
+
+        // 3. 活体优先逻辑：当死物与活物同地块时优先返回活体
+        em.AddEntity(1004, "白野猪(尸体)", Mir2Client.Game.EntityManager.EntityType.Monster, 320, 320);
+        em.TriggerDeath(1004);
+        em.AddEntity(1005, "红野猪(活体)", Mir2Client.Game.EntityManager.EntityType.Monster, 320, 320);
+
+        var hit = em.GetEntityAt(320, 320);
+        Assert.NotNull(hit);
+        Assert.Equal(1005, hit.Uid);
+
+        // 4. GetEntitiesAt 返回同坐标所有实体
+        var list = em.GetEntitiesAt(320, 320);
+        Assert.Equal(2, list.Count);
+    }
+
+    [Fact]
+    public void TestOfficialGroundTruth_QueryUsernameAndNpcClick()
+    {
+        // 1. 官方 80 查玩家名 (CM_QUERYUSERNAME)
+        Assert.Equal(80, ProtocolConsts.CM_QUERYUSERNAME);
+        byte[] rawQ80 = PacketEncoder.QueryUsername(20001);
+        var parsedQ80 = PacketDecoder.Parse(rawQ80.AsSpan(1))!.Value;
+        Assert.Equal(80, parsedQ80.Ident);
+        Assert.Equal(20001, parsedQ80.Recog);
+
+        // 2. 官方 82 Shift+双击深度查名 (CM_QUERYUSERNAME_EXT, IDA 0x463649)
+        Assert.Equal(82, ProtocolConsts.CM_QUERYUSERNAME_EXT);
+        byte[] rawQ82 = PacketEncoder.QueryUsernameExt(20002);
+        var parsedQ82 = PacketDecoder.Parse(rawQ82.AsSpan(1))!.Value;
+        Assert.Equal(82, parsedQ82.Ident);
+        Assert.Equal(20002, parsedQ82.Recog);
+
+        // 3. 官方点击 NPC
+        byte[] rawNpc = PacketEncoder.ClickNpc("铁匠");
+        var parsedNpc = PacketDecoder.Parse(rawNpc.AsSpan(1))!.Value;
+        Assert.Equal("铁匠", parsedNpc.ExtraStr);
+    }
 }
 
 

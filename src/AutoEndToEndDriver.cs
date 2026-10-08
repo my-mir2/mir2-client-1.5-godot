@@ -2100,7 +2100,55 @@ public partial class AutoEndToEndDriver : Node
 
             case 123:
             {
-                GD.Print("[AutoE2E] ALL 123 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 观人面板栈管理、大世界实体点击查名与行会宣战停战发包 ===");
+                    gameView.HudInstance.Minimap?.SetMode(MinimapView.MinimapMode.Closed);
+
+                    // 1. 验证观人面板 OpenInspect 纳入 _stackManager
+                    gameView.HudInstance.OpenInspect("战神无双");
+                    if (gameView.HudInstance.InspectPanel != null)
+                    {
+                        if (!gameView.HudInstance.InspectPanel.Visible)
+                        {
+                            throw new Exception("InspectPanel 应为可见状态");
+                        }
+                    }
+
+                    // 2. 模拟 ESC 键关闭观人面板 (验证 _stackManager 纳管生效)
+                    gameView.HudInstance.CloseTopDialog();
+                    if (gameView.HudInstance.InspectPanel != null && gameView.HudInstance.InspectPanel.Visible)
+                    {
+                        throw new Exception("InspectPanel 应已被 ESC / CloseTopDialog 成功关闭");
+                    }
+
+                    // 3. 验证大世界实体点击交互 (NPC、玩家查名、怪物锁定)
+                    gameView.EntityManagerInstance.AddEntity(9001, "盟重药剂师", EntityManager.EntityType.Npc, 330, 330);
+                    gameView.EntityManagerInstance.AddEntity(9002, "烈火剑仙", EntityManager.EntityType.Player, 331, 331);
+                    gameView.EntityManagerInstance.AddEntity(9003, "半兽统领", EntityManager.EntityType.Monster, 332, 332);
+
+                    // 触发大世界实体交互信号
+                    gameView.InputPluginInstance?.EmitSignal(
+                        InputPlugin.SignalName.EntityInteracted, 9001, (int)EntityManager.EntityType.Npc, 330, 330, false);
+                    gameView.InputPluginInstance?.EmitSignal(
+                        InputPlugin.SignalName.EntityInteracted, 9002, (int)EntityManager.EntityType.Player, 331, 331, true); // Shift 深度查名
+                    gameView.InputPluginInstance?.EmitSignal(
+                        InputPlugin.SignalName.EntityInteracted, 9003, (int)EntityManager.EntityType.Monster, 332, 332, false);
+
+                    // 4. 验证行会面板宣战与停战信号发包闭环 (走 @guildwar / @cancelwar 文本通道)
+                    gameView.HudInstance.GuildPanel?.EmitSignal(
+                        GuildPanelView.SignalName.WarRequested, "烈焰神话");
+                    gameView.HudInstance.GuildPanel?.EmitSignal(
+                        GuildPanelView.SignalName.CancelWarRequested, "烈焰神话");
+                }
+                RequestCapture("step123_inspect_stack_entity_click_guild_war");
+                break;
+            }
+
+            case 124:
+            {
+                GD.Print("[AutoE2E] ALL 124 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

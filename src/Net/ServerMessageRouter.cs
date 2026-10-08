@@ -1090,7 +1090,7 @@ public sealed class ServerMessageRouter
                 if (inspect != null)
                 {
                     inspect.SetGender(gender);
-                    inspect.Inspect(name);
+                    _hud?.OpenInspect(name);
 
                     if (baseParts.Length > 1)
                     {

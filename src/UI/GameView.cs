@@ -63,6 +63,8 @@ namespace Mir2Client.UI
 
         public Node2D EntityContainer { get; private set; } = null!;
         private readonly Dictionary<int, EntityNode> _entityNodes = new();
+        private int _selectedTargetUid = 0;
+        public int SelectedTargetUid => _selectedTargetUid;
 
         public Node2D ItemContainer { get; private set; } = null!;
         public GroundItemManager GroundItemManagerInstance { get; } = new();
@@ -110,9 +112,10 @@ namespace Mir2Client.UI
             {
                 PlayerInstance.SetMapRenderer(MapRendererInstance);
             }
-            if (InputPluginInstance != null && MapRendererInstance != null)
+            if (InputPluginInstance != null)
             {
-                InputPluginInstance.SetMapRenderer(MapRendererInstance);
+                if (MapRendererInstance != null) InputPluginInstance.SetMapRenderer(MapRendererInstance);
+                InputPluginInstance.SetEntityManager(EntityManagerInstance);
             }
 
             SetupRetroDitherOverlay();
@@ -441,6 +444,16 @@ namespace Mir2Client.UI
                 {
                     OnSkillKeyPressed(slot);
                 };
+
+                InputPluginInstance.TargetSelected += (targetUid) =>
+                {
+                    _selectedTargetUid = targetUid;
+                };
+
+                InputPluginInstance.EntityInteracted += (targetUid, entityType, tileX, tileY, isShift) =>
+                {
+                    HandleEntityInteraction(targetUid, (EntityManager.EntityType)entityType, tileX, tileY, isShift);
+                };
             }
 
             if (HudInstance != null)
@@ -657,6 +670,14 @@ namespace Mir2Client.UI
                     HudInstance.GuildPanel.RankUpdated += (memberName, newRank) =>
                     {
                         _net?.SendPacket(PacketEncoder.GuildUpdateRank(memberName, newRank));
+                    };
+                    HudInstance.GuildPanel.WarRequested += (targetGuild) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildApplyWar(targetGuild));
+                    };
+                    HudInstance.GuildPanel.CancelWarRequested += (targetGuild) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.GuildCancelWar(targetGuild));
                     };
                 }
 
@@ -1550,6 +1571,48 @@ namespace Mir2Client.UI
                 PlayerInstance.CharacterName = uname;
                 PlayerInstance.Level = ulevel;
                 PlayerInstance.UpdateNameLabelText();
+            }
+        }
+
+        private void HandleEntityInteraction(int targetUid, EntityManager.EntityType type, int tileX, int tileY, bool isShift)
+        {
+            var ent = EntityManagerInstance.GetEntity(targetUid);
+            if (ent == null) return;
+
+            // 1. NPC 交互：向服务端发送点击 NPC (CM_CLICKNPC) 并呼出 NPC 对话
+            if (type == EntityManager.EntityType.Npc)
+            {
+                if (_net != null && _net.IsConnectedToServer)
+                {
+                    _net.SendPacket(PacketEncoder.ClickNpc(ent.Name));
+                }
+                else if (_isSandbox && HudInstance?.NpcDialog != null)
+                {
+                    HudInstance.NpcDialog.CurrentNpcUid = ent.Uid;
+                    HudInstance.ShowNpcDialog($"@{ent.Name}\n欢迎来到热血传奇世界！请问有什么可以帮助您的？\n<购买物品/@buy>\n<出售物品/@sell>\n<修理装备/@repair>\n<离开/@exit>");
+                }
+                GD.Print($"[GameView] 交互 NPC: {ent.Name} (Uid: {targetUid})");
+            }
+            // 2. 玩家交互：查询玩家名与他人装备 (官方实证 0x463649: Shift+双击 CM 82; 普通点击 CM 80)
+            else if (type == EntityManager.EntityType.Player)
+            {
+                if (_net != null && _net.IsConnectedToServer)
+                {
+                    byte[] pkt = isShift
+                        ? PacketEncoder.QueryUsernameExt(targetUid)
+                        : PacketEncoder.QueryUsername(targetUid);
+                    _net.SendPacket(pkt);
+                }
+                else if (_isSandbox && HudInstance != null)
+                {
+                    HudInstance.OpenInspect(ent.Name);
+                }
+                GD.Print($"[GameView] 交互玩家: {ent.Name} (Uid: {targetUid}, isShift: {isShift})");
+            }
+            // 3. 怪物交互：锁定目标
+            else if (type == EntityManager.EntityType.Monster)
+            {
+                GD.Print($"[GameView] 锁定怪物目标: {ent.Name} (Uid: {targetUid})");
             }
         }
     }

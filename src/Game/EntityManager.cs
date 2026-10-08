@@ -88,6 +88,39 @@ public class EntityManager
         return _entities.TryGetValue(uid, out var data) ? data : null;
     }
 
+    /// <summary>
+    /// 获取指定地块上的活体实体 (优先返回非尸体/活体，无活体则返回最新实体)
+    /// </summary>
+    public EntityData? GetEntityAt(int tileX, int tileY)
+    {
+        EntityData? candidate = null;
+        foreach (var ent in _entities.Values)
+        {
+            if (ent.TileX == tileX && ent.TileY == tileY)
+            {
+                if (!ent.IsDead) return ent;
+                candidate ??= ent;
+            }
+        }
+        return candidate;
+    }
+
+    /// <summary>
+    /// 获取指定地块上的所有实体列表
+    /// </summary>
+    public List<EntityData> GetEntitiesAt(int tileX, int tileY)
+    {
+        var list = new List<EntityData>();
+        foreach (var ent in _entities.Values)
+        {
+            if (ent.TileX == tileX && ent.TileY == tileY)
+            {
+                list.Add(ent);
+            }
+        }
+        return list;
+    }
+
     public bool RemoveEntity(int uid)
     {
         if (_entities.Remove(uid))

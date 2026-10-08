@@ -27,6 +27,7 @@ namespace Mir2Client.Game
         [Signal] public delegate void PkModeToggleRequestedEventHandler();
         [Signal] public delegate void AltShowItemsToggledEventHandler(bool show);
         [Signal] public delegate void TargetSelectedEventHandler(int targetUid);
+        [Signal] public delegate void EntityInteractedEventHandler(int targetUid, int entityType, int tileX, int tileY, bool isShift);
         [Signal] public delegate void ButcherRequestedEventHandler(int tileX, int tileY, int dir);
         [Signal] public delegate void PetCommandRequestedEventHandler();
         [Signal] public delegate void LogoutRequestedEventHandler();
@@ -47,11 +48,13 @@ namespace Mir2Client.Game
         private Node2D? _playerNode;
         private Node? _gameNode;
         private MapRenderer? _mapRenderer;
+        private EntityManager? _entityManager;
 
         private ulong _lastRightRunMs = 0;
         public const ulong RightRunIntervalMs = 360;
 
         public void SetMapRenderer(MapRenderer mr) => _mapRenderer = mr;
+        public void SetEntityManager(EntityManager em) => _entityManager = em;
         public void SetPlayer(Node2D p) => _playerNode = p;
         public void SetGame(Node g) => _gameNode = g;
 
@@ -248,6 +251,30 @@ namespace Mir2Client.Game
             {
                 EmitSignal(SignalName.ButcherRequested, targetTile.X, targetTile.Y, dir);
                 return;
+            }
+
+            // 实体点击判定 (NPC 对话 / 玩家选中与查名 / 怪物锁定与普攻)
+            if (targetTile.X >= 0 && _entityManager != null)
+            {
+                var ent = _entityManager.GetEntityAt(targetTile.X, targetTile.Y);
+                if (ent != null)
+                {
+                    bool isShift = Input.IsKeyPressed(Key.Shift);
+                    EmitSignal(SignalName.TargetSelected, ent.Uid);
+                    EmitSignal(SignalName.EntityInteracted, ent.Uid, (int)ent.Type, targetTile.X, targetTile.Y, isShift);
+
+                    // 若为相邻活体怪物且未按 Ctrl，自动发起近战攻击
+                    if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead && chebyshev <= 1 && !Input.IsKeyPressed(Key.Ctrl))
+                    {
+                        EmitSignal(SignalName.HitRequested, dir);
+                        return;
+                    }
+                    // 若为 NPC 或其他玩家，直接返回阻断向其脚下寻路跑动
+                    if (ent.Type == EntityManager.EntityType.Npc || ent.Type == EntityManager.EntityType.Player)
+                    {
+                        return;
+                    }
+                }
             }
 
             // 1. Shift 原地攻击

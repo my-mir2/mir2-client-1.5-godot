@@ -321,6 +321,9 @@ public static class PacketEncoder
     public static byte[] GuildApplyWar(string guildName) =>
         Say($"@guildwar {guildName}");
 
+    public static byte[] GuildCancelWar(string guildName) =>
+        Say($"@cancelwar {guildName}");
+
     public static byte[] GuildAllyRequest(string guildName) =>
         MakePacket(ProtocolConsts.CM_GUILD_ALLY_REQUEST, 0, 0, 0, Encoding.UTF8.GetBytes(guildName));
 

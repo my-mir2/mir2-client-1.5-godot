@@ -981,6 +981,11 @@ public partial class HudController : CanvasLayer
         AddChild(_repairPanelView);
 
         _inspectPanelView = new InspectPanelView();
+        _inspectPanelView.PanelClosed += () =>
+        {
+            if (_inspectPanelView != null)
+                _stackManager.PopWindow(_inspectPanelView);
+        };
         AddChild(_inspectPanelView);
 
         _adjustAbilPanelView = new AdjustAbilPanelView();
@@ -1561,6 +1566,40 @@ public partial class HudController : CanvasLayer
         }
     }
 
+    /// <summary>官方 1.5 观人面板 (IDA TFrmDlg_DUserState1DirectPaint 0x49219c, DCloseUS1Click 0x492ae8)</summary>
+    public void OpenInspect(string targetName)
+    {
+        if (_inspectPanelView != null)
+        {
+            _inspectPanelView.Inspect(targetName);
+            if (!_inspectPanelView.Visible)
+            {
+                _inspectPanelView.Visible = true;
+            }
+            _stackManager.PushWindow(_inspectPanelView);
+            GD.Print($"[HudController] 打开观人面板: {targetName}");
+        }
+    }
+
+    public void CloseInspect()
+    {
+        if (_inspectPanelView != null && _inspectPanelView.Visible)
+        {
+            _inspectPanelView.Visible = false;
+            _stackManager.PopWindow(_inspectPanelView);
+            GD.Print("[HudController] 关闭观人面板");
+        }
+    }
+
+    public void ToggleInspect()
+    {
+        if (_inspectPanelView != null)
+        {
+            _stackManager.ToggleWindow(_inspectPanelView);
+            GD.Print($"[HudController] 切换观人面板显示状态: {_inspectPanelView.Visible}");
+        }
+    }
+
     /// <summary>官方 1.5 底栏小地图按键切换 (IDA TFrmDlg_DBotMiniMapClick 0x490c80)</summary>
     public void ToggleMinimap()
     {
@@ -1950,6 +1989,7 @@ public partial class HudController : CanvasLayer
         var closed = _stackManager.CloseTopDialog();
         if (closed != null)
         {
+            GD.Print($"[HudController] CloseTopDialog 关闭了: {closed.WindowName}, 剩余StackCount={_stackManager.Count}");
             return true;
         }
 

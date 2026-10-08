@@ -6983,11 +6983,26 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_GroupCreateAddDelMemberAndMode` 单元测试，脱机测试覆盖扩充至 **167 / 167 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 122 步实机验证，总演练步数扩充至 **123 步**。
 
+31. **官方 1.5 观人面板纳管与ESC关闭互斥、大世界实体坐标点击交互与行会宣战停战发包实证 (`scratch/ida_dialogs.json:1092` TFrmDlg_DUserState1DirectPaint `0x49219c`, `0x492ae8`, `0x463649`, `0x493dd8`, `bridge.rs:88, 2249`)**：
+    - **官方实证**：
+      - 观人面板纳入 `WindowStackManager` 栈纳管与 ESC 互斥关闭：此前观人面板在 `HudController` 中孤立创建，未入栈管理，导致按 ESC 无法关闭且无法响应鼠标物理防穿透。现已接入 `_stackManager.PushWindow` 与 `PopWindow`，点击红叉或按 ESC 即可规范退出；
+      - 大世界实体坐标点击交互与查名：在 `EntityManager` 扩充 `GetEntityAt(x, y)` 活体优先查询，在 `InputPlugin` 接入实体命中检测并在点击时发射 `EntityInteracted`。在 `GameView` 中打通大世界点击 NPC (`CM_CLICKNPC`)、点击其他玩家查名 (`CM_QUERYUSERNAME 80`，按 Shift 则触发官方 `0x463649` 深度查名 `CM_QUERYUSERNAME_EXT 82`)、以及点击怪物锁定；
+      - 行会宣战与停战发包闭环：此前行会面板宣战与停战按钮处于网络断链状态，经官方 1.5 反编译与服务端 bridge 实证，行会宣战与停战走文本指令通道 `@guildwar` / `@cancelwar` (`CM_SAY 3030`)，现已在 `GameView.cs` 完整接通。
+    - **精准重构**：
+      - 在 `PacketEncoder.cs` 增加 `GuildCancelWar(string guildName)` 停战指令编码；
+      - 在 `EntityManager.cs` 实现 `GetEntityAt(tileX, tileY)` 与 `GetEntitiesAt(tileX, tileY)`；
+      - 在 `InputPlugin.cs` 增加 `SetEntityManager`、`EntityInteracted` 信号并在 `OnLeftClick` 中增加实体命中分流；
+      - 在 `HudController.cs` 规范导出 `OpenInspect`、`CloseInspect`、`ToggleInspect` 并纳入 `_stackManager`；
+      - 在 `ServerMessageRouter.cs` 中 `HandleSendUserState` 时通过 `_hud?.OpenInspect(name)` 统一压栈管理；
+      - 在 `GameView.cs` 打通 `EntityInteracted` 针对 NPC / Player / Monster 的交互逻辑，以及行会宣战停战发包；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_GuildWarAndCancelWar`、`TestOfficialGroundTruth_EntityManager_GetEntityAt`、`TestOfficialGroundTruth_QueryUsernameAndNpcClick` 3 项测试，脱机测试覆盖扩充至 **170 / 170 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 123 步实机验证，总演练步数扩充至 **124 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **167 / 167 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **123 / 123 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **170 / 170 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **124 / 124 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 
