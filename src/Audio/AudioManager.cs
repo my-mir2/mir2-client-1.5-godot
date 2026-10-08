@@ -59,6 +59,7 @@ public partial class AudioManager : Node
         public const int ClickDrug = 108;
         public const int SpaceMoveOut = 109;
         public const int SpaceMoveIn = 110;
+        public const int LevelUp = 255;     // 官方 1.5 角色升级音效 (IDA ProcessServerMessage case 44 @ 0x46A18D)
 
         public const int ClickWeapon = 111;
         public const int ClickArmor = 112;

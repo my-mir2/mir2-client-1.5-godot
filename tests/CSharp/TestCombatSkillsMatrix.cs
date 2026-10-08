@@ -572,6 +572,50 @@ public class TestCombatSkillsMatrix
         var sellOkPkt = new ServerPacket(ProtocolConsts.SM_SELL_OK_DELPHI, 99999, 0, 0, Array.Empty<byte>());
         router.OnPacket(sellOkPkt);
     }
+
+    [Fact]
+    public void Official_1_5_LevelUp_44_And_HealthSpell_53_GroundTruth_Test()
+    {
+        // 1. 常量真值断言：
+        // 盛大官方 1.5 原版二进制 IDA ProcessServerMessage:
+        // case 44 (',' @ 0x46A18D): *(_DWORD *)(dword_4F7EF8 + 72) = v66 (Recog 为 Level); play_sound(255)
+        // case 53 ('5' @ 0x46A275): v71 = get_actor_by_id(); *(_WORD *)(v71 + 60) = HIWORD(v67); *(_DWORD *)(v71 + 62) = v68;
+        Assert.Equal((short)44, ProtocolConsts.SM_LEVELUP);
+        Assert.Equal((short)53, ProtocolConsts.SM_HEALTHSPELLCHANGED);
+
+        var em = new EntityManager();
+        em.AddEntity(new EntityManager.EntityData
+        {
+            Uid = 8001,
+            Type = EntityManager.EntityType.Player,
+            TileX = 330,
+            TileY = 270,
+            Hp = 50,
+            MaxHp = 100
+        });
+
+        // 模拟登录绑定 8001 为本地主角
+        var router = new ServerMessageRouter(null, em);
+        var logonPkt = new ServerPacket(ProtocolConsts.SM_LOGON_DELPHI, 8001, 330, 270, Array.Empty<byte>());
+        router.OnPacket(logonPkt);
+
+        Assert.Equal(8001, em.LocalPlayerUid);
+        var hero = em.Hero;
+        Assert.NotNull(hero);
+        Assert.Equal(50, hero.Hp);
+
+        // 2. 模拟 44 升级协议：Recog=28 代表角色升到 28 级
+        var levelUpPkt = new ServerPacket(ProtocolConsts.SM_LEVELUP, 28, 0, 0, Array.Empty<byte>());
+        router.OnPacket(levelUpPkt);
+
+        // 3. 模拟 53 生命魔法变动协议：Recog=120 (当前HP), Param=150 (最大HP), Tag=80 (当前MP)
+        var hpPkt = new ServerPacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, 120, 150, 80, Array.Empty<byte>());
+        router.OnPacket(hpPkt);
+
+        // 断言主角实体数据模型是否与 53 封包 1:1 同步
+        Assert.Equal(120, hero.Hp);
+        Assert.Equal(150, hero.MaxHp);
+    }
 }
 
 

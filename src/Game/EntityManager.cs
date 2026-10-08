@@ -76,6 +76,9 @@ public class EntityManager
     /// <summary>本地主角实体的权威 UID (由 SM_STARTPLAY / SM_LOGON_DELPHI 绑定)</summary>
     public int LocalPlayerUid { get; set; } = 0;
 
+    /// <summary>本地主角实体数据引用</summary>
+    public EntityData? Hero => _entities.TryGetValue(LocalPlayerUid, out var e) ? e : null;
+
     public int Count => _entities.Count;
     public IEnumerable<EntityData> AllEntities => _entities.Values;
 
@@ -438,6 +441,19 @@ public class EntityManager
             if (maxHp > 0) ent.MaxHp = maxHp;
             if (color >= 0) ent.NameColor = color;
             EntityHealthBarColorChanged?.Invoke(uid, ent.Hp, ent.MaxHp, ent.NameColor);
+        }
+    }
+
+    /// <summary>
+    /// 更新指定实体的生命值与最大生命值，保持数据模型与表现层 1:1 同步
+    /// </summary>
+    public void UpdateHp(int uid, int hp, int maxHp)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            if (hp >= 0) ent.Hp = hp;
+            if (maxHp > 0) ent.MaxHp = maxHp;
+            if (hp <= 0) ent.IsDead = true;
         }
     }
 }

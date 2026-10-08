@@ -986,12 +986,16 @@ public sealed class ServerMessageRouter
         AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money); // 对齐 Delphi ClMain.pas:5532 PlaySound(s_money)
     }
 
+    // 盛大官方 1.5 角色升级协议 (IDA ProcessServerMessage case 44 @ 0x46A18D)
+    // 物理指令: *(_DWORD *)(dword_4F7EF8 + 72) = v66; (Recog 为等级 Level); play_sound(255);
     private void HandleLevelUp(ServerPacket pkt)
     {
-        int level = pkt.Param > 0 ? pkt.Param : pkt.Recog;
+        int level = pkt.Recog > 0 ? pkt.Recog : pkt.Param;
         if (level > 0)
         {
             _hud?.UpdateLevel(level);
+            _hud?.AddChat("系统", $"[升级] 恭喜你升到了 {level} 级！", new Color(1f, 0.9f, 0.2f));
+            AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.LevelUp);
         }
     }
 
@@ -1002,6 +1006,8 @@ public sealed class ServerMessageRouter
         _hud?.UpdateExp(curExp, maxExp);
     }
 
+    // 盛大官方 1.5 生命与魔法值变动协议 (IDA ProcessServerMessage case 53 '5' @ 0x46A275)
+    // 物理指令: v71 = get_actor_by_id(); *(_WORD *)(v71 + 60) = HIWORD(v67); *(_DWORD *)(v71 + 62) = v68;
     private void HandleHealthSpellChanged(ServerPacket pkt)
     {
         int hp = pkt.Recog;
@@ -1023,6 +1029,13 @@ public sealed class ServerMessageRouter
 
         _hud?.UpdateHp(hp, maxHp);
         _hud?.UpdateMp(mp, maxMp);
+
+        // 保持底层 EntityManager 中主角实体的 Hp/MaxHp 与表现层血球 1:1 绝对一致
+        var hero = _entityManager?.Hero;
+        if (hero != null)
+        {
+            _entityManager?.UpdateHp(hero.Uid, hp, maxHp);
+        }
     }
 
     // 盛大官方 1.5 负重变动协议 (IDA sub_467920 case 622 @ 0x46A7A0)

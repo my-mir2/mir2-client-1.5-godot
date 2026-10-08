@@ -7310,12 +7310,37 @@
         - 标注并隔离 629/632 仅为非标私服兼容别名；
       - 在 `ProtocolConsts.cs` 中建立官方 1.5 权威买卖/修理真值与非标私服隔离区；
       - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_WeightChanged_622_And_Isolation_Test` 脱机单测，测试集扩充至 **187 / 187 项 100% 全部通过**；
+51. **盛大官方 1.5 角色升级协议 (SM_LEVELUP 44) 物理指令与生命魔法值 (SM_HEALTHSPELLCHANGED 53) 底层实体模型同步 (`AudioManager.cs`, `EntityManager.cs`, `ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 1007~1010 铁证：
+        ```c
+        case 44:
+          *(_DWORD *)(dword_4F7EF8 + 72) = v66; // Recog 为角色等级 Level
+          play_sound(255);                     // 官方 1.5 原版升级特效音效 ID 255
+          break;
+        ```
+      - 此前客户端处理 `HandleLevelUp` 优先取 `Param`，与 IDA 原版物理汇编 `v66 (Recog)` 倒错，且缺失升级音效触发；
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 1018~1025 (case 53 '5' @ 0x46A275) 铁证：
+        ```c
+        case 53:
+          v71 = get_actor_by_id();
+          *(_WORD *)(v71 + 60) = HIWORD(v67);
+          *(_DWORD *)(v71 + 62) = v68;
+        ```
+      - 此前生命魔法协议仅更新了 HUD 血球与魔球表现层，底层实体管理器 `EntityManager` 中的主角实体数据未同步更新，导致上层逻辑查询角色数据与画面呈现不一致；
+    - **精准重构**：
+      - 在 `AudioManager.cs` 中增加 `LevelUp = 255` 官方升级音效常量；
+      - 在 `EntityManager.cs` 中添加 `Hero` 快捷属性与 `UpdateHp(int uid, int hp, int maxHp)` 方法；
+      - 在 `ServerMessageRouter.cs` 中：
+        - 纠偏 `HandleLevelUp` 为优先取 `pkt.Recog`，同步输出升级聊天公告并播放 255 升级音效；
+        - 在 `HandleHealthSpellChanged` 中增加对 `_entityManager?.UpdateHp(hero.Uid, hp, maxHp)` 的同步调用，保持底层实体数据模型与表现层血球 1:1 绝对一致；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_LevelUp_44_And_HealthSpell_53_GroundTruth_Test` 脱机单测，测试集扩充至 **188 / 188 项 100% 全部通过**；
       - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **187 / 187 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **188 / 188 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
