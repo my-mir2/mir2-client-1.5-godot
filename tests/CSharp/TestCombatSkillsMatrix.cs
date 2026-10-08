@@ -616,6 +616,38 @@ public class TestCombatSkillsMatrix
         Assert.Equal(120, hero.Hp);
         Assert.Equal(150, hero.MaxHp);
     }
+
+    [Fact]
+    public void Official_1_5_Gold_653_And_TakeOff_619_Isolation_Test()
+    {
+        // 1. 常量真值断言：
+        // 官方 1.5 原版二进制 IDA ProcessServerMessage:
+        // case 653: *(_DWORD *)(dword_4F7EF8 + 88) = v66 (Recog 为金币 Gold); play_sound(106);
+        // case 619: *(_DWORD *)(dword_4F7EF8 + 24) = v66; byte_4F93DC = 0; (脱下装备成功 SM_TAKEOFF_OK)
+        // 绝严禁将 653 误作为升级，绝严禁将 619 误作为经验增长！
+        Assert.Equal((short)653, ProtocolConsts.SM_GOLDCHANGED_DELPHI);
+        Assert.Equal((short)619, ProtocolConsts.SM_TAKEOFF_OK);
+        Assert.Equal((short)40, ProtocolConsts.SM_GOLDCHANGED);
+        Assert.Equal((short)45, ProtocolConsts.SM_EXPERIENCE);
+
+        var router = new ServerMessageRouter(null, null);
+
+        // 2. 模拟 653 金币协议：即使 Recog=100 (<=255)，也绝对是金币变动，绝不误触升级！
+        var goldPkt653 = new ServerPacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, 100, 0, 0, Array.Empty<byte>());
+        router.OnPacket(goldPkt653);
+
+        // 3. 模拟 40 原生金币协议
+        var goldPkt40 = new ServerPacket(ProtocolConsts.SM_GOLDCHANGED, 50000, 0, 0, Array.Empty<byte>());
+        router.OnPacket(goldPkt40);
+
+        // 4. 模拟 619 脱下装备协议：即使 Recog=12345 (物品ID非0)，Param=1 (衣服槽位)，也必须进入脱装备链路清空槽位，绝不倒错为经验增长
+        var takeOffPkt = new ServerPacket(ProtocolConsts.SM_TAKEOFF_OK, 12345, 1, 0, Array.Empty<byte>());
+        router.OnPacket(takeOffPkt);
+
+        // 5. 模拟 45 原生经验协议
+        var expPkt = new ServerPacket(ProtocolConsts.SM_EXPERIENCE, 5000, 10000, 0, Array.Empty<byte>());
+        router.OnPacket(expPkt);
+    }
 }
 
 

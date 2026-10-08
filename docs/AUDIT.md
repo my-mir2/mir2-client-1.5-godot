@@ -7337,10 +7337,43 @@
       - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_LevelUp_44_And_HealthSpell_53_GroundTruth_Test` 脱机单测，测试集扩充至 **188 / 188 项 100% 全部通过**；
       - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+52. **盛大官方 1.5 原版金币协议 (SM_GOLDCHANGED_DELPHI 653) 权威纠偏与脱下装备 (SM_TAKEOFF_OK 619) 伪经验多态坏账彻底清除 (`ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 1095~1104 铁证：
+        ```c
+        case 653:
+          sub_495794(106); // 播放 106.wav 金币音效 (s_money)
+          if ( *(_DWORD *)(dword_4F7EF8 + 88) < v66 )
+          {
+            sub_407D64(v26, v61);
+            sub_403CDC();
+            play_notice_sound();
+          }
+          *(_DWORD *)(dword_4F7EF8 + 88) = v66; // 存入金币字段 dword_4F7EF8 + 88 (Gold)
+          goto LABEL_486;
+        ```
+      - 此前客户端存在严重脑补坏账：将 653 判定为“<=255 为升级，>255 为金币”，导致刚注册新号或持有金币 <= 255 的良民误触发等级改变与升级播报；
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 1143~1147 铁证：
+        ```c
+        case 619:
+          *(_DWORD *)(dword_4F7EF8 + 24) = v66;
+          set_shop_state(v3, -11);
+          byte_4F93DC = 0; // 清空暂存装备缓存，脱下装备成功 (SM_TAKEOFF_OK)
+          break;
+        ```
+      - 此前客户端误定义了私服魔改常量 `SM_WINEXP = 619`，并在 switch 中写下伪逻辑 `if (packet.Recog == 0 && packet.Param < 9) ... else HandleExperience`，导致只要物品 Recog != 0 就会将脱卸封包错误路由至经验值更新，造成脱装备失败且刷经验乱码；
+    - **精准重构**：
+      - 彻底移除 `SM_WINEXP = 619` 常量；
+      - 将 `SM_GOLDCHANGED_DELPHI (653)` 统一路由至官方 `HandleGoldChanged(packet)`，彻底删除臆造的 `HandleOfficialLevelUpOrGold`；
+      - 将 `SM_TAKEOFF_OK (619)` 纠偏为纯净的 `HandleTakeOffOk(packet)` 装备脱卸调用；
+      - 在 `HandleSendUserState (52)` 中对齐官方 IDA 汇编，在 `Recog > 0` 时同步刷新金币；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_Gold_653_And_TakeOff_619_Isolation_Test` 脱机单测，测试集扩充至 **189 / 189 项 100% 全部通过**；
+      - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **188 / 188 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **189 / 189 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

@@ -19,11 +19,10 @@ public sealed class ServerMessageRouter
 {
     // ============ 官方 1.5 权威下行 SM 协议号 (对齐 IDA 0x467920) ============
     public const short SM_GOLDCHANGED            = 40;   // 金币变动广播
-    public const short SM_GOLDCHANGED_DELPHI     = 653;  // Delphi 官方金币变动码 (653)
-    public const short SM_LEVELUP                = 44;   // 角色升级
-    public const short SM_EXPERIENCE             = 45;   // 经验增长
-    public const short SM_WINEXP                 = 619;  // Delphi 杀怪/任务获得经验 (619)
-    public const short SM_SENDUSERSTATE          = 52;   // 角色基础四维属性 (攻魔道防)
+    public const short SM_GOLDCHANGED_DELPHI     = 653;  // Delphi 官方金币变动码 (IDA case 653 @ 0x469C80)
+    public const short SM_LEVELUP                = 44;   // 角色升级 (IDA case ',' @ 0x46A18D)
+    public const short SM_EXPERIENCE             = 45;   // 经验增长 (IDA case '-' @ 0x46A1B0)
+    public const short SM_SENDUSERSTATE          = 52;   // 角色基础四维属性 (攻魔道防, IDA case '4' @ 0x46A250)
     public const short SM_HEALTHSPELLCHANGED     = 53;   // HP/MP 血量魔法值变动
     public const short SM_CHANGELIGHT            = 46;   // 全局昼夜光照范围与火把状态 (46)
     public const short SM_NPCDIALOG              = 54;   // NPC 对话脚本页面
@@ -125,10 +124,8 @@ public sealed class ServerMessageRouter
         switch (smCode)
         {
             case SM_GOLDCHANGED:
+            case SM_GOLDCHANGED_DELPHI: // 653: 盛大官方 1.5 原版金币变动协议 (IDA sub_467920 case 653 @ 0x469C80)
                 HandleGoldChanged(packet);
-                break;
-            case SM_GOLDCHANGED_DELPHI: // 653: 官方 1.5 角色升级协议 (sub_467920 0x469C80)
-                HandleOfficialLevelUpOrGold(packet);
                 break;
             case SM_LEVELUP:
                 HandleLevelUp(packet);
@@ -257,15 +254,8 @@ public sealed class ServerMessageRouter
             case SM_TAKEON_OK:
                 HandleTakeOnOk(packet);
                 break;
-            case SM_TAKEOFF_OK: // 619: 官方 Delphi 619 号多态处理 (脱装备或经验)
-                if (packet.Recog == 0 && packet.Param < 9)
-                {
-                    HandleTakeOffOk(packet);
-                }
-                else
-                {
-                    HandleExperience(packet);
-                }
+            case SM_TAKEOFF_OK: // 619: 盛大官方 1.5 脱下装备成功 (IDA sub_467920 case 619 @ 0x4685A3)
+                HandleTakeOffOk(packet);
                 break;
             case SM_NPCDIALOG:
                 HandleNpcDialog(packet);
@@ -877,31 +867,6 @@ public sealed class ServerMessageRouter
     }
 
     /// <summary>
-    /// 官方 1.5 角色升级与金币双态处理 (SM_LEVELUP_DELPHI 653)
-    /// 严格依据 scratch/ida_processmsg.c 1098 与 client-exe-alignment.md:157
-    /// case 653: 播放 106.wav 音效, 角色等级 Level = v66, 触发升级通知与闪光；若数值超大(>255)兼顾金币变动
-    /// </summary>
-    private void HandleOfficialLevelUpOrGold(ServerPacket pkt)
-    {
-        int val = pkt.Recog;
-        if (val == 0 && !string.IsNullOrEmpty(pkt.ExtraStr) && int.TryParse(pkt.ExtraStr.Trim(), out var parsed))
-        {
-            val = parsed;
-        }
-
-        if (val > 255)
-        {
-            _hud?.UpdateGold(val);
-            AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money);
-        }
-        else
-        {
-            int level = val > 0 ? val : (pkt.Param > 0 ? pkt.Param : 1);
-            _hud?.UpdateLevel(level);
-            _hud?.AddChat("系统", $"[系统] 恭喜您升级到 Lv.{level}！", new Color(1f, 0.84f, 0f));
-            AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money); // 官方 106.wav 升级音效
-        }
-    }
 
     private void HandleGuildJoinFail(ServerPacket pkt)
     {
@@ -975,6 +940,8 @@ public sealed class ServerMessageRouter
         _hud?.AddChat("行会", $"[行会] 解盟失败：{msg}", new Color(1f, 0.4f, 0.4f));
     }
 
+    // 盛大官方 1.5 金币变动协议 (IDA ProcessServerMessage case 40 @ 0x46A140 与 case 653 @ 0x469C80)
+    // 物理指令: *(_DWORD *)(dword_4F7EF8 + 88) = v66; play_sound(106);
     private void HandleGoldChanged(ServerPacket pkt)
     {
         int gold = pkt.Recog;
@@ -1383,10 +1350,15 @@ public sealed class ServerMessageRouter
                 }
             }
             // 2. 若为 52 (SM_SENDUSERSTATE 主角属性下行)，驱动主角自己的 StatusPanel 与 HUD
+            // 盛大官方 1.5 IDA 物理指令: *(_DWORD *)(dword_4F7EF8 + 88) = v66; (Recog 即为 Gold)
             else
             {
                 _hud?.UpdateName(name);
                 _hud?.UpdateLevel(level);
+                if (pkt.Recog > 0)
+                {
+                    _hud?.UpdateGold(pkt.Recog);
+                }
 
                 var sp = _hud?.StatusPanel;
                 if (sp != null)
