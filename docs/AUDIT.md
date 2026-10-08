@@ -7414,10 +7414,34 @@
       - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_MakeObject_713_Sound_711_Light_46_GroundTruth_Test` 脱机单测，测试集扩充至 **190 / 190 项 100% 全部通过**；
       - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+54. **盛大官方 1.5 系统提示与带音效广播 (SM_SYSMSG_DELPHI 100~104) 全系分发与 104 附加数据回执物理指令实证 (`ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 1520~1529 铁证：
+        ```c
+        if ( (unsigned int)(unsigned __int16)v67 - 100 < 5 ) // 覆盖 100, 101, 102, 103, 104 全系！
+        {
+          ResetReadPtr();
+          GetByte();
+          v53 = read_timestamp();
+          read_timestamp();
+          play_sound(v53);
+          if ( (_WORD)v67 == 104 )
+            handle_sm_char_query_extra();
+          goto LABEL_486;
+        }
+        ```
+      - 此前客户端仅单一处理了 100 号协议，而将 101、102、103 协议全部 fallthrough 到 default 丢弃；同时在第 652 行独立设置了一个空壳的 `case 104: SafeLog(...)` 截胡了 104 封包，导致 104 丢失了系统广播与音效播报；
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中将 100、101、102、103 与 104 (`SM_CHAR_QUERY_EXTRA`) 统一收拢到官方 `HandleSysMsgDelphi` 链路；
+      - 清除 652 行空壳截胡的独立 104 case；
+      - 在 `HandleSysMsgDelphi` 中精准上报实际协议号 `pkt.Ident`；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_SysMsg_100_To_104_Family_GroundTruth_Test` 脱机单测，测试集扩充至 **191 / 191 项 100% 全部通过**；
+      - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **190 / 190 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **191 / 191 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

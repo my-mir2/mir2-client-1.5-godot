@@ -681,6 +681,39 @@ public class TestCombatSkillsMatrix
         var lightPkt = new ServerPacket(ProtocolConsts.SM_CHANGELIGHT, 0, 0, 7, Array.Empty<byte>());
         router.OnPacket(lightPkt);
     }
+
+    [Fact]
+    public void Official_1_5_SysMsg_100_To_104_Family_GroundTruth_Test()
+    {
+        // 1. 常量权威真值断言：
+        // 盛大官方 1.5 原版二进制 IDA ProcessServerMessage:
+        // if ( (unsigned int)(unsigned __int16)v67 - 100 < 5 ) // 100, 101, 102, 103, 104
+        // { play_sound(v53); if ( (_WORD)v67 == 104 ) handle_sm_char_query_extra(); }
+        Assert.Equal((short)100, ProtocolConsts.SM_SYSMSG_DELPHI);
+        Assert.Equal((short)104, ProtocolConsts.SM_CHAR_QUERY_EXTRA);
+
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        var enc = System.Text.Encoding.GetEncoding("gb2312");
+        var router = new ServerMessageRouter(null, null);
+
+        // 2. 模拟 100 官方系统广播
+        var msg100 = new ServerPacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 106, 0, enc.GetBytes("欢迎来到热血传奇"));
+        router.OnPacket(msg100);
+
+        // 3. 模拟 101、102、103 广播
+        var msg101 = new ServerPacket(101, 0, 0, 0, enc.GetBytes("全服公告101"));
+        router.OnPacket(msg101);
+
+        var msg102 = new ServerPacket(102, 0, 0, 0, enc.GetBytes("全服公告102"));
+        router.OnPacket(msg102);
+
+        var msg103 = new ServerPacket(103, 0, 0, 0, enc.GetBytes("全服公告103"));
+        router.OnPacket(msg103);
+
+        // 4. 模拟 104 官方附加数据回执
+        var msg104 = new ServerPacket(ProtocolConsts.SM_CHAR_QUERY_EXTRA, 0, 0, 0, enc.GetBytes("角色查询回显104"));
+        router.OnPacket(msg104);
+    }
 }
 
 

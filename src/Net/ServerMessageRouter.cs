@@ -148,7 +148,11 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_GUILDNAME_DELPHI: // 42: 官方 1.5 实体所属行会与封号变动 (IDA case '*' @ 0x46A16F)
                 HandleChangeEntityGuildName(packet);
                 break;
-            case ProtocolConsts.SM_SYSMSG_DELPHI: // 100: 官方 1.5 系统提示与带音效广播 (IDA 0x467920 100~104 @ 0x46AF10)
+            case ProtocolConsts.SM_SYSMSG_DELPHI: // 100~104: 盛大官方 1.5 系统提示与带音效广播 (IDA sub_467920 100~104 @ 0x46AF10)
+            case 101:
+            case 102:
+            case 103:
+            case ProtocolConsts.SM_CHAR_QUERY_EXTRA: // 104
                 HandleSysMsgDelphi(packet);
                 break;
             case SM_LOGICSTATE:
@@ -645,9 +649,7 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_REFRESH_DELPHI: // 51: 官方 1.5 实体数据重置刷新 (IDA case '3')
                 SafeLog($"[SM] 实体数据重置刷新 (SM_REFRESH_DELPHI=51)");
                 break;
-            case ProtocolConsts.SM_CHAR_QUERY_EXTRA: // 104: 官方 1.5 角色附加数据查询 (IDA case 104)
-                SafeLog($"[SM] 角色附加数据查询 (SM_CHAR_QUERY_EXTRA=104)");
-                break;
+
             case ProtocolConsts.SM_QUERYCHAR_FAIL: // 528: 查询角色失败
                 SafeLog($"[SM] 查询角色失败 (SM_QUERYCHAR_FAIL=528)");
                 break;
@@ -1911,7 +1913,7 @@ public sealed class ServerMessageRouter
         {
             _hud?.AddChat("系统", $"[系统] {text}", new Color(1f, 0.9f, 0.4f));
         }
-        SafeLog($"[SM] 官方系统提示: {text} sound={pkt.Param} (SM_SYSMSG_DELPHI 100)");
+        SafeLog($"[SM] 官方系统提示: {text} sound={pkt.Param} (SM_SYSMSG_DELPHI {pkt.Ident})");
     }
 
     // 破土/潜地（36/37）：recog=实体，param/tag=坐标。
