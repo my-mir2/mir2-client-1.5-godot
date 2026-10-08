@@ -70,8 +70,12 @@ public static class ProtocolConsts
     public const short CM_ADDGROUPMEMBER         = 1021;   // 邀请玩家加入队伍
     public const short CM_DELGROUPMEMBER         = 1022;   // 踢出队伍成员
     public const short CM_USERLEAVEGROUP         = 73;   // 已废禁发：网关/Rust 无退组入口（仅 GROUPCLOSE=1036 解散），73 无 arm
-    public const short CM_GROUPMODE              = 1019;   // 切换允许组队模式开关
-    public const short CM_ADJUST_BONUS           = 85;   // 提交分配自由属性点
+    public const short CM_GROUPMODE              = 1019; // 切换允许组队模式开关
+    public const short CM_ADJUST_BONUS           = 1043; // 官方 1.5 提交分配自由属性点 (IDA 0x466E78 DAdjustAbilOkClick 0x4952A8)
+    public const short CM_ADJUST_BONUS_ALT       = 85;   // 历史私服兼容别名
+    public const short CM_MAGICKEYCHANGE         = 1008; // 官方 1.5 技能快捷键设置同步 (IDA case 1008 / bridge)
+    public const short CM_OPENDOOR               = 1002; // 官方 1.5 请求打开石门 (IDA case 1002 / bridge)
+    public const short CM_WANTMINIMAP            = 1033; // 官方 1.5 请求小地图数据 (IDA case 1033 / bridge)
     public const short CM_GUILD_OPEN_PAGE        = 1035; // 打开行会主页
     public const short CM_GUILD_MEMBER_LIST      = 1037; // 获取行会成员列表
     public const short CM_GUILD_NOTICE_UPDATE    = 1040; // 更新发布行会公告

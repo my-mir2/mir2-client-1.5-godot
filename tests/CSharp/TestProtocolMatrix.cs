@@ -2389,6 +2389,38 @@ public class TestProtocolMatrix
         var parsedShopDetail = PacketDecoder.Parse(rawShopDetail.AsSpan(1))!.Value;
         Assert.Equal(ProtocolConsts.SM_SHOP_DETAIL2, parsedShopDetail.Ident);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruthCmCases_AdjustBonusMagicKeyAndMinimap()
+    {
+        // 1. 官方 1.5 加点确认发包 (CM_ADJUST_BONUS 1043, recog=bonusType)
+        byte[] rawAdjust = PacketEncoder.AdjustBonus(2); // 比如分配点数到 MC
+        var parsedAdjust = PacketDecoder.Parse(rawAdjust.AsSpan(1))!.Value;
+        Assert.Equal(1043, parsedAdjust.Ident);
+        Assert.Equal(ProtocolConsts.CM_ADJUST_BONUS, parsedAdjust.Ident);
+        Assert.Equal(2, parsedAdjust.Recog);
+
+        // 2. 官方 1.5 魔法快捷键变更发包 (CM_MAGICKEYCHANGE 1008, recog=magic_id, param=key)
+        byte[] rawMagicKey = PacketEncoder.MagicKeyChange(10, 1); // 雷电术绑定 F1
+        var parsedMagicKey = PacketDecoder.Parse(rawMagicKey.AsSpan(1))!.Value;
+        Assert.Equal(1008, parsedMagicKey.Ident);
+        Assert.Equal(ProtocolConsts.CM_MAGICKEYCHANGE, parsedMagicKey.Ident);
+        Assert.Equal(10, parsedMagicKey.Recog);
+        Assert.Equal(1, parsedMagicKey.Param);
+
+        // 3. 官方 1.5 请求开门 (CM_OPENDOOR 1002, recog=doorIndex)
+        byte[] rawOpenDoor = PacketEncoder.OpenDoor(5);
+        var parsedOpenDoor = PacketDecoder.Parse(rawOpenDoor.AsSpan(1))!.Value;
+        Assert.Equal(1002, parsedOpenDoor.Ident);
+        Assert.Equal(ProtocolConsts.CM_OPENDOOR, parsedOpenDoor.Ident);
+        Assert.Equal(5, parsedOpenDoor.Recog);
+
+        // 4. 官方 1.5 请求小地图数据 (CM_WANTMINIMAP 1033)
+        byte[] rawMinimap = PacketEncoder.WantMinimap();
+        var parsedMinimap = PacketDecoder.Parse(rawMinimap.AsSpan(1))!.Value;
+        Assert.Equal(1033, parsedMinimap.Ident);
+        Assert.Equal(ProtocolConsts.CM_WANTMINIMAP, parsedMinimap.Ident);
+    }
 }
 
 

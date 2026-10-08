@@ -45,6 +45,9 @@ public partial class HudController : CanvasLayer
     [Signal]
     public delegate void TradeCancelRequestedEventHandler();
 
+    [Signal]
+    public delegate void MinimapToggledEventHandler();
+
     public enum ChatChannel
     {
         Near = 0,
@@ -1532,6 +1535,7 @@ public partial class HudController : CanvasLayer
     public void ToggleMinimap()
     {
         _minimapView?.CycleMode();
+        EmitSignal(SignalName.MinimapToggled);
     }
 
     private Vector2 _bagPosBeforeStorage;

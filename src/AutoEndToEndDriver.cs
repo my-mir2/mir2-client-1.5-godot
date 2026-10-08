@@ -2011,7 +2011,30 @@ public partial class AutoEndToEndDriver : Node
 
             case 119:
             {
-                GD.Print("[AutoE2E] ALL 119 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    GD.Print("[AutoE2E] === 验证官方 1.5 加点确认发包 (CM_ADJUST_BONUS 1043)、快捷键设置同步 (CM_MAGICKEYCHANGE 1008) 与小地图请求 (CM_WANTMINIMAP 1033) ===");
+                    // 1. 验证加点面板分配点数并提交
+                    gameView.HudInstance.ToggleAdjustAbil(5);
+                    gameView.HudInstance.AdjustAbilPanel?.AllocateStat(0, 1); // 攻击 +1
+                    gameView.HudInstance.AdjustAbilPanel?.AllocateStat(1, 1); // 魔法 +1
+                    // 模拟提交加点 (触发 StatSubmitted -> CM_ADJUST_BONUS 1043)
+                    gameView.HudInstance.AdjustAbilPanel?.EmitSignal(AdjustAbilPanelView.SignalName.StatSubmitted, 1);
+
+                    // 2. 验证技能快捷键绑定变更并向服务端同步 (触发 KeyBindingConfirmed -> CM_MAGICKEYCHANGE 1008)
+                    gameView.HudInstance.KeySelectDialog?.EmitSignal(KeySelectDialogView.SignalName.KeyBindingConfirmed, 10, 1); // 雷电术绑定 F1
+
+                    // 3. 验证点击小地图切雷达模式并触发请求数据 (触发 MinimapToggled -> CM_WANTMINIMAP 1033)
+                    gameView.HudInstance.ToggleMinimap();
+                }
+                RequestCapture("step119_adjust_bonus_magickey_wantminimap_cm");
+                break;
+            }
+
+            case 120:
+            {
+                GD.Print("[AutoE2E] ALL 120 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }

@@ -660,6 +660,27 @@ namespace Mir2Client.UI
                     };
                 }
 
+                if (HudInstance.AdjustAbilPanel != null)
+                {
+                    HudInstance.AdjustAbilPanel.StatSubmitted += (bonusType) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.AdjustBonus((short)bonusType));
+                    };
+                }
+
+                if (HudInstance.KeySelectDialog != null)
+                {
+                    HudInstance.KeySelectDialog.KeyBindingConfirmed += (magicId, keyNum) =>
+                    {
+                        _net?.SendPacket(PacketEncoder.MagicKeyChange(magicId, (byte)keyNum));
+                    };
+                }
+
+                HudInstance.MinimapToggled += () =>
+                {
+                    _net?.SendPacket(PacketEncoder.WantMinimap());
+                };
+
                 if (HudInstance.Minimap != null)
                 {
                     HudInstance.Minimap.MapTargetSelected += (targetX, targetY) =>

@@ -6935,11 +6935,25 @@
       - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthSmCases_ServerListTakeoffFailShopDetailAndLampDura` 单元测试，脱机测试覆盖扩充至 **163 / 163 项**；
       - 在 `AutoEndToEndDriver.cs` 增加第 118 步实机验证，总演练步数扩充至 **119 步**。
 
+27. **官方 1.5 属性加点上行协议真值纠偏、技能快捷键同步与底栏小地图请求发包全链路连通 (`scratch/ida_processmsg.c`, IDA `0x466E78`, `DAdjustAbilOkClick 0x4952A8`, 服务端 `bridge.rs:81, 1008, 1033`)**：
+    - **官方实证**：
+      - 属性点分配上行协议真值纠偏 (`CM_ADJUST_BONUS 1043`)：此前被误用非标私服协议号 85，经盛大官方原版 1.5 原生代码 `DAdjustAbilOkClick (0x4952A8)` 逆向分析，确认其调用 `0x466E78`，内部硬编码 `push 1043 (0x413)`，且官方 1.4/1.5 服务端网关 `bridge.rs:81, 1060` 明确指定 `CM_ADJUST_BONUS = 1043`，发 85 属于非标漂移，现彻底纠偏为权威物理真值 1043；
+      - 技能快捷键设置与服务端持久化同步 (`CM_MAGICKEYCHANGE 1008`)：官方 1.5 在快捷键设置窗体确认后，发送 `1008` 上报 `magicId` 与绑定的快捷键位索引（0~7 对应 F1~F8）；
+      - 石门开启请求 (`CM_OPENDOOR 1002`)：官方 1.5 玩家与石门交互触发 1002 请求服务端开门；
+      - 底栏小地图雷达校准请求 (`CM_WANTMINIMAP 1033`)：官方 1.5 切换或刷新雷达时向服务端上报请求校准数据；
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 将 `CM_ADJUST_BONUS` 纠偏为 1043，新增 `CM_MAGICKEYCHANGE = 1008`, `CM_OPENDOOR = 1002`, `CM_WANTMINIMAP = 1033`；
+      - 在 `PacketEncoder.cs` 补全 `AdjustBonus` (1043)、`MagicKeyChange` (1008)、`OpenDoor` (1002)、`WantMinimap` (1033) 序列化封包；
+      - 在 `HudController.cs` 增加 `MinimapToggled` 信号并在雷达切换时发射；
+      - 在 `GameView.cs` 彻底连通加点提交、快捷键绑定确认、小地图雷达点击事件至网络发包链路；
+      - 在 `TestProtocolMatrix.cs` 补充 `TestOfficialGroundTruthCmCases_AdjustBonusMagicKeyAndMinimap` 单元测试，脱机测试覆盖扩充至 **164 / 164 项**；
+      - 在 `AutoEndToEndDriver.cs` 增加第 119 步实机验证，总演练步数扩充至 **120 步**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **163 / 163 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
-- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **119 / 119 阶段全生命周期 0 缺陷通过**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **164 / 164 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **120 / 120 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
 

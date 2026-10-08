@@ -284,6 +284,15 @@ public static class PacketEncoder
     public static byte[] AdjustBonus(short bonusType) =>
         MakePacket(ProtocolConsts.CM_ADJUST_BONUS, bonusType);
 
+    public static byte[] MagicKeyChange(int magicId, byte keyNum) =>
+        MakePacket(ProtocolConsts.CM_MAGICKEYCHANGE, magicId, keyNum);
+
+    public static byte[] OpenDoor(int doorIndex = 0) =>
+        MakePacket(ProtocolConsts.CM_OPENDOOR, doorIndex);
+
+    public static byte[] WantMinimap() =>
+        MakePacket(ProtocolConsts.CM_WANTMINIMAP, 0);
+
     public static byte[] QueryRepairCost(int slot) =>
         MakePacket(ProtocolConsts.CM_QUERYREPAIRCOST, slot);
 
