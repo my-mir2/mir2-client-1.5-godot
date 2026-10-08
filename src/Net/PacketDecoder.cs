@@ -73,4 +73,51 @@ public static class PacketDecoder
         }
         return list;
     }
+
+    /// <summary>
+    /// 解析盛大官方 1.5 商店商品条目列表 (SM_MERCHANT_ITEM 645, SM_MERCHANT_SELL_LIST 652)
+    /// Extra 包含制表符、斜杠或换行符分隔的商品条目:
+    /// 每行格式：名称 [\t 或 / 或 空格] 价格 [\t 或 / 或 空格] 重量或当前持久 [\t 或 / 或 空格] 最大持久
+    /// </summary>
+    public static System.Collections.Generic.List<UI.ShopPanelView.ShopItemEntry> DecodeShopItems(string extraText)
+    {
+        var list = new System.Collections.Generic.List<UI.ShopPanelView.ShopItemEntry>();
+        if (string.IsNullOrWhiteSpace(extraText))
+            return list;
+
+        var lines = extraText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            // 优先按制表符 \t 分隔，若无则按 / 分隔，最后按空格分隔
+            char separator = trimmed.Contains('\t') ? '\t' : (trimmed.Contains('/') ? '/' : ' ');
+            var parts = trimmed.Split(new[] { separator }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+                continue;
+
+            string name = parts[0].Trim();
+            int price = 0;
+            int weightOrDura = 0;
+            int maxDura = 0;
+
+            if (parts.Length > 1 && int.TryParse(parts[1].Trim(), out int p))
+                price = p;
+            if (parts.Length > 2 && int.TryParse(parts[2].Trim(), out int w))
+                weightOrDura = w;
+            if (parts.Length > 3 && int.TryParse(parts[3].Trim(), out int md))
+                maxDura = md;
+
+            var entry = new UI.ShopPanelView.ShopItemEntry(name, weightOrDura, price);
+            if (maxDura > 0)
+            {
+                entry.Dura = weightOrDura;
+                entry.MaxDura = maxDura;
+            }
+            list.Add(entry);
+        }
+        return list;
+    }
 }

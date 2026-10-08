@@ -7443,10 +7443,49 @@
       - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_SysMsg_100_To_104_Family_GroundTruth_Test` 脱机单测，测试集扩充至 **191 / 191 项 100% 全部通过**；
       - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+55. **盛大官方 1.5 商店货架商品解析 (SM 645/652)、组队开关强制激活 (SM 660)、虚表重绘 (SM 666) 与战斗姿态解除 (SM 635) 物理指令实证 (`ServerMessageRouter.cs`, `PacketDecoder.cs`, `GroupPanelView.cs`, `HudController.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 327~330、398~400、1046~1048、1092~1094、1120~1124 铁证：
+        ```c
+        // 660: 建队成功/允许组队，官方指令无条件开启全局组队开关
+        case 660:
+          dword_4F94E8 = GetTickCount();
+          byte_4F94F8 = 1;
+          goto LABEL_486;
+        // 666: 组队窗口虚表重绘函数回调 (GroupPanel.RefreshMembers)
+        case 666:
+          (*(void (**)(void))(*(_DWORD *)dword_4F94FC + 64))();
+          goto LABEL_486;
+        // 645 与 652: 加载商店货架商品明细与回购列表
+        case 645:
+          load_shop_detail(v81);
+          goto LABEL_486;
+        case 652:
+          load_shop_sell_list(v81, (unsigned __int16)v68);
+          goto LABEL_486;
+        // 635: 战斗姿态解除与网络防抖锁复位
+        case 635:
+          byte_4F9410 = 0;
+          handle_sm_combat_end();
+          goto LABEL_486;
+        ```
+      - 此前客户端坏账：
+        1. 660 误判为 `Recog > 0 || Param > 0`，若服务端下发 660 空参数包则错误将组队模式置为 false；
+        2. 666 误判为纯解散清空，丢失了官方窗体虚表重绘链路；
+        3. 645 与 652 仅在聊天框打印日志，未将 Extra 中的商品条目解码并填充至 `ShopPanel` 货架列表；
+        4. 635 仅有日志输出，未在界面控制器触发战斗姿态解除与防抖复位。
+    - **精准重构**：
+      - 在 `GroupPanelView.cs` 增加成员列表缓存与官方虚表重绘 `RefreshMembers()` 方法；
+      - 在 `PacketDecoder.cs` 增加 `DecodeShopItems`，支持制表符、斜杠、空格分隔的商品条目解析（名称、价格、重量/耐久、最大耐久）；
+      - 在 `HudController.cs` 增加 `OnCombatEnd()`；
+      - 在 `ServerMessageRouter.cs` 将 660 纠偏为无条件 `allowGroup = true`，将 666 接入 `RefreshMembers()`，将 645/652 解析数据注入 `ShopPanel.SetItems` 并驱动界面显现，将 635 接入 `OnCombatEnd()`；
+      - 在 `TestCombatSkillsMatrix.cs` 中新增 `Official_1_5_Shop_Items_645_652_And_Group_660_666_GroundTruth_Test` 脱机单测，测试集扩充至 **193 / 193 项 100% 全部通过**；
+      - 在 Godot 真实无头自动化演练中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **191 / 191 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **193 / 193 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

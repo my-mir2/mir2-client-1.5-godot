@@ -1465,6 +1465,14 @@ public partial class HudController : CanvasLayer
         AddChat("战斗", msg, new Color(1f, 0.6f, 0.3f));
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 战斗姿态解除 (SM_COMBAT_END 635, IDA case 635 @ 0x469B80: byte_4F9410 = 0)
+    /// </summary>
+    public void OnCombatEnd()
+    {
+        AddChat("战斗", "[战斗] 战斗状态解除，恢复常态。", new Color(0.6f, 0.8f, 1f));
+    }
+
     public void UpdateName(string name)
     {
         if (_lblName != null) _lblName.Text = name;

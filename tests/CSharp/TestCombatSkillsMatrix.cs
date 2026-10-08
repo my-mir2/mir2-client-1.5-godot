@@ -714,6 +714,61 @@ public class TestCombatSkillsMatrix
         var msg104 = new ServerPacket(ProtocolConsts.SM_CHAR_QUERY_EXTRA, 0, 0, 0, enc.GetBytes("角色查询回显104"));
         router.OnPacket(msg104);
     }
+
+    [Fact]
+    public void Official_1_5_Shop_Items_645_652_And_Group_660_666_GroundTruth_Test()
+    {
+        // 1. 验证 PacketDecoder.DecodeShopItems 解析能力
+        string shopDataTab = "金创药(小量)\t100\t1\n魔法药(小量)\t120\t1\n乌木剑\t1000\t8\t10";
+        var itemsTab = PacketDecoder.DecodeShopItems(shopDataTab);
+        Assert.Equal(3, itemsTab.Count);
+        Assert.Equal("金创药(小量)", itemsTab[0].Name);
+        Assert.Equal(100, itemsTab[0].Price);
+        Assert.Equal(1, itemsTab[0].Weight);
+        Assert.Equal("乌木剑", itemsTab[2].Name);
+        Assert.Equal(1000, itemsTab[2].Price);
+        Assert.Equal(8, itemsTab[2].Dura);
+        Assert.Equal(10, itemsTab[2].MaxDura);
+
+        // 验证斜杠格式
+        string shopDataSlash = "金创药(中量)/220/2\n魔法药(中量)/250/2";
+        var itemsSlash = PacketDecoder.DecodeShopItems(shopDataSlash);
+        Assert.Equal(2, itemsSlash.Count);
+        Assert.Equal("金创药(中量)", itemsSlash[0].Name);
+        Assert.Equal(220, itemsSlash[0].Price);
+
+        // 2. 验证官方 1.5 协议常量真值
+        Assert.Equal((short)645, ProtocolConsts.SM_MERCHANT_ITEM);
+        Assert.Equal((short)652, ProtocolConsts.SM_MERCHANT_SELL_LIST);
+        Assert.Equal((short)660, ProtocolConsts.SM_GROUP_MODE_CHANGED);
+        Assert.Equal((short)666, ProtocolConsts.SM_DISMISS_GROUP);
+        Assert.Equal((short)635, ProtocolConsts.SM_COMBAT_END);
+
+        // 3. 验证 645/652/660/666/635 在 ServerMessageRouter 路由分发中的鲁棒性
+        var router = new ServerMessageRouter(null, null);
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        var enc = System.Text.Encoding.GetEncoding("gb2312");
+
+        // 模拟 645 货架条目下发
+        var p645 = new ServerPacket(ProtocolConsts.SM_MERCHANT_ITEM, 101, 0, 0, enc.GetBytes(shopDataTab));
+        router.OnPacket(p645);
+
+        // 模拟 652 回售列表下发
+        var p652 = new ServerPacket(ProtocolConsts.SM_MERCHANT_SELL_LIST, 101, 0, 0, enc.GetBytes(shopDataSlash));
+        router.OnPacket(p652);
+
+        // 模拟 660 建队成功/强制开启组队模式 (即便 Recog/Param 均为 0，官方指令无条件 byte_4F94F8 = 1)
+        var p660 = new ServerPacket(ProtocolConsts.SM_GROUP_MODE_CHANGED, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p660);
+
+        // 模拟 666 界面重绘虚表回调
+        var p666 = new ServerPacket(ProtocolConsts.SM_DISMISS_GROUP, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p666);
+
+        // 模拟 635 战斗姿态解除
+        var p635 = new ServerPacket(ProtocolConsts.SM_COMBAT_END, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(p635);
+    }
 }
 
 

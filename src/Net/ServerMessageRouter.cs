@@ -408,12 +408,9 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_GROUP_INVITE_CONFIRM: // 658: 组队邀请模态确认 (IDA case 658)
                 HandleGroupInviteConfirm(packet);
                 break;
-            case ProtocolConsts.SM_GROUP_MODE_CHANGED: // 660: 组队模式开关变动回显 (IDA case 660)
-                {
-                    bool allowGroup = packet.Recog > 0 || packet.Param > 0;
-                    _hud?.GroupPanel?.SetAllowGroup(allowGroup);
-                    _hud?.AddChat("组队", allowGroup ? "[组队] 已开启允许组队模式。" : "[组队] 已关闭允许组队模式。", new Color(0.4f, 1f, 0.5f));
-                }
+            case ProtocolConsts.SM_GROUP_MODE_CHANGED: // 660: 盛大官方 1.5 组队模式强制开启与建队成功 (IDA case 660: dword_4F94E8 = GetTickCount(); byte_4F94F8 = 1)
+                _hud?.GroupPanel?.SetAllowGroup(true);
+                _hud?.AddChat("组队", "[组队] 已开启允许组队模式。", new Color(0.4f, 1f, 0.5f));
                 break;
             case ProtocolConsts.SM_MAPDESCRIPTION: // 661: 地图描述公告 / 组队邀请反馈 (IDA 0x46A3A2)
                 if (packet.Recog < 0)
@@ -431,9 +428,13 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_LEAVEGROUP_FAIL: // 665: 踢出/退出编组失败模态弹窗 (IDA 0x46A4CE)
                 HandleLeaveGroupFail(packet);
                 break;
-            case ProtocolConsts.SM_DISMISS_GROUP: // 666: 解散编组注销清空 (IDA case 666)
-                _hud?.GroupPanel?.ClearMembers();
-                _hud?.AddChat("组队", "[组队] 编组已经解散。", new Color(1f, 0.8f, 0.4f));
+            case ProtocolConsts.SM_DISMISS_GROUP: // 666: 盛大官方 1.5 组队成员重绘回调与解散处理 (IDA case 666: (*(void (**)(void))(*(_DWORD *)dword_4F94FC + 64))())
+                _hud?.GroupPanel?.RefreshMembers();
+                if (packet.Recog == 0 && packet.Param == 0)
+                {
+                    _hud?.GroupPanel?.ClearMembers();
+                    _hud?.AddChat("组队", "[组队] 编组已经解散。", new Color(1f, 0.8f, 0.4f));
+                }
                 break;
             case ProtocolConsts.SM_SENDNOTICE: // 662: 全服系统公告跑马灯
                 HandleSendNotice(packet);
@@ -730,12 +731,39 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_MERCHANT_NORMAL: // 646: 打开常规买卖面板
                 _hud?.ToggleShop(packet.Recog);
                 break;
-            case ProtocolConsts.SM_MERCHANT_ITEM: // 645: 商店商品明细条目
-                _hud?.AddChat("商店", $"[商店] 货架商品更新: {DecodeExtraText(packet.Extra)}", new Color(0.9f, 0.9f, 0.5f));
+            case ProtocolConsts.SM_MERCHANT_ITEM: // 645: 商店商品明细条目 (IDA case 645 load_shop_detail)
+                {
+                    string extraStr = DecodeExtraText(packet.Extra);
+                    if (string.IsNullOrEmpty(extraStr)) extraStr = packet.ExtraStr;
+                    var items = PacketDecoder.DecodeShopItems(extraStr);
+                    if (items.Count > 0)
+                    {
+                        _hud?.ShopPanel?.SetMode(ShopPanelView.ShopMode.Buy);
+                        _hud?.ShopPanel?.SetItems(items);
+                        if (_hud?.ShopPanel != null && !_hud.ShopPanel.Visible)
+                        {
+                            _hud.ToggleShop(packet.Recog);
+                        }
+                    }
+                    _hud?.AddChat("商店", $"[商店] 货架商品更新: {extraStr}", new Color(0.9f, 0.9f, 0.5f));
+                }
                 break;
-            case ProtocolConsts.SM_MERCHANT_SELL_LIST: // 652: 打开回购出售列表
-                _hud?.ToggleShop(packet.Recog);
-                _hud?.AddChat("商店", "[商店] 回售列表已加载。", new Color(0.8f, 0.9f, 0.6f));
+            case ProtocolConsts.SM_MERCHANT_SELL_LIST: // 652: 打开回购出售列表 (IDA case 652 load_shop_sell_list)
+                {
+                    string extraStr = DecodeExtraText(packet.Extra);
+                    if (string.IsNullOrEmpty(extraStr)) extraStr = packet.ExtraStr;
+                    var items = PacketDecoder.DecodeShopItems(extraStr);
+                    _hud?.ShopPanel?.SetMode(ShopPanelView.ShopMode.Sell);
+                    if (items.Count > 0)
+                    {
+                        _hud?.ShopPanel?.SetItems(items);
+                    }
+                    if (_hud?.ShopPanel != null && !_hud.ShopPanel.Visible)
+                    {
+                        _hud.ToggleShop(packet.Recog);
+                    }
+                    _hud?.AddChat("商店", "[商店] 回售列表已加载。", new Color(0.8f, 0.9f, 0.6f));
+                }
                 break;
             case ProtocolConsts.SM_ACTOR_PARAM: // 654: 实体属性/体态更新
                 _hud?.OnActorParam(packet.Recog, packet.Param);
@@ -783,7 +811,8 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_COMBAT_BROADCAST: // 634: 战斗广播/战斗消息 (IDA case 634)
                 _hud?.OnCombatBroadcast($"[战斗] {DecodeExtraText(packet.Extra)}");
                 break;
-            case ProtocolConsts.SM_COMBAT_END: // 635: 战斗姿态解除 (IDA case 635)
+            case ProtocolConsts.SM_COMBAT_END: // 635: 盛大官方 1.5 战斗姿态解除与防抖复位 (IDA case 635: byte_4F9410 = 0)
+                _hud?.OnCombatEnd();
                 SafeLog("[SM] 战斗姿态已解除 (SM_COMBAT_END=635)");
                 break;
             case ProtocolConsts.SM_ACTOR_TIMESTAMP: // 656: 实体动作校验时间戳同步 (IDA case 656)

@@ -197,6 +197,17 @@ public partial class GroupPanelView : Control, IManagedWindow
         EmitSignal(SignalName.GroupModeToggled, _groupModeEnabled);
     }
 
+    public string CurrentLeader { get; private set; } = string.Empty;
+    public List<string> CurrentMembers { get; private set; } = new();
+
+    /// <summary>
+    /// 盛大官方 1.5 组队界面成员刷新重绘 (IDA ProcessServerMessage case 666: (*(void (**)(void))(*(_DWORD *)dword_4F94FC + 64))())
+    /// </summary>
+    public void RefreshMembers()
+    {
+        SetMembers(CurrentLeader, CurrentMembers);
+    }
+
     /// <summary>
     /// 盛大官方 1.5 组队成员绘制 (IDA sub_490DFC 绝对坐标实证):
     /// 1. 队长 (索引 0): (Left + 28, Top + 80), 银灰文字 0xC0C0C0;
@@ -204,6 +215,13 @@ public partial class GroupPanelView : Control, IManagedWindow
     /// </summary>
     public void SetMembers(string leader, IList<string>? members = null)
     {
+        CurrentLeader = leader ?? string.Empty;
+        CurrentMembers.Clear();
+        if (members != null)
+        {
+            CurrentMembers.AddRange(members);
+        }
+
         if (_membersContainer == null) return;
         foreach (Node child in _membersContainer.GetChildren())
         {
@@ -257,6 +275,8 @@ public partial class GroupPanelView : Control, IManagedWindow
 
     public void ClearMembers()
     {
+        CurrentLeader = string.Empty;
+        CurrentMembers.Clear();
         if (_membersContainer == null) return;
         foreach (Node child in _membersContainer.GetChildren())
         {
