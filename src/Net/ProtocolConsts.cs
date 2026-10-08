@@ -93,6 +93,7 @@ public static class ProtocolConsts
     // ============ 官方 1.5 权威 SM 协议号 (下行) ============
     public const short SM_ATTACKMODECHANGED      = 766;  // 官方攻击模式变更回显 (IDA sub_467920 case 766 @ 0x468A2B)
     public const short SM_PASSOK                 = 500;  // 账号密码验证成功
+    public const short SM_VERSION_FAIL           = 501;  // 盛大官方 1.5 客户端补丁版本不符 (IDA 0x46B68C)
     public const short SM_CHANGEPASS_FAIL        = 503;  // 盛大官方 1.5 修改密码失败模态框 (IDA case 503 @ 0x46B174~0x46B264)
     public const short SM_SERVERINDEX            = 114;  // 服务器分区列表下发
     public const short SM_CHARLIST               = 120;  // 官方桥接角色列表下发
@@ -111,6 +112,8 @@ public static class ProtocolConsts
     public const short SM_DELCHR_SUCCESS         = 123;  // 删除角色成功 (桥接号)
     public const short SM_DELCHAR_SUCCESS_DELPHI = 523;  // 盛大官方 1.5 删除角色成功/重新查询 (IDA case 523)
     public const short SM_SELECTSERVER_OK        = 525;  // 盛大官方 1.5 选服确认进入选角 (IDA case 525)
+    public const short SM_SELECTCHAR_OK_DELPHI   = 531;  // 盛大官方 1.5 选定角色成功确认 (IDA case 531 @ 0x468867)
+    public const short SM_ENTITY_ACTION_STRING   = 9;    // 盛大官方 1.5 实体动画带附带字符串广播 (IDA case 9)
     public const short SM_OUTOFCONNECTION        = 526;  // 服务器满员
     public const short SM_DISCONNECT_DELPHI      = 527;  // 服务端强制断开
     public const short SM_BILLING_NOTICE         = 529;  // 计费到期通知 (sub_467920 0x46B3C8)
@@ -141,18 +144,24 @@ public static class ProtocolConsts
     public const short SM_NPCDELETE              = 231;  // NPC 离开视野 (bridge.rs 权威实证)
     public const short SM_GROUNDITEM             = 314;  // 地表掉落物品出现 (bridge.rs 权威实证)
     public const short SM_DELGROUNDITEM          = 315;  // 地表掉落物品消失/拾取 (bridge.rs 权威实证)
-    public const short SM_ACTION_PARAM_SYNC      = 22;   // 动作参数三元组同步
-    public const short SM_MAPMOVE                = 23;   // 地图传送坐标突变
-    public const short SM_SITDOWN                = 27;   // 打坐/起立切换
+    public const short SM_ACTION_PARAM_SYNC      = 22;   // 动作参数三元组同步 (IDA case 22)
+    public const short SM_MAPMOVE                = 23;   // 地图传送坐标突变 (IDA case 23)
+    public const short SM_SITDOWN                = 27;   // 打坐/起立切换 (IDA case 27)
+    public const short SM_DEATH_ACTION_DELPHI    = 28;   // 盛大官方 1.5 实体死亡倒地动画 (IDA sub_467920 case 28)
     public const short SM_SPELLRESULT            = 30;   // 施法伤害结算
-    public const short SM_SPELLEFFECT            = 32;   // 施法魔法光效
+    public const short SM_SPELLEFFECT            = 32;   // 官方 1.5 施法魔法光效 (IDA sub_467920 case ' ')
+    public const short SM_FLYAXE_DELPHI          = 33;   // 盛大官方 1.5 投掷物飞行弹道 (IDA sub_467920 case '!')
+    public const short SM_SPELLACTION_DELPHI     = 34;   // 盛大官方 1.5 实体施法动作 (IDA sub_467920 case '"')
     public const short SM_OBJECTSPELL            = 243;  // 实体施法动作 (bridge.rs 权威实证)
     public const short SM_OBJECTSTRUCK           = 244;  // 实体受击后仰 (bridge.rs 权威实证)
     public const short SM_OBJECTSTRUCK_DELPHI    = 637;  // 实体受击伤害结算 (Delphi 变体)
     public const short SM_MAGIC_FIRE             = 638;  // 施法特效下发广播 (bridge.rs 权威实证)
     public const short SM_DIGUP                  = 36;   // 地下破土
     public const short SM_DIGDOWN                = 37;   // 潜入地下
-    public const short SM_GOLDCHANGED            = 40;   // 金币变动广播
+    public const short SM_ACTORSOUND_DELPHI      = 40;   // 盛大官方 1.5 实体音效触发播放 (IDA sub_467920 case '(')
+    public const short SM_GOLDCHANGED            = 40;   // 兼容早期金币变动广播别名
+    public const short SM_REFRESH_DELPHI         = 51;   // 盛大官方 1.5 实体数据重置刷新 (IDA sub_467920 case '3')
+    public const short SM_CHAR_QUERY_EXTRA       = 104;  // 盛大官方 1.5 角色附加数据查询回执 (IDA sub_467920 case 104)
     public const short SM_CHANGENAMECOLOR        = 41;   // 名字颜色/PK红黄名
     public const short SM_GUILDNAME_DELPHI       = 42;   // 行会封号更新
     public const short SM_LEVELUP                = 44;   // 角色升级金光

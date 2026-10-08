@@ -2784,6 +2784,70 @@ public class TestProtocolMatrix
         Assert.Equal("您选择的服务器用户满员。", fullMsg);
         Assert.Contains("连接时间可能超过限制", disconMsg);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruth_All172TopLevelOpcodesAndActionPipeline()
+    {
+        // 1. 验证盛大官方 1.5 权威顶层操作码常量
+        Assert.Equal(22, ProtocolConsts.SM_ACTION_PARAM_SYNC);
+        Assert.Equal(23, ProtocolConsts.SM_MAPMOVE);
+        Assert.Equal(28, ProtocolConsts.SM_DEATH_ACTION_DELPHI);
+        Assert.Equal(32, ProtocolConsts.SM_SPELLEFFECT);
+        Assert.Equal(33, ProtocolConsts.SM_FLYAXE_DELPHI);
+        Assert.Equal(34, ProtocolConsts.SM_SPELLACTION_DELPHI);
+        Assert.Equal(50, ProtocolConsts.SM_LOGON_DELPHI);
+        Assert.Equal(51, ProtocolConsts.SM_REFRESH_DELPHI);
+        Assert.Equal(104, ProtocolConsts.SM_CHAR_QUERY_EXTRA);
+        Assert.Equal(501, ProtocolConsts.SM_VERSION_FAIL);
+        Assert.Equal(525, ProtocolConsts.SM_SELECTSERVER_OK);
+        Assert.Equal(531, ProtocolConsts.SM_SELECTCHAR_OK_DELPHI);
+
+        // 2. 验证 ServerMessageRouter 针对新增顶层协议的分发闭环
+        var em = new Mir2Client.Game.EntityManager();
+        em.AddEntity(1001, "测试目标", Mir2Client.Game.EntityManager.EntityType.Monster, 300, 300);
+        var router = new ServerMessageRouter(null, em, null, null);
+
+        // 22: 动作参数同步
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_ACTION_PARAM_SYNC, 1001, 888, 0, Array.Empty<byte>()));
+        var target = em.GetEntity(1001);
+        Assert.NotNull(target);
+        Assert.Equal(888, target.ActorParam);
+
+        // 23: 地图传送瞬移坐标突变 (同地图瞬移)
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_MAPMOVE, 1001, 350, 360, Array.Empty<byte>()));
+
+        // 28: 实体死亡倒地动画
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEATH_ACTION_DELPHI, 1001, 0, 0, Array.Empty<byte>()));
+        Assert.True(target.IsDead);
+
+        // 31: 实体位移平滑移动
+        router.OnPacket(new ServerPacket(31, 1001, 0, 0, System.Text.Encoding.UTF8.GetBytes("355/365/2")));
+
+        // 32/34: 施法光效前摇与动作
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_SPELLEFFECT, 1001, 10, 300, System.Text.Encoding.UTF8.GetBytes("300 10")));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_SPELLACTION_DELPHI, 1001, 10, 300, System.Text.Encoding.UTF8.GetBytes("300 10")));
+
+        // 33: 投掷物飞行弹道
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_FLYAXE_DELPHI, 1001, 10, 300, System.Text.Encoding.UTF8.GetBytes("300 10")));
+
+        // 50: 主角色进入世界并绑定
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_LOGON_DELPHI, 1001, 0, 0, Array.Empty<byte>()));
+
+        // 51: 实体数据刷新
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_REFRESH_DELPHI, 1001, 0, 0, Array.Empty<byte>()));
+
+        // 104: 角色附加数据查询
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_CHAR_QUERY_EXTRA, 1001, 0, 0, Array.Empty<byte>()));
+
+        // 501: 补丁版本不符
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_VERSION_FAIL, 0, 0, 0, Array.Empty<byte>()));
+
+        // 525: 选服确认进入选角
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_SELECTSERVER_OK, 0, 0, 0, Array.Empty<byte>()));
+
+        // 531: 选定角色成功确认
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_SELECTCHAR_OK_DELPHI, 0, 0, 0, Array.Empty<byte>()));
+    }
 }
 
 

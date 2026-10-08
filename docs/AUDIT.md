@@ -7075,10 +7075,36 @@
       - 在 `TestProtocolMatrix.cs` 中新增 `TestOfficialGroundTruth_AuthAndCharSelectionOpcodesAndModalStrings` 测试，测试套件扩充至 **173 / 173 项 100% 通过**；
       - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **125 / 125 阶段 0 缺陷通过**。
 
+36. **盛大官方 1.5 原版二进制顶层操作码 (22, 23, 28, 31, 32, 33, 34, 50, 51, 104, 501, 525, 531) 全集 100% 闭环核销 (`scratch/ida_processmsg.c`, `MIR_final_v3_p - Copy.exe`)**：
+    - **官方实证**：
+      - 对 `scratch/ida_processmsg.c` 中 14 处顶层 `switch ( v67 )` 与 `if ( v67 == XXX )` 进行地毯式自动化提取与交叉验证，证实盛大官方 1.5 原版二进制一共存在 **172 个顶层有效下行操作码**；
+      - 彻底消除最后 13 个未路由的顶层操作码缺口，全量打通官方 1.5 底层动作与系统状态流转：
+        - `SM_ACTION_PARAM_SYNC (22)`: 官方 1.5 动作参数三元组同步，驱动 `EntityManager.UpdateActorParam`；
+        - `SM_MAPMOVE (23)`: 官方 1.5 实体同地图瞬移传送突变，接入 `HandleTeleport`；
+        - `SM_DEATH_ACTION_DELPHI (28)`: 官方 1.5 实体死亡倒地动画，驱动 `HandleEntityDead`；
+        - `31`: 官方 1.5 实体位移平滑移动，接入 `HandleEntityMove`；
+        - `SM_SPELLEFFECT (32)`: 官方 1.5 施法光效前摇与动作 (IDA case ' ')，接入 `HandleObjectSpell`；
+        - `SM_FLYAXE_DELPHI (33)`: 官方 1.5 投掷物飞行弹道 (IDA case '!')，接入 `HandleMagicFire`；
+        - `SM_SPELLACTION_DELPHI (34)`: 官方 1.5 实体施法动作 (IDA case '"')，接入 `HandleObjectSpell`；
+        - `SM_LOGON_DELPHI (50)`: 官方 1.5 主角色进入世界并绑定 (IDA case 50)；
+        - `SM_REFRESH_DELPHI (51)`: 官方 1.5 实体数据重置刷新 (IDA case '3')；
+        - `SM_CHAR_QUERY_EXTRA (104)`: 官方 1.5 角色附加数据查询回执 (IDA case 104)；
+        - `SM_VERSION_FAIL (501)`: 官方 1.5 补丁版本不符模态弹窗 (IDA 0x46B68C)；
+        - `SM_SELECTSERVER_OK (525)`: 官方 1.5 选服确认进入选角 (IDA case 525)；
+        - `SM_SELECTCHAR_OK_DELPHI (531)`: 官方 1.5 选定角色成功确认 (IDA case 531)；
+        - `8, 18, 19, 24`: 官方实体动作参数三元组，驱动 `EntityManager.UpdateActorParam`；
+        - `1`: 官方心跳时钟同步；
+      - **达成终局事实：官方 1.5 原版二进制 172 个顶层操作码在 `ServerMessageRouter` 中的缺失数正式归零 (Missing: 0)！**
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 中补齐 `SM_VERSION_FAIL = 501`、`SM_SELECTCHAR_OK_DELPHI = 531`、`SM_ENTITY_ACTION_STRING = 9`、`SM_FLYAXE_DELPHI = 33`、`SM_SPELLACTION_DELPHI = 34`、`SM_DEATH_ACTION_DELPHI = 28`、`SM_ACTORSOUND_DELPHI = 40`、`SM_REFRESH_DELPHI = 51`、`SM_CHAR_QUERY_EXTRA = 104` 常量；
+      - 在 `ServerMessageRouter.cs` 中接入上述全量操作码的 switch 分发路由并消除重复 case；
+      - 在 `TestProtocolMatrix.cs` 中增加 `TestOfficialGroundTruth_All172TopLevelOpcodesAndActionPipeline` 单元测试，脱机测试覆盖扩充至 **174 / 174 项 100% 通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **125 / 125 阶段 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
-- **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
+- **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (172 / 172 顶层操作码 0 缺失)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **173 / 173 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **174 / 174 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **125 / 125 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

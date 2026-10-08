@@ -1,31 +1,68 @@
-import os, re
+import re
 
-missing_ids = [1, 2, 3, 4, 5, 8, 9, 17, 18, 19, 20, 21, 22, 23, 24, 28, 29, 30, 520, 521, 522, 523, 524, 528, 530, 615, 617, 618, 619, 620, 621, 622, 637, 638, 639, 642, 643, 644, 645, 646, 647, 652, 653, 654, 655, 657, 663, 671, 673, 674, 675, 676, 677, 678, 681, 682, 683, 684, 685, 686, 687, 700, 704, 708, 709, 710, 712, 751, 753, 756, 758, 766, 767, 768, 770, 805, 810]
+with open("scratch/ida_processmsg.c", "r", encoding="utf-8") as f:
+    ida_text = f.read()
 
-src_files = []
-for root, dirs, files in os.walk('src'):
-    for f in files:
-        if f.endswith('.cs'):
-            src_files.append(os.path.join(root, f))
-
-found_dict = {}
-for mid in missing_ids:
-    hits = []
-    pattern = re.compile(r'(\bcase\s+' + str(mid) + r'\b|\bIdent\s*==\s*' + str(mid) + r'\b|\bSM_[A-Za-z0-9_]+\s*=\s*' + str(mid) + r'\b)')
-    for sf in src_files:
-        with open(sf, 'r', encoding='utf-8', errors='ignore') as f:
-            content = f.read()
-            m = pattern.search(content)
-            if m:
-                hits.append((sf, m.group(0)))
-    found_dict[mid] = hits
-
-completely_missing = []
-for mid in missing_ids:
-    if not found_dict[mid]:
-        completely_missing.append(mid)
+ida_cases = set()
+for m in re.finditer(r"case\s+([0-9xXa-fA-F]+|'[^']+'):", ida_text):
+    c = m.group(1)
+    if c.startswith("'"):
+        val = ord(c[1])
+    elif c.lower().startswith("0x"):
+        val = int(c, 16)
     else:
-        print(f"ID {mid} found in: {[h[0] + ': ' + h[1] for h in found_dict[mid]]}")
+        val = int(c)
+    ida_cases.add(val)
 
-print('=== COMPLETELY MISSING IDS (' + str(len(completely_missing)) + ') ===')
-print(completely_missing)
+for m in re.finditer(r"v67\s*==\s*([0-9xXa-fA-F]+)", ida_text):
+    c = m.group(1)
+    val = int(c, 16) if c.lower().startswith("0x") else int(c)
+    ida_cases.add(val)
+
+with open("src/Net/ServerMessageRouter.cs", "r", encoding="utf-8") as f:
+    router_text = f.read()
+
+with open("src/Net/ProtocolConsts.cs", "r", encoding="utf-8") as f:
+    consts_text = f.read()
+
+const_vals = {}
+for m in re.finditer(r"public\s+const\s+(?:int|short)\s+(\w+)\s*=\s*([0-9a-fA-Fx]+);", consts_text):
+    val_str = m.group(2)
+    val = int(val_str, 16) if val_str.lower().startswith("0x") else int(val_str)
+    const_vals[m.group(1)] = val
+for m in re.finditer(r"(?:public|private)\s+const\s+(?:int|short)\s+(\w+)\s*=\s*([0-9a-fA-Fx]+);", router_text):
+    val_str = m.group(2)
+    val = int(val_str, 16) if val_str.lower().startswith("0x") else int(val_str)
+    const_vals[m.group(1)] = val
+
+router_cases = set()
+for m in re.finditer(r"case\s+(?:ProtocolConsts\.)?(\w+):", router_text):
+    c = m.group(1)
+    if c.isdigit():
+        router_cases.add(int(c))
+    elif c.lower().startswith("0x"):
+        router_cases.add(int(c, 16))
+    elif c in const_vals:
+        router_cases.add(const_vals[c])
+    else:
+        print("Unknown constant in router:", c)
+
+missing = sorted(list(ida_cases - router_cases))
+print("Total IDA cases found:", len(ida_cases))
+print("Total Router cases found:", len(router_cases))
+print("Missing cases count:", len(missing))
+print("Missing cases list:", missing)
+
+print("\n--- DETAILED MISSING CASES ---")
+for case_num in missing:
+    patterns = [f"case {case_num}:", f"case 0x{case_num:x}:", f"case 0x{case_num:X}:"]
+    if 32 <= case_num <= 126:
+        patterns.append(f"case '{chr(case_num)}':")
+    patterns.append(f"v67 == {case_num}")
+    
+    for p in patterns:
+        idx = ida_text.find(p)
+        if idx != -1:
+            snippet = ida_text[max(0, idx-20):min(len(ida_text), idx+150)].replace("\n", " ")
+            print(f"[{case_num}] {snippet[:120]}")
+            break

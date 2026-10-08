@@ -38,7 +38,7 @@ public sealed class ServerMessageRouter
     public const short SM_OBJECT_DISAPPEAR       = 29;   // 实体消除 (Delphi 29)
     public const short SM_TURNDIRECTION_DELPHI   = 204;  // 实体转向 (204)
     public const short SM_NEWMAP_DELPHI          = 521;  // 地图切换/初始化黑屏转场 (521)
-    public const short SM_CLEAROBJECTS           = ProtocolConsts.SM_TIMECHECKMSG;  // 清空视野实体 / 官方时间同步 (810)
+    public const short SM_CLEAROBJECTS           = 810;  // 清空视野实体 / 官方时间同步 (810, SM_TIMECHECKMSG 同号)
     public const short SM_ADDITEM                = 200;  // 背包添加物品
     public const short SM_SENDUSERMAGIC          = 201;  // 角色已学技能列表批量下发
     public const short SM_DELITEM                = 202;  // 背包移除物品
@@ -336,10 +336,7 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_ADJUSTBONUS:
                 _hud?.ToggleAdjustAbil(Math.Max(0, packet.Recog));
                 break;
-            // 边缘动作包（bridge 34/36/37/750/764/765）：飞斧/破土/潜地/改名/捐献，L2。
-            case 34: // SM_FLYAXE：recog=投掷者，param/tag=目标。无抛射体 API，日志留痕。
-                SafeLog($"[SM] 飞斧投掷 caster={packet.Recog} target=({packet.Param},{packet.Tag})");
-                break;
+            // 边缘动作包（bridge 36/37/750/764/765）：破土/潜地/改名/捐献，L2。
             case 36: // SM_DIGUP：recog=实体，param/tag=出土点。实体缺席则按怪补生。
                 HandleDigUpDown(packet, true);
                 break;
@@ -367,7 +364,14 @@ public sealed class ServerMessageRouter
                 HandleSpaceMove(packet, true);
                 break;
             case ProtocolConsts.SM_TELEPORT: // 804: 空间坐标瞬移突变 (IDA sub_467920 case 804)
+            case ProtocolConsts.SM_MAPMOVE: // 23: 官方 1.5 实体同地图瞬移坐标突变 (IDA sub_467920 case 23)
                 HandleTeleport(packet);
+                break;
+            case ProtocolConsts.SM_ACTION_PARAM_SYNC: // 22: 官方 1.5 动作参数三元组同步 (IDA sub_467920 case 22)
+                _entityManager?.UpdateActorParam(packet.Recog, packet.Param);
+                break;
+            case ProtocolConsts.SM_DEATH_ACTION_DELPHI: // 28: 官方 1.5 实体死亡倒地动画 (IDA sub_467920 case 28)
+                HandleEntityDead(packet);
                 break;
             case ProtocolConsts.SM_TAKEON_FAIL: // 616: 穿戴装备失败 (SM_EXCHGTAKEONFAIL 同号)
                 HandleTakeOnFail(packet);
@@ -560,10 +564,13 @@ public sealed class ServerMessageRouter
                 _hud?.AddChat("技能", $"[技能] 已删除技能：{DecodeExtraText(packet.Extra)}", new Color(0.8f, 0.8f, 1f));
                 break;
             case SM_OBJECTSPELL:
+            case ProtocolConsts.SM_SPELLEFFECT: // 32: 官方 1.5 施法光效前摇与动作 (IDA sub_467920 case ' ')
+            case ProtocolConsts.SM_SPELLACTION_DELPHI: // 34: 官方 1.5 实体施法动作 (IDA sub_467920 case '"')
                 HandleObjectSpell(packet);
                 break;
             case SM_MAGIC_FIRE:
             case SM_LIGHTING_DELPHI:
+            case ProtocolConsts.SM_FLYAXE_DELPHI: // 33: 官方 1.5 投掷物飞行弹道 (IDA sub_467920 case '!')
                 HandleMagicFire(packet);
                 break;
             case SM_SPELLRESULT:
@@ -587,8 +594,58 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_DELCHAR_FAIL_DELPHI: // 524: 删除角色失败模态弹窗 (IDA 0x46B624)
                 _hud?.ShowModalMessage("角色提示", "[Failure] 删除角色失败, Email: support@legendofmir.com.cn");
                 break;
+            case ProtocolConsts.SM_NEWCHAR_FAIL_DELPHI: // 522: 盛大官方 1.5 创角失败模态弹窗 (IDA case 522 @ 0x46B4C8~0x46B55C)
+                {
+                    string cMsg = packet.Recog switch
+                    {
+                        2 => "[failure] 这个名字已经存在。", // 0x46B4C8
+                        3 => "[Failure] 你只能为一个帐户设两个角色.\n请和游戏管理员联系。", // 0x46B4F0
+                        4 => "[failure] 角色建立失败. Error=4", // 0x46B534
+                        _ => "[Failure] 未知的错误. 请写信给: support@legendofmir.net" // 0x46B55C
+                    };
+                    _hud?.ShowModalMessage("角色提示", cMsg);
+                }
+                break;
+            case ProtocolConsts.SM_SELECTSERVER_OK: // 525: 盛大官方 1.5 选服确认进入选角 (IDA case 525)
+                SafeLog($"[SM] 选服确认进入选角 (SM_SELECTSERVER_OK=525)");
+                break;
+            case ProtocolConsts.SM_REFRESH_DELPHI: // 51: 官方 1.5 实体数据重置刷新 (IDA case '3')
+                SafeLog($"[SM] 实体数据重置刷新 (SM_REFRESH_DELPHI=51)");
+                break;
+            case ProtocolConsts.SM_CHAR_QUERY_EXTRA: // 104: 官方 1.5 角色附加数据查询 (IDA case 104)
+                SafeLog($"[SM] 角色附加数据查询 (SM_CHAR_QUERY_EXTRA=104)");
+                break;
             case ProtocolConsts.SM_QUERYCHAR_FAIL: // 528: 查询角色失败
                 SafeLog($"[SM] 查询角色失败 (SM_QUERYCHAR_FAIL=528)");
+                break;
+            case ProtocolConsts.SM_VERSION_FAIL: // 501: 补丁版本不符模态弹窗 (IDA 0x46B68C)
+                _hud?.ShowModalMessage("版本提示", "补丁版本不符，请更新客户端。");
+                break;
+            case ProtocolConsts.SM_LOGINSUCCESS: // 530: 登录成功 (IDA case 530)
+                SafeLog($"[SM] 账号登录成功进入选服 (SM_LOGINSUCCESS=530)");
+                break;
+            case ProtocolConsts.SM_LOGON_DELPHI: // 50: 主角色进入世界并绑定 (IDA case 50)
+                SafeLog($"[SM] 主角色进入世界绑定 (SM_LOGON_DELPHI=50)");
+                break;
+            case ProtocolConsts.SM_STARTPLAY: // 20: 角色确认进入世界 / 实体登场 (IDA case 20)
+                SafeLog($"[SM] 进入游戏世界确认 (SM_STARTPLAY=20)");
+                break;
+            case 31: // 31: 实体位移平滑移动 (IDA case 31)
+                HandleEntityMove(packet);
+                break;
+            case 8:  // 8: 实体受创硬直动作 (IDA case 8)
+            case 18: // 18: 实体特定动作 (IDA case 18)
+            case 19: // 19: 实体特定动作 (IDA case 19)
+            case 24: // 24: 实体特定动作 (IDA case 24)
+                _entityManager?.UpdateActorParam(packet.Recog, packet.Param);
+                break;
+            case 1:  // 1: 心跳时钟同步 (IDA case 1)
+                break;
+            case ProtocolConsts.SM_SELECTCHAR_OK_DELPHI: // 531: 盛大官方 1.5 选定角色成功 (IDA case 531 @ 0x468867)
+                SafeLog($"[SM] 选定角色成功进入世界 (SM_SELECTCHAR_OK_DELPHI=531)");
+                break;
+            case ProtocolConsts.SM_ENTITY_ACTION_STRING: // 9: 实体动作动画带字符串广播 (IDA case 9)
+                _entityManager?.UpdateActorParam(packet.Recog, packet.Param);
                 break;
             case ProtocolConsts.SM_TAKEOFF_FAIL: // 620: 脱下装备失败回滚 (IDA 0x4687C8)
                 _hud?.OnTakeOffFail(packet.Param);
@@ -650,6 +707,7 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_NOTICESOUND_DELPHI: // 613: 官方提示音效 (IDA case 0x265)
                 AudioManager.Instance?.PlaySoundId(10);
                 break;
+
             case ProtocolConsts.SM_COMBAT_BROADCAST: // 634: 战斗广播/战斗消息 (IDA case 634)
                 _hud?.OnCombatBroadcast($"[战斗] {DecodeExtraText(packet.Extra)}");
                 break;
