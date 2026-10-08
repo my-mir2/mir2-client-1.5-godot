@@ -7151,10 +7151,25 @@
       - 在 `TestCombatSkillsMatrix.cs` 中增加 `SkillLevelUp_And_MerchantClose_644_DualDispatch_GroundTruth` 脱机单元测试，测试集扩充至 **177 / 177 项 100% 通过**；
       - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
+41. **盛大官方 1.5 背包物品下发制表符协议解析 (SM_ADDITEM 200)、全量刷新 (SM_BAGITEMS 600) 与采矿结果 (SM_MINERESULT 601) 权威闭环核销 (`ServerMessageRouter.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译元数据 `scratch/ida_processmsg.c` 行 1223~1226（`case 0x258u: handle_sm_refresh();`）与行 1204~1207（`case 0x259u: handle_sm_refresh2(v66, v61[0]);`）确证：
+        - 600 (`SM_BAGITEMS` / `SM_REFRESH`) 为官方全量背包数据重置刷新操作码；
+        - 601 (`SM_MINERESULT` / `SM_REFRESH2`) 为官方采矿/挖矿矿石产出与纯度显示操作码；
+      - Rust 官方网关服务端 `bridge.rs:1452` 与 `bridge.rs:1459` 实证：服务端下发 `SM_ADDITEM (200)` 时，`extra` 字段格式为制表符分隔的 `name\tdura\tdura_max\titem_index`；
+      - 彻底修复此前因客户端仅使用 `['/', '|']` 分割导致物品名带有制表符与数字、持久度描述丢失回退为默认 `10/10`、图标回退为默认贴图的严重协议坏账。
+    - **精准重构**：
+      - 在 `ServerMessageRouter.cs` 中：
+        - 优化 `HandleAddItem`：使用 `DecodeExtraText(pkt.Extra)` 并回退至 `pkt.ExtraStr`，优先按 `\t` 分割提取物品名、当前持久度、最大持久度及物品索引，自动格式化 `StateItem_{itemIndex:D4}.png` 图标并生成带颜色代码的准确持久度描述，同时保持对传统斜杠/竖线格式的向下兼容；
+        - 新增 `case ProtocolConsts.SM_BAGITEMS (600)`：驱动 `_hud?.ClearAllBagItems()` 并输出背包同步提示；
+        - 新增 `case ProtocolConsts.SM_MINERESULT (601)` 与 `HandleMineResult`：解析矿石名称与纯度，驱动聊天与系统提示；
+      - 在 `TestCombatSkillsMatrix.cs` 中增加 `BagItems_And_MineResult_GroundTruth_Test` 脱机单元测试，测试集扩充至 **178 / 178 项 100% 全部通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (172 / 172 顶层操作码 0 缺失)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **177 / 177 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **178 / 178 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

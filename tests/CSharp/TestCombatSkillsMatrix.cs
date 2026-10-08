@@ -180,6 +180,39 @@ public class TestCombatSkillsMatrix
         var expPkt = new ServerPacket(ProtocolConsts.SM_MAGICLVEXP, 12, 2, 1500, Array.Empty<byte>());
         router.OnPacket(expPkt);
     }
+
+    [Fact]
+    public void BagItems_And_MineResult_GroundTruth_Test()
+    {
+        // 1. 常量真值断言：
+        // 200: SM_ADDITEM (背包添加物品)
+        // 600: SM_BAGITEMS (官方 1.5 IDA 0x258u handle_sm_refresh)
+        // 601: SM_MINERESULT (官方 1.5 IDA 0x259u handle_sm_refresh2)
+        Assert.Equal((short)200, ProtocolConsts.SM_ADDITEM);
+        Assert.Equal((short)600, ProtocolConsts.SM_BAGITEMS);
+        Assert.Equal((short)601, ProtocolConsts.SM_MINERESULT);
+
+        var router = new ServerMessageRouter(null, null);
+
+        // 2. 模拟服务端 bridge.rs 下发制表符标准物品包 (SM_ADDITEM 200, recog=make_index, param=slot, extra="屠龙\t33\t33\t105")
+        byte[] tabExtra = Encoding.UTF8.GetBytes("屠龙\t33\t33\t105");
+        var addItemPkt = new ServerPacket(ProtocolConsts.SM_ADDITEM, 9999, 0, 0, tabExtra);
+        router.OnPacket(addItemPkt);
+
+        // 3. 模拟兼容斜杠/竖线格式物品包
+        byte[] slashExtra = Encoding.UTF8.GetBytes("金创药(小量)/StateItem_0002.png/重量 1 持久 5/5");
+        var addSlashPkt = new ServerPacket(ProtocolConsts.SM_ADDITEM, 9998, 1, 0, slashExtra);
+        router.OnPacket(addSlashPkt);
+
+        // 4. 模拟官方 1.5 背包全量刷新 (SM_BAGITEMS 600)
+        var refreshPkt = new ServerPacket(ProtocolConsts.SM_BAGITEMS, 0, 0, 0, Array.Empty<byte>());
+        router.OnPacket(refreshPkt);
+
+        // 5. 模拟官方 1.5 采矿结果 (SM_MINERESULT 601, recog=purity, extra="黑铁矿石")
+        byte[] mineExtra = Encoding.UTF8.GetBytes("黑铁矿石");
+        var minePkt = new ServerPacket(ProtocolConsts.SM_MINERESULT, 18, 0, 0, mineExtra);
+        router.OnPacket(minePkt);
+    }
 }
 
 

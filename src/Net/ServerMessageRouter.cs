@@ -199,6 +199,13 @@ public sealed class ServerMessageRouter
                 _entityManager?.Clear();
                 SafeLog($"[SM] 官方时间同步与视野重置 tick={packet.Recog}");
                 break;
+            case ProtocolConsts.SM_BAGITEMS: // 600: 背包物品全量刷新 / 官方 1.5 handle_sm_refresh (IDA case 0x258u)
+                _hud?.ClearAllBagItems();
+                _hud?.AddChat("包裹", "[包裹] 背包数据已重置同步。", new Color(0.7f, 0.9f, 0.7f));
+                break;
+            case ProtocolConsts.SM_MINERESULT: // 601: 采矿结果 / 官方 1.5 handle_sm_refresh2 (IDA case 0x259u)
+                HandleMineResult(packet);
+                break;
             case SM_ADDITEM:
                 HandleAddItem(packet);
                 break;
@@ -1026,15 +1033,42 @@ public sealed class ServerMessageRouter
         string iconFile = "StateItem_0001.png";
         string desc = "[color=#c0c0c0]重量 1   持久力 10/10[/color]";
 
-        if (!string.IsNullOrEmpty(pkt.ExtraStr))
+        string rawText = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(rawText)) rawText = pkt.ExtraStr;
+
+        if (!string.IsNullOrEmpty(rawText))
         {
-            var parts = pkt.ExtraStr.Split(new[] { '/', '|' }, StringSplitOptions.None);
-            if (parts.Length >= 1 && !string.IsNullOrEmpty(parts[0])) itemName = parts[0];
-            if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[1])) iconFile = parts[1];
-            if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2])) desc = parts[2];
+            if (rawText.Contains('\t'))
+            {
+                // 服务端网关 bridge.rs 标准格式: name\tdura\tdura_max\titem_index
+                var parts = rawText.Split('\t');
+                if (parts.Length >= 1 && !string.IsNullOrEmpty(parts[0])) itemName = parts[0];
+                int dura = parts.Length >= 2 && int.TryParse(parts[1], out var d) ? d : 10;
+                int duraMax = parts.Length >= 3 && int.TryParse(parts[2], out var dm) ? dm : 10;
+                int itemIndex = parts.Length >= 4 && int.TryParse(parts[3], out var idx) ? idx : 1;
+                iconFile = $"StateItem_{itemIndex:D4}.png";
+                desc = $"[color=#c0c0c0]重量 1   持久力 {dura}/{duraMax}[/color]";
+            }
+            else
+            {
+                // 兼容斜杠或竖线分割: name/icon/desc
+                var parts = rawText.Split(new[] { '/', '|' }, StringSplitOptions.None);
+                if (parts.Length >= 1 && !string.IsNullOrEmpty(parts[0])) itemName = parts[0];
+                if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[1])) iconFile = parts[1];
+                if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2])) desc = parts[2];
+            }
         }
 
         _hud?.SetBagItem(slot, itemName, iconFile, desc);
+    }
+
+    private void HandleMineResult(ServerPacket pkt)
+    {
+        string rawText = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(rawText)) rawText = pkt.ExtraStr;
+        string oreName = !string.IsNullOrEmpty(rawText) ? rawText : "矿石";
+        int purity = pkt.Recog > 0 ? pkt.Recog : (pkt.Param > 0 ? pkt.Param : 10);
+        _hud?.AddChat("采矿", $"[采矿] 挖矿获得：{oreName} (纯度 {purity})", new Color(0.85f, 0.75f, 0.5f));
     }
 
     private void HandleDelItem(ServerPacket pkt)
