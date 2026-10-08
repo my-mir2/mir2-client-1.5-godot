@@ -619,6 +619,14 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_SHOP_DETAIL2: // 712: 商品特价明细下发
                 _hud?.AddChat("商店", $"[商店] 物品特价详情: {DecodeExtraText(packet.Extra)}", new Color(0.9f, 0.9f, 0.4f));
                 break;
+            case ProtocolConsts.SM_TAKEON_NOOP1: // 617
+            case ProtocolConsts.SM_TAKEON_NOOP2: // 618
+                // 官方 1.5 空占位分支 (goto LABEL_486)
+                break;
+            case ProtocolConsts.SM_MERCHANT_PAGE: // 647: 商店货架分页切换
+                SafeLog($"[SM] 商店货架分页切换 (SM_MERCHANT_PAGE=647, page={packet.Recog})");
+                break;
+
 
         }
     }
