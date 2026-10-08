@@ -2636,6 +2636,96 @@ public class TestProtocolMatrix
         var parsedNpc = PacketDecoder.Parse(rawNpc.AsSpan(1))!.Value;
         Assert.Equal("铁匠", parsedNpc.ExtraStr);
     }
+
+    [Fact]
+    public void TestOfficialGroundTruth_MapMarkAndCombatAndEntityStatusControl()
+    {
+        // 1. 验证盛大官方 1.5 操作码常数绝对真值
+        Assert.Equal(610, ProtocolConsts.SM_LISTADD_DELPHI);
+        Assert.Equal(611, ProtocolConsts.SM_LISTDEL_DELPHI);
+        Assert.Equal(612, ProtocolConsts.SM_MAPMARK_DELPHI);
+        Assert.Equal(613, ProtocolConsts.SM_NOTICESOUND_DELPHI);
+        Assert.Equal(614, ProtocolConsts.SM_SPELLEFFECT_DELPHI);
+        Assert.Equal(634, ProtocolConsts.SM_COMBAT_BROADCAST);
+        Assert.Equal(635, ProtocolConsts.SM_COMBAT_END);
+        Assert.Equal(654, ProtocolConsts.SM_ACTOR_PARAM);
+        Assert.Equal(656, ProtocolConsts.SM_ACTOR_TIMESTAMP);
+        Assert.Equal(657, ProtocolConsts.SM_ENTITY_EFFECT_DELPHI);
+        Assert.Equal(716, ProtocolConsts.SM_ATTR2_DELPHI);
+        Assert.Equal(1100, ProtocolConsts.SM_CHAR_FREEZE_START);
+        Assert.Equal(1101, ProtocolConsts.SM_CHAR_FREEZE_END);
+        Assert.Equal(1102, ProtocolConsts.SM_BREAK_WEAPON);
+        Assert.Equal(1103, ProtocolConsts.SM_CHAR_STUN);
+        Assert.Equal(1105, ProtocolConsts.SM_HEALTHBAR_DELPHI);
+
+        // 2. 验证 EntityManager 实体状态扩展与事件驱动机制
+        var em = new Mir2Client.Game.EntityManager();
+        em.AddEntity(8888, "沃玛卫士", Mir2Client.Game.EntityManager.EntityType.Monster, 150, 150, 4, 30);
+        var monster = em.GetEntity(8888);
+        Assert.NotNull(monster);
+
+        // 2.1 麻痹/定身 (1100/1101)
+        bool frozenFired = false;
+        bool lastFrozenState = false;
+        em.EntityFrozenChanged += (uid, frozen) =>
+        {
+            if (uid == 8888)
+            {
+                frozenFired = true;
+                lastFrozenState = frozen;
+            }
+        };
+
+        em.SetActorFrozen(8888, true);
+        Assert.True(monster.IsFrozen);
+        Assert.True(frozenFired);
+        Assert.True(lastFrozenState);
+
+        em.SetActorFrozen(8888, false);
+        Assert.False(monster.IsFrozen);
+        Assert.False(lastFrozenState);
+
+        // 2.2 受到击晕硬直 (1103)
+        em.SetActorStunned(8888, 2000, 10000);
+        Assert.Equal(12000, monster.StunExpireTick);
+        Assert.True(lastFrozenState);
+
+        // 2.3 实体属性/体态更新 (654)
+        int paramVal = 0;
+        em.EntityParamChanged += (uid, p) => { if (uid == 8888) paramVal = p; };
+        em.UpdateActorParam(8888, 0x1234);
+        Assert.Equal(0x1234, monster.ActorParam);
+        Assert.Equal(0x1234, paramVal);
+
+        // 2.4 实体动作时间戳校验 (656)
+        em.UpdateActorTimestamp(8888, 999888777);
+        Assert.Equal(999888777, monster.LastActionTick);
+
+        // 2.5 实体特效动画触发 (657)
+        int effectIdTriggered = 0, effectParamTriggered = 0;
+        em.EntityEffectTriggered += (uid, eid, ep) =>
+        {
+            if (uid == 8888)
+            {
+                effectIdTriggered = eid;
+                effectParamTriggered = ep;
+            }
+        };
+        em.PlayEntityEffect(8888, 12, 99);
+        Assert.Equal(12, effectIdTriggered);
+        Assert.Equal(99, effectParamTriggered);
+
+        // 2.6 浮动血条显隐控制 (1105)
+        bool healthBarVisible = false;
+        em.EntityHealthBarToggled += (uid, v) => { if (uid == 8888) healthBarVisible = v; };
+        em.ToggleFloatingHealthBar(8888, false);
+        Assert.False(monster.ShowHealthBar);
+        Assert.False(healthBarVisible);
+
+        em.ToggleFloatingHealthBar(8888, true);
+        Assert.True(monster.ShowHealthBar);
+        Assert.True(healthBarVisible);
+    }
 }
 
 

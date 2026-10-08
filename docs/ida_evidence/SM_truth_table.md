@@ -79,13 +79,16 @@
 | 530 SM_LOGINSUCCESS | YES | 定义 | 在真值表 |
 | 532 SM_UPDATEID_SUCCESS | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 533 SM_UPDATEID_FAIL | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 600 SM_BAGITEMS | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 601 SM_MINERESULT | NO | 定义 | 不在真值表（存疑/变体/错号） |
+| 600 SM_BAGITEMS / SM_REFRESH | YES | 定义 | 在真值表 (IDA case 0x258u handle_sm_refresh) |
+| 601 SM_MINERESULT / SM_REFRESH2 | YES | 定义 | 在真值表 (IDA case 0x259u handle_sm_refresh2) |
 | 603 SM_UPDATEITEM | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 604 SM_SENDUSEITEMS | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 606 SM_EAT_OK | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 612 SM_OPENDOOR | NO | 定义 | 不在真值表（存疑/变体/错号） |
-| 614 SM_CLOSEDOOR | NO | 定义 | 不在真值表（存疑/变体/错号） |
+| 610 SM_LISTADD_DELPHI | YES | 定义 | 在真值表 (IDA case 0x262u handle_sm_list_add @ 0x469B14) |
+| 611 SM_LISTDEL_DELPHI | YES | 定义 | 在真值表 (IDA case 0x263u handle_sm_list_del @ 0x469B2A) |
+| 612 SM_MAPMARK_DELPHI | YES | 定义 | 在真值表 (IDA case 0x264u handle_sm_map_mark @ 0x469B38 小地图标记) |
+| 613 SM_NOTICESOUND_DELPHI | YES | 定义 | 在真值表 (IDA case 0x265u play_notice_sound @ 0x469B4B 提示音) |
+| 614 SM_SPELLEFFECT_DELPHI | YES | 定义 | 在真值表 (IDA case 614 @ 0x469B56 施法光效与受击结算) |
 | 615 SM_TAKEON_OK | YES | 定义 | 在真值表 |
 | 615 SM_EXCHGTAKEONOK | YES | 定义 | 在真值表 |
 | 616 SM_TAKEON_FAIL | YES | 定义 | 在真值表 |
@@ -106,7 +109,8 @@
 | 632 SM_SELLITEMFAIL | NO | 定义 | 不在真值表（存疑/变体/错号） |
 | 633 SM_BUYITEM_FAIL | YES | 定义 | 在真值表 |
 | 633 SM_MERCHANTSAY | YES | 定义 | 在真值表 |
-| 635 SM_MENUOK | NO | 定义 | 不在真值表（存疑/变体/错号） |
+| 634 SM_COMBAT_BROADCAST | YES | 定义 | 在真值表 (IDA case 634 @ 0x46A74C 战斗消息广播) |
+| 635 SM_COMBAT_END | YES | 定义 | 在真值表 (IDA case 635 @ 0x469B80 战斗姿态解除) |
 | 636 SM_DLGMSG | YES | 定义 | 在真值表 |
 | 637 SM_OBJECTSTRUCK_DELPHI | YES | 定义 | 在真值表 |
 | 638 SM_MAGIC_FIRE | YES | 定义 | 在真值表 |

@@ -166,7 +166,11 @@ public static class ProtocolConsts
     public const short SM_MINERESULT             = 601;  // 挖矿产出矿石
     public const short SM_UPDATEITEM             = 603;  // 物品持久度变动
     public const short SM_EAT_OK                 = 606;  // 药水使用确认
-    public const short SM_OPENDOOR               = 612;  // 石门开启
+    public const short SM_LISTADD_DELPHI          = 610;  // 盛大官方 1.5 列表条目添加 (好友/黑名单等, IDA case 0x262 @ 0x469B14)
+    public const short SM_LISTDEL_DELPHI          = 611;  // 盛大官方 1.5 列表条目删除 (IDA case 0x263 @ 0x469B2A)
+    public const short SM_MAPMARK_DELPHI          = 612;  // 盛大官方 1.5 小地图雷达坐标标记 (IDA case 0x264 @ 0x469B38)
+    public const short SM_OPENDOOR               = 612;  // 兼容别名
+    public const short SM_NOTICESOUND_DELPHI      = 613;  // 盛大官方 1.5 提示音效触发 (IDA case 0x265 @ 0x469B4B)
     public const short SM_CLOSEDOOR              = 614;  // 石门关闭 (历史兼容)
     public const short SM_SPELLEFFECT_DELPHI      = 614;  // 盛大官方 1.5 施法光效与受击结算 (IDA sub_467920 case 614 @ 0x469B56)
     public const short SM_TAKEON_OK              = 615;  // 穿戴装备成功
@@ -293,4 +297,14 @@ public static class ProtocolConsts
     public const short SM_TAKEON_NOOP1            = 617;  // 官方空占位 (IDA case 617)
     public const short SM_TAKEON_NOOP2            = 618;  // 官方空占位 (IDA case 618)
     public const short SM_MERCHANT_PAGE           = 647;  // 商店货架分页切换 (IDA case 647)
+    public const short SM_COMBAT_BROADCAST        = 634;  // 战斗广播/战斗消息 (IDA case 634 @ 0x46A74C)
+    public const short SM_COMBAT_END              = 635;  // 战斗姿态解除 (IDA case 635 @ 0x469B80)
+    public const short SM_ACTOR_TIMESTAMP         = 656;  // 实体动作校验时间戳同步 (IDA case 656 @ 0x469CE2)
+    public const short SM_ENTITY_EFFECT_DELPHI    = 657;  // 实体动画与光效播放 (IDA case 657 @ 0x469D0B)
+    public const short SM_ATTR2_DELPHI            = 716;  // 扩展属性同步2 (IDA case 716 @ 0x46A854)
+    public const short SM_CHAR_FREEZE_START       = 1100; // 实体麻痹/定身开始 (IDA case 0x44C @ 0x469600)
+    public const short SM_CHAR_FREEZE_END         = 1101; // 实体麻痹/定身解除 (IDA case 0x44D @ 0x469620)
+    public const short SM_BREAK_WEAPON            = 1102; // 武器开刀破碎损毁 (IDA case 0x44E @ 0x469635)
+    public const short SM_CHAR_STUN               = 1103; // 受到重击击晕硬直 (IDA case 0x44F @ 0x469650)
+    public const short SM_HEALTHBAR_DELPHI        = 1105; // 浮动血条显隐切换 (IDA case 0x451 @ 0x469690)
 }

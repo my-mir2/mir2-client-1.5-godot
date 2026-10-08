@@ -2176,6 +2176,22 @@ public partial class AutoEndToEndDriver : Node
 
                         // 7. 模拟收到官方 1.5 系统提示与带音效广播 (SM_SYSMSG_DELPHI 100)
                         router.OnPacket(new ServerPacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 106, 0, System.Text.Encoding.UTF8.GetBytes("盛大官方 1.5 行会战已正式打响！")));
+
+                        // 8. 模拟收到官方 1.5 小地图雷达标记 (SM_MAPMARK_DELPHI 612)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_MAPMARK_DELPHI, 0, 330, 270, Array.Empty<byte>()));
+
+                        // 9. 模拟收到官方 1.5 战斗消息广播 (SM_COMBAT_BROADCAST 634)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_COMBAT_BROADCAST, 0, 0, 0, System.Text.Encoding.UTF8.GetBytes("沃玛教主发出一声震天狂吼！")));
+
+                        // 10. 模拟收到官方 1.5 实体麻痹/定身开始 (SM_CHAR_FREEZE_START 1100) 与解除 (1101)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_CHAR_FREEZE_START, 9002, 0, 0, Array.Empty<byte>()));
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_CHAR_FREEZE_END, 9002, 0, 0, Array.Empty<byte>()));
+
+                        // 11. 模拟收到官方 1.5 武器试刀损毁 (SM_BREAK_WEAPON 1102)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_BREAK_WEAPON, 0, 0, 0, Array.Empty<byte>()));
+
+                        // 12. 模拟收到官方 1.5 浮动血条显隐切换 (SM_HEALTHBAR_DELPHI 1105)
+                        router.OnPacket(new ServerPacket(ProtocolConsts.SM_HEALTHBAR_DELPHI, 9002, 1, 0, Array.Empty<byte>()));
                     }
                 }
                 RequestCapture("step124_guild_group_truth_modals");

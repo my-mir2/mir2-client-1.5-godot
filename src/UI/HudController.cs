@@ -1397,6 +1397,33 @@ public partial class HudController : CanvasLayer
         AddChat("装备", $"[装备] 脱下装备失败 (槽位: {slot})，已原子回滚。", new Color(1f, 0.4f, 0.4f));
     }
 
+    /// <summary>盛大官方 1.5 小地图雷达标记 (SM_MAPMARK_DELPHI 612)</summary>
+    public void SetMapMarker(int x, int y)
+    {
+        if (x > 0 && y > 0)
+        {
+            _minimapView?.SetTargetMarker(x, y);
+            AddChat("系统", $"[雷达] 目标标记更新至坐标 ({x}, {y})。", new Color(0.4f, 1f, 0.8f));
+        }
+        else
+        {
+            _minimapView?.ClearTarget();
+            AddChat("系统", "[雷达] 目标标记已清除。", new Color(0.8f, 0.8f, 0.8f));
+        }
+    }
+
+    /// <summary>盛大官方 1.5 武器损毁提示 (SM_BREAK_WEAPON 1102)</summary>
+    public void OnBreakWeapon()
+    {
+        AddChat("装备", "[装备] 你的武器在试刀或激烈战斗中损毁破裂！", new Color(1f, 0.2f, 0.2f));
+    }
+
+    /// <summary>盛大官方 1.5 战斗消息广播 (SM_COMBAT_BROADCAST 634)</summary>
+    public void OnCombatBroadcast(string msg)
+    {
+        AddChat("战斗", msg, new Color(1f, 0.6f, 0.3f));
+    }
+
     public void UpdateName(string name)
     {
         if (_lblName != null) _lblName.Text = name;

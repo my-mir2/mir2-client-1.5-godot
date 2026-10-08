@@ -46,6 +46,11 @@ public class EntityManager
         public string GuildName { get; set; } = string.Empty; // 盛大官方 1.5 实体所属行会名 (SM_GUILDNAME_DELPHI 42)
         public string GuildRank { get; set; } = string.Empty; // 实体行会封号/职位
         public int NameColor { get; set; } = 0;  // 名字颜色值 (SM_CHANGENAMECOLOR 41)
+        public bool IsFrozen { get; set; } = false; // 麻痹/定身状态 (SM_CHAR_FREEZE_START 1100, SM_CHAR_FREEZE_END 1101)
+        public long StunExpireTick { get; set; } = 0; // 受到击晕硬直截止时间 (SM_CHAR_STUN 1103)
+        public int ActorParam { get; set; } = 0; // 实体参数/攻速/体态 (SM_ACTOR_PARAM 654)
+        public long LastActionTick { get; set; } = 0; // 实体动作校验时间戳 (SM_ACTOR_TIMESTAMP 656)
+        public bool ShowHealthBar { get; set; } = true; // 浮动血条显隐 (SM_HEALTHBAR_DELPHI 1105)
     }
 
     public event Action<EntityData>? EntityAdded;
@@ -60,6 +65,10 @@ public class EntityManager
     public event Action<int, int>? EntityPkChanged;     // uid, pkPoint
     public event Action<int, string, string>? EntityGuildChanged; // uid, guildName, guildRank
     public event Action<int, int>? EntityNameColorChanged;         // uid, color
+    public event Action<int, bool>? EntityFrozenChanged;          // uid, isFrozen (1100/1101)
+    public event Action<int, int>? EntityParamChanged;            // uid, actorParam (654)
+    public event Action<int, int, int>? EntityEffectTriggered;    // uid, effectId, effectParam (657)
+    public event Action<int, bool>? EntityHealthBarToggled;       // uid, visible (1105)
 
     private readonly Dictionary<int, EntityData> _entities = new();
 
@@ -331,6 +340,73 @@ public class EntityManager
         {
             ent.NameColor = color;
             EntityNameColorChanged?.Invoke(uid, color);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体麻痹/定身状态切换 (SM_CHAR_FREEZE_START 1100, SM_CHAR_FREEZE_END 1101)
+    /// </summary>
+    public void SetActorFrozen(int uid, bool frozen)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.IsFrozen = frozen;
+            EntityFrozenChanged?.Invoke(uid, frozen);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体受到击晕/硬直 (SM_CHAR_STUN 1103)
+    /// </summary>
+    public void SetActorStunned(int uid, int durationMs, long nowTick = 0)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.StunExpireTick = nowTick + durationMs;
+            EntityFrozenChanged?.Invoke(uid, true);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体属性/体态更新 (SM_ACTOR_PARAM 654, IDA case 654 @ 0x469CC0)
+    /// </summary>
+    public void UpdateActorParam(int uid, int param)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.ActorParam = param;
+            EntityParamChanged?.Invoke(uid, param);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体动作校验时间戳同步 (SM_ACTOR_TIMESTAMP 656, IDA case 656 @ 0x469CE2)
+    /// </summary>
+    public void UpdateActorTimestamp(int uid, long timestamp)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.LastActionTick = timestamp;
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体动画与特效播放 (SM_ENTITY_EFFECT_DELPHI 657, IDA case 657 @ 0x469D0B)
+    /// </summary>
+    public void PlayEntityEffect(int uid, int effectId, int effectParam)
+    {
+        EntityEffectTriggered?.Invoke(uid, effectId, effectParam);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体浮动血条显隐切换 (SM_HEALTHBAR_DELPHI 1105, IDA case 0x451 @ 0x469690)
+    /// </summary>
+    public void ToggleFloatingHealthBar(int uid, bool visible)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.ShowHealthBar = visible;
+            EntityHealthBarToggled?.Invoke(uid, visible);
         }
     }
 }

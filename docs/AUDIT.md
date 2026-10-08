@@ -7029,10 +7029,39 @@
       - 在 `TestProtocolMatrix.cs` 增加 `TestOfficialGroundTruthSmCases_EntityNameColorGuildAndSysMsg` 单元测试，脱机测试覆盖扩充至 **171 / 171 项**；
       - 在 `AutoEndToEndDriver.cs` 第 124 步实机验证中注入 41、42、100 号协议，端到端生命周期保持 **125 / 125 阶段 0 缺陷通过**。
 
+34. **盛大官方 1.5 原版二进制权威下行协议真值 (610-613, 634, 635, 654, 656, 657, 716, 1100-1105) 纠偏与实体状态控制全链路打通 (`scratch/ida_processmsg.c:1180-1200, 950-1000`, `docs/ida_evidence/SM_truth_table.md`)**：
+    - **官方实证**：
+      - 穿透 Hex-Rays 反编译的十六进制 case 伪装，从官方 1.5 原版二进制 (`MIR_final_v3_p.exe`) 中完整提取出 190 个唯一操作码分支；
+      - 彻底纠偏历史遗留或非标私服对 612 与 614 的错误命名（曾误写为石门开启/关闭），证实官方 1.5 物理地址 `sub_467920` 的真实功能：
+        - `SM_LISTADD_DELPHI (610 / 0x262)`: `handle_sm_list_add` 列表条目添加 (好友/黑名单等)；
+        - `SM_LISTDEL_DELPHI (611 / 0x263)`: `handle_sm_list_del` 列表条目删除；
+        - `SM_MAPMARK_DELPHI (612 / 0x264)`: `handle_sm_map_mark` 小地图雷达坐标标记 (X=Tag, Y=Param)；
+        - `SM_NOTICESOUND_DELPHI (613 / 0x265)`: `play_notice_sound` 播放官方提示音效；
+        - `SM_SPELLEFFECT_DELPHI (614 / 0x266)`: `handle_sm_spell_effect` 施法光效与受击命中结算；
+        - `SM_COMBAT_BROADCAST (634)`: `handle_sm_combat_broadcast` 战斗消息广播；
+        - `SM_COMBAT_END (635)`: `handle_sm_combat_end` 解除战斗姿态；
+        - `SM_ACTOR_PARAM (654)`: `*(v71 + 340) = HIWORD(v67)` 实体属性/体态更新；
+        - `SM_ACTOR_TIMESTAMP (656)`: `*(v71 + 44) = read_timestamp()` 实体动作校验时间戳同步；
+        - `SM_ENTITY_EFFECT_DELPHI (657)`: `show_entity_animation` 实体特效动画触发播放；
+        - `SM_ATTR2_DELPHI (716)`: `handle_sm_attr2` 官方扩展属性同步2；
+        - `SM_CHAR_FREEZE_START (1100 / 0x44C)`: `*(v71 + 308) = 1` 实体进入麻痹/定身状态；
+        - `SM_CHAR_FREEZE_END (1101 / 0x44D)`: `*(v71 + 308) = 0` 实体解除麻痹/定身状态；
+        - `SM_BREAK_WEAPON (1102 / 0x44E)`: `handle_sm_break_weapon` 武器试刀损毁裂开；
+        - `SM_CHAR_STUN (1103 / 0x44F)`: `*(v71 + 309) = 1; *(v71 + 316) = 2000` 实体受到重击击晕硬直 2 秒；
+        - `SM_HEALTHBAR_DELPHI (1105 / 0x451)`: `handle_sm_healthbar` 浮动血条显隐切换。
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 中补齐上述权威操作码定义与官方 Delphi 物理地址注释；
+      - 在 `EntityManager.cs` 中增加 `IsFrozen`、`StunExpireTick`、`ActorParam`、`LastActionTick`、`ShowHealthBar` 等状态字段及对应控制方法与变更事件；
+      - 在 `HudController.cs` 中实现 `SetMapMarker`（小地图雷达坐标标记与清除）、`OnBreakWeapon`（武器损毁提示）与 `OnCombatBroadcast`；
+      - 在 `ServerMessageRouter.cs` 中接入上述协议的全量 switch 路由分发；
+      - 在 `docs/ida_evidence/SM_truth_table.md` 中全面纠偏与更新 600, 601, 610-614, 634, 635 为真值 `YES`；
+      - 在 `TestProtocolMatrix.cs` 中增加 `TestOfficialGroundTruth_MapMarkAndCombatAndEntityStatusControl` 单元测试，脱机测试覆盖扩充至 **172 / 172 项 100% 通过**；
+      - 在 `AutoEndToEndDriver.cs` 第 124 步实机演练中注入 612, 634, 1100, 1101, 1102, 1105 等全套协议，端到端生命周期保持 **125 / 125 阶段 0 缺陷通过**。
+
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 核心按钮事件全量接入，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **171 / 171 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **172 / 172 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **125 / 125 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

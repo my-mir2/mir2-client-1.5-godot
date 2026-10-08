@@ -533,8 +533,9 @@ public sealed class ServerMessageRouter
                     }
                 }
                 break;
-            case ProtocolConsts.SM_CHARSTATUSCHANGED: // 657: 实体状态位图与攻速同步 (IDA sub_467920 0x469D0B)
+            case ProtocolConsts.SM_CHARSTATUSCHANGED: // 657: 实体状态位图与动画特效同步 (SM_ENTITY_EFFECT_DELPHI 同号)
                 _hud?.AddChat("状态", "[状态] 实体增益/减益状态与攻速已同步。", new Color(0.6f, 1f, 0.8f));
+                _entityManager?.PlayEntityEffect(packet.Recog, packet.Tag, packet.Param);
                 break;
             case ProtocolConsts.SM_MYSTATUS: // 708: 角色体态/饥饿度变动 (IDA sub_467920 0x4689FE)
                 _hud?.UpdateHunger(packet.Recog);
@@ -612,6 +613,7 @@ public sealed class ServerMessageRouter
                 break;
             case ProtocolConsts.SM_ACTOR_PARAM: // 654: 实体属性/体态更新
                 _hud?.OnActorParam(packet.Recog, packet.Param);
+                _entityManager?.UpdateActorParam(packet.Recog, packet.Param);
                 break;
             case ProtocolConsts.SM_LAMPCHANGEDURA: // 655: 蜡烛油灯持久消耗
                 _hud?.UpdateLampDura(packet.Recog);
@@ -635,6 +637,48 @@ public sealed class ServerMessageRouter
                 break;
             case ProtocolConsts.SM_MERCHANT_PAGE: // 647: 商店货架分页切换
                 SafeLog($"[SM] 商店货架分页切换 (SM_MERCHANT_PAGE=647, page={packet.Recog})");
+                break;
+            case ProtocolConsts.SM_LISTADD_DELPHI: // 610: 名单列表条目添加 (IDA case 0x262)
+                _hud?.AddChat("系统", $"[名单] 添加条目: {DecodeExtraText(packet.Extra)}", new Color(0.7f, 0.9f, 0.6f));
+                break;
+            case ProtocolConsts.SM_LISTDEL_DELPHI: // 611: 名单列表条目删除 (IDA case 0x263)
+                _hud?.AddChat("系统", $"[名单] 移除条目 (ID:{packet.Recog})", new Color(0.8f, 0.7f, 0.6f));
+                break;
+            case ProtocolConsts.SM_MAPMARK_DELPHI: // 612: 盛大官方 1.5 小地图雷达标记 (IDA case 0x264)
+                _hud?.SetMapMarker(packet.Tag, packet.Param);
+                break;
+            case ProtocolConsts.SM_NOTICESOUND_DELPHI: // 613: 官方提示音效 (IDA case 0x265)
+                AudioManager.Instance?.PlaySoundId(10);
+                break;
+            case ProtocolConsts.SM_COMBAT_BROADCAST: // 634: 战斗广播/战斗消息 (IDA case 634)
+                _hud?.OnCombatBroadcast($"[战斗] {DecodeExtraText(packet.Extra)}");
+                break;
+            case ProtocolConsts.SM_COMBAT_END: // 635: 战斗姿态解除 (IDA case 635)
+                SafeLog("[SM] 战斗姿态已解除 (SM_COMBAT_END=635)");
+                break;
+            case ProtocolConsts.SM_ACTOR_TIMESTAMP: // 656: 实体动作校验时间戳同步 (IDA case 656)
+                _entityManager?.UpdateActorTimestamp(packet.Recog, packet.Param);
+                break;
+            case ProtocolConsts.SM_ATTR2_DELPHI: // 716: 官方扩展属性同步2 (IDA case 716)
+                SafeLog($"[SM] 扩展属性同步2 (SM_ATTR2_DELPHI=716, val={packet.Recog})");
+                break;
+            case ProtocolConsts.SM_CHAR_FREEZE_START: // 1100: 实体麻痹/定身开始 (IDA case 0x44C)
+                _entityManager?.SetActorFrozen(packet.Recog, true);
+                SafeLog($"[SM] 实体 UID={packet.Recog} 进入麻痹/定身状态 (SM_CHAR_FREEZE_START=1100)");
+                break;
+            case ProtocolConsts.SM_CHAR_FREEZE_END: // 1101: 实体麻痹/定身解除 (IDA case 0x44D)
+                _entityManager?.SetActorFrozen(packet.Recog, false);
+                SafeLog($"[SM] 实体 UID={packet.Recog} 解除麻痹/定身状态 (SM_CHAR_FREEZE_END=1101)");
+                break;
+            case ProtocolConsts.SM_BREAK_WEAPON: // 1102: 武器试刀破碎损毁 (IDA case 0x44E)
+                _hud?.OnBreakWeapon();
+                break;
+            case ProtocolConsts.SM_CHAR_STUN: // 1103: 受到重击击晕硬直 (IDA case 0x44F)
+                _entityManager?.SetActorStunned(packet.Recog, 2000);
+                SafeLog($"[SM] 实体 UID={packet.Recog} 受到击晕硬直 2000ms (SM_CHAR_STUN=1103)");
+                break;
+            case ProtocolConsts.SM_HEALTHBAR_DELPHI: // 1105: 浮动血条显隐切换 (IDA case 0x451)
+                _entityManager?.ToggleFloatingHealthBar(packet.Recog, packet.Param != 0);
                 break;
 
 
