@@ -7245,11 +7245,27 @@
         - 补齐未处理按键 `Key.X` (Alt+X -> `RequestExitGame()`) 与 `Key.Q` (Alt+Q -> `RequestSoftClose()`)；
       - 在 `TestCombatSkillsMatrix.cs` 中增加 `Official_150_AltX_AltQ_Shortcut_GroundTruth_Test` 脱机单元测试，测试集扩充至 **183 / 183 项 100% 全部通过**；
       - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+47. **盛大官方 1.5 物品使用/吃药 (CM_EATITEM 1006) 物品名网络封包闭环与背包单击选中 (TFrmDlg_DItemGridGridSelect 0x48e118) 拨乱反正 (`HudController.cs`, `GameView.cs`, `TestCombatSkillsMatrix.cs`)**：
+    - **官方实证**：
+      - 盛大官方原版二进制 IDA 反编译客户端 `sub_462B1C` (0x462B65~0x462E76) 与 `sub_465B14` 实证：
+        - 物品使用/吃药发送 `CM_EATITEM (1006)`，在 `recog` 中传递槽位，并在 Extra 负载中携带经过盛大官方 6-bit / +60（`EncodePlus60`）动态网络编码的物品真实名称；
+        - 此前客户端 `HudController.cs` 中 `UseItemRequested` 信号仅传 `slot`，丢失了 `itemName`，导致发往服务端 `bridge.rs` 的 Extra 字段恒为空字符串，服务端无法精准核验物品名称；
+        - 快捷药水栏 1~6 格（`QuickItemUsed`）此前仅在本地扣除 UI 数量并修改客户端 HP/MP，未向服务端发送 `CM_EATITEM (1006)` 封包，属于网络层严重断链；
+        - 背包格子 `_bagSlots[slot].Pressed` 此前直接调用了吃药信号，导致玩家单击背包误吃药；官方 IDA 0x48e118 `TFrmDlg_DItemGridGridSelect` 实证：单击仅选中格子（`_selectedBagSlot = slot`），双击（`DItemGridDblClick` 0x48e33c）或快捷键 1~6 才能使用消耗品。
+    - **精准重构**：
+      - 在 `HudController.cs` 中：
+        - 将 `UseItemRequested` 信号扩展为 `(int slot, string itemName)`，并在 `ConsumeBagItem` 中发射完整参数；
+        - 将背包格子的 `Pressed` 事件纠偏为仅记录选中的格子 `_selectedBagSlot = slot`，彻底杜绝单击误吃药；
+      - 在 `GameView.cs` 中：
+        - `UseItemRequested` 接入 `(slot, item)` 并调用 `PacketEncoder.EatItem(slot, item)`；
+        - 在 `QuickItemUsed` 触发时增加 `_net?.SendPacket(PacketEncoder.EatItem(slot, item));`，彻底打通快捷药水栏的网络通信闭环；
+      - 在 `TestCombatSkillsMatrix.cs` 中增加 `Official_150_EatItem_Packet_And_GridSelect_GroundTruth_Test` 脱机单元测试，验证 CM_EATITEM 的 6-bit 编码与还原，测试集扩充至 **184 / 184 项 100% 全部通过**；
+      - 在 `AutoEndToEndDriver.cs` 端到端生命周期验证中保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI 事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **183 / 183 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **184 / 184 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

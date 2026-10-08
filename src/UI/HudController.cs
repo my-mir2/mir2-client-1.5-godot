@@ -16,7 +16,7 @@ public partial class HudController : CanvasLayer
     public delegate void ChatSentEventHandler(string msg);
 
     [Signal]
-    public delegate void UseItemRequestedEventHandler(int slot);
+    public delegate void UseItemRequestedEventHandler(int slot, string itemName);
 
     [Signal]
     public delegate void WearItemRequestedEventHandler(int bagSlot, int equipSlot);
@@ -171,6 +171,7 @@ public partial class HudController : CanvasLayer
     private TextureButton? _btnHudExit;
     private TextureButton? _btnHudMyState;
     private TextureButton? _btnHudOption;
+    private int _selectedBagSlot = -1;
 
     public TextureButton? BtnHudBag => _btnHudBag;
     public TextureButton? BtnHudEquip => _btnHudEquip;
@@ -531,7 +532,8 @@ public partial class HudController : CanvasLayer
                             Flat = true
                         };
                         _bagSlots[slot] = btn;
-                        btn.Pressed += () => EmitSignal(SignalName.UseItemRequested, slot);
+                        // 单击选中格子 (对齐官方 1.5 IDA 0x48e118 TFrmDlg_DItemGridGridSelect，双击才吃药/穿戴)
+                        btn.Pressed += () => _selectedBagSlot = slot;
                         btn.MouseEntered += () =>
                         {
                             if (btn.ItemTexture != null || btn.Icon != null)
@@ -3091,8 +3093,8 @@ public partial class HudController : CanvasLayer
         // 播放经典吃药吞咽音效 (官方 sound 107, SoundId.EatDrug)
         AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.EatDrug);
         
-        // 派发信号供网络层发包 CM_EATITEM (1006)
-        EmitSignal(SignalName.UseItemRequested, bagSlot);
+        // 派发信号供网络层发包 CM_EATITEM (1006)，携带完整物品名称对齐官方协议
+        EmitSignal(SignalName.UseItemRequested, bagSlot, itemName);
 
         // 清理/扣减背包槽位
         ClearBagItem(bagSlot);

@@ -471,6 +471,9 @@ namespace Mir2Client.UI
             {
                 HudInstance.QuickItemUsed += (slot, item) =>
                 {
+                    // 盛大官方 1.5 快捷栏使用物品发包 CM_EATITEM (1006)
+                    _net?.SendPacket(PacketEncoder.EatItem(slot, item));
+
                     if (PlayerInstance == null) return;
                     if (item.Contains("金创") || item.Contains("红"))
                     {
@@ -548,9 +551,9 @@ namespace Mir2Client.UI
                 };
 
                 // 官方 1.5 物品使用/吃药、穿戴、脱下网络发包 (CM_EATITEM 1006 / CM_WEARITEM 1003 / CM_TAKEOFFITEM 1004)
-                HudInstance.UseItemRequested += (slot) =>
+                HudInstance.UseItemRequested += (slot, item) =>
                 {
-                    _net?.SendPacket(PacketEncoder.EatItem(slot));
+                    _net?.SendPacket(PacketEncoder.EatItem(slot, item));
                 };
                 HudInstance.WearItemRequested += (bagSlot, equipSlot) =>
                 {

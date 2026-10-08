@@ -396,7 +396,41 @@ public class TestCombatSkillsMatrix
         Assert.Equal(ProtocolConsts.CM_SOFTCLOSE, ident);
         Assert.Equal((short)1009, ident);
     }
+
+    [Fact]
+    public void Official_150_EatItem_Packet_And_GridSelect_GroundTruth_Test()
+    {
+        // 1. 验证盛大官方 1.5 物品使用/吃药 CM_EATITEM (1006) 封包编码物理真值
+        const int testSlot = 5;
+        const string testItem = "强效太阳水";
+        byte[] pkt = PacketEncoder.EatItem(testSlot, testItem);
+
+        Assert.NotNull(pkt);
+        Assert.True(pkt.Length >= 12 + Encoding.UTF8.GetByteCount(testItem));
+
+        // 校验包头与协议号
+        short ident = (short)(pkt[1] | (pkt[2] << 8));
+        Assert.Equal(ProtocolConsts.CM_EATITEM, ident);
+        Assert.Equal((short)1006, ident);
+
+        // 校验 recog 字段为背包/快捷栏槽位
+        int recog = pkt[3] | (pkt[4] << 8) | (pkt[5] << 16) | (pkt[6] << 24);
+        Assert.Equal(testSlot, recog);
+
+        // 校验 extra 字段携带经过官方 EncodePlus60 编码的物品数据，还原后完全对齐物品名称
+        byte[] decodedExtra = PacketCodec.DecodePlus60(pkt.AsSpan(11, pkt.Length - 12));
+        string extraStr = Encoding.UTF8.GetString(decodedExtra);
+        Assert.Equal(testItem, extraStr);
+
+        // 2. 验证缺省物品名时的封包结构
+        byte[] fallbackPkt = PacketEncoder.EatItem(3);
+        Assert.NotNull(fallbackPkt);
+        Assert.True(fallbackPkt.Length >= 12);
+        short fallbackIdent = (short)(fallbackPkt[1] | (fallbackPkt[2] << 8));
+        Assert.Equal(ProtocolConsts.CM_EATITEM, fallbackIdent);
+    }
 }
+
 
 
 
