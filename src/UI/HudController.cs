@@ -338,6 +338,7 @@ public partial class HudController : CanvasLayer
         _chatInput = GetNodeOrNull<LineEdit>("ChatInput");
         if (_chatInput != null)
         {
+            _chatInput.MaxLength = 70; // 盛大官方 1.5 聊天单行最大 70 字符规约 (ClMain.pas / IDA sub_461DEC)
             _chatInput.TextSubmitted += OnChatInputSubmitted;
         }
 
@@ -1413,8 +1414,22 @@ public partial class HudController : CanvasLayer
 
     public void UpdateLampDura(int dura)
     {
-        _lampDura = dura;
+        _lampDura = Math.Max(0, dura);
         GD.Print($"[HudController] 蜡烛/油灯持久更新 (SM_LAMPCHANGEDURA=655): {_lampDura}");
+
+        // 盛大官方 1.5 蜡烛火把持久度同步与燃尽熄灭 (IDA case 655 & sub_48A0F0 DSWLightDirectPaint)
+        if (_equipItemDetails[2] is { } eq && (eq.Name.Contains("火把") || eq.Name.Contains("蜡烛")))
+        {
+            string newDesc = $"重量 1   持久力 {_lampDura}/10";
+            _equipItemDetails[2] = (eq.Name, newDesc);
+            UpdateEquipDurability(2, _lampDura, 10);
+
+            if (_lampDura <= 0)
+            {
+                AddChat("系统", "[提示] 你的火把已经燃尽熄灭了。", new Color(0.9f, 0.7f, 0.3f));
+                UpdateVisionFog(true, Mir2Client.Game.DarknessFogManager.BaseDarkRadius, new Vector2(400, 225));
+            }
+        }
     }
 
     public void UpdateItemPrice(int price)

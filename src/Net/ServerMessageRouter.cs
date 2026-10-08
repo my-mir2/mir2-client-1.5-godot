@@ -2209,8 +2209,14 @@ public sealed class ServerMessageRouter
 
     private void HandleEntityDead(ServerPacket pkt)
     {
-        if (_entityManager == null) return;
         int uid = pkt.Recog;
+        if (_gameView?.PlayerInstance != null && (uid == 0 || uid == _gameView.SessionId || uid == _gameView.PlayerInstance.Uid))
+        {
+            _gameView.TriggerPlayerDeath();
+            return;
+        }
+
+        if (_entityManager == null) return;
         _entityManager.TriggerDeath(uid);
     }
 
@@ -2294,6 +2300,10 @@ public sealed class ServerMessageRouter
             if (damage > 0)
             {
                 _hud?.AddChat("战斗", $"受到伤害 {damage} 点，剩余生命 {targetHp}。", new Color(1f, 0.4f, 0.4f));
+            }
+            if (_gameView.PlayerInstance.Hp <= 0)
+            {
+                _gameView.TriggerPlayerDeath();
             }
         }
         else if (_entityManager?.GetEntity(targetId) is { } targetEnt)

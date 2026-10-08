@@ -54,9 +54,15 @@ namespace Mir2Client.Game
             }
 
             var lightItem = player.Equipment[(int)OfficialEquipSlot.Lighting];
-            if (lightItem == null || string.IsNullOrEmpty(lightItem.Name) || lightItem.Dura <= 0)
+            if (lightItem == null || string.IsNullOrEmpty(lightItem.Name))
             {
                 return new VisionResult { Radius = BaseDarkRadius, Source = "徒手摸黑", IsDark = true, Dura = 0 };
+            }
+
+            if (lightItem.Dura <= 0)
+            {
+                TorchDepleted?.Invoke(lightItem.Uid);
+                return new VisionResult { Radius = BaseDarkRadius, Source = "火把熄灭", IsDark = true, Dura = 0 };
             }
 
             VisionResult res;

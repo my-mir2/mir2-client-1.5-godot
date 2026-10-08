@@ -226,6 +226,8 @@
 | 82 | `648` / `650` | `SM_BUY_OK_DELPHI` / `SM_SELL_OK_DELPHI` | 商店买卖成功更新金币 (case 648/650) | `ServerMessageRouter.cs:391` | `bridge.rs:1915` | `[L3 1:1]` | 购买/出售金币变动与背包底栏 LblBagGold 刷新已对齐 |
 | 83 | `668` | `SM_OPENREPAIRDLG` | 铁匠铺打开修理面板 (case 668) | `ServerMessageRouter.cs:407` | `bridge.rs:190` | `[L3 1:1]` | 驱动 HudController.OpenRepairPanel 弹出装备修理面板 |
 | 84 | `752` | `SM_OPENGUILDDLGFAIL` | 打开行会面板失败提示 (case 752) | `ServerMessageRouter.cs:410` | `bridge.rs:1142` | `[L3 1:1]` | 弹出未加入行会模态警告弹窗 |
+| 85 | `655` | `SM_LAMPCHANGEDURA` | 蜡烛火把持久度衰减与燃尽熄灭 (case 655) | `HudController.cs:1414` | `bridge.rs:655` | `[L3 1:1]` | 官方 IDA sub_48A0F0 DSWLightDirectPaint 逆向实证：槽位 2 蜡烛火把持久度同步刷新，持久降为 0 时提示火把燃尽，并在黑夜地牢环境中将光照半径平滑回退至徒手摸黑暗光 |
+| 86 | `21` / `28` | `SM_DEATH` / `SM_DEATH_ACTION_DELPHI` | 实体/主角死亡倒地与回城复活全生命周期闭环 (case 21/28) | `GameView.cs:1735` | `bridge.rs:21` | `[L3 1:1]` | 官方 IDA sub_481DD4 / sub_486DF0 逆向实证：主角死亡倒地播放男女惨叫音效 (144/145)，激活全屏灰度滤镜后处理与血滴动画 (DeathScreenView Prguse 360/361/365)，严密拦截死亡状态下移动、割肉与嗑药穿透，支持安全区满血重获新生 |
 
 ---
 

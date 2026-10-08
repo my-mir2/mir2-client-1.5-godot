@@ -427,6 +427,7 @@ namespace Mir2Client.UI
 
                 InputPluginInstance.ButcherRequested += (tx, ty, dir) =>
                 {
+                    if (PlayerInstance.IsDead) return;
                     PerformButcher(tx, ty, dir);
                 };
 
@@ -437,6 +438,7 @@ namespace Mir2Client.UI
 
                 InputPluginInstance.QuickItemKeyPressed += (slot) =>
                 {
+                    if (PlayerInstance.IsDead) return;
                     HudInstance?.UseQuickSlot(slot);
                 };
 
@@ -532,15 +534,18 @@ namespace Mir2Client.UI
                 // 官方 1.5 物品使用/吃药、穿戴、脱下网络发包 (CM_EATITEM 1006 / CM_WEARITEM 1003 / CM_TAKEOFFITEM 1004)
                 HudInstance.UseItemRequested += (slot, item) =>
                 {
+                    if (PlayerInstance?.IsDead == true) return;
                     _net?.SendPacket(PacketEncoder.EatItem(slot, item));
                     ApplyPotionRecovery(item);
                 };
                 HudInstance.WearItemRequested += (bagSlot, equipSlot) =>
                 {
+                    if (PlayerInstance?.IsDead == true) return;
                     _net?.SendPacket(PacketEncoder.WearItem((short)bagSlot, (short)equipSlot));
                 };
                 HudInstance.TakeoffItemRequested += (equipSlot) =>
                 {
+                    if (PlayerInstance?.IsDead == true) return;
                     _net?.SendPacket(PacketEncoder.TakeOffItem((short)equipSlot));
                 };
 
@@ -738,6 +743,18 @@ namespace Mir2Client.UI
                             HudInstance?.AddChat("提示", $"无法到达目标点 ({targetX}, {targetY})，该区域可能存在阻挡障碍。", new Color(1f, 0.4f, 0.4f));
                             HudInstance?.Minimap?.ClearTarget();
                         }
+                    };
+                }
+
+                if (HudInstance.DeathScreen != null)
+                {
+                    HudInstance.DeathScreen.ReviveAtStartRequested += () =>
+                    {
+                        PerformPlayerRevive();
+                    };
+                    HudInstance.DeathScreen.ExitGameRequested += () =>
+                    {
+                        HudInstance?.RequestExitGame();
                     };
                 }
             }
@@ -947,8 +964,7 @@ namespace Mir2Client.UI
             }
             else if (res.died)
             {
-                HudInstance?.AddChat("提示", "你已经阵亡……", new Color(1f, 0.2f, 0.2f));
-                PlayerInstance?.Anim.SetAction(ActionType.Die, PlayerInstance.Direction);
+                TriggerPlayerDeath();
             }
             else
             {
@@ -1672,6 +1688,7 @@ namespace Mir2Client.UI
 
         private void HandleEntityInteraction(int targetUid, EntityManager.EntityType type, int tileX, int tileY, bool isShift)
         {
+            if (PlayerInstance == null || PlayerInstance.IsDead) return;
             var ent = EntityManagerInstance.GetEntity(targetUid);
             if (ent == null) return;
 
@@ -1709,6 +1726,50 @@ namespace Mir2Client.UI
             else if (type == EntityManager.EntityType.Monster)
             {
                 GD.Print($"[GameView] 锁定怪物目标: {ent.Name} (Uid: {targetUid})");
+            }
+        }
+
+        /// <summary>
+        /// 盛大官方 1.5 主角阵亡全流程闭环 (IDA sub_481DD4 / sub_486DF0 & DeathScreenView 灰屏与确认框)
+        /// </summary>
+        public void TriggerPlayerDeath()
+        {
+            if (PlayerInstance == null || PlayerInstance.IsDead) return;
+
+            PlayerInstance.ApplyDie();
+            PlayerStateInstance.Hp = 0;
+            HudInstance?.UpdateHp(0, PlayerStateInstance.MaxHp);
+            HudInstance?.DeathScreen?.ShowDeath();
+            HudInstance?.AddChat("提示", "你已经阵亡了，是否想要重新开始？", new Color(1f, 0.2f, 0.2f));
+        }
+
+        /// <summary>
+        /// 盛大官方 1.5 主角复活全流程闭环 (单机沙盒恢复满血满蓝传送安全区，联机发送复活/小退)
+        /// </summary>
+        public void PerformPlayerRevive()
+        {
+            if (PlayerInstance == null) return;
+            if (HudInstance?.DeathScreen != null)
+            {
+                HudInstance.DeathScreen.Visible = false;
+            }
+
+            if (_isSandbox)
+            {
+                PlayerStateInstance.Hp = PlayerStateInstance.MaxHp;
+                PlayerStateInstance.Mp = PlayerStateInstance.MaxMp;
+                HudInstance?.UpdateHp(PlayerStateInstance.Hp, PlayerStateInstance.MaxHp);
+                HudInstance?.UpdateMp(PlayerStateInstance.Mp, PlayerStateInstance.MaxMp);
+                PlayerInstance.ApplyRevive(PlayerStateInstance.MaxHp, PlayerStateInstance.MaxMp);
+                PlayerInstance.Direction = 0;
+                // 复活回城：传送回比奇安全区 (330, 270)
+                PlayerInstance.SetTilePos(330, 270);
+                UpdateEnvironmentLighting();
+                HudInstance?.AddChat("复活", "[复活] 你已在安全区重获新生！", new Color(0.3f, 1f, 0.4f));
+            }
+            else
+            {
+                _net?.SendPacket(PacketEncoder.SoftClose());
             }
         }
     }

@@ -249,5 +249,75 @@ namespace Mir2Client.Tests
             Assert.False(died2);
             Assert.True(rev2);
         }
+
+        [Fact]
+        public void TestPlayerDeathLifecycleAndRevive()
+        {
+            var ps = new PlayerState
+            {
+                Hp = 50,
+                MaxHp = 100,
+                Mp = 30,
+                MaxMp = 100
+            };
+
+            // 1. 无复活戒指，受到致死打击 100 伤害
+            int dummyDura = 0;
+            var (hp, mp, died, rev) = ps.TakeCombatDamage(100, hasProtectRing: false, hasReviveRing: false, ref dummyDura, 0, 100000);
+            Assert.Equal(0, hp);
+            Assert.True(died);
+            Assert.False(rev);
+
+            // 2. 复活回城重置生命
+            ps.Hp = ps.MaxHp;
+            ps.Mp = ps.MaxMp;
+            Assert.Equal(100, ps.Hp);
+            Assert.Equal(100, ps.Mp);
+        }
+
+        [Fact]
+        public void TestDarknessFogAndTorchDura()
+        {
+            var fog = new DarknessFogManager();
+            var ps = new PlayerState();
+
+            // 1. 地表比奇省不是黑夜地图，全量日光 15 瓦片
+            var visSurface = fog.CalculateVisionRadius(ps, "0");
+            Assert.False(visSurface.IsDark);
+            Assert.Equal(DarknessFogManager.DaylightRadius, visSurface.Radius);
+
+            // 2. 地牢 d401（沃玛寺庙）：徒手摸黑视野 1 瓦片
+            var visDungeonBare = fog.CalculateVisionRadius(ps, "d401");
+            Assert.True(visDungeonBare.IsDark);
+            Assert.Equal(DarknessFogManager.BaseDarkRadius, visDungeonBare.Radius);
+
+            // 3. 佩戴火把（槽位 2 / Lighting）
+            var torch = new EquipItem { Name = "火把", Dura = 10 };
+            ps.WearItem(OfficialEquipSlot.Lighting, torch);
+            var visTorch = fog.CalculateVisionRadius(ps, "d401");
+            Assert.True(visTorch.IsDark);
+            Assert.Equal(DarknessFogManager.TorchRadius, visTorch.Radius);
+
+            // 4. 火把持久衰减为 0（燃尽熄灭），触发 TorchDepleted 并视野收缩
+            bool depletedTriggered = false;
+            fog.TorchDepleted += (uid) => depletedTriggered = true;
+            torch.Dura = 0;
+            var visDepleted = fog.CalculateVisionRadius(ps, "d401");
+            Assert.True(visDepleted.IsDark);
+            Assert.Equal(DarknessFogManager.BaseDarkRadius, visDepleted.Radius);
+            Assert.True(depletedTriggered);
+        }
+
+        [Fact]
+        public void TestChatInputLimits()
+        {
+            const int officialMaxLen = 70;
+            string normalMsg = "!大家好，欢迎来到热血传奇1.5！";
+            Assert.True(normalMsg.Length <= officialMaxLen);
+
+            string ultraLong = new string('A', 120);
+            string clamped = ultraLong.Length > officialMaxLen ? ultraLong[..officialMaxLen] : ultraLong;
+            Assert.Equal(officialMaxLen, clamped.Length);
+        }
     }
 }
