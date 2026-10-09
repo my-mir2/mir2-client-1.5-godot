@@ -460,5 +460,69 @@ namespace Mir2Client.Render
             }
             _attachedEffects.Clear();
         }
+
+        /// <summary>
+        /// 盛大官方 1.5 全量 32 门技能视听动画统一调度器 (由 OfficialMagicCompendium 驱动)
+        /// </summary>
+        public void PlayOfficialMagic(int magicId, Vector2 startWorld, Vector2 targetWorld, Node? targetNode = null)
+        {
+            var def = Mir2Client.Game.OfficialMagicCompendium.Get(magicId);
+            if (def == null) return;
+
+            var loader = def.SpellWil == 2 ? _wilMagic2 : _wilMagic;
+
+            switch (def.CastType)
+            {
+                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.TargetProjectile:
+                    var proj = new Projectile
+                    {
+                        MagicId = magicId,
+                        StartPos = startWorld,
+                        TargetPos = targetWorld,
+                        Progress = 0f,
+                        Speed = def.ProjectileSpeed > 0 ? def.ProjectileSpeed : 500f,
+                        BaseFrame = def.EffectStartFrame,
+                        FrameCount = Math.Max(1, def.EffectFrameCount),
+                        WilLoaderInstance = loader,
+                        Sprite = new Sprite2D { Centered = true, ZIndex = 110 }
+                    };
+                    AddChild(proj.Sprite);
+                    _flyingProjectiles.Add(proj);
+                    break;
+
+                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.GroundAoE:
+                    var gm = new GroundMagic
+                    {
+                        TilePos = new Vector2I((int)(targetWorld.X / 48), (int)(targetWorld.Y / 32)),
+                        RemainingLife = def.GroundDurationMs > 0 ? def.GroundDurationMs / 1000f : 20f,
+                        BaseFrame = def.EffectStartFrame,
+                        FrameCount = Math.Max(1, def.EffectFrameCount),
+                        WilLoaderInstance = loader,
+                        Sprite = new Sprite2D { Centered = true, GlobalPosition = targetWorld, ZIndex = 5 }
+                    };
+                    AddChild(gm.Sprite);
+                    _groundMagics.Add(gm);
+                    break;
+
+                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.SelfCast:
+                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.TargetDirect:
+                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.TargetArea:
+                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.Summon:
+                    var eff = new AttachedEffect
+                    {
+                        MagicId = magicId,
+                        TargetEntity = targetNode ?? this,
+                        Duration = def.GroundDurationMs > 0 ? def.GroundDurationMs / 1000f : 1.5f,
+                        BaseFrame = def.EffectStartFrame,
+                        FrameCount = Math.Max(1, def.EffectFrameCount),
+                        IsPersistent = def.MagicId == 31, // 魔法盾常驻
+                        WilLoaderInstance = loader,
+                        Sprite = new Sprite2D { Centered = true, GlobalPosition = targetWorld, ZIndex = 105 }
+                    };
+                    AddChild(eff.Sprite);
+                    _attachedEffects.Add(eff);
+                    break;
+            }
+        }
     }
 }
