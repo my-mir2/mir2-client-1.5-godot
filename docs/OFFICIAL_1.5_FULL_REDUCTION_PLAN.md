@@ -27,11 +27,12 @@
 - [x] 2.5 【新增细节】MagicManager.PlayOfficialMagic 统一挂接 OfficialMagicCompendium，实现弹道、地面火墙与身周光效的全态调度。
 
 ### 战役 3：155 个下行 SM 消息客户端本地状态机全集 (协议全集)
-- [ ] 3.1 实体生命周期分发（Spawn/Delete/Move/Turn/Death/Disappear 全量状态同步）；
-- [ ] 3.2 动作与伤害广播（Walk/Run/Hit/Spell/Struck/FlyAxe/Lighting/DigUp 原生时钟驱动）；
-- [ ] 3.3 背包、资产与属性同步（AddItem/DelItem/GoldChanged/UserState/HealthChanged/EquipInfo 全字段映射）；
-- [ ] 3.4 交互与社交回执（NPC/Deal/Guild/Storage/Merchant/Inspect/NeedPassword 24 窗体状态机联动）；
-- [ ] 3.5 环境与地图切换（NewMap/ChangeLight/ClearObjects 黑屏转场与视野擦除）。
+- [x] 3.1 实体生命周期分发（Spawn/Delete/Move/Turn/Death/Disappear 全量状态同步）；
+- [x] 3.2 动作与伤害广播（Walk/Run/Hit/Spell/Struck/FlyAxe/Lighting/DigUp 原生时钟驱动）；
+- [x] 3.3 背包、资产与属性同步（AddItem/DelItem/GoldChanged/UserState/HealthChanged/EquipInfo 全字段映射）；
+- [x] 3.4 交互与社交回执（NPC/Deal/Guild/Storage/Merchant/Inspect/NeedPassword 24 窗体状态机联动）；
+- [x] 3.5 环境与地图切换（NewMap/ChangeLight/ClearObjects 黑屏转场与视野擦除）；
+- [x] 3.6 【新增细节】ServerMessageRouter.ProtocolDispatcher 全量托管 155 个 SM Jumptable 分支，实现 100% 协议分发闭环。
 
 ### 战役 4：角色/怪物 8 方向动作骨骼与地图环境生态 (表现层全集)
 - [ ] 4.1 主角 8 方向动作切片（站立、走 6 帧、跑 6 帧、普攻 6 帧、施法 6 帧、受击 3 帧、倒地 4 帧、挖肉 4 帧）；

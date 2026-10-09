@@ -120,9 +120,13 @@ public sealed class ServerMessageRouter
         OnPacket(packet);
     }
 
+    public Official15ProtocolDispatcher ProtocolDispatcher { get; } = new();
+
     public void OnPacket(ServerPacket packet)
     {
         short smCode = packet.Ident;
+        ProtocolDispatcher.Dispatch(smCode, packet.Recog, packet.Param, packet.Tag, packet.Series, packet.Data);
+
         switch (smCode)
         {
             case SM_GOLDCHANGED:
