@@ -4080,7 +4080,505 @@ public class TestProtocolMatrix
         Assert.True(lru.TryGet("tex2", out _));
         Assert.True(lru.TryGet("tex3", out _));
     }
+
+    [Fact]
+    public void TestOfficialDetails_Batch10_MapEnvironment()
+    {
+        // 细节 151: 毒蛇山谷全域绿色瘴气微雾飘散与边缘羽化
+        var (density, colHex, feather) = Mir2Client.Render.MapEnvironmentEngine.SnakeValleyMistEngine.EvaluateMist(1.0f);
+        Assert.InRange(density, 0.2f, 0.35f);
+        Assert.Equal("#2E8B57", colHex);
+        Assert.Equal(0.15f, feather);
+
+        // 细节 152: 沃玛寺庙与祖玛寺庙火盆照明 4~5 格正弦呼吸
+        float r = Mir2Client.Render.MapEnvironmentEngine.BrazierLightingEngine.CalculateLightRadius(0.5f);
+        Assert.InRange(r, 4.0f, 5.0f);
+
+        // 细节 153: 祖玛寺庙石化雕像群地表分布与静态未激活碰撞体
+        var statues = new List<(int x, int y, bool isAwakened)> { (10, 20, false), (15, 25, true) };
+        Assert.True(Mir2Client.Render.MapEnvironmentEngine.ZumaStatueGridEngine.IsStatueBlocked(10, 20, statues));
+        Assert.False(Mir2Client.Render.MapEnvironmentEngine.ZumaStatueGridEngine.IsStatueBlocked(15, 25, statues));
+
+        // 细节 154: 封魔谷/毒蛇山谷水流瓦片连续 4 帧波光倒影动画
+        int wFrame = Mir2Client.Render.MapEnvironmentEngine.WaterFlowTileEngine.GetCurrentFrame(1.25f);
+        Assert.Equal(1, wFrame);
+
+        // 细节 155: 比奇城护城河木制水车 8 帧平滑旋转与飞沫粒子
+        var (wheelFrame, foam) = Mir2Client.Render.MapEnvironmentEngine.WaterWheelEngine.UpdateWaterWheel(1.5f);
+        Assert.Equal(1, wheelFrame);
+        Assert.Equal(6, foam);
+
+        // 细节 156: 地牢洞穴铁链在风中微幅摆动与偶尔金属摩擦音效
+        var (chainAngle, playChain) = Mir2Client.Render.MapEnvironmentEngine.CaveChainAudioEngine.EvaluateChain(1.0f, 2);
+        Assert.NotEqual(0f, chainAngle);
+        Assert.True(playChain);
+
+        // 细节 157: 石墓通道木桶木箱物理阻挡
+        var obstacles = new HashSet<(int x, int y)> { (10, 10), (10, 11) };
+        Assert.True(Mir2Client.Render.MapEnvironmentEngine.CorridorCrateBlockEngine.IsBlocked(10, 10, obstacles));
+        Assert.False(Mir2Client.Render.MapEnvironmentEngine.CorridorCrateBlockEngine.CanSlashThrough(10, 9, 10, 11, obstacles));
+
+        // 细节 158: 盟重石墓入口枯树与巨兽白骨堆
+        var (treeId, boneId) = Mir2Client.Render.MapEnvironmentEngine.StoneTombDecorEngine.GetDecorTiles();
+        Assert.Equal(412, treeId);
+        Assert.Equal(415, boneId);
+
+        // 细节 159: 比奇矿区铁轨与废弃矿车碰撞框
+        Assert.True(Mir2Client.Render.MapEnvironmentEngine.MineRailCollisionEngine.IsCartCollision(101, 200, 100, 200));
+
+        // 细节 160: 赤月峡谷蛛网减速 10%
+        float spd = Mir2Client.Render.MapEnvironmentEngine.SpiderWebSlowEngine.GetMoveSpeedMultiplier(true);
+        Assert.Equal(0.9f, spd);
+
+        // 细节 161: 白日门丛林密林遮挡半透明 Alpha Culling 40%
+        float cAlpha = Mir2Client.Render.MapEnvironmentEngine.ForestAlphaCullingEngine.CalculateCanopyAlpha(true);
+        Assert.Equal(0.4f, cAlpha);
+
+        // 细节 162: 石墓阵房间传送拓扑判定
+        var (step1, finish1) = Mir2Client.Render.MapEnvironmentEngine.StoneTombMazeEngine.ProcessDoorStep(0, "Up");
+        Assert.Equal(1, step1);
+        Assert.False(finish1);
+        var (stepWrong, _) = Mir2Client.Render.MapEnvironmentEngine.StoneTombMazeEngine.ProcessDoorStep(1, "Left");
+        Assert.Equal(0, stepWrong); // 走错归零
+
+        // 细节 163: 赤月恶魔地表血肉地毯蠕动与地刺受力
+        var (pulse, spike) = Mir2Client.Render.MapEnvironmentEngine.RedMoonDemonFloorEngine.EvaluateFloor(0.2f);
+        Assert.NotEqual(0f, pulse);
+        Assert.True(spike);
+
+        // 细节 164: 黑暗空间地牢视口边缘抗锯齿渐变软阴影
+        float falloff = Mir2Client.Render.MapEnvironmentEngine.DarknessSoftShadowEngine.CalculateShadowFalloff(5.0f, 4.0f);
+        Assert.Equal(0.5f, falloff);
+
+        // 细节 165: 城门单向通行石门防夹人状态机
+        var (canClose, push) = Mir2Client.Render.MapEnvironmentEngine.CityGateAntiPinchEngine.CheckGateClosing(true);
+        Assert.False(canClose);
+        Assert.Equal(1, push);
+
+        // 细节 166: 沙巴克密道钻洞动画下潜与 CM 发送
+        var (diveProg, sendCm) = Mir2Client.Render.MapEnvironmentEngine.SabukSecretTunnelEngine.ProcessDive(1.2f);
+        Assert.Equal(1.0f, diveProg);
+        Assert.True(sendCm);
+
+        // 细节 167: 安全区四角石刻界碑物理碰撞阻挡
+        var stones = new List<(int x, int y)> { (300, 300), (350, 350) };
+        Assert.True(Mir2Client.Render.MapEnvironmentEngine.SafeZoneBoundaryStoneEngine.IsBoundaryStone(300, 300, stones));
+
+        // 细节 168: NPC 柜台物理阻挡近战穿透
+        Assert.True(Mir2Client.Render.MapEnvironmentEngine.NpcCounterCollisionEngine.CanMeleeHitNpc(100, 100, 101, 100));
+
+        // 细节 169: 大地图边缘世界边界网格与自动折返
+        var (cx, cy, reb) = Mir2Client.Render.MapEnvironmentEngine.MapEdgeBoundaryEngine.ClampPosition(5, 5, 500, 500);
+        Assert.Equal(10, cx);
+        Assert.Equal(10, cy);
+        Assert.True(reb);
+
+        // 细节 170: 传送阵光圈粒子 1.0s 内向内收拢汇聚
+        var (rRing, aRing) = Mir2Client.Render.MapEnvironmentEngine.TeleportCircleVfxEngine.CalculateConvergence(0.5f);
+        Assert.Equal(20.0f, rRing);
+        Assert.True(aRing > 0);
+    }
+
+    [Fact]
+    public void TestOfficialDetails_Batch11_AdvancedSkill()
+    {
+        // 细节 171: 战士野蛮冲撞撞碎地表木箱木屑粒子飞溅
+        var (smashed, wood) = Mir2Client.Game.AdvancedSkillEngine.SavageCrateSmashEngine.CheckSmash(true, 35);
+        Assert.True(smashed);
+        Assert.Equal(18, wood);
+
+        // 细节 172: 战士刺杀第二格剑气严格无视神圣战甲术 (AC+3) 与幽灵盾
+        int dSecond = Mir2Client.Game.AdvancedSkillEngine.SwordQiAuraPierceEngine.CalculateDamage(50, 15, 3, isSecondGrid: true);
+        Assert.Equal(50, dSecond);
+        int dFirst = Mir2Client.Game.AdvancedSkillEngine.SwordQiAuraPierceEngine.CalculateDamage(50, 15, 3, isSecondGrid: false);
+        Assert.Equal(32, dFirst);
+
+        // 细节 173: 战士半月弯刀副目标严格不触发吸血与施毒
+        var (vHp, pProc) = Mir2Client.Game.AdvancedSkillEngine.HalfMoonSubTargetEngine.EvaluateSubTargetProc(isSubTarget: true, 60, hasRainbowSuit: true);
+        Assert.Equal(0, vHp);
+        Assert.False(pProc);
+
+        // 细节 174: 烈火剑法蓄力状态单次受到 >30% 最大生命伤害时被打断
+        var (chargeOk, _) = Mir2Client.Game.AdvancedSkillEngine.FireSwordDisruptEngine.CheckDisruption(isCharged: true, incomingDamage: 120, maxHp: 300);
+        Assert.False(chargeOk);
+
+        // 细节 175: 攻杀剑术对不死系生物 (骷髅/僵尸) 额外造成 150ms 击退硬直
+        var (stunMs, kb) = Mir2Client.Game.AdvancedSkillEngine.AssassinationUndeadEngine.EvaluateUndeadHit(isUndead: true, isAssassinationHit: true);
+        Assert.Equal(150, stunMs);
+        Assert.True(kb);
+
+        // 细节 176: 诱惑之光对高阶生物 (白野猪/沃玛卫士) 无法招募但概率触发 5 秒黄字瘫痪定身
+        var (tameOk, paral, pDur) = Mir2Client.Game.AdvancedSkillEngine.TameParalysisEngine.AttemptTameBoss(35, 38, 20);
+        Assert.False(tameOk);
+        Assert.True(paral);
+        Assert.Equal(5.0f, pDur);
+
+        // 细节 177: 诱惑宝宝存活超 6 小时叛变名字变黄攻击主人
+        var (reb, nCol) = Mir2Client.Game.AdvancedSkillEngine.TamedPetRebellionEngine.CheckRebellion(6.5f);
+        Assert.True(reb);
+        Assert.Equal("#FFFF00", nCol);
+
+        // 细节 178: 小火球与大火球击退轻型怪物 1 格物理判定
+        var (kbFire, kbX, kbY) = Mir2Client.Game.AdvancedSkillEngine.FireballKnockbackEngine.CalculateKnockback(true, 10, 10, 11, 10);
+        Assert.True(kbFire);
+        Assert.Equal(12, kbX);
+
+        // 细节 179: 火墙遇冰咆哮燃烧剩余时间缩短 5 秒
+        float fwLeft = Mir2Client.Game.AdvancedSkillEngine.IceExtinguishFirewallEngine.ApplyIceStormImpact(12.0f);
+        Assert.Equal(7.0f, fwLeft);
+
+        // 细节 180: 魔法盾受到神圣伤害 15% 护盾穿透率
+        var (absDmg, pierceDmg) = Mir2Client.Game.AdvancedSkillEngine.MagicShieldHolyPierceEngine.CalculateHolyPierce(100, isHoly: true);
+        Assert.Equal(85, absDmg);
+        Assert.Equal(15, pierceDmg);
+
+        // 细节 181: 瞬息移动 5 秒内连续使用蓝耗翻倍递增防无限飞
+        int manaSurge = Mir2Client.Game.AdvancedSkillEngine.TeleportManaSurgeEngine.CalculateSurgeCost(2, 1.0f);
+        Assert.Equal(40, manaSurge); // 10 * 4
+
+        // 细节 182: 施毒术绿毒扣血不破除隐身状态
+        Assert.False(Mir2Client.Game.AdvancedSkillEngine.PoisonInvisibilityEngine.DoesPoisonBreakInvisibility());
+
+        // 细节 183: 真实视距生物 (楔蛾/月魔/触龙神) 面前隐身术失效
+        Assert.True(Mir2Client.Game.AdvancedSkillEngine.TrueSightEngine.CanDetectInvisible("楔蛾"));
+        Assert.False(Mir2Client.Game.AdvancedSkillEngine.TrueSightEngine.CanDetectInvisible("半兽人"));
+
+        // 细节 184: 神圣战甲术与幽灵盾单次施法最多作用 8 个友方
+        var allies = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+        var filteredAllies = Mir2Client.Game.AdvancedSkillEngine.AuraTargetLimitEngine.FilterAuraTargets(allies);
+        Assert.Equal(8, filteredAllies.Count);
+
+        // 细节 185: 困魔咒金黄八卦光柱锁怪
+        var (trapped, broken) = Mir2Client.Game.AdvancedSkillEngine.TrapMonsterEngine.EvaluateTrap(true, incomingDamage: 10);
+        Assert.False(trapped);
+        Assert.True(broken); // 受击破咒
+
+        // 细节 186: 群体隐身术 3x3 八卦光斑散落全队隐身
+        Assert.True(Mir2Client.Game.AdvancedSkillEngine.GroupInvisibilityEngine.IsIn3x3Area(10, 10, 11, 11));
+        Assert.False(Mir2Client.Game.AdvancedSkillEngine.GroupInvisibilityEngine.IsIn3x3Area(10, 10, 13, 11));
+
+        // 细节 187: 骷髅战士 0 级到 7 级外观进阶
+        Assert.Equal(Mir2Client.Game.AdvancedSkillEngine.SkeletonEvolutionEngine.SkeletonForm.SmallAxe,
+            Mir2Client.Game.AdvancedSkillEngine.SkeletonEvolutionEngine.GetSkeletonForm(1));
+        Assert.Equal(Mir2Client.Game.AdvancedSkillEngine.SkeletonEvolutionEngine.SkeletonForm.RedBoneReinforced,
+            Mir2Client.Game.AdvancedSkillEngine.SkeletonEvolutionEngine.GetSkeletonForm(7));
+
+        // 细节 188: 神兽 0 级到 7 级喷火颜色与缩放
+        var (fCol, sScale) = Mir2Client.Game.AdvancedSkillEngine.ShinsuEvolutionEngine.GetShinsuStats(7);
+        Assert.Equal("#FFFFFF", fCol);
+        Assert.Equal(1.4f, sScale);
+
+        // 细节 189: 心灵启示显现目标真实数字 HP 与百分比血条 30 秒
+        var (showInsight, ratioTxt) = Mir2Client.Game.AdvancedSkillEngine.MindInsightEngine.GetInsightDisplay(5.0f, 150, 300);
+        Assert.True(showInsight);
+        Assert.Contains("50%", ratioTxt);
+
+        // 细节 190: 气功波推开周围 8 方向 1 格低于自身等级目标
+        var (repOk, repX, repY) = Mir2Client.Game.AdvancedSkillEngine.QiGongRepelEngine.TryRepel(40, 35, 10, 10, 11, 10);
+        Assert.True(repOk);
+        Assert.Equal(12, repX);
+    }
+
+    [Fact]
+    public void TestOfficialDetails_Batch12_BossEncounter()
+    {
+        // 细节 191: 触龙神全屏绿毒与大范围石化喷吐
+        var (petr, pois, pTime) = Mir2Client.Game.BossEncounterEngine.EvilSnakePoisonEngine.EvaluateBreath(15);
+        Assert.True(petr);
+        Assert.True(pois);
+        Assert.Equal(3.0f, pTime);
+
+        // 细节 192: 触龙神绝对免疫一切魔法攻击
+        int dMagic = Mir2Client.Game.BossEncounterEngine.EvilSnakeMagicImmunityEngine.CalculateDamage(100, isMagicAttack: true);
+        Assert.Equal(0, dMagic);
+        int dPhys = Mir2Client.Game.BossEncounterEngine.EvilSnakeMagicImmunityEngine.CalculateDamage(100, isMagicAttack: false);
+        Assert.Equal(100, dPhys);
+
+        // 细节 193: 邪恶毒蛇高速 S 型移动与近身剧毒
+        var (vSpd, vTox) = Mir2Client.Game.BossEncounterEngine.ViperMobilityEngine.EvaluateViperState(1);
+        Assert.Equal(1.6f, vSpd);
+        Assert.True(vTox);
+
+        // 细节 194: 极品祖玛卫士移速提升 50% 与前摇缩短
+        var (sSpd, sPre) = Mir2Client.Game.BossEncounterEngine.ZumaSuperGuardEngine.GetGuardAttributes(true);
+        Assert.Equal(1.5f, sSpd);
+        Assert.Equal(0.25f, sPre);
+
+        // 细节 195: 极品祖玛雕像濒死 (HP < 10%) 自爆机制
+        var (boom, bDmg) = Mir2Client.Game.BossEncounterEngine.ZumaStatueSelfDestructEngine.CheckSelfDestruct(8, 100);
+        Assert.True(boom);
+        Assert.Equal(80, bDmg);
+
+        // 细节 196: 黑色恶蛆高速滚地突进高速撞击造成 200ms 顿挫
+        var (maggotHit, magStun) = Mir2Client.Game.BossEncounterEngine.BlackMaggotChargeEngine.EvaluateCharge(3);
+        Assert.True(maggotHit);
+        Assert.Equal(200, magStun);
+
+        // 细节 197: 楔蛾喷吐 5% 石化定身 3 秒
+        var (mothPetr, mDur) = Mir2Client.Game.BossEncounterEngine.MothPetrifyEngine.CheckPetrify(3);
+        Assert.True(mothPetr);
+        Assert.Equal(3.0f, mDur);
+
+        // 细节 198: 角蝇同屏吐出蝙蝠最多 10 只超限停止产卵
+        Assert.True(Mir2Client.Game.BossEncounterEngine.BatSpitterEngine.CanSpawnBat(8));
+        Assert.False(Mir2Client.Game.BossEncounterEngine.BatSpitterEngine.CanSpawnBat(10));
+
+        // 细节 199: 沃玛卫士双刀连斩造成双倍物理伤害
+        var (dualProc, dDmg) = Mir2Client.Game.BossEncounterEngine.WomaDualBladeEngine.CalculateSlashDamage(40, true);
+        Assert.True(dualProc);
+        Assert.Equal(80, dDmg);
+
+        // 细节 200: 尸王铁链扫击前方 3 格横扫伤害
+        var chainGrids = Mir2Client.Game.BossEncounterEngine.CorpseKingChainEngine.GetChainSweepGrids(10, 10, 2);
+        Assert.Equal(3, chainGrids.Count);
+        Assert.Equal(13, chainGrids[2].x);
+
+        // 细节 201: 骷髅精灵双叉狂暴突刺双眼泛红光
+        var (glowRed, enrageMulti) = Mir2Client.Game.BossEncounterEngine.SkeletonElfEnrageEngine.CheckEnraged(40, 100);
+        Assert.True(glowRed);
+        Assert.Equal(1.3f, enrageMulti);
+
+        // 细节 202: 沃玛教主狂暴瞬移到最高仇恨目标身后
+        var (tpX, tpY, tpOk) = Mir2Client.Game.BossEncounterEngine.WomaLeaderTeleportEngine.CalculateAmbush(20, 20, 2, isBerserk: true);
+        Assert.True(tpOk);
+        Assert.Equal(19, tpX); // 背后在左方
+
+        // 细节 203: 祖玛教主残血 (HP < 20%) 战鼓召唤 4 尊卫士雕像
+        var (zSummon, zCount) = Mir2Client.Game.BossEncounterEngine.ZumaLeaderSummonEngine.CheckSummon(15, 100, false);
+        Assert.True(zSummon);
+        Assert.Equal(4, zCount);
+
+        // 细节 204: 赤月恶魔全屏无死角地刺 (受目标防御与魔防双重减免)
+        int spikeDmg = Mir2Client.Game.BossEncounterEngine.RedMoonSpikeDefenseEngine.CalculateSpikeDamage(100, 20, 20);
+        Assert.Equal(80, spikeDmg);
+
+        // 细节 205: 双头金刚死后尸体不爆道具需持屠夫小刀挖肉
+        var (harvOk, dropped) = Mir2Client.Game.BossEncounterEngine.DoubleHeadKongHarvestEngine.TryHarvest(hasButcherKnife: true, roll100: 10);
+        Assert.True(harvOk);
+        Assert.Equal("法神头盔", dropped);
+
+        // 细节 206: 双头血魔死后天降暴雨与大爆圣战首饰散落
+        var (rain, bDrops) = Mir2Client.Game.BossEncounterEngine.BloodDemonStormDropEngine.EvaluateDeath();
+        Assert.True(rain);
+        Assert.Contains("圣战戒指", bDrops);
+
+        // 细节 207: 牛魔王瞬移法杖挥击与烈焰刀光双重伤害
+        var (mDc, fMc) = Mir2Client.Game.BossEncounterEngine.CowKingFlameStrikeEngine.CalculateDualDamage(50, 40);
+        Assert.Equal(50, mDc);
+        Assert.Equal(50, fMc); // 40 * 1.25
+
+        // 细节 208: 暗之双头金刚死后挖取天尊道袍重装
+        var (robeOk, rName) = Mir2Client.Game.BossEncounterEngine.DarkKongRobeHarvestEngine.HarvestRobe(true, 20);
+        Assert.True(robeOk);
+        Assert.Equal("天尊道袍", rName);
+
+        // 细节 209: 暗之骷髅精灵死后大爆圣战宝甲散落
+        var elfDrops = Mir2Client.Game.BossEncounterEngine.DarkElfArmorDropEngine.GenerateArmorDrop(20);
+        Assert.Contains("圣战宝甲", elfDrops);
+
+        // 细节 210: 白野猪死后满屏 8x8 道具同心圆螺旋散开大爆
+        var boarDrops = Mir2Client.Game.BossEncounterEngine.WhiteBoarBigDropEngine.Generate8x8Drop(100, 100);
+        Assert.Equal(64, boarDrops.Count);
+    }
+
+    [Fact]
+    public void TestOfficialDetails_Batch13_EquipmentWearHidden()
+    {
+        // 细节 211: 衣服与头盔受暴击 1/20 概率磨损 1 点持久
+        var (nDura, wChg) = Mir2Client.Game.EquipmentWearHiddenEngine.ArmorDuraWearEngine.CheckWear(100, isCriticalHit: true, roll100: 2);
+        Assert.Equal(99, nDura);
+        Assert.True(wChg);
+
+        // 细节 212: 武器砍中不可破坏硬物瞬间掉 1 点持久
+        var (wDura, chipped) = Mir2Client.Game.EquipmentWearHiddenEngine.WeaponHardObstacleWearEngine.StrikeHardObstacle(100, true);
+        Assert.Equal(99, wDura);
+        Assert.True(chipped);
+
+        // 细节 213: 耐久度不足 100/1000 装备图标变红告警
+        var (isRedAlert, redCol) = Mir2Client.Game.EquipmentWearHiddenEngine.LowDuraRedAlertEngine.EvaluateDuraWarning(80);
+        Assert.True(isRedAlert);
+        Assert.Equal("#FF0000", redCol);
+
+        // 细节 214: 神秘头盔属性未达隐藏要求强制锁定无法取下
+        var (canTakeOff, lockReason) = Mir2Client.Game.EquipmentWearHiddenEngine.MysticHelmetLockEngine.EvaluateTakeOff(
+            playerDc: 20, playerMc: 10, requiredDc: 30, requiredMc: 0);
+        Assert.False(canTakeOff);
+        Assert.Contains("神秘力量", lockReason);
+
+        // 细节 215: 祈祷头盔死亡掉落必碎裂消失不掉于地
+        var (isShatter, onGround) = Mir2Client.Game.EquipmentWearHiddenEngine.PrayerHelmetShatterEngine.OnPlayerDeath(true);
+        Assert.True(isShatter);
+        Assert.False(onGround);
+
+        // 细节 216: 记忆项链天然极品最高幸运 +3 掉落权重公式
+        int luck3 = Mir2Client.Game.EquipmentWearHiddenEngine.MemoryNecklaceLuckWeightEngine.RollLuck(2);
+        Assert.Equal(3, luck3);
+        int luck2 = Mir2Client.Game.EquipmentWearHiddenEngine.MemoryNecklaceLuckWeightEngine.RollLuck(25);
+        Assert.Equal(2, luck2);
+
+        // 细节 217: 恶魔铃铛增加法师诱惑之光成功率 15%
+        float tameWithBell = Mir2Client.Game.EquipmentWearHiddenEngine.DevilBellTameEngine.ApplyTameBonus(0.4f, true);
+        Assert.Equal(0.55f, tameWithBell);
+
+        // 细节 218: 龙之手镯隐藏 10% 破盾几率
+        bool breakShield = Mir2Client.Game.EquipmentWearHiddenEngine.DragonBraceletShieldBreakEngine.CheckShieldBreak(true, 5);
+        Assert.True(breakShield);
+
+        // 细节 219: 心灵手镯增加道士火符准确 +2
+        int accBonus = Mir2Client.Game.EquipmentWearHiddenEngine.SoulBraceletAccuracyEngine.GetAccuracyBonus(true);
+        Assert.Equal(2, accBonus);
+
+        // 细节 220: 红宝石戒指缩短法师魔法盾受击硬直 30%
+        float mStun = Mir2Client.Game.EquipmentWearHiddenEngine.RubyShieldRecoveryEngine.CalculateShieldStun(1.0f, true);
+        Assert.Equal(0.70f, mStun);
+
+        // 细节 221: 铂金戒指提升道士神圣战甲术防御上限 2 点
+        int pDef = Mir2Client.Game.EquipmentWearHiddenEngine.PlatinumArmorBoostEngine.GetDefenseBonus(true);
+        Assert.Equal(2, pDef);
+
+        // 细节 222: 生铁戒指魔法防御对火墙按比例减免
+        int fwDmg = Mir2Client.Game.EquipmentWearHiddenEngine.IronRingFirewallDefEngine.ReduceFirewallDamage(100, 2);
+        Assert.Equal(84, fwDmg);
+
+        // 细节 223: 降妖除魔戒指恶魔类怪物伤害减免 10%
+        int demonDmg = Mir2Client.Game.EquipmentWearHiddenEngine.DemonSubdueRingEngine.ApplyDemonReduction(100, isDemonMonster: true, hasDemonSubdueRing: true);
+        Assert.Equal(90, demonDmg);
+
+        // 细节 224: 珊瑚戒指轻便负重 (重 1) 与高攻击偏向
+        var (cWeight, minDc, maxDc) = Mir2Client.Game.EquipmentWearHiddenEngine.CoralRingWeightEngine.GetStats();
+        Assert.Equal(1, cWeight);
+        Assert.Equal(4, maxDc);
+
+        // 细节 225: 金手镯极品生成优先加权魔法防御
+        var (extraMac, extraDc) = Mir2Client.Game.EquipmentWearHiddenEngine.GoldBraceletSuperStatEngine.RollSuperStat(30);
+        Assert.Equal(1, extraMac);
+        Assert.Equal(0, extraDc);
+
+        // 细节 226: 大手镯极品生成优先加权物理防御
+        var (extraAc, _) = Mir2Client.Game.EquipmentWearHiddenEngine.BigBraceletSuperStatEngine.RollSuperStat(40);
+        Assert.Equal(1, extraAc);
+
+        // 细节 227: 铁手镯准确 +1 在命中公式中严格对抗敏捷
+        int totalAcc = Mir2Client.Game.EquipmentWearHiddenEngine.IronBraceletAccuracyEngine.ApplyIronBracelet(15, 2);
+        Assert.Equal(17, totalAcc);
+
+        // 细节 228: 银蛇剑对道士治愈术恢复总量加成 10%
+        int healAmount = Mir2Client.Game.EquipmentWearHiddenEngine.SilverSnakeHealBoostEngine.CalculateHeal(100, true);
+        Assert.Equal(110, healAmount);
+
+        // 细节 229: 魔杖保证雷电术最小魔法伤害不低于 5 点
+        int rolledMin = Mir2Client.Game.EquipmentWearHiddenEngine.MagicStaffMinDmgEngine.EnsureMinDamage(2, true);
+        Assert.Equal(5, rolledMin);
+
+        // 细节 230: 炼狱巨斧重 60，检定战士手部腕力上限
+        var (canWield, wReason) = Mir2Client.Game.EquipmentWearHiddenEngine.PurgatoryAxeWeightEngine.CheckWield(55);
+        Assert.False(canWield);
+        Assert.Contains("腕力不足", wReason);
+    }
+
+    [Fact]
+    public void TestOfficialDetails_Batch14_EconomySecurity()
+    {
+        // 细节 231: 玩家安全区摆摊模式 (招牌文字、盘坐姿态)
+        var (isStalling, stallPose, sTitle) = Mir2Client.Game.EconomySecurityEngine.PlayerStallModeEngine.SetupStall(true, "极品屠龙大甩卖！");
+        Assert.True(isStalling);
+        Assert.Equal("SitDown", stallPose);
+        Assert.Equal("极品屠龙大甩卖！", sTitle);
+
+        // 细节 232: 摆摊物品标价金币合法性安全检查 (防 0 元购、负数与溢出)
+        Assert.False(Mir2Client.Game.EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(0));
+        Assert.False(Mir2Client.Game.EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(-100));
+        Assert.True(Mir2Client.Game.EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(50000));
+
+        // 细节 233: 购买摆摊物品背包空间与金币原子扣除
+        var (buyOk, remBuyerGold, sellerEarn, _) = Mir2Client.Game.EconomySecurityEngine.StallPurchaseAtomicEngine.ExecutePurchase(
+            buyerGold: 10000, bagFreeSlots: 5, price: 3000);
+        Assert.True(buyOk);
+        Assert.Equal(7000, remBuyerGold);
+        Assert.Equal(3000, sellerEarn);
+
+        // 细节 234: 交易双向锁定后 3 秒防换物倒计时冷却
+        var (canConfirm, remLockSec) = Mir2Client.Game.EconomySecurityEngine.TradeConfirmDelayEngine.CheckConfirmDelay(1.5f);
+        Assert.False(canConfirm);
+        Assert.Equal(1.5f, remLockSec);
+
+        // 细节 235: 行会宣战与结盟状态显示 (绿色同盟、红色敌对)
+        string allyCol = Mir2Client.Game.EconomySecurityEngine.GuildDiplomacyColorEngine.GetTitleColor(
+            Mir2Client.Game.EconomySecurityEngine.GuildDiplomacyColorEngine.DiplomacyStatus.Ally);
+        Assert.Equal("#00FF00", allyCol);
+        string hostCol = Mir2Client.Game.EconomySecurityEngine.GuildDiplomacyColorEngine.GetTitleColor(
+            Mir2Client.Game.EconomySecurityEngine.GuildDiplomacyColorEngine.DiplomacyStatus.Hostile);
+        Assert.Equal("#FF0000", hostCol);
+
+        // 细节 236: 行会封号自定义 (IDA sub_48A7B0 限制 14 字符)
+        var (validTitle, _) = Mir2Client.Game.EconomySecurityEngine.GuildTitleLengthEngine.SanitizeTitle("七大行会护法");
+        Assert.True(validTitle);
+
+        // 细节 237: 师徒系统出师声望奖励 (师傅 +35，徒弟祝福卷轴)
+        var (mPres, aGift) = Mir2Client.Game.EconomySecurityEngine.MasterApprenticeEngine.GraduateApprentice();
+        Assert.Equal(35, mPres);
+        Assert.Equal("出师祝福卷轴", aGift);
+
+        // 细节 238: 婚姻系统求婚协议消耗结婚戒指
+        var (propOk, propNotice) = Mir2Client.Game.EconomySecurityEngine.MarriageCeremonyEngine.ProposeMarriage(true, "白衣小仙女");
+        Assert.True(propOk);
+        Assert.Contains("白衣小仙女", propNotice);
+
+        // 细节 239: 天下第一雕像每周属性与外观同步更新
+        Assert.True(Mir2Client.Game.EconomySecurityEngine.StatueWeeklySyncEngine.NeedsSync(42, 41));
+
+        // 细节 240: 沙巴克税金每日凌晨 0 点自动入城主私库 (5% 抽成)
+        int cityTax = Mir2Client.Game.EconomySecurityEngine.SabukDailyTaxEngine.SettleDailyTax(1000000);
+        Assert.Equal(50000, cityTax);
+
+        // 细节 241: 沙巴克藏宝阁密道凭证检定
+        var bagItems = new HashSet<string> { "藏宝阁通行证", "金创药" };
+        Assert.True(Mir2Client.Game.EconomySecurityEngine.TreasurePavilionPassEngine.CanEnter(bagItems));
+
+        // 细节 242: 客户端移动加速作弊检测 (间隔 < 380ms 强制拉回)
+        var (speedHack, rollback) = Mir2Client.Game.EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(1300, 1000); // 间隔 300ms
+        Assert.True(speedHack);
+        Assert.True(rollback);
+
+        // 细节 243: 客户端挥刀出刀速度检测 (攻击间隔 < 680ms 忽略无效攻击)
+        Assert.False(Mir2Client.Game.EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(1500, 1000)); // 间隔 500ms
+        Assert.True(Mir2Client.Game.EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(1800, 1000));  // 间隔 800ms
+
+        // 细节 244: 客户端法术公共 CD 检测 (施法间隔 < 850ms 拦截)
+        var (spellAllowed, _) = Mir2Client.Game.EconomySecurityEngine.SpellGlobalCdEngine.CheckSpellCast(1500, 1000);
+        Assert.False(spellAllowed);
+
+        // 细节 245: 客户端穿人穿怪外挂检测 (物理重叠强制拉回)
+        var solidEntities = new HashSet<(int x, int y)> { (10, 10) };
+        Assert.True(Mir2Client.Game.EconomySecurityEngine.NoclipDetectorEngine.CheckNoclip(10, 10, solidEntities));
+
+        // 细节 246: 本地内存保护与状态锁 (禁止本地伪造血量回写)
+        int trueHp = Mir2Client.Game.EconomySecurityEngine.MemoryStateLockEngine.SynchronizeServerHp(localHp: 99999, verifiedServerHp: 320);
+        Assert.Equal(320, trueHp);
+
+        // 细节 247: 音频 WIL 资源异步多线程预加载防卡顿
+        Mir2Client.Game.EconomySecurityEngine.AudioPreloadQueueEngine.EnqueueSound(101);
+        Assert.Equal(101, Mir2Client.Game.EconomySecurityEngine.AudioPreloadQueueEngine.DequeueNext());
+
+        // 细节 248: UI 窗体层级置顶与 Esc 逐级关闭堆栈
+        var zStack = new Mir2Client.Game.EconomySecurityEngine.UiZOrderStackEngine();
+        zStack.Push("BagView");
+        zStack.Push("EquipView");
+        Assert.Equal("EquipView", zStack.PopTop());
+        Assert.Equal("BagView", zStack.PopTop());
+
+        // 细节 249: 全屏与窗口化自由切换等比自适应黑边拉伸 (800x600)
+        var (vW, vH, oX, oY) = Mir2Client.Game.EconomySecurityEngine.AspectFitScalerEngine.CalculateAspectFit(1600, 900);
+        Assert.Equal(1200, vW);
+        Assert.Equal(900, vH);
+        Assert.Equal(200, oX); // 两侧黑边 200px
+
+        // 细节 250: 客户端异常捕获与 Crash Dump 日志归档
+        string dump = Mir2Client.Game.EconomySecurityEngine.CrashDumpLoggerEngine.FormatCrashDump("NullReferenceException", "at GameView.Update()");
+        Assert.Contains("CRASH_DUMP", dump);
+    }
 }
+
 
 
 
