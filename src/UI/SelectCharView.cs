@@ -103,6 +103,7 @@ public partial class SelectCharView : Control
     private TextureButton? _btnRightHair;
     private TextureButton? _btnCreate;
     private TextureButton? _btnCancel;
+    private TextureRect? _previewCharRect;
 
     private int _newCharJob = 0;
     private int _newCharSex = 0;
@@ -190,6 +191,14 @@ public partial class SelectCharView : Control
             _btnRightHair = BindTextureButton("NewCharPanel/BtnRightHair", 80);
             _btnCreate = BindTextureButton("NewCharPanel/BtnCreate", 62, 81);
             _btnCancel = BindTextureButton("NewCharPanel/BtnCancel", 64);
+
+            _previewCharRect = new TextureRect
+            {
+                Name = "PreviewCharRect",
+                Position = new Vector2(170, 60),
+                MouseFilter = MouseFilterEnum.Ignore
+            };
+            _newCharPanel.AddChild(_previewCharRect);
 
             if (_btnWarrior != null) _btnWarrior.Pressed += () => SelectJob(0);
             if (_btnWizzard != null) _btnWizzard.Pressed += () => SelectJob(1);
@@ -285,6 +294,11 @@ public partial class SelectCharView : Control
             _flameFrame = (_flameFrame + 1) % OfficialFlameTotalFrames;
             UpdateFlameTextures();
         }
+
+        // 盛大官方 1.5 烛火火把明暗呼吸调光 (正弦波 4 阶明暗调制，呈现烛火微明微暗)
+        float flameAlpha = 0.85f + 0.15f * MathF.Sin((float)(_flameFrame * (MathF.PI / 7.0f)));
+        if (_flameSlot0 != null && _flameSlot0.Visible) _flameSlot0.Modulate = new Color(1f, 1f, 1f, flameAlpha);
+        if (_flameSlot1 != null && _flameSlot1.Visible) _flameSlot1.Modulate = new Color(1f, 1f, 1f, flameAlpha);
 
         // 2. 角色呼吸动作循环动画 (300ms / 0x12C 帧步长, sub_47F264 @ 0x47F9EB)
         _charAnimTimer += delta;
@@ -598,6 +612,19 @@ public partial class SelectCharView : Control
 
         if (_btnMale != null) _btnMale.TextureNormal = (_newCharSex == 0) ? texMalePressed : texMaleNormal;
         if (_btnFemale != null) _btnFemale.TextureNormal = (_newCharSex == 1) ? texFemalePressed : texFemaleNormal;
+
+        // 联动创角全身立绘预览 (ChrSel 贴图库)
+        if (_previewCharRect != null)
+        {
+            int previewFrame = CalculateCharBaseFrame(_newCharJob, _newCharSex, true);
+            var texPreview = ResPath.LoadImageTexture($"resources/wil/png/ChrSel/ChrSel_{previewFrame:D4}.png");
+            if (texPreview != null)
+            {
+                _previewCharRect.Texture = texPreview;
+                _previewCharRect.Size = texPreview.GetSize();
+                _previewCharRect.Visible = true;
+            }
+        }
     }
 
     private void ChangeHair(int delta)

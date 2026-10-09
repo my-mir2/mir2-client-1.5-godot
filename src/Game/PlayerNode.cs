@@ -211,6 +211,20 @@ namespace Mir2Client.Game
             Anim.SetAction(animAction, Direction);
         }
 
+        /// <summary>
+        /// 盛大官方 1.5 割肉/挖肉动作 (IDA sub_478148 / ButcherCorpse)
+        /// 播放弯腰挥刀动作并调度 40 号割肉音效
+        /// </summary>
+        public void PlayButcher(int dir = -1)
+        {
+            if (IsStunned || IsDead) return;
+            if (dir >= 0) Direction = dir & 7;
+            _isMoving = false;
+            _pathQueue.Clear();
+            Anim.SetAction(ActionType.Hit, Direction);
+            AudioManager.Instance?.PlaySoundId(40);
+        }
+
         public void StartStepMovement(int tx, int ty, int stepTiles, ActionType action, int dir)
         {
             if (IsStunned || IsDead) return;
