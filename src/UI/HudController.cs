@@ -639,6 +639,16 @@ public partial class HudController : CanvasLayer
                                     }
                                 }
                             }
+
+                            // 官方 1.5 原生微交互：右键点击背包物品直接嗑药或装备上身
+                            if (ev is InputEventMouseButton rmb && rmb.Pressed && rmb.ButtonIndex == MouseButton.Right)
+                            {
+                                var item = _bagItemDetails[slot];
+                                if (item != null)
+                                {
+                                    HandleBagSlotDoubleClick(slot);
+                                }
+                            }
                         };
                         grid.AddChild(btn);
                     }
@@ -961,6 +971,14 @@ public partial class HudController : CanvasLayer
                 };
                 _equipSlots[equipSlot] = btn;
                 btn.Pressed += () => EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
+                btn.GuiInput += (ev) =>
+                {
+                    // 盛大官方 1.5 微交互：右键点击穿戴中装备直接脱下放回背包
+                    if (ev is InputEventMouseButton rmb && rmb.Pressed && rmb.ButtonIndex == MouseButton.Right)
+                    {
+                        EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
+                    }
+                };
                 btn.MouseEntered += () =>
                 {
                     var (fallbackName, fallbackDesc) = equipSlot switch

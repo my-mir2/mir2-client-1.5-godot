@@ -148,8 +148,21 @@ public partial class LoginView : Control
             }
         }
 
-        if (_txtPassword != null) _txtPassword.TextSubmitted += _ => OnLoginClicked();
-        if (_txtUsername != null) _txtUsername.TextSubmitted += _ => _txtPassword?.GrabFocus();
+        if (_txtUsername != null)
+        {
+            _txtUsername.CaretBlink = true;
+            _txtUsername.CaretBlinkInterval = 0.5f;
+            _txtUsername.MaxLength = 12;
+            _txtUsername.TextSubmitted += _ => _txtPassword?.GrabFocus();
+        }
+        if (_txtPassword != null)
+        {
+            _txtPassword.CaretBlink = true;
+            _txtPassword.CaretBlinkInterval = 0.5f;
+            _txtPassword.MaxLength = 12;
+            _txtPassword.Secret = true;
+            _txtPassword.TextSubmitted += _ => OnLoginClicked();
+        }
 
         // 5. 绑定新用户注册面板 (Prguse.wil[63] 640x473, IDA sub_47D864 模式 2 / 0x0B)
         _newUserPanel = GetNodeOrNull<Panel>("NewUserPanel");

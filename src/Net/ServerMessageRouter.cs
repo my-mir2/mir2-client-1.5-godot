@@ -99,6 +99,7 @@ public sealed class ServerMessageRouter
         _entityManager = em;
         _gameView = gv;
         _groundItemManager = gm;
+        ProtocolDispatcher.BindContext(_hud, _gameView, _entityManager, _groundItemManager);
     }
 
     /// <summary>
