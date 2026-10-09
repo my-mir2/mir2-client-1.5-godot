@@ -31,15 +31,26 @@ public sealed class ClientSession : IDisposable
     public int CurrentMapId { get; set; }
     public int X { get; set; }
     public int Y { get; set; }
+    public byte Direction { get; set; }
     public long LastMoveTimeMs { get; set; }
     public long LastAttackTimeMs { get; set; }
     public long LastSpellTimeMs { get; set; }
     public bool IsConnected => _socket.Connected;
 
-    public ClientSession(int sessionId, Socket socket)
+    // 现代协议与消特征支持
+    public bool UseModernProtocol { get; set; }
+    public Mir2.Shared.Protocols.Modern.PacketCipher? Cipher { get; set; }
+    public ushort SendSequence { get; set; }
+
+    public ClientSession(int sessionId, Socket socket, uint sessionKey = 0)
     {
         SessionId = sessionId;
         _socket = socket;
+        if (sessionKey != 0)
+        {
+            Cipher = new Mir2.Shared.Protocols.Modern.PacketCipher(sessionKey);
+            UseModernProtocol = true;
+        }
         // 每个会话预分配 16KB 待发送合包缓冲区（覆盖最极端千人同屏密集战斗每 100ms 的下行包量）
         _sendBuffer = ArrayPool<byte>.Shared.Rent(16384);
         _sendBufferOffset = 0;
@@ -64,6 +75,46 @@ public sealed class ClientSession : IDisposable
             var packetStr = $"#{ident}/{recog}/{param}/{tag}/{series}/{extra}!";
             int written = Encoding.UTF8.GetBytes(packetStr, _sendBuffer.AsSpan(_sendBufferOffset));
             _sendBufferOffset += written;
+        }
+    }
+
+    /// <summary>
+    /// 将现代高吞吐二进制封包推入待发送批次队列 (零堆分配，就地消特征混淆)
+    /// </summary>
+    public void EnqueueBinaryPacket(ushort msgId, ReadOnlySpan<byte> payload)
+    {
+        int totalLen = Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize + payload.Length;
+        lock (_sendLock)
+        {
+            if (_sendBuffer.Length - _sendBufferOffset < totalLen)
+            {
+                FlushDirectUnsafe();
+            }
+
+            ushort seq = ++SendSequence;
+            var header = new Mir2.Shared.Protocols.Modern.BinaryProtocol.PacketHeader
+            {
+                Magic = Mir2.Shared.Protocols.Modern.BinaryProtocol.DefaultMagic,
+                MsgId = msgId,
+                PayloadLength = (ushort)payload.Length,
+                Sequence = seq
+            };
+
+            var destSpan = _sendBuffer.AsSpan(_sendBufferOffset, totalLen);
+            var headerSpan = destSpan[0..Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize];
+            var payloadSpan = destSpan[Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize..];
+
+            header.Write(headerSpan);
+            payload.CopyTo(payloadSpan);
+
+            // 如果开启了消特征混淆，就地执行对称异或变换
+            if (Cipher != null)
+            {
+                Cipher.ProcessHeader(headerSpan);
+                Cipher.ProcessPayload(payloadSpan, seq);
+            }
+
+            _sendBufferOffset += totalLen;
         }
     }
 

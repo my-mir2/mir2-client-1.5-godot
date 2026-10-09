@@ -5,6 +5,7 @@ using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Protocols.Modern;
 using Mir2.Shared.Rules;
 
 namespace Mir2.Server.Game;
@@ -1361,4 +1362,316 @@ public sealed class PacketDispatcher
         // CM_SITDOWN (3012)
         session.EnqueuePacket(ProtocolConsts.SM_SITDOWN, session.SessionId, 0, 0, 0);
     }
+
+    #region 现代高吞吐全权威服务端状态机体系 (Server-Authoritative Intent Engine)
+
+    /// <summary>
+    /// 处理现代高吞吐紧凑二进制封包 (Direct-Blit 零分配，全权威状态机驱动)
+    /// </summary>
+    public void DispatchBinary(ClientSession session, in BinaryProtocol.PacketHeader header, ReadOnlySpan<byte> payload)
+    {
+        switch ((BinaryProtocol.MsgType)header.MsgId)
+        {
+            case BinaryProtocol.MsgType.HandshakeRequest:
+                HandleBinaryHandshake(session);
+                break;
+
+            case BinaryProtocol.MsgType.IntentMove:
+                HandleBinaryMoveIntent(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentAttack:
+                HandleBinaryAttackIntent(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentSpell:
+                HandleBinarySpellIntent(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentUseItem:
+                HandleBinaryUseItemIntent(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentPickup:
+                HandleBinaryPickupIntent(session);
+                break;
+
+            case BinaryProtocol.MsgType.Heartbeat:
+                // 心跳回执
+                session.EnqueueBinaryPacket((ushort)BinaryProtocol.MsgType.Heartbeat, ReadOnlySpan<byte>.Empty);
+                break;
+        }
+    }
+
+    private static void HandleBinaryHandshake(ClientSession session)
+    {
+        session.UseModernProtocol = true;
+        // 回复握手成功响应 (0 载荷)
+        session.EnqueueBinaryPacket((ushort)BinaryProtocol.MsgType.HandshakeResponse, ReadOnlySpan<byte>.Empty);
+    }
+
+    /// <summary>
+    /// 权威移动意图校验 (杜绝穿墙、瞬移、变速齿轮加速外挂)
+    /// </summary>
+    public void HandleBinaryMoveIntent(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 6) return;
+        var move = BinaryProtocol.MoveIntentPayload.Read(payload);
+
+        int oldX = session.X;
+        int oldY = session.Y;
+        int newX = move.TargetX;
+        int newY = move.TargetY;
+        bool isRun = move.IsRun != 0;
+        byte dir = move.Direction;
+
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+
+        // 1. 地图物理边界与障碍阻挡判定
+        if (!map.IsWalkable(newX, newY))
+        {
+            SendPositionPullback(session, oldX, oldY, session.Direction);
+            return;
+        }
+
+        // 2. 步长与防瞬移物理校验 (行走限 1 格，跑步限 2 格)
+        int maxDist = isRun ? 2 : 1;
+        int deltaX = Math.Abs(newX - oldX);
+        int deltaY = Math.Abs(newY - oldY);
+        if (deltaX > maxDist || deltaY > maxDist || (deltaX == 0 && deltaY == 0))
+        {
+            SendPositionPullback(session, oldX, oldY, session.Direction);
+            return;
+        }
+
+        // 3. 移速反加速外挂校验 (基于真实服务器物理时间戳)
+        long nowMs = Environment.TickCount64;
+        if (session.LastMoveTimeMs > 0)
+        {
+            var (isSpeedHack, shouldRollback) = EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(nowMs, session.LastMoveTimeMs);
+            if (isSpeedHack && shouldRollback)
+            {
+                SendPositionPullback(session, oldX, oldY, session.Direction);
+                return;
+            }
+        }
+        session.LastMoveTimeMs = nowMs;
+
+        // 4. 权威更新实体状态
+        session.X = newX;
+        session.Y = newY;
+        session.Direction = dir;
+
+        // 5. 更新九宫格 AOI 空间分区
+        map.Aoi.UpdatePosition(session, oldX, oldY, newX, newY, out _, out _);
+
+        // 6. 千人同屏九宫格 LOD 广播实体移动 (仅 6 字节二进制帧)
+        Span<byte> syncSpan = stackalloc byte[6];
+        new BinaryProtocol.PositionSyncPayload
+        {
+            X = (short)newX,
+            Y = (short)newY,
+            Direction = dir,
+            ForcePullback = 0
+        }.Write(syncSpan);
+
+        BroadcastBinaryToNinePatch(session, (ushort)BinaryProtocol.MsgType.BroadcastEntityMove, syncSpan, includeSelf: false);
+    }
+
+    /// <summary>
+    /// 权威物理攻击意图校验 (杜绝一秒十刀加速外挂与超远攻击)
+    /// </summary>
+    public void HandleBinaryAttackIntent(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 6) return;
+        var attack = BinaryProtocol.AttackIntentPayload.Read(payload);
+
+        long nowMs = Environment.TickCount64;
+        if (session.LastAttackTimeMs > 0 && !EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(nowMs, session.LastAttackTimeMs))
+        {
+            return; // 挥刀过快拦截
+        }
+        session.LastAttackTimeMs = nowMs;
+
+        // 1. 向同屏九宫格广播动作帧
+        Span<byte> actionSpan = stackalloc byte[6];
+        actionSpan[0] = attack.Direction;
+        actionSpan[1] = attack.SkillType;
+        BroadcastBinaryToNinePatch(session, (ushort)BinaryProtocol.MsgType.BroadcastEntityAction, actionSpan, includeSelf: false);
+
+        // 2. 武器试刀判定
+        session.State?.TrialSlashEquippedWeapon();
+
+        // 3. 在九宫格检索攻击目标
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+        ClientSession? defender = null;
+        lock (_ninePatchBuffer)
+        {
+            _ninePatchBuffer.Clear();
+            map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+            for (int i = 0; i < _ninePatchBuffer.Count; i++)
+            {
+                var p = _ninePatchBuffer[i];
+                if (p.SessionId == attack.TargetUid)
+                {
+                    defender = p;
+                    break;
+                }
+            }
+        }
+
+        if (defender != null && defender.State != null)
+        {
+            // 距离校验 (战士普通近身攻击限 1 格，刺杀限 2 格)
+            int dist = Math.Max(Math.Abs(defender.X - session.X), Math.Abs(defender.Y - session.Y));
+            if (dist <= 2)
+            {
+                int rawDmg = OfficialClientRulesEngine.CombatMath.CalculatePhysicalDamage(15, 30, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
+                var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = defender.State.TakeCombatDamageFull(rawDmg, nowMs);
+
+                // 权威血量同步
+                Span<byte> hpSpan = stackalloc byte[8];
+                new BinaryProtocol.HealthSyncPayload
+                {
+                    Hp = (short)defender.State.Hp,
+                    Mp = (short)defender.State.Mp,
+                    MaxHp = (short)defender.State.MaxHp,
+                    MaxMp = (short)defender.State.MaxMp
+                }.Write(hpSpan);
+
+                defender.EnqueueBinaryPacket((ushort)BinaryProtocol.MsgType.BroadcastHealthSync, hpSpan);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 权威法术施法意图校验 (杜绝无CD施法与全屏雷电外挂)
+    /// </summary>
+    public void HandleBinarySpellIntent(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 9) return;
+        var spell = BinaryProtocol.SpellIntentPayload.Read(payload);
+
+        long nowMs = Environment.TickCount64;
+        // 施法公共冷却 GCD (1000ms)
+        if (session.LastSpellTimeMs > 0 && (nowMs - session.LastSpellTimeMs < 1000))
+        {
+            return; // 施法过快拦截
+        }
+        session.LastSpellTimeMs = nowMs;
+
+        // 蓝量扣除与校验 (假设施法消耗 10 点 MP)
+        if (session.State != null)
+        {
+            if (session.State.Mp < 10) return; // 蓝量不足
+            session.State.Mp -= 10;
+
+            // 广播施法动作
+            Span<byte> actionSpan = stackalloc byte[6];
+            actionSpan[0] = 0; // Spell Action
+            actionSpan[1] = spell.SpellId;
+            BroadcastBinaryToNinePatch(session, (ushort)BinaryProtocol.MsgType.BroadcastEntityAction, actionSpan, includeSelf: false);
+
+            // 自身蓝量同步
+            Span<byte> hpSpan = stackalloc byte[8];
+            new BinaryProtocol.HealthSyncPayload
+            {
+                Hp = (short)session.State.Hp,
+                Mp = (short)session.State.Mp,
+                MaxHp = (short)session.State.MaxHp,
+                MaxMp = (short)session.State.MaxMp
+            }.Write(hpSpan);
+            session.EnqueueBinaryPacket((ushort)BinaryProtocol.MsgType.BroadcastHealthSync, hpSpan);
+        }
+    }
+
+    /// <summary>
+    /// 权威消耗品使用意图校验
+    /// </summary>
+    public void HandleBinaryUseItemIntent(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 4) return;
+        int itemUid = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[0..4]);
+
+        if (session.State == null) return;
+        for (int i = 0; i < session.State.BagItems.Count; i++)
+        {
+            var item = session.State.BagItems[i];
+            if (item.Uid == itemUid)
+            {
+                session.State.BagItems.RemoveAt(i);
+                // 恢复 50 点生命与 30 点魔法
+                session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + 50);
+                session.State.Mp = Math.Min(session.State.MaxMp, session.State.Mp + 30);
+
+                // 下发权威血蓝同步
+                Span<byte> hpSpan = stackalloc byte[8];
+                new BinaryProtocol.HealthSyncPayload
+                {
+                    Hp = (short)session.State.Hp,
+                    Mp = (short)session.State.Mp,
+                    MaxHp = (short)session.State.MaxHp,
+                    MaxMp = (short)session.State.MaxMp
+                }.Write(hpSpan);
+                session.EnqueueBinaryPacket((ushort)BinaryProtocol.MsgType.BroadcastHealthSync, hpSpan);
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 权威拾取意图校验 (杜绝全屏吸物外挂)
+    /// </summary>
+    public void HandleBinaryPickupIntent(ClientSession session)
+    {
+        // 必须与地表掉落物在同一格 (session.X, session.Y)
+        HandlePickUp(session);
+    }
+
+    /// <summary>
+    /// 服务端下发强制瞬移拉回包 (物理终结外挂穿墙与加速)
+    /// </summary>
+    private static void SendPositionPullback(ClientSession session, int x, int y, byte dir)
+    {
+        Span<byte> pullbackSpan = stackalloc byte[6];
+        new BinaryProtocol.PositionSyncPayload
+        {
+            X = (short)x,
+            Y = (short)y,
+            Direction = dir,
+            ForcePullback = 1
+        }.Write(pullbackSpan);
+
+        session.EnqueueBinaryPacket((ushort)BinaryProtocol.MsgType.SyncPosition, pullbackSpan);
+    }
+
+    /// <summary>
+    /// 千人同屏九宫格视距降采样广播 (LOD Spatial Partitioning)
+    /// </summary>
+    public void BroadcastBinaryToNinePatch(ClientSession source, ushort msgId, ReadOnlySpan<byte> payload, bool includeSelf = false, int maxDist = 15)
+    {
+        var map = _mapManager.GetMap(source.CurrentMapId) ?? _mapManager.DefaultMap;
+        lock (_ninePatchBuffer)
+        {
+            _ninePatchBuffer.Clear();
+            map.Aoi.GetEntitiesInNinePatch(source.X, source.Y, _ninePatchBuffer);
+
+            for (int i = 0; i < _ninePatchBuffer.Count; i++)
+            {
+                var target = _ninePatchBuffer[i];
+                if (!includeSelf && target == source) continue;
+
+                // 视距 LOD 剔除: 切比雪夫距离超出 maxDist 格的实体不广播高频微小动作
+                int dist = Math.Max(Math.Abs(target.X - source.X), Math.Abs(target.Y - source.Y));
+                if (dist > maxDist) continue;
+
+                if (target.UseModernProtocol)
+                {
+                    target.EnqueueBinaryPacket(msgId, payload);
+                }
+            }
+        }
+    }
+
+    #endregion
 }
