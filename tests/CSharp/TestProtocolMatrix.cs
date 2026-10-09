@@ -1345,6 +1345,34 @@ public class TestProtocolMatrix
     }
 
     [Fact]
+    public void TestEquipment_BrokenZeroDurability_DisablesSpecialAttributes()
+    {
+        var ps = new Mir2Client.Game.PlayerState { Hp = 100, MaxHp = 100, BaseMaxWearWeight = 20 };
+
+        // 1. 正常穿戴有效超负载戒指 (MaxDura=5000, Dura=4500)
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        {
+            Name = "超负载戒指",
+            Shape = 119,
+            MaxDura = 5000,
+            Dura = 4500
+        });
+        Assert.True(ps.HasOverloadRing);
+        Assert.Equal(40, ps.MaxWearWeight); // 负重翻倍
+
+        // 2. 该超负载戒指磨损耗尽破损 (MaxDura=5000, Dura=0)
+        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        {
+            Name = "超负载戒指",
+            Shape = 119,
+            MaxDura = 5000,
+            Dura = 0
+        });
+        Assert.False(ps.HasOverloadRing); // 盛大官方 1.5 铁律：损坏装备绝不生效特戒属性
+        Assert.Equal(20, ps.MaxWearWeight); // 负重恢复基础值
+    }
+
+    [Fact]
     public void TestWarrior_FireHit_CooldownAndDoubleFireWindow()
     {
         var tracker = new Mir2Client.Game.WarriorCombatEngine.FireHitTracker();

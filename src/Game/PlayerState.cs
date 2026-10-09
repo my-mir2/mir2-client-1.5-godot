@@ -186,6 +186,8 @@ public sealed class PlayerState
         {
             var eq = Equipment[i];
             if (eq == null) continue;
+            // 盛大官方 1.5 铁律：有持久上限且当前持久磨损归零者彻底破损坏死，不激活特戒与套装隐藏属性
+            if (eq.MaxDura > 0 && eq.Dura <= 0) continue;
             pieceShapes.Add(eq.Shape);
 
             // 护身戒指
