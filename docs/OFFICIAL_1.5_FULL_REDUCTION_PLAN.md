@@ -48,6 +48,12 @@
 - [x] 5.4 【已闭环】药水双轨回复曲线：由 PotionMetabolism 与 PotionSystem 真实执行 250ms 定频注入，生命球平滑上涨（提交 ac71152）；
 - [x] 5.5 【已归集】OfficialClientRulesEngine 本地数值与 Delphi 伪随机数发生器封装（提交 b087e14）。
 
+### 战役 6：官方 1.5 深水区微按键交互与防误触盲区排查 (盲区清零全集)
+- [x] 6.1 【已闭环】退出与小退防误触二次确认：Alt+X (TFrmDlg_DBotExitClick 0x491520) 弹出“你真的想要退出游戏吗？”模态确认框；Alt+Q (TFrmDlg_DBotLogoutClick 0x491474) 弹出“你真的想要重新选择角色吗？”模态确认框（在 HudController.cs 落地，提交 3e90aa4）；
+- [x] 6.2 【已闭环】PrintScreen / Pause 全屏截屏：将当前视口渲染图保存为 Images/Mir_yyyyMMdd_HHmmss.png，并在聊天栏飘黄字“游戏截图已保存至 Images 目录”，调度 103 号按钮点击声（在 GameView.cs 落地，提交 3e90aa4）；
+- [x] 6.3 【已闭环】道士 Ctrl+A 召唤兽宝宝控制闭环：连接 InputPlugin.PetCommandRequested 信号，切换休息/攻击状态并飘绿字“[系统] 召唤兽进入休息/攻击状态。”（在 GameView.cs 落地，提交 3e90aa4）；
+- [x] 6.4 【已闭环】战士快捷键冲突纠正：修正 InputPlugin.cs 中 Ctrl+B 原错误绑为包裹打开，对齐官方 1.5 纠正为半月弯刀开关 (ToggleHalfMoonRequested)，并增设 Ctrl+F 刺杀剑术开关 (ThrustingToggleRequested) 路由打通（在 InputPlugin.cs 落地，提交 3e90aa4）。
+
 ---
 
 ## 三、终局交付标准
