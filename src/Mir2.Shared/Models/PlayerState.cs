@@ -34,10 +34,20 @@ public sealed class EquipItem
     public int Dura { get; set; }
     public int MaxDura { get; set; }
     public int Ac { get; set; }
+    public int MaxAc { get; set; }
     public int Mac { get; set; }
+    public int MaxMac { get; set; }
     public int Dc { get; set; }
+    public int MaxDc { get; set; }
     public int Mc { get; set; }
+    public int MaxMc { get; set; }
     public int Sc { get; set; }
+    public int MaxSc { get; set; }
+    public int BonusDc { get; set; }
+    public int BonusMc { get; set; }
+    public int BonusSc { get; set; }
+    public int BonusAc { get; set; }
+    public int BonusMac { get; set; }
     public int Luck { get; set; }
     public int Curse { get; set; }
     public int UpgradeState { get; set; } // 官方 bt_value[10] 升级结果试刀码 (1=碎刀, 10..12=DC, 20..22=MC, 30..32=SC)

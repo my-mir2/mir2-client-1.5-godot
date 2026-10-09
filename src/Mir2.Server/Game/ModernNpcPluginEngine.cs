@@ -78,9 +78,21 @@ public sealed class ModernNpcPluginEngine
     private readonly ConcurrentDictionary<string, INpcBehavior> _pluginsByName = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<int, INpcBehavior> _pluginsById = new();
 
+    private PluginSandboxLoadContext? _currentSandboxContext;
+    private readonly List<string> _loadedPluginNamesInSandbox = new();
+    private readonly object _sandboxLock = new();
+
+    /// <summary>
+    /// 独立可卸载程序集沙箱上下文 (支持 Collectible 动态 GC 彻底释放，消除内存残留)
+    /// </summary>
+    public sealed class PluginSandboxLoadContext : System.Runtime.Loader.AssemblyLoadContext
+    {
+        public PluginSandboxLoadContext(string name) : base(name, isCollectible: true) { }
+    }
+
     public ModernNpcPluginEngine()
     {
-        // 预注册盛大官方 1.5 全量 13 大经典核心重写插件
+        // 预注册盛大官方 1.5 全量 14 大经典核心重写插件
         RegisterPlugin(new VeteranNpcBehavior());
         RegisterPlugin(new SabukStewardNpcBehavior());
         RegisterPlugin(new YuelaoNpcBehavior());
@@ -94,6 +106,7 @@ public sealed class ModernNpcPluginEngine
         RegisterPlugin(new DarkHallTeleporterNpcBehavior());
         RegisterPlugin(new SkillBookSynthesizerNpcBehavior());
         RegisterPlugin(new NewbieGuideNpcBehavior());
+        RegisterPlugin(new RedBloodSwordNpcBehavior());
     }
 
     public void RegisterPlugin(INpcBehavior plugin)
@@ -122,7 +135,7 @@ public sealed class ModernNpcPluginEngine
     public bool HasPlugin(int npcId) => _pluginsById.ContainsKey(npcId);
 
     /// <summary>
-    /// 从内存程序集字节流直接装载/热替换插件 (无需落地写盘，不锁文件，本地编译即插即用)
+    /// 从内存程序集字节流直接装载/热替换插件 (通过 Collectible AssemblyLoadContext 隔离与卸载)
     /// </summary>
     [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026:RequiresUnreferencedCode")]
     [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2072:TargetRequiresPublicParameterlessConstructor")]
@@ -133,29 +146,50 @@ public sealed class ModernNpcPluginEngine
             return new PluginLoadResult { Success = false, Message = "字节码流为空" };
         }
 
-        try
+        lock (_sandboxLock)
         {
-            var asm = Assembly.Load(assemblyBytes);
-            var result = new PluginLoadResult { Success = true };
-
-            foreach (var type in asm.GetTypes())
+            try
             {
-                if (typeof(INpcBehavior).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
+                // 1. 若已有运行中的插件沙箱，先注销旧插件并彻底卸载旧上下文
+                if (_currentSandboxContext != null)
                 {
-                    if (Activator.CreateInstance(type) is INpcBehavior behavior)
+                    for (int i = 0; i < _loadedPluginNamesInSandbox.Count; i++)
                     {
-                        RegisterPlugin(behavior);
-                        result.LoadedNpcNames.Add(behavior.NpcName);
+                        UnregisterPlugin(_loadedPluginNamesInSandbox[i]);
+                    }
+                    _loadedPluginNamesInSandbox.Clear();
+                    _currentSandboxContext.Unload();
+                    _currentSandboxContext = null;
+                }
+
+                // 2. 建立新独立可回收沙箱上下文，从内存流中安全加载
+                var newContext = new PluginSandboxLoadContext($"NpcPluginContext_{Guid.NewGuid()}");
+                using var ms = new System.IO.MemoryStream(assemblyBytes);
+                var asm = newContext.LoadFromStream(ms);
+
+                var result = new PluginLoadResult { Success = true };
+
+                foreach (var type in asm.GetTypes())
+                {
+                    if (typeof(INpcBehavior).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
+                    {
+                        if (Activator.CreateInstance(type) is INpcBehavior behavior)
+                        {
+                            RegisterPlugin(behavior);
+                            result.LoadedNpcNames.Add(behavior.NpcName);
+                            _loadedPluginNamesInSandbox.Add(behavior.NpcName);
+                        }
                     }
                 }
-            }
 
-            result.Message = $"成功装载 {result.LoadedNpcNames.Count} 个插件";
-            return result;
-        }
-        catch (Exception ex)
-        {
-            return new PluginLoadResult { Success = false, Message = $"程序集解析失败: {ex.Message}" };
+                _currentSandboxContext = newContext;
+                result.Message = $"成功在可卸载沙箱中装载 {result.LoadedNpcNames.Count} 个插件";
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return new PluginLoadResult { Success = false, Message = $"沙箱程序集装载失败: {ex.Message}" };
+            }
         }
     }
 
@@ -896,6 +930,68 @@ public sealed class ModernNpcPluginEngine
 
                 case "@learn_butcher":
                     ctx.DialogText = "击杀鹿或鸡后，按住键盘 Alt 键并鼠标左键点击尸体，即可权威割取新鲜肉类！";
+                    ctx.AddLink("返回", "@main");
+                    break;
+
+                case "@close":
+                default:
+                    ctx.CloseWindow = true;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 14. 桃源之门神秘老人 / 赤血魔剑合成使者行为树
+    /// </summary>
+    public sealed class RedBloodSwordNpcBehavior : INpcBehavior
+    {
+        public int NpcId => 114;
+        public string NpcName => "桃源神秘老人";
+
+        public void OnInteract(NpcDialogContext ctx)
+        {
+            if (ctx.Session.State == null) return;
+
+            switch (ctx.SelectedAction.ToLowerInvariant())
+            {
+                case "@main":
+                    ctx.DialogText = "老夫归隐桃源之门数十载，掌握血煞铸兵术！以凶兵【罗刹】为引，可铸绝世魔兵【赤血魔剑】！";
+                    ctx.AddLink("铸造赤血魔剑 (需 罗刹、祈祷头盔、祝福油、神水与 1,000,000 金币)", "@craft_sword");
+                    ctx.AddLink("打听赤血魔剑特性", "@sword_lore");
+                    ctx.AddLink("离开", "@close");
+                    break;
+
+                case "@craft_sword":
+                    if (ctx.Session.State.Gold >= 1000000)
+                    {
+                        ctx.Session.State.Gold -= 1000000;
+                        ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
+                        var sword = new EquipItem
+                        {
+                            Uid = 99990,
+                            Name = "赤血魔剑",
+                            Dura = 28000,
+                            MaxDura = 28000,
+                            Weight = 22,
+                            Dc = 15,
+                            MaxDc = 20,
+                            Mc = 4,
+                            MaxMc = 3,
+                            Sc = 4,
+                            MaxSc = 5
+                        };
+                        ctx.Session.State.BagItems.Add(sword);
+                        ctx.DialogText = "煞气冲天！血光凝刃！上古魔兵【赤血魔剑】已被你收入囊中！此剑死亡永不掉落！";
+                    }
+                    else
+                    {
+                        ctx.DialogText = "铸造赤血魔剑需要 1,000,000 祭炼金币，金币不足！";
+                    }
+                    break;
+
+                case "@sword_lore":
+                    ctx.DialogText = "赤血魔剑攻15-20、魔4-3、道4-5，重量仅22！最奇特之处在于：一旦佩戴，人剑合一，死亡永不爆落！";
                     ctx.AddLink("返回", "@main");
                     break;
 

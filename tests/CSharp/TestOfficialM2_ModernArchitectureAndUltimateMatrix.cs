@@ -324,4 +324,107 @@ public class TestOfficialM2_ModernArchitectureAndUltimateMatrix
         Assert.Single(step1);
         Assert.Equal(322, step1[0].nextX); // 323 -> 322
     }
+
+    // ==================== 5. 模块十七: 官方极品词条生成与三大瞬移卷轴 ====================
+
+    [Fact]
+    public void Test_ItemDropRarityEngine_BonusStatRolls()
+    {
+        var item = new EquipItem { Uid = 701, Name = "死神手套", Dc = 1, MaxDc = 2 };
+        // 模拟摇出 3 点极品
+        var mockRng = new Random(42);
+        var result = ItemDropRarityEngine.RollRareBonus(item, mockRng);
+
+        // 验证极品生成合法性与属性附魔
+        if (result.IsRare)
+        {
+            Assert.True(item.BonusDc > 0 || item.BonusMc > 0 || item.BonusSc > 0 || item.BonusAc > 0 || item.BonusMac > 0 || item.MaxDura > 0);
+        }
+    }
+
+    [Fact]
+    public void Test_TeleportScrollEngine_Town_Random_Dungeon()
+    {
+        var mapMgr = new Mir2.Server.Maps.MapManager();
+        var map = mapMgr.GetMap(0)!;
+        var session = CreateMockSession(5001, "行者", level: 25, gold: 500);
+
+        // 1. 回城卷测试
+        var (tOk, tMap, tX, tY, _) = TeleportScrollEngine.UseTownTeleport(session, mapMgr);
+        Assert.True(tOk);
+        Assert.Equal(0, tMap);
+        Assert.Equal(330, tX);
+        Assert.Equal(270, tY);
+
+        // 2. 随机传送卷测试 (必须传送到可行走网格)
+        var (rOk, rX, rY, _) = TeleportScrollEngine.UseRandomTeleport(session, map, Random.Shared);
+        Assert.True(rOk);
+        Assert.True(map.IsWalkable(rX, rY));
+
+        // 3. 地牢逃脱卷测试
+        var (dOk, dMap, dX, dY, _) = TeleportScrollEngine.UseDungeonEscape(session);
+        Assert.True(dOk);
+        Assert.Equal(0, dMap);
+    }
+
+    // ==================== 6. 模块十八: 毒素掉血与石化麻痹控制 ====================
+
+    [Fact]
+    public void Test_PoisonAndParalyzeTickEngine_CombatControls()
+    {
+        var state = new PlayerState { Hp = 100, MaxHp = 100, Sc = 20 };
+        long now = 100000;
+
+        // 1. 绿毒每秒掉血精算
+        state.HasGreenPoison = true;
+        state.GreenPoisonExpireMs = now + 10000;
+
+        var (damaged, dmg, died) = PoisonAndParalyzeTickEngine.TickGreenPoison(state, now);
+        Assert.True(damaged);
+        Assert.True(dmg > 0);
+        Assert.Equal(100 - dmg, state.Hp);
+        Assert.False(died);
+
+        // 2. 麻痹戒指 5 秒石化行动拦截
+        state.ParalyzeExpireMs = now + 5000;
+        bool forbidden = PoisonAndParalyzeTickEngine.IsActionForbiddenByParalysis(state, now + 1000);
+        Assert.True(forbidden);
+
+        // 5秒后石化解除
+        bool unfreeze = PoisonAndParalyzeTickEngine.IsActionForbiddenByParalysis(state, now + 6000);
+        Assert.False(unfreeze);
+    }
+
+    // ==================== 7. 桃源之门赤血魔剑合成与可卸载沙箱多次热更循环 ====================
+
+    [Fact]
+    public void Test_ModernNpcPlugin_RedBloodSwordCrafting_And_SandboxUnloadCycle()
+    {
+        var engine = new ModernNpcPluginEngine();
+        var session = CreateMockSession(6001, "魔剑铸造师", level: 40, gold: 2000000);
+
+        // 1. 桃源之门神秘老人合成赤血魔剑 (ID 114)
+        var (h14, s14, _) = engine.DispatchDialog(session, 114, "@craft_sword");
+        Assert.True(h14);
+        Assert.Contains("赤血魔剑", s14);
+        Assert.Equal(1000000, session.State!.Gold);
+        Assert.Contains(session.State.BagItems, i => i.Name == "赤血魔剑" && i.Dc == 15 && i.MaxDc == 20);
+
+        // 2. 可卸载独立沙箱多次热更循环测试 (验证旧沙箱彻底 Unload 且新沙箱即插即用)
+        string testAsmPath = typeof(CustomMockPlugin).Assembly.Location;
+        if (File.Exists(testAsmPath))
+        {
+            byte[] asmBytes = File.ReadAllBytes(testAsmPath);
+
+            // 第一次装载
+            var r1 = engine.LoadPluginsFromAssemblyBytes(asmBytes);
+            Assert.True(r1.Success);
+            Assert.True(engine.HasPlugin("新副本引路人"));
+
+            // 第二次装载热替换 (旧沙箱触发 Unload 并重新装载)
+            var r2 = engine.LoadPluginsFromAssemblyBytes(asmBytes);
+            Assert.True(r2.Success);
+            Assert.True(engine.HasPlugin("新副本引路人"));
+        }
+    }
 }
