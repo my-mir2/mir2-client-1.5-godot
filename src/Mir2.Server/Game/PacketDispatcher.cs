@@ -148,6 +148,33 @@ public sealed class PacketDispatcher
                 HandleDealCancel(session);
                 break;
 
+            case ProtocolConsts.CM_USERSTORAGEDEPOSIT: // 1031 存入仓库物品
+            case 1015: // CM_STORAGE 官方 1.4/1.5
+                HandleStorageDeposit(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_USERSTORAGEWITHDRAW: // 1032 取回仓库物品
+            case 1016: // CM_TAKEOUTSTORAGE 官方 1.4/1.5
+                HandleStorageWithdraw(session, remaining);
+                break;
+
+            case 1017: // CM_SAVEGOLD 官方存入金币
+                HandleStorageSaveGold(session, remaining);
+                break;
+
+            case 1018: // CM_TAKEGOLD 官方支取金币
+                HandleStorageTakeGold(session, remaining);
+                break;
+
+            case 1019: // CM_CHECKPASSWORD 官方二级密码校验
+                HandleStoragePassword(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_EATITEM: // 1006 使用物品/吃药
+            case 1002: // CM_EAT 官方 1.4/1.5
+                HandleEatItem(session, remaining);
+                break;
+
             default:
                 // 未知或扩展协议默认回显记录
                 break;
@@ -943,5 +970,151 @@ public sealed class PacketDispatcher
     private void HandleDealCancel(ClientSession session)
     {
         TradeEngine?.CancelTrade(session);
+    }
+
+    private void HandleStorageDeposit(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+        int slot = -1;
+        string itemName = string.Empty;
+
+        int slash = payload.IndexOf('/');
+        if (slash > 0)
+        {
+            int.TryParse(payload[..slash], out slot);
+            itemName = payload[(slash + 1)..].ToString();
+        }
+        else
+        {
+            if (!int.TryParse(payload, out slot))
+            {
+                itemName = payload.ToString();
+            }
+        }
+
+        var (res, item) = StorageEngine.DepositItem(session.State, slot, itemName);
+        switch (res)
+        {
+            case StorageEngine.StorageResult.Success when item != null:
+                session.EnqueuePacket(ProtocolConsts.SM_SAVEITEM_OK, item.Id, 0, 0, 0, item.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_DELITEM, item.Id, 0, 0, 0, item.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+                break;
+            case StorageEngine.StorageResult.StorageFull:
+                session.EnqueuePacket(ProtocolConsts.SM_SAVEITEM_FULL, 0, 0, 0, 0, "保管箱已满无法寄存");
+                break;
+            case StorageEngine.StorageResult.NeedPassword:
+                session.EnqueuePacket(ProtocolConsts.SM_NEEDPASSWORD, 0, 0, 0, 0, "请先输入仓库二级密码");
+                break;
+            default:
+                session.EnqueuePacket(ProtocolConsts.SM_SAVEITEM_FAIL, 0, 0, 0, 0, "寄存失败");
+                break;
+        }
+    }
+
+    private void HandleStorageWithdraw(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+        if (!int.TryParse(payload, out int storageSlot)) return;
+
+        var (res, item) = StorageEngine.WithdrawItem(session.State, storageSlot);
+        switch (res)
+        {
+            case StorageEngine.StorageResult.Success when item != null:
+                session.EnqueuePacket(ProtocolConsts.SM_TAKEBACKITEM_OK, item.Id, 0, 0, 0, item.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, item.Id, 0, 0, 0, item.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+                break;
+            case StorageEngine.StorageResult.BagFull:
+            case StorageEngine.StorageResult.OverWeight:
+                session.EnqueuePacket(ProtocolConsts.SM_TAKEBACKITEM_FULL, 0, 0, 0, 0, "个人包袱已满或负重超限");
+                break;
+            case StorageEngine.StorageResult.NeedPassword:
+                session.EnqueuePacket(ProtocolConsts.SM_NEEDPASSWORD, 0, 0, 0, 0, "请先输入仓库二级密码");
+                break;
+            default:
+                session.EnqueuePacket(ProtocolConsts.SM_TAKEBACKITEM_FAIL, 0, 0, 0, 0, "取回失败");
+                break;
+        }
+    }
+
+    private void HandleStorageSaveGold(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+        if (!int.TryParse(payload, out int amount)) return;
+
+        var res = StorageEngine.DepositGold(session.State, amount);
+        if (res == StorageEngine.StorageResult.Success)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_STORAGE_SOUND, 0, 0, 0, 0);
+            session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, session.State.StorageGold, 0, 0);
+        }
+        else if (res == StorageEngine.StorageResult.NeedPassword)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_NEEDPASSWORD, 0, 0, 0, 0, "请先输入仓库二级密码");
+        }
+    }
+
+    private void HandleStorageTakeGold(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+        if (!int.TryParse(payload, out int amount)) return;
+
+        var res = StorageEngine.WithdrawGold(session.State, amount);
+        if (res == StorageEngine.StorageResult.Success)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_STORAGE_SOUND, 0, 0, 0, 0);
+            session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, session.State.StorageGold, 0, 0);
+        }
+        else if (res == StorageEngine.StorageResult.NeedPassword)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_NEEDPASSWORD, 0, 0, 0, 0, "请先输入仓库二级密码");
+        }
+    }
+
+    private void HandleStoragePassword(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+        string pass = payload.ToString();
+        var res = StorageEngine.VerifyPassword(session.State, pass);
+        if (res == StorageEngine.StorageResult.Success)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_PASSWORDSTATUS, 1, 0, 0, 0, "密码验证成功");
+            // 自动下发仓库物品列表
+            session.EnqueuePacket(ProtocolConsts.SM_OPENSTORAGEDLG, 0, 0, 0, 0);
+        }
+        else
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_PASSWORDSTATUS, 0, 0, 0, 0, "密码错误");
+        }
+    }
+
+    private void HandleEatItem(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+        int slot = -1;
+        string itemName = string.Empty;
+
+        int slash = payload.IndexOf('/');
+        if (slash > 0)
+        {
+            int.TryParse(payload[..slash], out slot);
+            itemName = payload[(slash + 1)..].ToString();
+        }
+        else
+        {
+            if (!int.TryParse(payload, out slot))
+            {
+                itemName = payload.ToString();
+            }
+        }
+
+        var (res, effect) = PotionEngine.ConsumePotion(session.State, slot, itemName);
+        if (res == PotionEngine.PotionResult.Success && effect != null)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_EAT_OK, 0, 0, 0, 0);
+            session.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, session.State.Hp, session.State.Mp, session.State.MaxHp, session.State.MaxMp);
+            session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+        }
     }
 }

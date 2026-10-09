@@ -11,9 +11,9 @@
 
 | 核心维度 | 封闭总分母 (Denominator) | 已完成分子 (Numerator) | 正在对齐 | 剩余未完成 | 官方 1:1 完工率 |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **维度一：客户端上行 CM 协议全集** | **45 项** | **25 项** | **2 项** | **18 项** | **55.6%** |
-| **维度二：M2Server 核心子系统引擎** | **20 项** | **16 项** | **1 项** | **3 项** | **80.0%** |
-| **全服务端综合 1:1 还原进度** | **65 项** | **41 项** | **3 项** | **21 项** | **63.1%** |
+| **维度一：客户端上行 CM 协议全集** | **45 项** | **37 项** | **1 项** | **7 项** | **82.2%** |
+| **维度二：M2Server 核心子系统引擎** | **20 项** | **19 项** | **0 项** | **1 项** | **95.0%** |
+| **全服务端综合 1:1 还原进度** | **65 项** | **56 项** | **1 项** | **8 项** | **86.2%** |
 
 ---
 
@@ -40,11 +40,12 @@
 | `3017`| `CM_SPELL` | 战法道技能施法与伤害/增益结算 | `PacketDispatcher.cs:435` | `0x49350C` | `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
 | `3018`| `CM_POWERHIT` | 攻杀剑术蓄力斩 | `PacketDispatcher.cs:313` | `0x4C1EF4 @ L12621`| `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
 | `3019`| `CM_LONGHIT` | 刺杀剑气穿透 | `PlayerState.cs` | `0x4C2400` | `[L2 粗通]` | 待接入 Dispatcher |
-| `3024`| `CM_WIDEHIT` | 半月弯刀群体环绕剑气 | `PlayerState.cs` | `0x4C2550` | `[L2 粗通]` | 待接入 Dispatcher |
+| `3024`| `CM_WIDEHIT` | 半月弯刀群体环绕剑气 | `PlayerState.cs` | `0x4C2550` | `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
 | `3025`| `CM_FIREHIT` | 烈火剑法精灵火焰爆发 | `PacketDispatcher.cs:320` | `0x4C1EF4 @ L12627`| `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
 | `1004`| `CM_TAKEONITEM` | 穿戴装备到 9 大官方槽位 | `PlayerState.cs:175` | `0x4B6800` | `[L3 1:1]` | `TestOfficialClientEquipMatrix` |
 | `1005`| `CM_TAKEOFFITEM` | 卸下 9 大官方槽位装备 | `PlayerState.cs:220` | `0x4B6A20` | `[L3 1:1]` | `TestOfficialClientEquipMatrix` |
-| `1002`| `CM_EAT` | 吞服药水与物品使用 | `PlayerState.cs` | `0x4B7100` | `[L0 缺失]` | 待补充 |
+| `1002`| `CM_EAT` | 吞服药水与物品使用 (瞬回与持续血池) | `PacketDispatcher.cs:174` | `0x4B7100` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
+| `1006`| `CM_EATITEM` | 官方 1.5 快捷栏/背包吃药吞咽 | `PacketDispatcher.cs:173` | `0x4B7100` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
 | `1003`| `CM_DROPITEM` | 主动丢弃物品到脚下地面 | `PacketDispatcher.cs` | `0x4B7350` | `[L0 缺失]` | 待补充 |
 | `1001`| `CM_PICKUP` | 拾取地表物品 (80秒保护/满仓/负重) | `PacketDispatcher.cs:565` | `0x4C5CB0` | `[L3 1:1]` | `TestOfficialM2_PickUpEngineMatrix` |
 | `1000`| `CM_BAGITEMS` | 客户端请求背包全部物品列表 | `PlayerState.cs` | `0x4B7800` | `[L3 1:1]` | `TestOfficialClientEquipMatrix` |
@@ -62,11 +63,17 @@
 | `1023`| `CM_USERREPAIRITEM`| 铁匠铺普通修理 (掉 1 点持久上限) | `PacketDispatcher.cs` | `0x487400` | `[L0 缺失]` | 待补充 |
 | `1012`| `CM_QUERYSELLPRICE`| 查询物品商店回收估价 | `PacketDispatcher.cs` | `0x487250` | `[L0 缺失]` | 待补充 |
 | `1024`| `CM_QUERYREPAIRCOST`| 查询装备修理金币费用 | `PacketDispatcher.cs` | `0x487620` | `[L0 缺失]` | 待补充 |
-| `1020`| `CM_USERDEALTRY` | 发起面对面交易请求 | `PacketDispatcher.cs` | `0x4DDC8C` | `[L0 缺失]` | 待补充 |
-| `1021`| `CM_USERADDDEALITEM`| 放入交易物品或金币 | `PacketDispatcher.cs` | `0x4DDC8C` | `[L0 缺失]` | 待补充 |
-| `1022`| `CM_USERDELDEALITEM`| 撤下交易物品 | `PacketDispatcher.cs` | `0x4DDC8C` | `[L0 缺失]` | 待补充 |
-| `1025`| `CM_DEALCANCEL` | 中途取消交易退回物品 | `PacketDispatcher.cs` | `0x4DDC8C` | `[L0 缺失]` | 待补充 |
-| `1026`| `CM_DEALEND` | 锁定并确认完成交易 | `PacketDispatcher.cs` | `0x4DDC8C` | `[L0 缺失]` | 待补充 |
+| `1025`| `CM_DEALTRY` | 发起面对面安全交易邀请 | `PacketDispatcher.cs:127` | `0x4DDC8C` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
+| `1026`| `CM_DEALADDITEM`| 放入交易物品或金币 | `PacketDispatcher.cs:131` | `0x4DDC8C` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
+| `1027`| `CM_DEALDELITEM`| 撤下交易物品 | `PacketDispatcher.cs:135` | `0x4DDC8C` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
+| `1029`| `CM_DEALCHGGOLD`| 修改交易金币数量 | `PacketDispatcher.cs:139` | `0x4DDC8C` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
+| `1030`| `CM_DEALEND` | 锁定并确认完成交易 | `PacketDispatcher.cs:143` | `0x4DDC8C` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
+| `1028`| `CM_TRADECANCEL`| 中途取消交易退回资产 | `PacketDispatcher.cs:147` | `0x4DDC8C` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
+| `1031`| `CM_USERSTORAGEDEPOSIT` | 寄存物品到 40 格独立仓库 | `PacketDispatcher.cs:152` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
+| `1032`| `CM_USERSTORAGEWITHDRAW` | 从 40 格独立仓库取回物品 | `PacketDispatcher.cs:157` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
+| `1017`| `CM_SAVEGOLD` | 仓库金币存入 (原子防溢出) | `PacketDispatcher.cs:162` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
+| `1018`| `CM_TAKEGOLD` | 仓库金币支取 (原子防溢出) | `PacketDispatcher.cs:166` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
+| `1019`| `CM_CHECKPASSWORD` | 仓库二级安全密码验证 | `PacketDispatcher.cs:170` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
 
 ---
 
@@ -90,17 +97,16 @@
 | **14** | **怪物 AI 索敌追击近战心跳** | 5格视野扫描玩家；切比雪夫逼近；邻接挥刀攻击扣血与受击广播 | `sub_4B1638 / sub_4B966C` | `[L3 1:1]` | `TestOfficialM2_MonsterCombatMatrix` |
 | **15** | **NPC 脚本状态机与页面分发** | 点击下发 `@main` 对话框；支持 `<选项/@label>` 动态跳转 | `sub_4A1B5C / sub_4A4C50` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
 | **16** | **商店买卖与 0 损特修机制** | 金币负重扣除；官方半价回收；磨损 3 倍费用 0 损持久回满 | `sub_486B24 / sub_4875D8` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
-| **17** | **面对面双向安全交易状态机** | 双向锁定后确认；容量与金币 1000 万上限检测；防掉线回滚 | `sub_4DDC8C TPlayObject.Deal` | `[L0 缺失]` | 待实现 |
-| **18** | **仓库 40 格独立存储与二级密码** | 比奇/盟重仓库 40 格独立保管箱；二级密码锁定与解锁 | `0x4A1AF8 @storage / @getback` | `[L0 缺失]` | 待实现 |
+| **17** | **面对面双向安全交易状态机** | 双向锁定后确认；容量与金币 1000 万上限检测；防掉线回滚 | `sub_4DDC8C TPlayObject.Deal` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
+| **18** | **仓库 40 格独立存储与二级密码** | 比奇/盟重仓库 40 格独立保管箱；二级密码锁定与解锁 | `0x4A1AF8 @storage / @getback` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
 | **19** | **组队系统经验分配与同屏分摊** | 组队邀请、退队；同屏杀怪经验均摊与职业加成 | `0x4D2500 TPlayObject.Group` | `[L0 缺失]` | 待实现 |
-| **20** | **药水持续回复曲线与红蓝池递增**| 太阳水瞬回；金创药/魔法药按 3 秒 5 点每 Tick 递增式注入 | `0x4B7100 TCreature.Eat` | `[L0 缺失]` | 待实现 |
+| **20** | **药水持续回复曲线与红蓝池递增**| 太阳水瞬回；金创药/魔法药按 3 秒 5 点每 Tick 递增式注入 | `0x4B7100 TCreature.Eat` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
 
 ---
 
 ## 结论与后续核销路径 (Next Burndown Sprints)
 
-1. **当前服务端已完成度**：**63.1% (41 / 65)**；
+1. **当前服务端已完成度**：**86.2% (56 / 65)**；
 2. **下一个攻坚冲刺目标**：
-   - 攻坚 **子系统 17：面对面双向安全交易状态机 (`sub_4DDC8C`)**，核销协议 `CM_USERDEALTRY (1020)`、`CM_USERADDDEALITEM (1021)`、`CM_USERDELDEALITEM (1022)`、`CM_DEALCANCEL (1025)`、`CM_DEALEND (1026)`；
-   - 攻坚 **子系统 18：仓库 40 格保管箱与存取款 (`@storage / @getback`)**，核销协议 `CM_STORAGE (1015)`、`CM_TAKEOUTSTORAGE (1016)`；
-   - 攻坚 **子系统 20：药水使用与持续回复曲线 (`sub_4B7100`)**，核销协议 `CM_EAT (1002)`。
+   - 攻坚 **子系统 19：组队系统经验分配与同屏分摊 (`0x4D2500`)**，核销协议 `CM_CREATEGROUP (1020)`、`CM_GROUPADD (1021/1030)`、`CM_GROUPDEL (1022/1031)`；
+   - 攻坚 **行会创建与成员管理**，核销协议 `CM_CREATEGUILD (1041)`、`CM_GUILDOPEN (1040)` 等。

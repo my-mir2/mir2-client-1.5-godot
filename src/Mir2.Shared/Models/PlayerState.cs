@@ -26,6 +26,7 @@ public enum OfficialEquipSlot : byte
 public sealed class EquipItem
 {
     public int Uid { get; set; }
+    public int Id { get => Uid; set => Uid = value; }
     public string Name { get; set; } = string.Empty;
     public int Shape { get; set; }
     public int Weight { get; set; }
@@ -120,6 +121,23 @@ public sealed class PlayerState
 
     // 背包 40 格
     public List<EquipItem> BagItems { get; } = new(40);
+
+    // 官方 40 格独立仓库 (IDA sub_4A5E44 MAX_STORAGE_COUNT = 40)
+    public const int MaxStorageCapacity = 40;
+    public List<EquipItem> StorageItems { get; } = new(MaxStorageCapacity);
+    private int _storageGold;
+    public int StorageGold
+    {
+        get => _storageGold;
+        set => _storageGold = Math.Clamp(value, 0, MaxGoldLimit);
+    }
+    public string StoragePassword { get; set; } = string.Empty;
+    public bool IsStorageUnlocked { get; set; } = false;
+
+    // 官方 1.4/1.5 药水持续血池与蓝池递增 (IDA sub_4B7100 TCreature.Eat: nIncHealth / nIncSpell)
+    public int IncHealth { get; set; } = 0;
+    public int IncSpell { get; set; } = 0;
+    public long LastPotionTick { get; set; } = 0;
 
     // ==================== 官方 7 大特戒与 4 大套装运行时状态 ====================
     public bool HasProtectRing { get; private set; }
