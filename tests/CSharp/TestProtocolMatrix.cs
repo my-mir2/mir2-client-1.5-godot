@@ -4577,7 +4577,236 @@ public class TestProtocolMatrix
         string dump = Mir2Client.Game.EconomySecurityEngine.CrashDumpLoggerEngine.FormatCrashDump("NullReferenceException", "at GameView.Update()");
         Assert.Contains("CRASH_DUMP", dump);
     }
+
+    [Fact]
+    public void TestOfficialDetails_Batch15_WorldEnvironmentAtlas()
+    {
+        // 细节 252: 石狮子阻挡
+        Assert.True(Mir2Client.Render.WorldEnvironmentAtlasEngine.CastleAndTempleEngine.IsStoneBridgeLionBlocked(100, 200, 100, 200));
+
+        // 细节 253: 皇宫地毯与金龙盘柱
+        var (tId, isPillar) = Mir2Client.Render.WorldEnvironmentAtlasEngine.CastleAndTempleEngine.GetPalaceCarpetTile(20, 15);
+        Assert.True(isPillar);
+        Assert.Equal(901, tId);
+
+        // 细节 255: 酒旗 4 帧摇曳
+        Assert.Equal(2, Mir2Client.Render.WorldEnvironmentAtlasEngine.CastleAndTempleEngine.GetTavernFlagFrame(0.5f));
+
+        // 细节 256: 红名村木栅栏缺口穿行
+        Assert.True(Mir2Client.Render.WorldEnvironmentAtlasEngine.CastleAndTempleEngine.CanPassRedVillageFence(105, 88));
+        Assert.False(Mir2Client.Render.WorldEnvironmentAtlasEngine.CastleAndTempleEngine.CanPassRedVillageFence(105, 89));
+
+        // 细节 258: 沙巴克城门开启 6 帧动画
+        var (gFrame, gFin) = Mir2Client.Render.WorldEnvironmentAtlasEngine.CastleAndTempleEngine.GetSabukGateOpenFrame(0.5f);
+        Assert.Equal(3, gFrame);
+        Assert.False(gFin);
+
+        // 细节 262: 沃玛祭坛绝对坐标
+        Assert.True(Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.IsWomaAltar(50, 50));
+
+        // 细节 265: 祖玛阁传送路由
+        var (zStep, zFin) = Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.CheckZumaMazeRoute(0, "Left");
+        Assert.Equal(1, zStep);
+        Assert.False(zFin);
+
+        // 细节 268: 尸王出洞坐标 (82, 26)
+        Assert.Equal((82, 26), Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.StoneTombSeventhFloorKingHole);
+
+        // 细节 272: 封魔殿幽暗红光 (180, 50, 50)
+        Assert.Equal((180, 50, 50), Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.FengmoPalaceAmbientLight);
+
+        // 细节 276: 白日门太极八卦大阵中心判定
+        var (taiTile, inCenter) = Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.GetBaiRiMenTaichi(100, 100, 100, 100);
+        Assert.True(inCenter);
+        Assert.Equal(501, taiTile);
+
+        // 细节 279: 未知暗殿 3 格暗光手电筒视口
+        Assert.Equal(3.0f, Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.GetUnknownDarkHallLightRadius());
+
+        // 细节 288: 蛙鸣夜间时段判定
+        Assert.True(Mir2Client.Render.WorldEnvironmentAtlasEngine.NatureAndWildernessEngine.ShouldPlayFrogSound(22));
+        Assert.False(Mir2Client.Render.WorldEnvironmentAtlasEngine.NatureAndWildernessEngine.ShouldPlayFrogSound(12));
+
+        // 细节 302: 大地图绝对坐标 1/8 映射
+        Assert.Equal((41, 33), Mir2Client.Render.WorldEnvironmentAtlasEngine.NatureAndWildernessEngine.MapWorldToRadar(330, 270));
+
+        // 细节 350: 10 分钟昼夜天空色彩渐变
+        var (skyR, skyG, skyB) = Mir2Client.Render.WorldEnvironmentAtlasEngine.NatureAndWildernessEngine.CalculateDuskTransition(0.5f);
+        Assert.InRange(skyR, 0.5f, 0.7f);
+        Assert.InRange(skyB, 0.6f, 0.7f);
+    }
+
+    [Fact]
+    public void TestOfficialDetails_Batch16_SkillActionTimeline()
+    {
+        // 细节 352/353: 攻杀/刺杀前摇后摇帧数
+        var (slayingPre, slayingRec) = Mir2Client.Game.SkillActionTimelineEngine.CombatTimelineEngine.GetWarriorSlashFrames(7);
+        Assert.Equal(1, slayingPre);
+        Assert.Equal(2, slayingRec);
+
+        // 细节 358: 小火球速度 12 格/秒
+        Assert.Equal(12.0f, Mir2Client.Game.SkillActionTimelineEngine.CombatTimelineEngine.FireballSpeedGridsPerSecond);
+
+        // 细节 361: 地狱火 5 格每格 40ms 延迟
+        var (hDelay, hGrids) = Mir2Client.Game.SkillActionTimelineEngine.CombatTimelineEngine.GetHellfireWaveTiming(2);
+        Assert.Equal(80, hDelay);
+        Assert.Equal(5, hGrids);
+
+        // 细节 369: 圣言术秒杀碎骨化灰
+        var (_, fatal) = Mir2Client.Game.SkillActionTimelineEngine.CombatTimelineEngine.EvaluateHolyWord(isUndead: true, isSuccess: true);
+        Assert.True(fatal);
+
+        // 细节 376: 隐身术 Alpha 0.35
+        var (invAlpha, dropAggro) = Mir2Client.Game.SkillActionTimelineEngine.TaoistSpellTimelineEngine.GetInvisibilityState(true);
+        Assert.Equal(0.35f, invAlpha);
+        Assert.True(dropAggro);
+
+        // 细节 386: 雷电术受击白炽 120ms
+        Assert.Equal(0.12f, Mir2Client.Game.SkillActionTimelineEngine.CombatTimelineEngine.GetStruckOverexposedDurationSeconds());
+
+        // 细节 402/403: 火球抛物线高度
+        Assert.Equal(30.0f, Mir2Client.Game.SkillActionTimelineEngine.TaoistSpellTimelineEngine.SmallFireballArcHeightPx);
+        Assert.Equal(45.0f, Mir2Client.Game.SkillActionTimelineEngine.TaoistSpellTimelineEngine.BigFireballArcHeightPx);
+
+        // 细节 409/410: 神兽与骷髅苏醒耗时 (1.8s 与 1.2s)
+        Assert.Equal(1.8f, Mir2Client.Game.SkillActionTimelineEngine.TaoistSpellTimelineEngine.ShinsuEmergeTotalSeconds);
+        Assert.Equal(1.2f, Mir2Client.Game.SkillActionTimelineEngine.TaoistSpellTimelineEngine.SkeletonEmergeTotalSeconds);
+
+        // 细节 435: 火墙每秒触发 2 次伤害判定
+        var (ticks, intv) = Mir2Client.Game.SkillActionTimelineEngine.TaoistSpellTimelineEngine.GetFirewallDamageCadence();
+        Assert.Equal(2, ticks);
+        Assert.Equal(0.5f, intv);
+
+        // 细节 448: 魔法盾 1 伤害抵扣 0.5 MP
+        var (absDmg, usedMp) = Mir2Client.Game.SkillActionTimelineEngine.TaoistSpellTimelineEngine.CalculateShieldAbsorb(incomingDmg: 100, currentMp: 100);
+        Assert.Equal(100, absDmg);
+        Assert.Equal(50, usedMp);
+
+        // 细节 450: 800ms 施法节律
+        Assert.Equal(800, Mir2Client.Game.SkillActionTimelineEngine.TaoistSpellTimelineEngine.SpellGlobalCooldownMs);
+    }
+
+    [Fact]
+    public void TestOfficialDetails_Batch17_MonsterEcologyDrop()
+    {
+        // 细节 451/452: 肉质受击衰减
+        var (qMeat, _) = Mir2Client.Game.MonsterEcologyDropEngine.CreatureEcologyEngine.GetChickenDeathMeat(struckCount: 3);
+        Assert.Equal(12, qMeat);
+
+        // 细节 459: 半兽人重劈前摇 0.4s
+        var (orcPre, orcStun) = Mir2Client.Game.MonsterEcologyDropEngine.CreatureEcologyEngine.GetOrcPrecast("半兽人");
+        Assert.Equal(0.4f, orcPre);
+        Assert.Equal(250, orcStun);
+
+        // 细节 494: 血僵尸挖血饮
+        var (drinkOk, itName) = Mir2Client.Game.MonsterEcologyDropEngine.BossDropTreeEngine.EvaluateBloodZombieBloodDrink(2);
+        Assert.True(drinkOk);
+        Assert.Equal("血饮", itName);
+
+        // 细节 510/511: 尸体保留时钟 (普通 60s，首领 300s)
+        Assert.Equal((60.0f, 300.0f), Mir2Client.Game.MonsterEcologyDropEngine.CreatureEcologyEngine.CorpseDecayTimers);
+
+        // 细节 529/530: 割肉持续 3 秒
+        var (carvOk, cProg) = Mir2Client.Game.MonsterEcologyDropEngine.BossDropTreeEngine.EvaluateButcherCarving(true, 3.0f);
+        Assert.True(carvOk);
+        Assert.Equal(3.0f, cProg);
+
+        // 细节 532/533: 首领爆物内外圈半径
+        Assert.Equal((2.0f, 4.0f), Mir2Client.Game.MonsterEcologyDropEngine.BossDropTreeEngine.GetBossDropRadii());
+
+        // 细节 534: 掉落物保护 120 秒
+        var (isOwner, remProt) = Mir2Client.Game.MonsterEcologyDropEngine.BossDropTreeEngine.CheckDropOwnership(1001, 1002, 50.0f);
+        Assert.False(isOwner);
+        Assert.Equal(70.0f, remProt);
+
+        // 细节 537: 视距判定 (首领 12 格)
+        var (_, bossVision) = Mir2Client.Game.MonsterEcologyDropEngine.CreatureEcologyEngine.GetMonsterSenses(isBoss: true);
+        Assert.Equal(12, bossVision);
+
+        // 细节 543: 沃玛卫士二连斩间隔 600ms
+        Assert.Equal(600, Mir2Client.Game.MonsterEcologyDropEngine.CreatureEcologyEngine.WomaGuardDualSlashIntervalMs);
+    }
+
+    [Fact]
+    public void TestOfficialDetails_Batch18_ItemPropertyCompendium()
+    {
+        // 细节 563: 炼狱重量 60，等级 26
+        Assert.True(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("炼狱", out var lianYu));
+        Assert.Equal(60, lianYu.Weight);
+        Assert.Equal(25, lianYu.MaxDc);
+
+        // 细节 567: 血饮准确 +5
+        Assert.True(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("血饮", out var xueYin));
+        Assert.Equal(5, xueYin.Accuracy);
+
+        // 细节 569: 裁决之杖攻击 0-30，重量 80
+        Assert.True(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("裁决之杖", out var caiJue));
+        Assert.Equal(80, caiJue.Weight);
+        Assert.Equal(30, caiJue.MaxDc);
+
+        // 细节 572: 屠龙腕力 50 强制检定
+        Assert.True(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.CheckDragonSlayerHandWeight(52));
+        Assert.False(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.CheckDragonSlayerHandWeight(48));
+
+        // 细节 588: 天魔神甲防御 5-12，魔防 4-7，攻击 1-2
+        var tArmor = Mir2Client.Game.ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetHeavyArmorStats("天魔神甲");
+        Assert.Equal(5, tArmor.acMin);
+        Assert.Equal(12, tArmor.acMax);
+        Assert.Equal(2, tArmor.dcMax);
+
+        // 细节 637: 麻痹戒指石化概率
+        var (_, _, pProc) = Mir2Client.Game.ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetParalysisRingEffect(hasRing: true, roll100: 3);
+        Assert.True(pProc);
+
+        // 细节 649/650: 太阳水与雪霜瞬回
+        var (sHp, sMp, sInst) = Mir2Client.Game.ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetPotionRestore("强效太阳水");
+        Assert.Equal(50, sHp);
+        Assert.True(sInst);
+        var (gHp, gMp, _) = Mir2Client.Game.ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetPotionRestore("万年雪霜");
+        Assert.Equal(100, gHp);
+    }
+
+    [Fact]
+    public void TestOfficialDetails_Batch19_UIStateProtocolMatrix()
+    {
+        // 细节 721~724: 聊天频道前缀与颜色解析
+        var (wCh, wCol) = Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.ParseChatChannel("/小美 你好");
+        Assert.Equal("Whisper", wCh);
+        Assert.Equal("#DA70D6", wCol);
+        var (gCh, gCol) = Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.ParseChatChannel("!~大家加油攻城");
+        Assert.Equal("Guild", gCh);
+        Assert.Equal("#00BFFF", gCol);
+
+        // 细节 657: 纸娃娃三层渲染顺序 (Body -> Dress -> Weapon)
+        var order = Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.PaperDollRenderOrder;
+        Assert.Equal("Body", order[0]);
+        Assert.Equal("Dress", order[1]);
+        Assert.Equal("Weapon", order[2]);
+
+        // 细节 660: Shift 装备对比
+        var (showComp, dDc, _) = Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.CompareEquipment(
+            currentDc: 20, newDc: 25, currentMc: 0, newMc: 0, isShiftHeld: true);
+        Assert.True(showComp);
+        Assert.Equal(5, dDc);
+
+        // 细节 702: TCP 心跳 5000ms
+        Assert.Equal(5000, Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.HeartbeatIntervalMs);
+
+        // 细节 728: 屏幕边缘红晕脉冲 (>20% 最大生命受创)
+        var (_, pulse) = Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.EvaluateScreenRedPulse(damage: 80, maxHp: 300);
+        Assert.True(pulse);
+
+        // 细节 736: 声音 15 格距离衰减
+        float volFar = Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.AudioDistanceAttenuation(16.0f);
+        Assert.Equal(0f, volFar);
+        float volNear = Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.AudioDistanceAttenuation(7.5f);
+        Assert.Equal(0.5f, volNear);
+
+        // 细节 738: 后台降帧 15FPS
+        Assert.Equal(15, Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.BackgroundTargetFps);
+    }
 }
+
 
 
 
