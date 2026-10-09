@@ -500,8 +500,31 @@ public sealed class PacketDispatcher
             // 1. 向九宫格广播普通物理挥刀动作: SM_OBJECTHIT (242)
             BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTHIT, session.SessionId, session.X, session.Y, dir, session.CharacterName, includeSelf: false);
 
-            // 2. 武器开刀试刀判定
-            session.State?.TrialSlashEquippedWeapon();
+            // 2. 武器开刀试刀判定 (第一刀砍出结果)
+            if (session.State != null)
+            {
+                var trialRes = session.State.TrialSlashEquippedWeapon();
+                if (trialRes.Outcome != WeaponUpgradeEngine.TrialSlashOutcome.None)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, trialRes.Message);
+                    if (trialRes.Outcome == WeaponUpgradeEngine.TrialSlashOutcome.Broken)
+                    {
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 999, "碎刀", includeSelf: true);
+                    }
+                    else if (trialRes.Outcome == WeaponUpgradeEngine.TrialSlashOutcome.Success)
+                    {
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 26, "神兵升级成功", includeSelf: true);
+                    }
+                    SendAbility(session);
+                }
+
+                // 官方 1/30 武器物理磨损衰减 (折断则伤害降为徒手 1 点)
+                var (deducted, broken) = ItemLifecycleEngine.DeductWeaponDurabilityOnAttack(session.State, Random.Shared);
+                if (broken)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【折断】你的武器耐久耗尽折断！无法发挥威力！");
+                }
+            }
 
             // 3. 在九宫格同屏检索攻击目标 (坐标处于 targetX, targetY)
             ClientSession? defender = null;
@@ -534,6 +557,9 @@ public sealed class PacketDispatcher
 
                 if (hit && rawDmg > 0)
                 {
+                    // 官方受击防具持久磨损衰减 (衣服 1/15, 首饰防具 1/40)
+                    ItemLifecycleEngine.DeductArmorDurabilityOnDamage(defender.State, Random.Shared);
+
                     // 受击后仰广播: SM_OBJECTSTRUCK (244)
                     BroadcastToNinePatch(defender, ProtocolConsts.SM_OBJECTSTRUCK, defender.SessionId, defender.X, defender.Y, rawDmg, defender.CharacterName, includeSelf: true);
 
@@ -543,7 +569,19 @@ public sealed class PacketDispatcher
                     // 死亡倒地动画广播: SM_DEATH_ACTION_DELPHI (28)
                     if (died)
                     {
+                        bool wasWhiteName = !defender.State.IsRedName && !defender.State.IsYellowName;
                         session.State?.AddPkMurder();
+
+                        // 恶意击杀白名加深武器诅咒 (IDA 0x4C1EF4)
+                        if (wasWhiteName && session.State != null)
+                        {
+                            bool cursed = ItemLifecycleEngine.CheckWeaponCurseOnMurder(session.State, Random.Shared);
+                            if (cursed)
+                            {
+                                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你滥杀无辜，手中的武器被一层怨气缠绕，诅咒加深！");
+                            }
+                        }
+
                         BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
 
                         // 官方死亡爆装与爆背包结算 (IDA 0x4BB44C / 0x4BB6C8)
@@ -1241,6 +1279,17 @@ public sealed class PacketDispatcher
             }
         }
 
+        // 祝福油权威判定 (ItemLifecycleEngine.ApplyBlessOilToEquippedWeapon)
+        if (itemName.Contains("祝福油") || (slot >= 0 && slot < session.State.BagItems.Count && session.State.BagItems[slot].Name.Contains("祝福油")))
+        {
+            var (blessOk, blessMsg) = ItemLifecycleEngine.ApplyBlessOilToEquippedWeapon(session, Random.Shared);
+            session.EnqueuePacket(ProtocolConsts.SM_EAT_OK, 0, 0, 0, 0);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, blessMsg);
+            session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+            SendAbility(session);
+            return;
+        }
+
         var (res, effect) = PotionEngine.ConsumePotion(session.State, slot, itemName);
         if (res == PotionEngine.PotionResult.Success && effect != null)
         {
@@ -1777,7 +1826,8 @@ public sealed class PacketDispatcher
         }
 
         // 3. 基础伤害精算 (结合武器与项链幸运/诅咒与运九套满攻爆发)
-        int rawDmg = attacker.State.CalculateAttackDamageWithLuck(15, 30, Random.Shared);
+        var weapon = attacker.State.Equipment[(int)OfficialEquipSlot.Weapon];
+        int rawDmg = (weapon != null && weapon.Dura <= 0) ? 1 : attacker.State.CalculateAttackDamageWithLuck(15, 30, Random.Shared);
 
         // 4. 攻杀剑气附加伤害
         if (attacker.State.BoAttackKill)
@@ -1845,7 +1895,8 @@ public sealed class PacketDispatcher
         bool hit = rollSpeed < attacker.State.Hit;
         if (!hit) return (0, false, false, false);
 
-        int rawDmg = attacker.State.CalculateAttackDamageWithLuck(15, 30, Random.Shared);
+        var weap = attacker.State.Equipment[(int)OfficialEquipSlot.Weapon];
+        int rawDmg = (weap != null && weap.Dura <= 0) ? 1 : attacker.State.CalculateAttackDamageWithLuck(15, 30, Random.Shared);
         if (attacker.State.BoAttackKill)
         {
             attacker.State.BoAttackKill = false;
