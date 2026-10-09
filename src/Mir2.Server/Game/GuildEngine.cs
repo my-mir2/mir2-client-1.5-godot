@@ -119,6 +119,12 @@ public sealed class GuildEngine
     }
 
     /// <summary>
+    /// 获取玩家所属行会名称 (未入会返回 null)
+    /// </summary>
+    public string? GetPlayerGuild(string playerName) =>
+        GetGuildByPlayer(playerName)?.Name;
+
+    /// <summary>
     /// 招收新成员入会 (CM_GUILDADDMEMBER 1038)
     /// </summary>
     public GuildResult AddMember(ClientSession masterSession, string targetName)

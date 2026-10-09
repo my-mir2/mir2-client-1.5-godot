@@ -23,9 +23,11 @@ public sealed class PacketDispatcher
     public TradeEngine? TradeEngine { get; set; }
     public GroupEngine GroupEngine { get; set; } = new();
     public GuildEngine GuildEngine { get; set; } = new();
+    public SabukSiegeEngine SabukEngine { get; set; } = new();
+    public EconomyAntiDupeEngine EcoEngine { get; set; } = new();
     private int _nextGroundItemUid = 10000;
 
-    public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null, TradeEngine? tradeEngine = null, GroupEngine? groupEngine = null, GuildEngine? guildEngine = null)
+    public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null, TradeEngine? tradeEngine = null, GroupEngine? groupEngine = null, GuildEngine? guildEngine = null, SabukSiegeEngine? sabukEngine = null, EconomyAntiDupeEngine? ecoEngine = null)
     {
         _mapManager = mapManager;
         RegenEngine = regenEngine;
@@ -33,6 +35,8 @@ public sealed class PacketDispatcher
         TradeEngine = tradeEngine;
         if (groupEngine != null) GroupEngine = groupEngine;
         if (guildEngine != null) GuildEngine = guildEngine;
+        if (sabukEngine != null) SabukEngine = sabukEngine;
+        if (ecoEngine != null) EcoEngine = ecoEngine;
     }
 
     public PacketDispatcher(NinePatchAoi<ClientSession> mapAoi)
@@ -570,15 +574,23 @@ public sealed class PacketDispatcher
                     if (died)
                     {
                         bool wasWhiteName = !defender.State.IsRedName && !defender.State.IsYellowName;
-                        session.State?.AddPkMurder();
+                        bool isFreePk = SabukEngine.IsFreePkBattle(
+                            session.CurrentMapId,
+                            GuildEngine.GetPlayerGuild(session.CharacterName),
+                            GuildEngine.GetPlayerGuild(defender.CharacterName));
 
-                        // 恶意击杀白名加深武器诅咒 (IDA 0x4C1EF4)
-                        if (wasWhiteName && session.State != null)
+                        if (!isFreePk)
                         {
-                            bool cursed = ItemLifecycleEngine.CheckWeaponCurseOnMurder(session.State, Random.Shared);
-                            if (cursed)
+                            session.State?.AddPkMurder();
+
+                            // 恶意击杀白名加深武器诅咒 (IDA 0x4C1EF4)
+                            if (wasWhiteName && session.State != null)
                             {
-                                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你滥杀无辜，手中的武器被一层怨气缠绕，诅咒加深！");
+                                bool cursed = ItemLifecycleEngine.CheckWeaponCurseOnMurder(session.State, Random.Shared);
+                                if (cursed)
+                                {
+                                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你滥杀无辜，手中的武器被一层怨气缠绕，诅咒加深！");
+                                }
                             }
                         }
 
