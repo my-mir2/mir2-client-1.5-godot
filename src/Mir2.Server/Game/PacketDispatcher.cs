@@ -2079,7 +2079,208 @@ public sealed class PacketDispatcher
             return;
         }
 
-        // 10. 常规单体法术 (雷电术=10, 火球术=1, 灵魂火符=13)
+        // 10. 瞬息移动 (MagicId = 11, 兼容 14)
+        if (magicId == 11 && targetUid == 0 && targetX == 0 && targetY == 0 || magicId == 14)
+        {
+            var (tx, ty, ok) = MageCombatEngine.Teleport.ResolveRandomLandingTile(map.Width, map.Height, (x, y) => !map.IsWalkable(x, y), Random.Shared);
+            int oldX = session.X;
+            int oldY = session.Y;
+            session.X = tx;
+            session.Y = ty;
+            map.Aoi.UpdatePosition(session, oldX, oldY, tx, ty, out _, out _);
+            SendPositionPullback(session, tx, ty, session.Direction);
+            BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTRUN, session.SessionId, tx, ty, session.Direction, session.CharacterName, includeSelf: true);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【瞬息移动】已瞬移至 ({tx}, {ty})");
+            return;
+        }
+
+        // 11. 诱惑之光 (MagicId = 20, 兼容 11 目标为怪物)
+        if (magicId == 20 || (magicId == 11 && (targetUid != 0 || targetX != 0 || targetY != 0)))
+        {
+            if (RegenEngine != null)
+            {
+                var monster = RegenEngine.FindMonsterByUid(targetUid) ?? RegenEngine.FindMonsterAt(session.CurrentMapId, targetX, targetY);
+                if (monster != null && !monster.IsDead)
+                {
+                    bool isBossOrUndead = monster.Name.Contains("教主") || monster.Name.Contains("骷髅") || monster.Name.Contains("尸");
+                    var result = MageCombatEngine.Temptation.Evaluate(session.State.Level, 3, 20, 0, isBossOrUndead, Random.Shared.Next(100));
+                    if (result.Outcome == MageCombatEngine.Temptation.TameOutcome.Paralyzed)
+                    {
+                        monster.NextActionTimeMs = nowMs + result.ParalyzeDurationSec * 1000;
+                        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, result.Description);
+                    }
+                    else if (result.Outcome == MageCombatEngine.Temptation.TameOutcome.Tamed)
+                    {
+                        monster.TargetSessionId = 0; // 解除仇恨
+                        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, result.Description);
+                    }
+                    else
+                    {
+                        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, result.Description);
+                    }
+                }
+            }
+            return;
+        }
+
+        // 12. 线性穿透法术：地狱火 (MagicId = 9, 5格) 与 疾光电影 (MagicId = 23, 8格)
+        if (magicId == 9 || magicId == 23)
+        {
+            int maxSteps = magicId == 23 ? 8 : 5;
+            var (stepDx, stepDy) = MonsterRegenEngine.GetDirOffset(session.Direction);
+            if (stepDx == 0 && stepDy == 0) (stepDx, stepDy) = (0, -1);
+
+            for (int step = 1; step <= maxSteps; step++)
+            {
+                int lineX = session.X + stepDx * step;
+                int lineY = session.Y + stepDy * step;
+                if (!map.IsWalkable(lineX, lineY)) break; // 遇障碍阻断
+
+                // 穿透结算玩家
+                lock (_ninePatchBuffer)
+                {
+                    map.Aoi.GetEntitiesInNinePatch(lineX, lineY, _ninePatchBuffer);
+                    for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                    {
+                        var target = _ninePatchBuffer[i];
+                        if (target.SessionId != session.SessionId && target.X == lineX && target.Y == lineY && target.State != null && target.State.Hp > 0)
+                        {
+                            int dmg = magicId == 23
+                                ? OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(35, 60, 0, 8, OfficialClientRulesEngine.DelphiRandom.Shared)
+                                : OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(15, 30, 0, 4, OfficialClientRulesEngine.DelphiRandom.Shared);
+
+                            var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = target.State.TakeCombatDamageFull(dmg, nowMs);
+                            BroadcastToNinePatch(target, ProtocolConsts.SM_OBJECTSTRUCK, target.SessionId, target.X, target.Y, dmg, target.CharacterName, includeSelf: true);
+                            target.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, target.State.Hp, target.State.MaxHp, target.State.Mp, target.State.MaxMp);
+                            if (died)
+                            {
+                                session.State.AddPkMurder();
+                                BroadcastToNinePatch(target, ProtocolConsts.SM_DEATH_ACTION_DELPHI, target.SessionId, target.X, target.Y, 0, target.CharacterName, includeSelf: true);
+                            }
+                        }
+                    }
+                }
+
+                // 穿透结算怪物
+                if (RegenEngine != null)
+                {
+                    var m = RegenEngine.FindMonsterAt(session.CurrentMapId, lineX, lineY);
+                    if (m != null && !m.IsDead)
+                    {
+                        int dmg = magicId == 23
+                            ? OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(35, 60, 0, 8, OfficialClientRulesEngine.DelphiRandom.Shared)
+                            : OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(15, 30, 0, 4, OfficialClientRulesEngine.DelphiRandom.Shared);
+
+                        m.Hp = Math.Max(0, m.Hp - dmg);
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, m.Uid, m.X, m.Y, dmg, m.Name, includeSelf: true);
+                        if (m.IsDead)
+                        {
+                            RegenEngine.OnMonsterDied(m.Uid);
+                            BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, m.Uid, m.X, m.Y, 0, m.Name, includeSelf: true);
+                            OnMonsterKilledByPlayer(session, m);
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        // 13. 范围法术：爆裂火焰 (MagicId = 15) 与 冰咆哮 (MagicId = 32 或 33, 100%无视魔躲)
+        if (magicId == 15 || magicId == 32 || magicId == 33)
+        {
+            for (int ax = targetX - 1; ax <= targetX + 1; ax++)
+            {
+                for (int ay = targetY - 1; ay <= targetY + 1; ay++)
+                {
+                    lock (_ninePatchBuffer)
+                    {
+                        map.Aoi.GetEntitiesInNinePatch(ax, ay, _ninePatchBuffer);
+                        for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                        {
+                            var target = _ninePatchBuffer[i];
+                            if (target.SessionId != session.SessionId && target.X == ax && target.Y == ay && target.State != null && target.State.Hp > 0)
+                            {
+                                int dmg = (magicId == 32 || magicId == 33)
+                                    ? MageCombatEngine.Blizzard.CalculateDamage(55, target.State.Mac)
+                                    : OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(20, 35, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
+
+                                var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = target.State.TakeCombatDamageFull(dmg, nowMs);
+                                BroadcastToNinePatch(target, ProtocolConsts.SM_OBJECTSTRUCK, target.SessionId, target.X, target.Y, dmg, target.CharacterName, includeSelf: true);
+                                target.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, target.State.Hp, target.State.MaxHp, target.State.Mp, target.State.MaxMp);
+                                if (died)
+                                {
+                                    session.State.AddPkMurder();
+                                    BroadcastToNinePatch(target, ProtocolConsts.SM_DEATH_ACTION_DELPHI, target.SessionId, target.X, target.Y, 0, target.CharacterName, includeSelf: true);
+                                }
+                            }
+                        }
+                    }
+
+                    if (RegenEngine != null)
+                    {
+                        var m = RegenEngine.FindMonsterAt(session.CurrentMapId, ax, ay);
+                        if (m != null && !m.IsDead)
+                        {
+                            int dmg = (magicId == 32 || magicId == 33)
+                                ? MageCombatEngine.Blizzard.CalculateDamage(55, 5)
+                                : OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(20, 35, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
+
+                            m.Hp = Math.Max(0, m.Hp - dmg);
+                            BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, m.Uid, m.X, m.Y, dmg, m.Name, includeSelf: true);
+                            if (m.IsDead)
+                            {
+                                RegenEngine.OnMonsterDied(m.Uid);
+                                BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, m.Uid, m.X, m.Y, 0, m.Name, includeSelf: true);
+                                OnMonsterKilledByPlayer(session, m);
+                            }
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        // 14. 圣言术 (MagicId = 24)
+        if (magicId == 24)
+        {
+            if (RegenEngine != null)
+            {
+                var monster = RegenEngine.FindMonsterByUid(targetUid) ?? RegenEngine.FindMonsterAt(session.CurrentMapId, targetX, targetY);
+                if (monster != null && !monster.IsDead)
+                {
+                    bool isUndead = monster.Name.Contains("尸") || monster.Name.Contains("骷髅") || monster.Name.Contains("骨");
+                    if (isUndead && !monster.Name.Contains("教主"))
+                    {
+                        int levelDiff = session.State.Level - 20;
+                        int killChance = Math.Clamp(40 + levelDiff * 5, 20, 90);
+                        if (Random.Shared.Next(100) < killChance)
+                        {
+                            monster.Hp = 0;
+                            BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, monster.Uid, monster.X, monster.Y, monster.MaxHp, monster.Name, includeSelf: true);
+                            RegenEngine.OnMonsterDied(monster.Uid);
+                            BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, monster.Uid, monster.X, monster.Y, 0, monster.Name, includeSelf: true);
+                            OnMonsterKilledByPlayer(session, monster);
+                            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【圣言术】神圣光芒净化了 {monster.Name}！");
+                            return;
+                        }
+                    }
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【圣言术】圣言术未产生秒杀效果。");
+                }
+            }
+            return;
+        }
+
+        // 15. 雷电术 (MagicId = 10) 视线射线穿透检测 (防穿墙)
+        if (magicId == 10)
+        {
+            if (!map.CheckLineOfSight(session.X, session.Y, targetX, targetY))
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "障碍物阻挡了施法视线！");
+                return;
+            }
+        }
+
+        // 16. 常规单体法术 (雷电术=10, 火球术=1, 大火球=5, 灵魂火符=13)
         ClientSession? defender = null;
         lock (_ninePatchBuffer)
         {

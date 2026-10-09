@@ -938,6 +938,89 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         Assert.True(chaser.X != 100 || chaser.Y != 102);    // 成功发生了移动
         Assert.Contains(chaser.X, new[] { 99, 101 });       // 向左或向右进行了侧向绕行
     }
+
+    [Fact]
+    public void TestOfficialMageHighTierSpellsFullLoop()
+    {
+        var (mapMgr, regen, _, dispatcher, map) = CreateTestEnvironment();
+
+        var mage = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 200,
+            Y = 200,
+            Direction = 2, // 朝向东
+            CharacterName = "雷霆法圣",
+            State = new PlayerState { Uid = 1001, Name = "雷霆法圣", Level = 40, Hp = 200, MaxHp = 200, Mp = 500, MaxMp = 500 }
+        };
+        map.Aoi.Enter(mage, 200, 200);
+
+        // 1. 测试极光电影 (MagicId = 23, 朝东穿透直线 8 格)
+        // 在前方 (202, 200) 与 (205, 200) 分别放置一只怪物
+        regen.AddRule(new MonsterSpawnRule { RuleId = 1, MonsterName = "靶子怪1", MapId = 0, CenterX = 202, CenterY = 200, Radius = 0, MaxCount = 1, BaseHp = 100 });
+        regen.AddRule(new MonsterSpawnRule { RuleId = 2, MonsterName = "靶子怪2", MapId = 0, CenterX = 205, CenterY = 200, Radius = 0, MaxCount = 1, BaseHp = 100 });
+        regen.ProcessRegenTick(new OfficialClientRulesEngine.DelphiRandom(1));
+        var target1 = regen.FindMonsterAt(0, 202, 200);
+        var target2 = regen.FindMonsterAt(0, 205, 200);
+        Assert.NotNull(target1);
+        Assert.NotNull(target2);
+
+        mage.ClearBufferedPackets();
+        mage.LastSpellTimeMs = 0;
+        // 释放极光电影 (MagicId = 23)
+        dispatcher.Dispatch(mage, $"#{ProtocolConsts.CM_SPELL}/0/23/200/200/!");
+        Assert.True(target1.Hp < 100); // 直线上第一只怪受到穿透伤害
+        Assert.True(target2.Hp < 100); // 直线上第二只怪同样受到穿透伤害
+
+        // 2. 测试冰咆哮 (MagicId = 33, 3x3 范围)
+        // 在 (150, 150) 周围放置多只怪物
+        regen.AddRule(new MonsterSpawnRule { RuleId = 3, MonsterName = "冰冻怪1", MapId = 0, CenterX = 150, CenterY = 150, Radius = 0, MaxCount = 1, BaseHp = 100 });
+        regen.AddRule(new MonsterSpawnRule { RuleId = 4, MonsterName = "冰冻怪2", MapId = 0, CenterX = 151, CenterY = 151, Radius = 0, MaxCount = 1, BaseHp = 100 });
+        regen.ProcessRegenTick(new OfficialClientRulesEngine.DelphiRandom(1));
+        var ice1 = regen.FindMonsterAt(0, 150, 150);
+        var ice2 = regen.FindMonsterAt(0, 151, 151);
+        Assert.NotNull(ice1);
+        Assert.NotNull(ice2);
+
+        mage.ClearBufferedPackets();
+        mage.LastSpellTimeMs = 0;
+        // 释放冰咆哮对准 (150, 150) (MagicId = 32)
+        dispatcher.Dispatch(mage, $"#{ProtocolConsts.CM_SPELL}/0/32/150/150/!");
+        Assert.True(ice1.Hp < 100);
+        Assert.True(ice2.Hp < 100);
+
+        // 3. 测试圣言术 (MagicId = 24, 秒杀不死系)
+        regen.AddRule(new MonsterSpawnRule { RuleId = 5, MonsterName = "骷髅精灵", MapId = 0, CenterX = 201, CenterY = 200, Radius = 0, MaxCount = 1, BaseHp = 500 });
+        regen.ProcessRegenTick(new OfficialClientRulesEngine.DelphiRandom(1));
+        var skeleton = regen.FindMonsterAt(0, 201, 200);
+        Assert.NotNull(skeleton);
+
+        mage.ClearBufferedPackets();
+        mage.LastSpellTimeMs = 0;
+        // 释放圣言术
+        dispatcher.Dispatch(mage, $"#{ProtocolConsts.CM_SPELL}/{skeleton.Uid}/24/201/200/!");
+        Assert.True(mage.HasBufferedPacket($"#{ProtocolConsts.SM_SYSMSG_DELPHI}/"));
+
+        // 4. 测试瞬息移动 (MagicId = 11)
+        int oldX = mage.X;
+        int oldY = mage.Y;
+        mage.ClearBufferedPackets();
+        mage.LastSpellTimeMs = 0;
+        dispatcher.Dispatch(mage, $"#{ProtocolConsts.CM_SPELL}/0/11/0/0/!");
+        Assert.True(mage.X != oldX || mage.Y != oldY); // 坐标已被随机瞬移更新
+        Assert.True(map.IsWalkable(mage.X, mage.Y));  // 瞬移目标必须为合法无阻挡点
+
+        // 5. 测试雷电术视线阻挡 (MagicId = 10)
+        // 在中间 (102, 100) 设置一道墙体阻挡
+        map.SetWalkable(102, 100, false);
+        mage.X = 99;
+        mage.Y = 100;
+        mage.ClearBufferedPackets();
+        mage.LastSpellTimeMs = 0;
+        // 目标在墙体对岸 (106, 100)，中间是墙体阻挡 (102, 100)
+        dispatcher.Dispatch(mage, $"#{ProtocolConsts.CM_SPELL}/0/10/106/100/!");
+        Assert.True(mage.HasBufferedPacket($"#{ProtocolConsts.SM_SYSMSG_DELPHI}/")); // 收到障碍阻挡提示
+    }
 }
 
 
