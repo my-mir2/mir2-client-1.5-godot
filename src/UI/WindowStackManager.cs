@@ -89,4 +89,20 @@ public sealed class WindowStackManager
 
         return false;
     }
+
+    /// <summary>
+    /// 盛大官方 1.5 角色位移时自动关闭可中断窗体 (交易、仓库、商店、NPC 对话框)
+    /// </summary>
+    public void CloseWindowsOnMovement()
+    {
+        for (int i = _stack.Count - 1; i >= 0; i--)
+        {
+            var win = _stack[i];
+            if (win.WindowName is "Trade" or "Storage" or "Shop" or "Repair" or "NpcDialog")
+            {
+                PopWindow(win);
+            }
+        }
+    }
 }
+

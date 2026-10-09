@@ -368,7 +368,8 @@ namespace Mir2Client.UI
             {
                 PlayerInstance.StepStarted += (tx, ty, dir, isRun) =>
                 {
-                    // 盛大官方 1.5 规则: 玩家移动步伐时，面对面交易自动强制中断并退还物品
+                    // 盛大官方 1.5 规则: 玩家移动步伐时，面对面交易、仓库、商店与 NPC 对话框自动强制中断关闭
+                    HudInstance?.StackManager.CloseWindowsOnMovement();
                     if (HudInstance?.TradePanel != null && HudInstance.TradePanel.Visible)
                     {
                         HudInstance.CloseTrade();
