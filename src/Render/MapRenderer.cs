@@ -55,6 +55,9 @@ namespace Mir2Client.Render
         [Signal]
         public delegate void MapLoadedEventHandler(int width, int height);
 
+        private float _animTime = 0f;
+        private float _lastAnimRefresh = 0f;
+
         public override void _Ready()
         {
             int baseW = (int)Math.Ceiling((float)ViewportW / TileW);
@@ -62,6 +65,18 @@ namespace Mir2Client.Render
             _viewTilesW = baseW + BufferTilesX * 2;
             _viewTilesH = baseH + BufferTilesYUp + BufferTilesYDown;
             InitSpritePool();
+        }
+
+        public override void _Process(double delta)
+        {
+            base._Process(delta);
+            _animTime += (float)delta;
+            // 盛大官方 1.5 规则：地图动态瓦片与物件 (水流/火盆/旗帜) 采用约 6 FPS (166ms) 步长定频刷新 (IDA sub_44D6CC)
+            if (_animTime - _lastAnimRefresh >= 0.166f)
+            {
+                _lastAnimRefresh = _animTime;
+                DirtyAll();
+            }
         }
 
         public void SetPlayerTile(int tx, int ty)
@@ -148,6 +163,8 @@ namespace Mir2Client.Render
             public int ObjIdx;
             public byte FileIdx;
             public byte Light;
+            public byte AniFrame;
+            public byte AniTick;
             public bool Passable;
         }
 
@@ -163,6 +180,8 @@ namespace Mir2Client.Render
             ushort floorRaw = (ushort)(_cells[offset] | (_cells[offset + 1] << 8));
             ushort midRaw = (ushort)(_cells[offset + 2] | (_cells[offset + 3] << 8));
             ushort objRaw = (ushort)(_cells[offset + 4] | (_cells[offset + 5] << 8));
+            byte aniFrame = _cells[offset + 8];
+            byte aniTick = _cells[offset + 9];
             byte fileIdx = _cells[offset + 10];
             byte light = _cells[offset + 11];
 
@@ -177,6 +196,8 @@ namespace Mir2Client.Render
                 ObjIdx = objVal,
                 FileIdx = fileIdx,
                 Light = light,
+                AniFrame = aniFrame,
+                AniTick = aniTick,
                 Passable = (floorRaw & 0x8000) == 0
             };
         }
@@ -332,6 +353,16 @@ namespace Mir2Client.Render
                     // 3. 物件层 (Objects1~7.wil: y = sy + 32 - h)
                     if (cell.ObjIdx >= 0)
                     {
+                        int drawObjIdx = cell.ObjIdx;
+                        int aniCount = cell.AniFrame & 0x7F;
+                        if (aniCount > 0)
+                        {
+                            // 官方 Delphi 动画时序 (IDA sub_44D6CC)：AniTick 定义每帧停留间隔 (单位约 50ms)，默认 166ms (6 FPS)
+                            float tickInterval = cell.AniTick > 0 ? (cell.AniTick * 0.05f) : 0.166f;
+                            int animOffset = ((int)(_animTime / tickInterval)) % aniCount;
+                            drawObjIdx += animOffset;
+                        }
+
                         WilLoader? targetWil = null;
                         if (cell.FileIdx == 0)
                         {
@@ -346,7 +377,7 @@ namespace Mir2Client.Render
                             targetWil = _wilObj;
                         }
 
-                        Texture2D? tex2 = targetWil?.GetFrame(cell.ObjIdx);
+                        Texture2D? tex2 = targetWil?.GetFrame(drawObjIdx);
                         if (tex2 != null)
                         {
                             so.Texture = tex2;
