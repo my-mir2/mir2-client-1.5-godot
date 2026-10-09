@@ -236,7 +236,48 @@ if ( Monster.Target != null ) {
 
 ---
 
-## 8. 关键函数物理地址对照表
+## 8. NPC 脚本对话与商人买卖特修机制 (0x4A1B5C / 0x4A4C50 TMerchant.UserSelect)
+
+```c
+// 1. NPC 点击与对话主页下发 (CM_MERCHANTHOMEPAGE 1010 -> SM_NPCDIALOG 54)
+SendDefMessage(User, SM_NPCDIALOG, Npc.Uid, 0, 0, 0, Npc.Script["@main"]);
+
+// 2. NPC 对话选项点击分支 (CM_NPCSELECT 1011)
+string selectKey = Payload; // 例如 "@buy", "@sell", "@s_repair"
+if ( Npc.Script.ContainsKey(selectKey) ) {
+    SendDefMessage(User, SM_NPCDIALOG, Npc.Uid, 0, 0, 0, Npc.Script[selectKey]);
+}
+
+// 3. 商店买入结算 (CM_USERBUYITEM 1014 -> SM_BUY_OK_DELPHI 648 / SM_BUY_FAIL_DELPHI 651)
+if ( User.Gold >= Item.Price && HasBagSpace(User) && CheckBagWeight(User, Item.Weight) ) {
+    User.Gold -= Item.Price;
+    AddToBag(User, Item);
+    SendDefMessage(User, SM_BUY_OK_DELPHI, Item.Uid, 0, 0, 0, Item.Name);
+    SendDefMessage(User, SM_GOLDCHANGED_DELPHI, User.Gold, 0, 0, 0, "");
+    SendDefMessage(User, SM_ADDITEM, Item.Uid, Item.Weight, 0, 0, Item.Name);
+} else {
+    SendDefMessage(User, SM_BUY_FAIL_DELPHI, 0, 0, 0, 0, "金币或负重不足");
+}
+
+// 4. 铁匠铺特修机制 (CM_REPAIRSPECIAL 48 -> SM_REPAIROK_DELPHI 669)
+int repairCost = (Equip.MaxDura - Equip.Dura) * COST_PER_DURA * 3; // 特修 3 倍金币
+if ( User.Gold >= repairCost ) {
+    User.Gold -= repairCost;
+    Equip.Dura = Equip.MaxDura; // 0 损最大持久上限！
+    SendDefMessage(User, SM_REPAIROK_DELPHI, Equip.Uid, Equip.Dura, Equip.MaxDura, 0, Equip.Name);
+} else {
+    SendDefMessage(User, SM_REPAIRFAIL_DELPHI, 0, 0, 0, 0, "修理金币不足");
+}
+```
+- **物理事实**：
+  1. NPC 点击协议号为 `CM_MERCHANTHOMEPAGE (1010)`，下发对话界面为 `SM_NPCDIALOG (54)`；
+  2. 选项点击协议号为 `CM_NPCSELECT (1011)`，支持 `@buy`、`@sell`、`@s_repair`、`@storage` 等标准标签；
+  3. 购买成功返回 `SM_BUY_OK_DELPHI (648)`，出售成功返回 `SM_SELL_OK_DELPHI (650)`；
+  4. 普通修理会损耗 1 点最大持久上限，特殊修理（`@s_repair`）消耗 3 倍金币实现 **0 损最大持久**，成功返回 `SM_REPAIROK_DELPHI (669)`。
+
+---
+
+## 9. 关键函数物理地址对照表
 
 | 函数地址 (Hex) | 函数大小 | 官方模块 | 函数名 / 职责说明 |
 | :--- | :--- | :--- | :--- |

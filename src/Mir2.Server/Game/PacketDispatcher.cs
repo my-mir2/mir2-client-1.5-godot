@@ -18,11 +18,13 @@ public sealed class PacketDispatcher
     private readonly MapManager _mapManager;
     private readonly List<ClientSession> _ninePatchBuffer = new(64);
     public MonsterRegenEngine? RegenEngine { get; set; }
+    public NpcMerchantEngine? NpcEngine { get; set; }
 
-    public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null)
+    public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null)
     {
         _mapManager = mapManager;
         RegenEngine = regenEngine;
+        NpcEngine = npcEngine;
     }
 
     public PacketDispatcher(NinePatchAoi<ClientSession> mapAoi)
@@ -96,6 +98,28 @@ public sealed class PacketDispatcher
 
             case ProtocolConsts.CM_PICKUP: // 1001 拾取地表物品 (IDA 0x4C5CB0)
                 HandlePickUp(session);
+                break;
+
+            case ProtocolConsts.CM_MERCHANTHOMEPAGE: // 1010 点击NPC打开对话框主页
+                HandleNpcHomePage(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_NPCSELECT: // 1011 点击NPC对话选项标签
+                HandleNpcSelect(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_USERBUYITEM: // 45 / 1014 购买商品
+            case ProtocolConsts.CM_USERBUYITEM_ALT:
+                HandleBuyItem(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_USERSELLITEM: // 46 / 1013 出售物品
+            case ProtocolConsts.CM_USERSELLITEM_ALT:
+                HandleSellItem(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_REPAIRSPECIAL: // 48 铁匠铺特修
+                HandleSpecialRepair(session, remaining);
                 break;
 
             default:
@@ -707,6 +731,105 @@ public sealed class PacketDispatcher
             for (int i = 0; i < _ninePatchBuffer.Count; i++)
             {
                 _ninePatchBuffer[i].EnqueuePacket(ident, recog, param, tag, series, extra);
+            }
+        }
+    }
+
+    private void HandleNpcHomePage(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: npcUid (CM_MERCHANTHOMEPAGE 1010)
+        if (NpcEngine == null) return;
+        if (int.TryParse(payload, out int npcUid))
+        {
+            string script = NpcEngine.GetNpcHomePage(npcUid);
+            // 下发官方 NPC 脚本对话框: SM_NPCDIALOG (54)
+            session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
+        }
+    }
+
+    private void HandleNpcSelect(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: npcUid/label (CM_NPCSELECT 1011)
+        if (NpcEngine == null) return;
+        int slash = payload.IndexOf('/');
+        if (slash < 0) return;
+
+        if (int.TryParse(payload[..slash], out int npcUid))
+        {
+            string label = payload[(slash + 1)..].ToString();
+            string script = NpcEngine.SelectScriptOption(npcUid, label);
+            session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
+        }
+    }
+
+    private void HandleBuyItem(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: npcUid/goodsId (CM_USERBUYITEM 1014)
+        if (NpcEngine == null || session.State == null) return;
+        int slash = payload.IndexOf('/');
+        if (slash < 0) return;
+
+        if (int.TryParse(payload[..slash], out int npcUid) && int.TryParse(payload[(slash + 1)..], out int goodsId))
+        {
+            var (success, errorMsg, item) = NpcEngine.BuyItem(session, npcUid, goodsId);
+            if (success && item != null)
+            {
+                // 1. 下发官方购买成功: SM_BUY_OK_DELPHI (648)
+                session.EnqueuePacket(ProtocolConsts.SM_BUY_OK_DELPHI, item.Uid, 0, 0, 0, item.Name);
+                // 2. 刷新金币: SM_GOLDCHANGED_DELPHI (653)
+                session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, 0, 0, 0);
+                // 3. 入包通知: SM_ADDITEM (200)
+                session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, item.Uid, item.Weight, 0, 0, item.Name);
+            }
+            else
+            {
+                // 下发官方购买失败: SM_BUY_FAIL_DELPHI (651)
+                session.EnqueuePacket(ProtocolConsts.SM_BUY_FAIL_DELPHI, 0, 0, 0, 0, errorMsg);
+            }
+        }
+    }
+
+    private void HandleSellItem(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: itemUid (CM_USERSELLITEM 1013)
+        if (NpcEngine == null || session.State == null) return;
+        if (int.TryParse(payload, out int itemUid))
+        {
+            var (success, goldEarned, itemName, errorMsg) = NpcEngine.SellItem(session, itemUid);
+            if (success)
+            {
+                // 1. 下发官方出售成功: SM_SELL_OK_DELPHI (650)
+                session.EnqueuePacket(ProtocolConsts.SM_SELL_OK_DELPHI, itemUid, goldEarned, 0, 0, itemName);
+                // 2. 刷新金币: SM_GOLDCHANGED_DELPHI (653)
+                session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, 0, 0, 0);
+            }
+            else
+            {
+                // 下发官方出售失败: SM_SELL_FAIL_DELPHI (649)
+                session.EnqueuePacket(ProtocolConsts.SM_SELL_FAIL_DELPHI, itemUid, 0, 0, 0, errorMsg);
+            }
+        }
+    }
+
+    private void HandleSpecialRepair(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: slot (CM_REPAIRSPECIAL 48)
+        if (NpcEngine == null || session.State == null) return;
+        if (int.TryParse(payload, out int slotVal) && slotVal >= 0 && slotVal < 9)
+        {
+            var (success, cost, itemName, errorMsg) = NpcEngine.SpecialRepairItem(session, (OfficialEquipSlot)slotVal);
+            if (success)
+            {
+                var equip = session.State.Equipment[slotVal]!;
+                // 1. 下发官方修理成功: SM_REPAIROK_DELPHI (669)
+                session.EnqueuePacket(ProtocolConsts.SM_REPAIROK_DELPHI, equip.Uid, equip.Dura, equip.MaxDura, 0, itemName);
+                // 2. 刷新金币: SM_GOLDCHANGED_DELPHI (653)
+                session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, 0, 0, 0);
+            }
+            else
+            {
+                // 下发官方修理失败: SM_REPAIRFAIL_DELPHI (670)
+                session.EnqueuePacket(ProtocolConsts.SM_REPAIRFAIL_DELPHI, 0, 0, 0, 0, errorMsg);
             }
         }
     }
