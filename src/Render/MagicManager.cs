@@ -469,6 +469,12 @@ namespace Mir2Client.Render
             var def = Mir2Client.Game.OfficialMagicCompendium.Get(magicId);
             if (def == null) return;
 
+            // 1. 播放官方起手施法音效
+            if (def.SoundCast > 0)
+            {
+                AudioManager.Instance?.PlaySoundId(def.SoundCast);
+            }
+
             var loader = def.SpellWil == 2 ? _wilMagic2 : _wilMagic;
 
             switch (def.CastType)
@@ -483,14 +489,21 @@ namespace Mir2Client.Render
                         Speed = def.ProjectileSpeed > 0 ? def.ProjectileSpeed : 500f,
                         BaseFrame = def.EffectStartFrame,
                         FrameCount = Math.Max(1, def.EffectFrameCount),
+                        HitFrame = def.EffectStartFrame + Math.Max(1, def.EffectFrameCount),
+                        HitCount = 6,
                         WilLoaderInstance = loader,
-                        Sprite = new Sprite2D { Centered = true, ZIndex = 110 }
+                        Sprite = new Sprite2D
+                        {
+                            Centered = true,
+                            ZIndex = 110,
+                            Material = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.Add }
+                        }
                     };
                     AddChild(proj.Sprite);
                     _flyingProjectiles.Add(proj);
                     break;
 
-                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.GroundAoE:
+                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.GroundAoE: // 火墙 (MagicId 22)
                     var gm = new GroundMagic
                     {
                         TilePos = new Vector2I((int)(targetWorld.X / 48), (int)(targetWorld.Y / 32)),
@@ -498,29 +511,59 @@ namespace Mir2Client.Render
                         BaseFrame = def.EffectStartFrame,
                         FrameCount = Math.Max(1, def.EffectFrameCount),
                         WilLoaderInstance = loader,
-                        Sprite = new Sprite2D { Centered = true, GlobalPosition = targetWorld, ZIndex = 5 }
+                        Sprite = new Sprite2D
+                        {
+                            Centered = true,
+                            GlobalPosition = targetWorld,
+                            ZIndex = 5,
+                            Material = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.Add }
+                        }
                     };
                     AddChild(gm.Sprite);
                     _groundMagics.Add(gm);
                     break;
 
+                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.SelfAoE: // 地狱雷光 (MagicId 18)
+                    // 官方 1.5 铁证：地狱雷光以施法者为中心，同时向周围 8 个方向爆发雷光
+                    int[] offsetsX = [0, -48, 48, 0, 0, -48, 48, -48, 48];
+                    int[] offsetsY = [0, 0, 0, -32, 32, -32, -32, 32, 32];
+                    for (int k = 0; k < 9; k++)
+                    {
+                        var subPos = startWorld + new Vector2(offsetsX[k], offsetsY[k]);
+                        CreateImpact(magicId, subPos, def.EffectStartFrame, Math.Max(1, def.EffectFrameCount), loader);
+                    }
+                    if (def.SoundHit > 0) AudioManager.Instance?.PlaySoundId(def.SoundHit);
+                    break;
+
+                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.DirectionalBeam: // 疾光电影 (MagicId 10) / 地狱火 (MagicId 8)
+                    var dir = (targetWorld - startWorld).Normalized();
+                    if (dir.LengthSquared() < 0.001f) dir = new Vector2(1, 0);
+                    int beamSteps = magicId == 10 ? 12 : 5; // 疾光电影 12 格，地狱火 5 格
+                    for (int step = 1; step <= beamSteps; step++)
+                    {
+                        var beamPos = startWorld + dir * (step * 40f);
+                        CreateImpact(magicId, beamPos, def.EffectStartFrame, Math.Max(1, def.EffectFrameCount), loader);
+                    }
+                    if (def.SoundHit > 0) AudioManager.Instance?.PlaySoundId(def.SoundHit);
+                    break;
+
                 case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.SelfCast:
+                    if (magicId == 31) // 魔法盾
+                    {
+                        AttachEffectToEntity(targetNode ?? this, 31, 30f, true);
+                    }
+                    else
+                    {
+                        CreateImpact(magicId, startWorld, def.EffectStartFrame, Math.Max(1, def.EffectFrameCount), loader);
+                    }
+                    break;
+
                 case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.TargetDirect:
                 case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.TargetArea:
                 case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.Summon:
-                    var eff = new AttachedEffect
-                    {
-                        MagicId = magicId,
-                        TargetEntity = targetNode ?? this,
-                        Duration = def.GroundDurationMs > 0 ? def.GroundDurationMs / 1000f : 1.5f,
-                        BaseFrame = def.EffectStartFrame,
-                        FrameCount = Math.Max(1, def.EffectFrameCount),
-                        IsPersistent = def.MagicId == 31, // 魔法盾常驻
-                        WilLoaderInstance = loader,
-                        Sprite = new Sprite2D { Centered = true, GlobalPosition = targetWorld, ZIndex = 105 }
-                    };
-                    AddChild(eff.Sprite);
-                    _attachedEffects.Add(eff);
+                default:
+                    CreateImpact(magicId, targetWorld, def.EffectStartFrame, Math.Max(1, def.EffectFrameCount), loader);
+                    if (def.SoundHit > 0) AudioManager.Instance?.PlaySoundId(def.SoundHit);
                     break;
             }
         }
