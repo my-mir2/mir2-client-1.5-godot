@@ -427,4 +427,280 @@ public class TestOfficialM2_ModernArchitectureAndUltimateMatrix
             Assert.True(engine.HasPlugin("新副本引路人"));
         }
     }
+
+    // ==================== 8. 模块十九: 传奇三大 BOSS 特殊战斗机制与狂暴 AI ====================
+
+    [Fact]
+    public void Test_BossEncounterEngine_MagicImmunity_GroundSpike_And_ZumaRage()
+    {
+        // 1. 触龙神 100% 绝对魔法免疫 (法术伤害归 0)
+        var centipede = new MonsterInstance { Uid = 901, Name = "触龙神", Hp = 1000, MaxHp = 1000 };
+        int magicDmg = BossEncounterEngine.ResolveMagicDamageOnBoss(centipede, 100);
+        Assert.Equal(0, magicDmg);
+
+        // 普通白野猪受到正常法术伤害
+        var pig = new MonsterInstance { Uid = 902, Name = "白野猪", Hp = 1000, MaxHp = 1000 };
+        Assert.Equal(100, BossEncounterEngine.ResolveMagicDamageOnBoss(pig, 100));
+
+        // 2. 赤月恶魔全屏地刺防御减免
+        var player = new PlayerState { Ac = 10, Mac = 10 }; // 减免 10 点
+        int spikeDmg = BossEncounterEngine.CalculateRedMoonDemonGroundSpikeDamage(50, player);
+        Assert.Equal(40, spikeDmg);
+
+        // 3. 祖玛教主残血狂暴召唤 4 大锤卫士
+        var zuma = new MonsterInstance { Uid = 903, Name = "祖玛教主", Hp = 150, MaxHp = 1000 }; // 15% 残血
+        var (shouldSummon, minions) = BossEncounterEngine.CheckZumaLeaderRageSummon(zuma);
+        Assert.True(shouldSummon);
+        Assert.Equal(4, minions.Count);
+        Assert.Contains(minions, m => m.Contains("祖玛卫士"));
+
+        // 4. 双头金刚死后挖肉产出法神披风
+        var kong = new MonsterInstance { Uid = 904, Name = "双头金刚", Hp = 0, MaxHp = 5000 };
+        var (bOk, fashenItem, _) = BossEncounterEngine.ButcherDualHeadKong(kong, new Random(14));
+        Assert.True(bOk);
+        Assert.NotNull(fashenItem);
+        Assert.Contains("法神", fashenItem.Name);
+    }
+
+    // ==================== 9. 模块二十: 个人安全区摆摊经济系统 ====================
+
+    [Fact]
+    public void Test_PersonalStallEngine_OpenStall_Buy_And_AntiDupe()
+    {
+        var stallEngine = new PersonalStallEngine();
+        var safeZone = new SafeZoneAndGuardEngine();
+        safeZone.RegisterSafeZone(0, 300, 250, 350, 300);
+
+        var vendor = CreateMockSession(7001, "摆摊商人", gold: 1000);
+        vendor.CurrentMapId = 0;
+        vendor.X = 330;
+        vendor.Y = 270;
+
+        var sword = new EquipItem { Uid = 7771, Name = "井中月", Weight = 58 };
+        vendor.State!.BagItems.Add(sword);
+
+        // 1. 开设摊位
+        var (openOk, _) = stallEngine.OpenStall(vendor, "井中月极品清仓", safeZone);
+        Assert.True(openOk);
+        Assert.True(stallEngine.HasStall(vendor.SessionId));
+
+        // 2. 上架物品标价 50000 金币
+        var (addOk, _) = stallEngine.AddItemToStall(vendor, sword, 50000);
+        Assert.True(addOk);
+        Assert.DoesNotContain(sword, vendor.State.BagItems);
+
+        // 3. 买家购买
+        var buyer = CreateMockSession(7002, "土豪买家", gold: 100000);
+        var (buyOk, boughtItem, _) = stallEngine.BuyStallItem(buyer, vendor.SessionId, 7771, vendor);
+        Assert.True(buyOk);
+        Assert.NotNull(boughtItem);
+        Assert.Equal("井中月", boughtItem.Name);
+        Assert.Equal(50000, buyer.State!.Gold); // 100000 - 50000 = 50000
+        Assert.Equal(51000, vendor.State!.Gold); // 1000 + 50000 = 51000
+        Assert.Contains(buyer.State.BagItems, i => i.Uid == 7771);
+
+        // 4. 摊主收摊
+        var (closeOk, _) = stallEngine.CloseStall(vendor);
+        Assert.True(closeOk);
+        Assert.False(stallEngine.HasStall(vendor.SessionId));
+    }
+
+    // ==================== 10. 模块二十一: 经典装备暗属性与祈祷头盔死亡碎裂 ====================
+
+    [Fact]
+    public void Test_EquipmentHiddenAttribEngine_DragonBracelet_And_PrayerHelmet()
+    {
+        var player = new PlayerState();
+
+        // 1. 龙之手镯破盾几率
+        player.Equipment[(int)OfficialEquipSlot.ArmringL] = new EquipItem { Uid = 801, Name = "龙之手镯" };
+        player.Equipment[(int)OfficialEquipSlot.ArmringR] = new EquipItem { Uid = 802, Name = "龙之手镯" };
+        bool pierced = EquipmentHiddenAttribEngine.CheckDragonBraceletArmorPiercing(player, new Random(14));
+        Assert.True(pierced);
+
+        // 2. 祈祷头盔死亡必碎裂销毁
+        player.Equipment[(int)OfficialEquipSlot.Helmet] = new EquipItem { Uid = 803, Name = "祈祷头盔" };
+        var (shattered, _) = EquipmentHiddenAttribEngine.ProcessPrayerHelmetDeathShatter(player);
+        Assert.True(shattered);
+        Assert.Null(player.Equipment[(int)OfficialEquipSlot.Helmet]); // 槽位被彻底清空销毁
+    }
+
+    // ==================== 11. 模块二十二: 官方 1.5 虎卫传说核心随从与成长测试 ====================
+
+    [Fact]
+    public void Test_HuWeiPetEngine_LevelUp_ToggleMode_And_TeleportSync()
+    {
+        // 1. 创建 0 级虎卫
+        var huwei = HuWeiPetEngine.CreateHuWei(901, 1001, mapId: 0, x: 300, y: 300);
+        Assert.Equal(0, huwei.Level);
+        Assert.Equal(400, huwei.MaxHp);
+        Assert.Equal("White", huwei.NameColor);
+
+        // 2. 累积杀怪经验一路晋级至 7 级
+        for (int i = 0; i < 7; i++)
+        {
+            bool lvlUp = HuWeiPetEngine.AddKillExpAndTryLevelUp(huwei, 100000);
+            Assert.True(lvlUp);
+        }
+        Assert.Equal(7, huwei.Level);
+        Assert.Equal("Blue", huwei.NameColor);
+        Assert.True(huwei.MaxHp > 3000, "7 级巅峰虎卫生命值应突破 3000 点");
+
+        // 3. Ctrl+A 切换休息与战斗
+        var (resting, msgRest) = HuWeiPetEngine.TogglePetMode(huwei);
+        Assert.True(resting);
+        Assert.Contains("休息状态", msgRest);
+
+        var (following, msgFollow) = HuWeiPetEngine.TogglePetMode(huwei);
+        Assert.False(following);
+        Assert.Contains("跟随主人", msgFollow);
+
+        // 4. 随主人跨地图瞬移
+        HuWeiPetEngine.SyncPetTeleportWithMaster(huwei, targetMapId: 3, masterX: 330, masterY: 330);
+        Assert.Equal(3, huwei.CurrentMapId);
+        Assert.Equal(331, huwei.X);
+        Assert.Equal(330, huwei.Y);
+    }
+
+    // ==================== 12. 模块二十三: 未知暗殿神秘装备解封、诅咒与神水洗涤测试 ====================
+
+    [Fact]
+    public void Test_MysticEquipmentEngine_Identification_Curse_And_HolyWaterPurify()
+    {
+        var mysticBelt = new EquipItem { Uid = 911, Name = "神秘腰带" };
+
+        // 1. 穿戴时首次解封鉴定 (使用确定性随机数使得触发诅咒)
+        // roll < 20 触发诅咒，设置 Random(0)
+        var rng = new Random(0);
+        var (identified, isCursed, msg) = MysticEquipmentEngine.IdentifyMysticEquipment(mysticBelt, rng);
+        Assert.True(identified);
+
+        // 2. 检查诅咒状态下禁止脱卸
+        mysticBelt.Curse = 1; // 强制模拟诅咒
+        var (canTakeOff, reason) = MysticEquipmentEngine.CheckCanTakeOff(mysticBelt);
+        Assert.False(canTakeOff);
+        Assert.Contains("被邪恶力量深深诅咒", reason);
+
+        // 3. 使用神水清洗诅咒
+        var (purified, purifyMsg) = MysticEquipmentEngine.PurifyMysticCurseWithHolyWater(mysticBelt);
+        Assert.True(purified);
+        Assert.Equal(0, mysticBelt.Curse);
+        Assert.Contains("洗净了邪恶诅咒", purifyMsg);
+
+        // 4. 清洗后允许自由脱下
+        var (canTakeOffAfter, _) = MysticEquipmentEngine.CheckCanTakeOff(mysticBelt);
+        Assert.True(canTakeOffAfter);
+    }
+
+    // ==================== 13. 模块二十四: 红名死亡大爆与盟重红名村流放复活测试 ====================
+
+    [Fact]
+    public void Test_RedNameDropAndReviveEngine_MegaExplosion_And_RedTownRevival()
+    {
+        // 1. 普通白名死亡
+        var whitePlayer = new PlayerState { Name = "守法良民", PkPoints = 0 };
+        for (int i = 0; i < 10; i++) whitePlayer.BagItems.Add(new EquipItem { Uid = 100 + i, Name = "金创药" });
+        whitePlayer.Equipment[(int)OfficialEquipSlot.Weapon] = new EquipItem { Uid = 201, Name = "木剑" };
+
+        var whiteDrops = RedNameDropAndReviveEngine.CalculateDeathDrops(whitePlayer, new Random(100));
+        Assert.False(whiteDrops.IsMegaExplosion);
+
+        var (whiteMap, whiteX, whiteY, _) = RedNameDropAndReviveEngine.GetReviveLocation(whitePlayer);
+        Assert.Equal(0, whiteMap); // 比奇主城
+        Assert.Equal(330, whiteX);
+
+        // 2. 狂暴红名死亡 (触发大爆)
+        var redPlayer = new PlayerState { Name = "绝世杀人狂", PkPoints = 500 };
+        for (int i = 0; i < 20; i++) redPlayer.BagItems.Add(new EquipItem { Uid = 300 + i, Name = $"战利品{i}" });
+        redPlayer.Equipment[(int)OfficialEquipSlot.Weapon] = new EquipItem { Uid = 401, Name = "屠龙" };
+        redPlayer.Equipment[(int)OfficialEquipSlot.Helmet] = new EquipItem { Uid = 402, Name = "圣战头盔" };
+
+        var redDrops = RedNameDropAndReviveEngine.CalculateDeathDrops(redPlayer, new Random(100));
+        Assert.True(redDrops.IsMegaExplosion);
+        Assert.True(redDrops.DroppedBagItems.Count > 10, "红名大爆背包大部分物品必须爆落");
+
+        // 3. 红名死亡必须强制投送到盟重省红名村 (850, 660)
+        var (redMap, redX, redY, redMsg) = RedNameDropAndReviveEngine.GetReviveLocation(redPlayer);
+        Assert.Equal(3, redMap); // 盟重省
+        Assert.Equal(850, redX);
+        Assert.Equal(660, redY);
+        Assert.Contains("红名村", redMsg);
+    }
+
+    // ==================== 14. 模块二十五: 师徒传承声望与荣誉勋章兑换测试 ====================
+
+    [Fact]
+    public void Test_MasterApprenticeHonorEngine_ApprenticeLevelUp_Graduation_And_BadgeExchange()
+    {
+        var master = new PlayerState { Name = "一代宗师", Level = 40, Prestige = 5 };
+        var apprentice = new PlayerState { Name = "初入江湖", Level = 20, Prestige = 0 };
+
+        // 1. 拜师
+        var (regOk, regMsg) = MasterApprenticeHonorEngine.RegisterApprenticeship(master, apprentice);
+        Assert.True(regOk);
+        Assert.Contains("拜入", regMsg);
+
+        // 2. 徒弟普通升级 (师傅声望 +1)
+        apprentice.Level = 21;
+        var (grad1, mGain1, aGain1, _) = MasterApprenticeHonorEngine.OnApprenticeLevelUp(apprentice, master);
+        Assert.False(grad1);
+        Assert.Equal(1, mGain1);
+        Assert.Equal(6, master.Prestige);
+
+        // 3. 徒弟升至 35 级出师 (师傅获得 20 声望，徒弟获得 10 声望)
+        apprentice.Level = 35;
+        var (grad2, mGain2, aGain2, gradMsg) = MasterApprenticeHonorEngine.OnApprenticeLevelUp(apprentice, master);
+        Assert.True(grad2);
+        Assert.Equal(20, mGain2);
+        Assert.Equal(10, aGain2);
+        Assert.Equal(26, master.Prestige); // 6 + 20 = 26
+        Assert.Equal(10, apprentice.Prestige);
+        Assert.Contains("出师", gradMsg);
+
+        // 4. 武馆教头处声望兑换荣誉勋章 14 号 (需要声望 25 点)
+        var (exOk, badge, exMsg) = MasterApprenticeHonorEngine.ExchangeHonorBadge(master, 14);
+        Assert.True(exOk);
+        Assert.NotNull(badge);
+        Assert.Equal("荣誉勋章14号", badge.Name);
+        Assert.Equal(1, master.Prestige); // 26 - 25 = 1
+        Assert.Contains(master.BagItems, i => i.Name == "荣誉勋章14号");
+    }
+
+    // ==================== 15. 模块二十六: 矿区铁鹤嘴锄挖矿与黑铁矿石产出测试 ====================
+
+    [Fact]
+    public void Test_MiningEngine_PickaxeDurability_And_BlackIronOrePurity()
+    {
+        var miner = new PlayerState { Name = "老矿工" };
+
+        // 1. 未装备鹤嘴锄禁止挖矿
+        var resNoPick = MiningEngine.DigOnce(miner, mapId: 1, Random.Shared);
+        Assert.False(resNoPick.Success);
+        Assert.Contains("没有装备鹤嘴锄", resNoPick.Message);
+
+        // 2. 非矿区地图无法挖矿
+        miner.Equipment[(int)OfficialEquipSlot.Weapon] = new EquipItem { Uid = 501, Name = "铁鹤嘴锄", Dura = 20, MaxDura = 20 };
+        var resWrongMap = MiningEngine.DigOnce(miner, mapId: 0, Random.Shared);
+        Assert.False(resWrongMap.Success);
+        Assert.Contains("不是矿区", resWrongMap.Message);
+
+        // 3. 矿区开采，消耗持久并产出矿石
+        // 使用固定随机种子保证必定产出矿石且触发黑铁矿石分支
+        // rng.Next(100) < 30 (出矿) -> oreRoll >= 96 (黑铁矿石)
+        bool gotBlackIron = false;
+        var rng = new Random(42);
+        for (int i = 0; i < 200; i++)
+        {
+            var res = MiningEngine.DigOnce(miner, mapId: 1, rng);
+            if (res.Success && res.MinedOre != null && res.MinedOre.Name == "黑铁矿石")
+            {
+                gotBlackIron = true;
+                Assert.True(res.MinedOre.Shape >= 5 && res.MinedOre.Shape <= 30, "黑铁矿石纯度必须在 5~30 之间");
+                break;
+            }
+        }
+        Assert.True(gotBlackIron, "持续开采必须能够挖出关键黑铁矿石");
+        Assert.Contains(miner.BagItems, i => i.Name == "黑铁矿石");
+    }
 }
+

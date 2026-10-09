@@ -63,9 +63,11 @@ public sealed class PlayerState
 {
     public int Uid { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string CharacterName { get => Name; set => Name = value; }
     public int Job { get; set; } // 0=战士, 1=法师, 2=道士
     public int Sex { get; set; } // 0=男, 1=女
     public int Level { get; set; } = 1;
+    public int Prestige { get; set; } = 0; // 江湖声望 (师徒出师与荣誉勋章兑换)
 
     public int Hp { get; set; } = 100;
     public int MaxHp { get; set; } = 100;
