@@ -378,17 +378,22 @@ public partial class SkillPanelView : Control, IManagedWindow
 
     public void UpdateSkillKey(int magicId, int keyNum)
     {
+        string keyStr = keyNum > 0 ? $"F{keyNum}" : "";
         for (int i = 0; i < _skills.Count; i++)
         {
+            // 盛大官方 1.5 快捷键互斥排他机制：若其他技能已占用该按键，自动解除旧绑定
+            if (!string.IsNullOrEmpty(keyStr) && _skills[i].Key == keyStr && _skills[i].MagicId != magicId)
+            {
+                var conflict = _skills[i];
+                _skills[i] = conflict with { Key = "" };
+            }
             if (_skills[i].MagicId == magicId)
             {
-                string keyStr = keyNum > 0 ? $"F{keyNum}" : "";
                 var old = _skills[i];
                 _skills[i] = old with { Key = keyStr };
-                RenderCurrentPage();
-                break;
             }
         }
+        RenderCurrentPage();
     }
 
     /// <summary>

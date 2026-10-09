@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Mir2Client.Game;
 using Mir2Client.Utils;
 
 namespace Mir2Client.UI;
@@ -42,7 +43,10 @@ public partial class MinimapView : Control, IManagedWindow
     private ColorRect? _playerDot;
     private ColorRect? _targetMarker;
     private Control? _entityDotsContainer;
+    private Control? _landmarksContainer;
     private readonly List<ColorRect> _dotPool = new();
+    private readonly List<Label> _landmarkLabels = new();
+    private readonly List<ColorRect> _landmarkMarkers = new();
 
     private float _blinkTimer = 0.0f;
     private bool _blinkState = true;
@@ -186,6 +190,14 @@ public partial class MinimapView : Control, IManagedWindow
             MouseFilter = MouseFilterEnum.Ignore
         };
         AddChild(_entityDotsContainer);
+
+        _landmarksContainer = new Control
+        {
+            Name = "LandmarksContainer",
+            MouseFilter = MouseFilterEnum.Ignore,
+            Visible = false
+        };
+        AddChild(_landmarksContainer);
 
         GD.Print("[MinimapView] 官方 1.5 双模地图场景与交互引擎就绪");
     }
@@ -495,6 +507,7 @@ public partial class MinimapView : Control, IManagedWindow
                 Visible = false;
                 if (_btnClose != null) _btnClose.Visible = false;
                 if (_lblHoverCoord != null) _lblHoverCoord.Visible = false;
+                if (_landmarksContainer != null) _landmarksContainer.Visible = false;
                 break;
 
             case MinimapMode.Mini:
@@ -515,6 +528,7 @@ public partial class MinimapView : Control, IManagedWindow
                 }
                 if (_btnClose != null) _btnClose.Visible = false;
                 if (_lblHoverCoord != null) _lblHoverCoord.Visible = false;
+                if (_landmarksContainer != null) _landmarksContainer.Visible = false;
                 UpdatePlayerDotPosition();
                 UpdateTargetMarkerPosition();
                 break;
@@ -549,8 +563,70 @@ public partial class MinimapView : Control, IManagedWindow
                 }
                 UpdatePlayerDotPosition();
                 UpdateTargetMarkerPosition();
+                RenderLandmarks();
                 break;
         }
         EmitSignal(SignalName.ModeChanged, (int)_currentMode);
+    }
+
+    private void RenderLandmarks()
+    {
+        if (_landmarksContainer == null) return;
+        var landmarks = MapLandmarkEngine.GetLandmarks(_mapId.Length > 0 ? _mapId : _mapName);
+        if (landmarks == null || landmarks.Count == 0)
+        {
+            _landmarksContainer.Visible = false;
+            return;
+        }
+
+        _landmarksContainer.Visible = true;
+        float mapAreaW = 536.0f;
+        float mapAreaH = 328.0f;
+
+        for (int i = 0; i < landmarks.Count; i++)
+        {
+            var lm = landmarks[i];
+            float px = 2 + (lm.X / (float)_mapWidthTiles) * mapAreaW;
+            float py = 24 + (lm.Y / (float)_mapHeightTiles) * mapAreaH;
+
+            while (_landmarkMarkers.Count <= i)
+            {
+                var marker = new ColorRect
+                {
+                    Size = new Vector2(4, 4),
+                    MouseFilter = MouseFilterEnum.Ignore
+                };
+                _landmarksContainer.AddChild(marker);
+                _landmarkMarkers.Add(marker);
+            }
+            var curMarker = _landmarkMarkers[i];
+            curMarker.Position = new Vector2(Math.Clamp(px - 2, 2, 534), Math.Clamp(py - 2, 24, 350));
+            curMarker.Color = lm.Type == MapLandmarkEngine.LandmarkType.Palace ? new Color(1f, 0.8f, 0.1f)
+                           : lm.Type == MapLandmarkEngine.LandmarkType.Portal ? new Color(0.2f, 0.9f, 1f)
+                           : new Color(0.3f, 1f, 0.4f);
+            curMarker.Visible = true;
+
+            while (_landmarkLabels.Count <= i)
+            {
+                var lbl = new Label
+                {
+                    MouseFilter = MouseFilterEnum.Ignore
+                };
+                lbl.AddThemeFontSizeOverride("font_size", 9);
+                _landmarksContainer.AddChild(lbl);
+                _landmarkLabels.Add(lbl);
+            }
+            var curLbl = _landmarkLabels[i];
+            curLbl.Text = $"{lm.Name} ({lm.X},{lm.Y})";
+            curLbl.Position = new Vector2(Math.Clamp(px + 4, 4, 460), Math.Clamp(py - 6, 24, 340));
+            curLbl.AddThemeColorOverride("font_color", curMarker.Color);
+            curLbl.Visible = true;
+        }
+
+        for (int i = landmarks.Count; i < _landmarkMarkers.Count; i++)
+        {
+            _landmarkMarkers[i].Visible = false;
+            _landmarkLabels[i].Visible = false;
+        }
     }
 }

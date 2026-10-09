@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using Mir2Client.Audio;
+using Mir2Client.Game;
 using Mir2Client.Utils;
 
 namespace Mir2Client.UI;
@@ -1540,8 +1541,58 @@ public partial class HudController : CanvasLayer
         _statusPanelView.UpdateAbilityValue(10, mpRecover);
     }
 
+    private int _playerLevel = 35;
+    private int _playerJob = 0; // 0: 战, 1: 法, 2: 道
+
+    public void SetPlayerJobAndLevel(int job, int level)
+    {
+        _playerJob = job;
+        _playerLevel = Math.Max(1, level);
+    }
+
+    public int GetCurrentWearWeight()
+    {
+        int total = 0;
+        for (int i = 0; i < 9; i++)
+        {
+            if (i == 1) continue; // 武器算腕力，不算防具负重
+            if (_equipItemDetails[i] != null)
+            {
+                var item = _equipItemDetails[i]!.Value;
+                total += WeightConstraintEngine.ExtractItemWeight(item.Name, item.Desc);
+            }
+        }
+        return total;
+    }
+
+    public int GetTalismanOrPoisonDura(int requiredDura)
+    {
+        // 优先检查 Slot 8 (官方护身符/毒药包槽位)
+        if (_equipItemDetails[8] != null)
+        {
+            var item = _equipItemDetails[8]!.Value;
+            int dura = ExtractItemCountOrDura(item.Desc);
+            if (dura >= requiredDura) return dura;
+        }
+        // 其次检查背包中是否有护身符或药粉
+        for (int i = 0; i < 40; i++)
+        {
+            if (_bagItemDetails[i] != null)
+            {
+                var item = _bagItemDetails[i]!.Value;
+                if (item.Name.Contains("护身符") || item.Name.Contains("毒粉") || item.Name.Contains("药粉"))
+                {
+                    int dura = ExtractItemCountOrDura(item.Desc);
+                    if (dura >= requiredDura) return dura;
+                }
+            }
+        }
+        return 0;
+    }
+
     public void UpdateLevel(int level)
     {
+        _playerLevel = level;
         // 盛大原版官方 HUD 嵌入 Lv 徽章右侧黑槽 (636, 484)
         if (_lblLevel != null)
         {
@@ -3170,6 +3221,35 @@ public partial class HudController : CanvasLayer
     }
 
     /// <summary>
+    /// 盛大官方 1.5 装备拖拽合法性即时高亮反馈 (合法槽位淡金高亮，非法暗淡)
+    /// </summary>
+    public void HighlightCompatibleEquipSlots(string itemName)
+    {
+        for (int slot = 0; slot < 9; slot++)
+        {
+            if (_equipSlots[slot] != null)
+            {
+                bool isCompat = IsItemCompatibleWithEquipSlot(itemName, slot);
+                _equipSlots[slot]!.Modulate = isCompat ? new Color(1.3f, 1.3f, 0.7f) : new Color(0.5f, 0.5f, 0.5f);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 清除装备槽位高亮反馈，复位原生纯白色
+    /// </summary>
+    public void ClearEquipSlotHighlights()
+    {
+        for (int slot = 0; slot < 9; slot++)
+        {
+            if (_equipSlots[slot] != null)
+            {
+                _equipSlots[slot]!.Modulate = Colors.White;
+            }
+        }
+    }
+
+    /// <summary>
     /// 背包穿戴装备到装备槽位
     /// </summary>
     public void WearBagItemToEquipSlot(int bagSlot, int equipSlot)
@@ -3186,6 +3266,21 @@ public partial class HudController : CanvasLayer
         if (!IsItemCompatibleWithEquipSlot(bagItem.Value.Name, equipSlot))
         {
             AddChat("系统", "[系统] 该物品无法装备到此位置。", new Color(1f, 0.3f, 0.3f));
+            return;
+        }
+
+        // 盛大官方 1.5 腕力与穿戴负重物理检定 (IDA sub_4C50E9 / sub_4C5114)
+        int itemWeight = WeightConstraintEngine.ExtractItemWeight(bagItem.Value.Name, bagItem.Value.Desc);
+        int curWearWeight = GetCurrentWearWeight();
+        if (equipSlot != 1 && _equipItemDetails[equipSlot] != null)
+        {
+            var oldItem = _equipItemDetails[equipSlot]!.Value;
+            curWearWeight = Math.Max(0, curWearWeight - WeightConstraintEngine.ExtractItemWeight(oldItem.Name, oldItem.Desc));
+        }
+
+        if (!WeightConstraintEngine.CheckCanEquip(_playerLevel, _playerJob, equipSlot, itemWeight, curWearWeight, out string weightReason))
+        {
+            AddChat("系统", $"[负重拦截] {weightReason}", new Color(1f, 0.3f, 0.3f));
             return;
         }
 

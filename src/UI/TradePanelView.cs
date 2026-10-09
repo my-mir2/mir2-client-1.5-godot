@@ -372,8 +372,20 @@ public partial class TradePanelView : Control, IManagedWindow
         }
     }
 
+    private void BreakLocksOnDataChange()
+    {
+        if (_isMyLocked || _isRemoteLocked)
+        {
+            _isMyLocked = false;
+            _isRemoteLocked = false;
+            UpdateLockVisual();
+            GD.Print("[TradePanelView] 交易物品或金币变动，官方防掉包机制触发：已强制重置双向锁定！");
+        }
+    }
+
     public void SetMyGold(int gold)
     {
+        BreakLocksOnDataChange();
         _myGold = Math.Max(0, gold);
         if (_lblMyGold != null)
         {
@@ -383,6 +395,7 @@ public partial class TradePanelView : Control, IManagedWindow
 
     public void SetRemoteGold(int gold)
     {
+        BreakLocksOnDataChange();
         _remoteGold = Math.Max(0, gold);
         if (_lblRemoteGold != null)
         {
@@ -393,6 +406,7 @@ public partial class TradePanelView : Control, IManagedWindow
     public void SetMyItem(int slot, string? itemName, Texture2D? icon = null)
     {
         if (slot < 0 || slot >= 10) return;
+        BreakLocksOnDataChange();
         _myItems[slot] = itemName;
         if (_mySlots[slot] != null)
         {
@@ -414,6 +428,7 @@ public partial class TradePanelView : Control, IManagedWindow
     public void SetRemoteItem(int slot, string? itemName, Texture2D? icon = null)
     {
         if (slot < 0 || slot >= 10) return;
+        BreakLocksOnDataChange();
         _remoteItems[slot] = itemName;
         if (_remoteSlots[slot] != null)
         {

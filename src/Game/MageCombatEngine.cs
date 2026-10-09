@@ -219,4 +219,88 @@ public static class MageCombatEngine
             return isUndead ? rawMagicDmg * 2 : rawMagicDmg;
         }
     }
+
+    // ==================== 4. 魔法盾机制与破盾 (MagicShield, MagicId = 31) ====================
+    public static class MagicShield
+    {
+        public const int BreakSoundId = 138; // 破盾金属碎裂音效
+
+        /// <summary>
+        /// 判定魔法盾减免伤害与破盾
+        /// </summary>
+        public static (int absorbedDmg, int remainingHpDmg, bool shieldBroken) ProcessShieldDamage(
+            int incomingDamage, int currentShieldHp, int shieldLevel)
+        {
+            if (incomingDamage <= 0 || currentShieldHp <= 0)
+            {
+                return (0, incomingDamage, false);
+            }
+
+            double absorbRatio = shieldLevel switch
+            {
+                1 => 0.50,
+                2 => 0.60,
+                3 => 0.70,
+                _ => 0.40
+            };
+
+            int maxAbsorb = (int)Math.Round(incomingDamage * absorbRatio);
+            int actualAbsorb = Math.Min(currentShieldHp, maxAbsorb);
+            int remainingShield = currentShieldHp - actualAbsorb;
+            bool broken = remainingShield <= 0;
+            int remainingDamage = incomingDamage - actualAbsorb;
+
+            return (actualAbsorb, remainingDamage, broken);
+        }
+    }
+
+    // ==================== 5. 火墙多层重叠与踏入伤害 (Firewall, MagicId = 21) ====================
+    public static class Firewall
+    {
+        public const int MaxLayersPerTile = 3;
+
+        /// <summary>
+        /// 计算地块火墙燃烧伤害 (支持最多 3 层重叠，每层增伤 50%)
+        /// </summary>
+        public static int CalculateTileDamage(int baseDamage, int layerCount)
+        {
+            layerCount = Math.Clamp(layerCount, 1, MaxLayersPerTile);
+            double multiplier = 1.0 + (layerCount - 1) * 0.50;
+            return (int)Math.Round(baseDamage * multiplier);
+        }
+    }
+
+    // ==================== 6. 瞬息移动传送机制 (Teleport, MagicId = 11) ====================
+    public static class Teleport
+    {
+        /// <summary>
+        /// 在地图范围内随机搜寻合法落点 (遭遇阻挡向外螺旋搜索合法瓦片)
+        /// </summary>
+        public static (int targetX, int targetY, bool success) ResolveRandomLandingTile(
+            int mapWidth, int mapHeight, Func<int, int, bool> isTileBlocked, Random rng)
+        {
+            for (int attempt = 0; attempt < 30; attempt++)
+            {
+                int rx = rng.Next(20, Math.Max(21, mapWidth - 20));
+                int ry = rng.Next(20, Math.Max(21, mapHeight - 20));
+                if (!isTileBlocked(rx, ry))
+                {
+                    return (rx, ry, true);
+                }
+            }
+            return (330, 270, false); // 回退至默认主城中心
+        }
+    }
+
+    // ==================== 7. 冰咆哮 (Blizzard, MagicId = 33) ====================
+    public static class Blizzard
+    {
+        /// <summary>
+        /// 盛大官方 1.5 铁律：冰咆哮 3x3 范围绝对命中，100% 无视目标魔法躲避
+        /// </summary>
+        public static int CalculateDamage(int rawMagicDamage, int targetMcDef)
+        {
+            return Math.Max(1, rawMagicDamage - targetMcDef);
+        }
+    }
 }

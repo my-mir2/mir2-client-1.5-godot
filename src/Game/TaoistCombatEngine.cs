@@ -171,6 +171,26 @@ public static class TaoistCombatEngine
         };
     }
 
+    public const int ReqTalismanDuraFireBall = 100;
+    public const int ReqTalismanDuraSkeleton = 100;
+    public const int ReqTalismanDuraShinsu = 500;
+
+    /// <summary>
+    /// 校验并扣除道士护符持久 (纯数值重载)
+    /// </summary>
+    public static (bool success, string desc, bool destroyed) TryConsumeTalisman(
+        int talismanDura, int reqDura)
+    {
+        if (talismanDura < reqDura)
+        {
+            int sheets = talismanDura / 100;
+            return (false, $"未佩戴护身符或张数不足 (仅剩 {sheets} 张，需 {reqDura / 100} 张)！", false);
+        }
+        int remaining = talismanDura - reqDura;
+        bool destroyed = remaining <= 0;
+        return (true, $"消耗 {reqDura / 100} 张护身符 (剩余 {remaining / 100} 张)", destroyed);
+    }
+
     /// <summary>
     /// 校验并扣除道士护符持久 (StdMode=25, Shape=5)
     /// </summary>
@@ -196,5 +216,50 @@ public static class TaoistCombatEngine
         talisman.Dura -= reqDura;
         bool destroyed = talisman.Dura <= 0;
         return (true, $"消耗 {reqDura / 100} 张护身符 (剩余 {talisman.Dura / 100} 张)", destroyed);
+    }
+
+    /// <summary>
+    /// 校验并扣除施毒术药粉持久 (灰色毒粉/黄色毒粉)
+    /// </summary>
+    public static (bool success, string desc, bool destroyed) TryConsumePoisonBag(
+        int poisonDura, PoisonType type)
+    {
+        if (poisonDura < PoisonDuraCost)
+        {
+            string pName = type == PoisonType.Green ? "灰色毒粉" : "黄色毒粉";
+            return (false, $"背包缺少【{pName}】或药粉已耗尽，无法施展施毒术！", false);
+        }
+        int remaining = poisonDura - PoisonDuraCost;
+        bool destroyed = remaining <= 0;
+        return (true, $"消耗 1 份施毒药粉 (剩余持久: {remaining})", destroyed);
+    }
+
+    // ==================== 4. 群体治愈术 (MassHeal, MagicId = 18) ====================
+    public static class MassHeal
+    {
+        public const int Radius = 1; // 3x3 范围 (Chebyshev 半径 1)
+
+        /// <summary>
+        /// 计算群体治愈术单次治疗量 (基于道术 SC 与技能等级)
+        /// </summary>
+        public static int CalculateHealAmount(int sc, int skillLevel)
+        {
+            return 15 + skillLevel * 10 + (int)Math.Round(sc * 0.8);
+        }
+    }
+
+    // ==================== 5. 神圣战甲术与幽灵盾 (HolyArmor & GhostShield) ====================
+    public static class AuraBuffs
+    {
+        public const int BonusAc = 3;   // 神圣战甲术物理防御加成 AC +3
+        public const int BonusMac = 3;  // 幽灵盾魔法防御加成 MAC +3
+
+        /// <summary>
+        /// 计算光环持续时间 (秒): 30 秒基准 + 道术 * 2 秒
+        /// </summary>
+        public static int CalculateBuffDurationSec(int sc, int skillLevel)
+        {
+            return 30 + skillLevel * 15 + sc * 2;
+        }
     }
 }

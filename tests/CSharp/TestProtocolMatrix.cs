@@ -3337,6 +3337,182 @@ public class TestProtocolMatrix
         int curCount = Mir2Client.UI.HudController.ExtractItemCountOrDura(countDesc);
         Assert.Equal(6, curCount);
     }
+
+    [Fact]
+    public void TestOfficialWeightConstraintsAndTaoistTalismanLandmarksFlow()
+    {
+        // 1. 盛大官方 1.5 腕力检定 (武器 Slot 1) 与穿戴负重检定 (防具首饰)
+        // 35 级战士 (Job 0): MaxHandWeight = 12 + round(35/13*35) = 12 + 94 = 106
+        int wMaxHand = Mir2Client.Game.WeightConstraintEngine.CalcMaxHandWeight(35, 0);
+        Assert.True(wMaxHand >= 100);
+
+        // 35 级法师 (Job 1): MaxHandWeight = 12 + round(35/90*35) = 12 + 14 = 26
+        int mMaxHand = Mir2Client.Game.WeightConstraintEngine.CalcMaxHandWeight(35, 1);
+        Assert.True(mMaxHand <= 30);
+
+        // 裁决之杖重量 80，法师 35 级佩戴被腕力拦截
+        bool canMageWearCaiJue = Mir2Client.Game.WeightConstraintEngine.CheckCanEquip(
+            level: 35, job: 1, equipSlot: 1, itemWeight: 80, currentTotalWearWeight: 10, out string reasonMage);
+        Assert.False(canMageWearCaiJue);
+        Assert.Contains("腕力不足", reasonMage);
+
+        // 战士 35 级佩戴裁决之杖顺利通过
+        bool canWarriorWearCaiJue = Mir2Client.Game.WeightConstraintEngine.CheckCanEquip(
+            level: 35, job: 0, equipSlot: 1, itemWeight: 80, currentTotalWearWeight: 10, out string reasonWarrior);
+        Assert.True(canWarriorWearCaiJue);
+        Assert.Empty(reasonWarrior);
+
+        // 提取物品重量
+        int tuLongWeight = Mir2Client.Game.WeightConstraintEngine.ExtractItemWeight("屠龙", "持久 33/33");
+        Assert.Equal(99, tuLongWeight);
+        int parsedDescWeight = Mir2Client.Game.WeightConstraintEngine.ExtractItemWeight("普通手镯", "重量 15 持久 8/8");
+        Assert.Equal(15, parsedDescWeight);
+
+        // 2. 道士施毒药粉与灵魂火符护身符消耗检定
+        // (1) 药粉持久足额扣减
+        var pResOk = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(150, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        Assert.True(pResOk.success);
+        Assert.False(pResOk.destroyed);
+
+        // (2) 药粉持久耗尽拦截
+        var pResFail = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(50, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        Assert.False(pResFail.success);
+        Assert.Contains("缺少", pResFail.desc);
+
+        // (3) 灵魂火符护身符足额扣减
+        var tResOk = Mir2Client.Game.TaoistCombatEngine.TryConsumeTalisman(500, Mir2Client.Game.TaoistCombatEngine.ReqTalismanDuraFireBall);
+        Assert.True(tResOk.success);
+        Assert.Contains("消耗 1 张护身符", tResOk.desc);
+
+        // (4) 灵魂火符护身符张数不足拦截
+        var tResFail = Mir2Client.Game.TaoistCombatEngine.TryConsumeTalisman(0, Mir2Client.Game.TaoistCombatEngine.ReqTalismanDuraFireBall);
+        Assert.False(tResFail.success);
+        Assert.Contains("未佩戴护身符", tResFail.desc);
+
+        // 3. 大地图核心地标门点定位引擎验证
+        var bqLandmarks = Mir2Client.Game.MapLandmarkEngine.GetLandmarks("0");
+        Assert.Contains(bqLandmarks, lm => lm.Name == "比奇皇宫" && lm.X == 632 && lm.Y == 633);
+        Assert.Contains(bqLandmarks, lm => lm.Name == "毒蛇山谷关卡" && lm.X == 400 && lm.Y == 10);
+
+        var mzLandmarks = Mir2Client.Game.MapLandmarkEngine.GetLandmarks("盟重省");
+        Assert.Contains(mzLandmarks, lm => lm.Name == "盟重土城" && lm.X == 330 && lm.Y == 330);
+        Assert.Contains(mzLandmarks, lm => lm.Name == "沙巴克皇宫" && lm.X == 640 && lm.Y == 120);
+        Assert.Contains(mzLandmarks, lm => lm.Name == "死亡山谷(蜈蚣洞)" && lm.X == 140 && lm.Y == 90);
+    }
+
+    [Fact]
+    public void TestOfficialBatch3AndBatch4CombatAndWorldRulesFlow()
+    {
+        // 1. 半月弯刀 (HalfMoon): 扇面 4 格与副目标伤害衰减
+        var tiles = Mir2Client.Game.WarriorCombatEngine.HalfMoon.GetAffectedTiles(100, 100, dir: 0); // 朝上
+        Assert.Equal(4, tiles.Length);
+        Assert.True(tiles[0].isMain); // 正前方主目标
+        Assert.False(tiles[1].isMain);
+        int mainDmg = Mir2Client.Game.WarriorCombatEngine.HalfMoon.CalculateDamage(60, isMainTarget: true, skillLevel: 3);
+        int subDmg = Mir2Client.Game.WarriorCombatEngine.HalfMoon.CalculateDamage(60, isMainTarget: false, skillLevel: 3);
+        Assert.Equal(60, mainDmg);
+        Assert.Equal(30, subDmg); // 3 级半月副目标 50% 伤害衰减
+
+        // 2. 魔法盾碎裂与火墙重叠
+        var (absorbed, remHp, broken) = Mir2Client.Game.MageCombatEngine.MagicShield.ProcessShieldDamage(incomingDamage: 100, currentShieldHp: 30, shieldLevel: 3);
+        Assert.Equal(30, absorbed);
+        Assert.Equal(70, remHp);
+        Assert.True(broken); // 盾破裂
+        int fire1 = Mir2Client.Game.MageCombatEngine.Firewall.CalculateTileDamage(40, 1);
+        int fire3 = Mir2Client.Game.MageCombatEngine.Firewall.CalculateTileDamage(40, 3);
+        Assert.Equal(40, fire1);
+        Assert.Equal(80, fire3); // 3 层重叠 200% 伤害
+
+        // 3. 冰咆哮与瞬移
+        int blizzDmg = Mir2Client.Game.MageCombatEngine.Blizzard.CalculateDamage(80, 20);
+        Assert.Equal(60, blizzDmg);
+        var rng = new Random(42);
+        var teleRes = Mir2Client.Game.MageCombatEngine.Teleport.ResolveRandomLandingTile(400, 400, (x, y) => false, rng);
+        Assert.True(teleRes.success);
+
+        // 4. 道士群体治愈术与双抗光环
+        int massHealVal = Mir2Client.Game.TaoistCombatEngine.MassHeal.CalculateHealAmount(sc: 30, skillLevel: 3);
+        Assert.True(massHealVal >= 60);
+        int buffDuration = Mir2Client.Game.TaoistCombatEngine.AuraBuffs.CalculateBuffDurationSec(sc: 25, skillLevel: 3);
+        Assert.Equal(30 + 45 + 50, buffDuration);
+
+        // 5. 七大特戒机制
+        // (1) 麻痹戒指
+        Assert.Equal(5, Mir2Client.Game.SpecialRingEngine.ParalysisRing.ParalyzeDurationSec);
+        // (2) 复活戒指致死重生
+        var revOk = Mir2Client.Game.SpecialRingEngine.RevivalRing.ProcessFatalDamage(currentDura: 5, maxHp: 300, maxMp: 150);
+        Assert.True(revOk.revived);
+        Assert.Equal(300, revOk.newHp);
+        Assert.Equal(4, revOk.remainingDura);
+        var revBroken = Mir2Client.Game.SpecialRingEngine.RevivalRing.ProcessFatalDamage(currentDura: 0, maxHp: 300, maxMp: 150);
+        Assert.False(revBroken.revived);
+        // (3) 护身戒指蓝抵扣血
+        var (hDmg1, cMp1, rMp1) = Mir2Client.Game.SpecialRingEngine.ProtectionRing.AbsorbDamage(incomingDamage: 50, currentMp: 100);
+        Assert.Equal(0, hDmg1); // 扣 0 点血
+        Assert.Equal(50, cMp1); // 扣 50 点蓝
+        Assert.Equal(50, rMp1);
+        var (hDmg2, cMp2, rMp2) = Mir2Client.Game.SpecialRingEngine.ProtectionRing.AbsorbDamage(incomingDamage: 80, currentMp: 30);
+        Assert.Equal(50, hDmg2); // 剩余 50 点伤害穿透扣血
+        Assert.Equal(30, cMp2);
+        Assert.Equal(0, rMp2);
+        // (4) 隐身戒指破隐
+        bool isInv1 = Mir2Client.Game.SpecialRingEngine.InvisibilityRing.IsInvisible(isWearing: true, lastAttackTick: 1000, nowTick: 4000);
+        bool isInv2 = Mir2Client.Game.SpecialRingEngine.InvisibilityRing.IsInvisible(isWearing: true, lastAttackTick: 3000, nowTick: 4000);
+        Assert.True(isInv1);
+        Assert.False(isInv2); // 刚出刀 1 秒内破隐
+        // (5) 传送戒指命令解析
+        var tpOk = Mir2Client.Game.SpecialRingEngine.TeleportRing.ParseCommand("@move 330 270", 400, 400, (x, y) => false);
+        Assert.True(tpOk.valid);
+        Assert.Equal(330, tpOk.targetX);
+        Assert.Equal(270, tpOk.targetY);
+
+        // 6. 套装机制
+        // (1) 虹魔套吸血 10%
+        int vampHp = Mir2Client.Game.SuitEffectEngine.RainbowMagicSuit.CalcVampiricHeal(120, isWearingSuit: true);
+        Assert.Equal(12, vampHp);
+        // (2) 魔血套蓝转血
+        var (bonusHp, penaltyMp) = Mir2Client.Game.SuitEffectEngine.DemonBloodSuit.CalculateStatModifiers(3);
+        Assert.Equal(75, bonusHp);
+        Assert.Equal(60, penaltyMp);
+        // (3) 祈祷套全服天谴
+        var (cataclysm, msg, neckBroken) = Mir2Client.Game.SuitEffectEngine.PrayerSuit.EvaluatePrayerCataclysm(isFullSetWearing: true);
+        Assert.True(cataclysm);
+        Assert.True(neckBroken);
+        Assert.Contains("叛变", msg);
+
+        // 7. 武器升级与开刀
+        int oreDura1 = Mir2Client.Game.WeaponUpgradeEngine.CalculateDuraChange(25, rng);
+        Assert.Equal(-3, oreDura1); // 纯度不足掉 3 点持久
+        int oreDura2 = Mir2Client.Game.WeaponUpgradeEngine.CalculateDuraChange(70, rng);
+        Assert.Equal(1, oreDura2);  // 纯度高涨 1 点持久
+        var (outcome, newBonus, duraD, _) = Mir2Client.Game.WeaponUpgradeEngine.EvaluateSlash(currentBonus: 6, totalOrePurity: 65, jewelryStatPoints: 10, rng);
+        Assert.True(outcome == Mir2Client.Game.WeaponUpgradeEngine.UpgradeOutcome.Success || outcome == Mir2Client.Game.WeaponUpgradeEngine.UpgradeOutcome.Failed);
+
+        // 8. PK 名字颜色状态机与大刀卫士秒杀
+        var colWhite = Mir2Client.Game.PkJusticeEngine.DetermineNameColor(pkPoints: 0, isGrayAttacking: false);
+        var colYellow = Mir2Client.Game.PkJusticeEngine.DetermineNameColor(pkPoints: 0, isGrayAttacking: true);
+        var colRed = Mir2Client.Game.PkJusticeEngine.DetermineNameColor(pkPoints: 150, isGrayAttacking: false);
+        Assert.Equal(Mir2Client.Game.PkJusticeEngine.NameColorType.White, colWhite);
+        Assert.Equal(Mir2Client.Game.PkJusticeEngine.NameColorType.Yellow, colYellow);
+        Assert.Equal(Mir2Client.Game.PkJusticeEngine.NameColorType.Red, colRed);
+        var guardStrike = Mir2Client.Game.PkJusticeEngine.CheckGuardHostility(guardX: 100, guardY: 100, targetX: 103, targetY: 104, colRed);
+        Assert.True(guardStrike.attack);
+        Assert.Equal(9999, guardStrike.damage); // 大刀卫士绝对秒杀
+
+        // 9. 昼夜交替时钟与火把/蜡烛照明
+        var todNoon = Mir2Client.Game.DayNightLightingEngine.GetTimeOfDay(12);
+        var todNight = Mir2Client.Game.DayNightLightingEngine.GetTimeOfDay(23);
+        Assert.Equal(Mir2Client.Game.DayNightLightingEngine.TimeOfDay.Day, todNoon);
+        Assert.Equal(Mir2Client.Game.DayNightLightingEngine.TimeOfDay.Night, todNight);
+        int dayRadius = Mir2Client.Game.DayNightLightingEngine.CalculateLightRadius(isDungeonMap: false, todNoon, "");
+        Assert.Equal(15, dayRadius); // 白天通亮大视野 15 格
+        int torchRadius = Mir2Client.Game.DayNightLightingEngine.CalculateLightRadius(isDungeonMap: true, todNight, "火把");
+        Assert.Equal(7, torchRadius); // 地牢装备火把 7 格视野
+        int candleRadius = Mir2Client.Game.DayNightLightingEngine.CalculateLightRadius(isDungeonMap: true, todNight, "蜡烛");
+        Assert.Equal(4, candleRadius); // 地牢装备蜡烛 4 格视野
+        int bareHandRadius = Mir2Client.Game.DayNightLightingEngine.CalculateLightRadius(isDungeonMap: true, todNight, "");
+        Assert.Equal(2, bareHandRadius); // 地牢空手 2 格视野
+    }
 }
 
 

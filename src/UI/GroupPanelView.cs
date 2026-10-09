@@ -232,15 +232,15 @@ public partial class GroupPanelView : Control, IManagedWindow
 
         var colorGray = new Color(0.753f, 0.753f, 0.753f); // 0xC0C0C0
 
-        // 队长名字绘制
+        // 队长名字绘制 (盛大官方高亮金黄色醒目标记)
         var lblLeader = new Label
         {
             Name = "LblLeader",
             Position = new Vector2(28, 80),
-            Text = leader
+            Text = $"{leader} [队长]"
         };
         lblLeader.AddThemeFontSizeOverride("font_size", 12);
-        lblLeader.AddThemeColorOverride("font_color", colorGray);
+        lblLeader.AddThemeColorOverride("font_color", new Color(1.0f, 0.85f, 0.2f)); // 金黄色队长
         _membersContainer.AddChild(lblLeader);
 
         if (members == null) return;

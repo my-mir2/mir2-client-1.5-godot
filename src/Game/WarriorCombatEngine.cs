@@ -265,4 +265,54 @@ public static class WarriorCombatEngine
             };
         }
     }
+
+    // ==================== 4. 半月弯刀 (HalfMoon / WideHit, MagicId = 25) ====================
+    public static class HalfMoon
+    {
+        public const int MpCost = 7;
+
+        /// <summary>
+        /// 获取半月弯刀以攻击者为中心、朝向 dir 的扇面 4 个攻击目标瓦片坐标:
+        /// 1. 正前方 (主目标, dir)
+        /// 2. 正前方顺时针侧格 ((dir + 1) % 8)
+        /// 3. 正前方逆时针侧格 ((dir + 7) % 8)
+        /// 4. 侧面顺侧格 ((dir + 2) % 8)
+        /// </summary>
+        public static (int x, int y, bool isMain)[] GetAffectedTiles(int px, int py, int dir)
+        {
+            var tiles = new (int x, int y, bool isMain)[4];
+            int d0 = dir & 7;
+            int dR1 = (dir + 1) & 7;
+            int dL1 = (dir + 7) & 7;
+            int dR2 = (dir + 2) & 7;
+
+            var off0 = PlayerAuditEngine.DirOffsets[d0];
+            var offR1 = PlayerAuditEngine.DirOffsets[dR1];
+            var offL1 = PlayerAuditEngine.DirOffsets[dL1];
+            var offR2 = PlayerAuditEngine.DirOffsets[dR2];
+
+            tiles[0] = (px + off0.X, py + off0.Y, true);      // 正前方主目标
+            tiles[1] = (px + offR1.X, py + offR1.Y, false);   // 侧翼副目标 1
+            tiles[2] = (px + offL1.X, py + offL1.Y, false);   // 侧翼副目标 2
+            tiles[3] = (px + offR2.X, py + offR2.Y, false);   // 侧翼副目标 3
+            return tiles;
+        }
+
+        /// <summary>
+        /// 计算半月弯刀物理攻击伤害:
+        /// 主目标承受 100% 伤害，副目标根据技能等级 (0~3 级) 衰减至 35%~50% 伤害
+        /// </summary>
+        public static int CalculateDamage(int rawDamage, bool isMainTarget, int skillLevel)
+        {
+            if (isMainTarget) return rawDamage;
+            double ratio = skillLevel switch
+            {
+                1 => 0.40,
+                2 => 0.45,
+                3 => 0.50,
+                _ => 0.35
+            };
+            return Math.Max(1, (int)Math.Round(rawDamage * ratio));
+        }
+    }
 }

@@ -141,17 +141,51 @@ public partial class StoragePanelView : Control, IManagedWindow
         _panel.AddChild(btnDepositGold);
     }
 
+    public const int MaxStorageGold = 50_000_000; // 盛大官方 5000 万金币安全上限
+
+    private int _currentPage = 0;
+    private int _currentStorageGold = 0;
+    public int CurrentPage => _currentPage;
+    public int CurrentStorageGold => _currentStorageGold;
+
     public void UpdateStorageGold(int gold)
     {
+        _currentStorageGold = Math.Clamp(gold, 0, MaxStorageGold);
         if (_lblGold != null)
         {
-            _lblGold.Text = gold.ToString("N0");
+            _lblGold.Text = _currentStorageGold.ToString("N0");
         }
+    }
+
+    public bool CheckDepositGoldValid(int depositAmount, out string reason)
+    {
+        if (depositAmount <= 0)
+        {
+            reason = "存入金币金额必须大于 0！";
+            return false;
+        }
+        if ((long)_currentStorageGold + depositAmount > MaxStorageGold)
+        {
+            reason = $"仓库金币已达上限 ({MaxStorageGold:N0})，无法继续存放！";
+            return false;
+        }
+        reason = string.Empty;
+        return true;
+    }
+
+    public void SetPage(int page)
+    {
+        _currentPage = Math.Clamp(page, 0, 1);
+        // 刷新当前页 40 格物品显示偏移
+        GD.Print($"[StoragePanelView] 切换仓库页码至: 第 {_currentPage + 1} 页 (格 {_currentPage * 40}..{_currentPage * 40 + 39})");
     }
 
     private void OnDepositGoldClicked()
     {
-        EmitSignal(SignalName.DepositGoldRequested, 10000);
+        if (CheckDepositGoldValid(10000, out string _))
+        {
+            EmitSignal(SignalName.DepositGoldRequested, 10000);
+        }
     }
 
     public void Open()

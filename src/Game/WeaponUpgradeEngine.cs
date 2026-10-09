@@ -254,4 +254,44 @@ public static class WeaponUpgradeEngine
         weapon.UpgradeState = 0;
         return new TrialResult(TrialSlashOutcome.None, StatUpgradeType.Dc, 0, "试刀完毕，刀身平静。");
     }
+
+    public enum UpgradeOutcome
+    {
+        Success,
+        Failed,
+        Capped
+    }
+
+    public static int CalculateDuraChange(int totalOrePurity, Random rng)
+    {
+        if (totalOrePurity < 30) return -3;
+        if (totalOrePurity < 60) return rng.Next(-1, 1);
+        return 1;
+    }
+
+    public static (UpgradeOutcome outcome, int newStatBonus, int duraDelta, string message) EvaluateSlash(
+        int currentBonus,
+        int totalOrePurity,
+        int jewelryStatPoints,
+        Random rng)
+    {
+        if (currentBonus >= 7)
+        {
+            return (UpgradeOutcome.Capped, currentBonus, 0, "该武器已达到 7 点极品升级上限，无法继续强化！");
+        }
+
+        int duraDelta = CalculateDuraChange(totalOrePurity, rng);
+        int successRate = Math.Clamp(50 + jewelryStatPoints * 3, 20, 85);
+        int roll = rng.Next(100);
+
+        if (roll < successRate)
+        {
+            int nextBonus = currentBonus + 1;
+            return (UpgradeOutcome.Success, nextBonus, duraDelta, $"【开刀成功】神兵光芒大盛！武器属性 +1！(当前强化: +{nextBonus})");
+        }
+        else
+        {
+            return (UpgradeOutcome.Failed, 0, duraDelta, "【开刀失败】刀身发出一声悲鸣，武器化为碎片碎裂消失！");
+        }
+    }
 }

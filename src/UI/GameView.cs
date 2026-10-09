@@ -1133,6 +1133,15 @@ namespace Mir2Client.UI
                     break;
 
                 case 6: // 施毒术 (Poisoning, MagicId = 6)
+                    // 盛大官方 1.5 检定：必须持有灰色/黄色毒粉且持久充足
+                    var pBagDura = HudInstance?.GetTalismanOrPoisonDura(TaoistCombatEngine.PoisonDuraCost) ?? 1000;
+                    var poisonCheck = TaoistCombatEngine.TryConsumePoisonBag(pBagDura, TaoistCombatEngine.PoisonType.Green);
+                    if (!poisonCheck.success)
+                    {
+                        HudInstance?.AddChat("提示", poisonCheck.desc, new Color(1f, 0.4f, 0.4f));
+                        return;
+                    }
+
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     MagicManagerInstance?.PlayMagic(magicId, playerTile, targetTile);
                     if (_net != null && _net.IsConnectedToServer)
@@ -1293,6 +1302,29 @@ namespace Mir2Client.UI
                     else if (_isSandbox)
                     {
                         CheckSandboxMeleeHit(dir, 35, isStabSkill: true);
+                    }
+                    break;
+
+                case 13: // 灵魂火符 (Soul Fire Ball)
+                    // 盛大官方 1.5 检定：必须佩戴护身符且剩余张数 >= 1 (持久 >= 100)
+                    var talismanDura = HudInstance?.GetTalismanOrPoisonDura(TaoistCombatEngine.ReqTalismanDuraFireBall) ?? 1000;
+                    var consumeRes = TaoistCombatEngine.TryConsumeTalisman(talismanDura, TaoistCombatEngine.ReqTalismanDuraFireBall);
+                    if (!consumeRes.success)
+                    {
+                        HudInstance?.AddChat("提示", consumeRes.desc, new Color(1f, 0.4f, 0.4f));
+                        return;
+                    }
+                    PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+                    MagicManagerInstance?.PlayMagic(13, playerTile, targetTile);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Spell(13, (short)targetTile.X, (short)targetTile.Y));
+                    }
+                    else if (_isSandbox)
+                    {
+                        CheckSandboxSpellHit(13, targetTile);
+                        HudInstance?.AddChat("法术", $"【灵魂火符】呼啸飞出！{consumeRes.desc}", new Color(1f, 0.8f, 0.2f));
+                        AudioManager.Instance?.PlaySoundId(15);
                     }
                     break;
 
