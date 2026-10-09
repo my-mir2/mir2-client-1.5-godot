@@ -268,6 +268,20 @@ namespace Mir2Client.Render
             _actionDuration = duration;
             _isActionLocked = (action == ActionType.Hit || action == ActionType.Struck || action == ActionType.Die);
 
+            // 盛大官方 1.5 怪物 80 种生态帧率与音效统一调度
+            var monDef = OfficialMonsterCompendium.GetByName(EntityName) ?? OfficialMonsterCompendium.GetByAppr(Appr);
+            if (monDef != null)
+            {
+                if (action == ActionType.Hit && monDef.SoundAttack > 0)
+                {
+                    AudioManager.Instance?.PlaySound(monDef.SoundAttack);
+                }
+                else if (action == ActionType.Die && monDef.SoundDie > 0)
+                {
+                    AudioManager.Instance?.PlaySound(monDef.SoundDie);
+                }
+            }
+
             UpdateFrameGraphic();
         }
 
