@@ -274,11 +274,11 @@ namespace Mir2Client.Render
             {
                 if (action == ActionType.Hit && monDef.SoundAttack > 0)
                 {
-                    AudioManager.Instance?.PlaySound(monDef.SoundAttack);
+                    AudioManager.Instance?.PlaySoundId(monDef.SoundAttack);
                 }
                 else if (action == ActionType.Die && monDef.SoundDie > 0)
                 {
-                    AudioManager.Instance?.PlaySound(monDef.SoundDie);
+                    AudioManager.Instance?.PlaySoundId(monDef.SoundDie);
                 }
             }
 

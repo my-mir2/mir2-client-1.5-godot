@@ -125,7 +125,7 @@ public sealed class ServerMessageRouter
     public void OnPacket(ServerPacket packet)
     {
         short smCode = packet.Ident;
-        ProtocolDispatcher.Dispatch(smCode, packet.Recog, packet.Param, packet.Tag, packet.Series, packet.Data);
+        ProtocolDispatcher.Dispatch(smCode, packet.Recog, packet.Param, packet.Tag, 0, packet.Extra);
 
         switch (smCode)
         {
