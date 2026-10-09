@@ -19,12 +19,14 @@ public sealed class PacketDispatcher
     private readonly List<ClientSession> _ninePatchBuffer = new(64);
     public MonsterRegenEngine? RegenEngine { get; set; }
     public NpcMerchantEngine? NpcEngine { get; set; }
+    public TradeEngine? TradeEngine { get; set; }
 
-    public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null)
+    public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null, TradeEngine? tradeEngine = null)
     {
         _mapManager = mapManager;
         RegenEngine = regenEngine;
         NpcEngine = npcEngine;
+        TradeEngine = tradeEngine;
     }
 
     public PacketDispatcher(NinePatchAoi<ClientSession> mapAoi)
@@ -120,6 +122,30 @@ public sealed class PacketDispatcher
 
             case ProtocolConsts.CM_REPAIRSPECIAL: // 48 铁匠铺特修
                 HandleSpecialRepair(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_DEALTRY: // 1025 发起面对面交易邀请
+                HandleDealTry(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_DEALADDITEM: // 1026 放入交易物品
+                HandleDealAddItem(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_DEALDELITEM: // 1027 撤下交易物品
+                HandleDealDelItem(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_DEALCHGGOLD: // 1029 修改交易金币
+                HandleDealChgGold(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_DEALEND: // 1030 确认锁定/执行交易
+                HandleDealEnd(session);
+                break;
+
+            case 1028: // 取消交易
+                HandleDealCancel(session);
                 break;
 
             default:
@@ -832,5 +858,90 @@ public sealed class PacketDispatcher
                 session.EnqueuePacket(ProtocolConsts.SM_REPAIRFAIL_DELPHI, 0, 0, 0, 0, errorMsg);
             }
         }
+    }
+
+    private void HandleDealTry(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: targetSessionId (CM_DEALTRY 1025)
+        if (TradeEngine == null) return;
+        if (int.TryParse(payload, out int targetSessionId))
+        {
+            var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+            ClientSession? target = null;
+            lock (_ninePatchBuffer)
+            {
+                map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                {
+                    if (_ninePatchBuffer[i].SessionId == targetSessionId)
+                    {
+                        target = _ninePatchBuffer[i];
+                        break;
+                    }
+                }
+            }
+
+            if (target != null)
+            {
+                var (success, errorMsg) = TradeEngine.TryInitiateTrade(session, target);
+                if (!success)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_DEALTRY_FAIL, 0, 0, 0, 0, errorMsg);
+                }
+            }
+            else
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_DEALTRY_FAIL, 0, 0, 0, 0, "目标未在视野内");
+            }
+        }
+    }
+
+    private void HandleDealAddItem(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: itemUid (CM_DEALADDITEM 1026)
+        if (TradeEngine == null) return;
+        if (int.TryParse(payload, out int itemUid))
+        {
+            var (success, errorMsg) = TradeEngine.AddItem(session, itemUid);
+            if (!success)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_DEALADDITEM_FAIL, itemUid, 0, 0, 0, errorMsg);
+            }
+        }
+    }
+
+    private void HandleDealDelItem(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: itemUid (CM_DEALDELITEM 1027)
+        if (TradeEngine == null) return;
+        if (int.TryParse(payload, out int itemUid))
+        {
+            TradeEngine.DelItem(session, itemUid);
+        }
+    }
+
+    private void HandleDealChgGold(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: gold (CM_DEALCHGGOLD 1029)
+        if (TradeEngine == null) return;
+        if (int.TryParse(payload, out int gold))
+        {
+            var (success, errorMsg) = TradeEngine.ChangeGold(session, gold);
+            if (!success)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_DEALCHGGOLD_FAIL, 0, 0, 0, 0, errorMsg);
+            }
+        }
+    }
+
+    private void HandleDealEnd(ClientSession session)
+    {
+        // CM_DEALEND (1030)
+        TradeEngine?.ConfirmDeal(session);
+    }
+
+    private void HandleDealCancel(ClientSession session)
+    {
+        TradeEngine?.CancelTrade(session);
     }
 }
