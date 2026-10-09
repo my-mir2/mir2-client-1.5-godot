@@ -7,6 +7,7 @@ using Mir2.Server.Core;
 using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
+using Mir2.Server.Game;
 using Mir2.Shared.Protocols;
 
 namespace Mir2.Server;
@@ -16,6 +17,7 @@ public static class Program
     private static TcpGateway? _gateway;
     private static GameWorldTick? _worldTick;
     private static NinePatchAoi<ClientSession>? _mainMapAoi;
+    private static PacketDispatcher? _dispatcher;
 
     public static async Task Main(string[] args)
     {
@@ -29,6 +31,7 @@ public static class Program
 
         // 1. 初始化比奇省主地图九宫格 AOI (比奇省 400x400 格子)
         _mainMapAoi = new NinePatchAoi<ClientSession>(400, 400);
+        _dispatcher = new PacketDispatcher(_mainMapAoi);
         Console.WriteLine("[Mir2.Server] 比奇省地图 AOI 空间索引初始化完成 (尺寸: 400x400, 划分 25x25=625 个 Zone).");
 
         // 2. 初始化现代异步网络网关 (默认端口 7000)
@@ -82,9 +85,7 @@ public static class Program
 
     private static void OnPacketReceived(ClientSession session, string packet)
     {
-        // 官方 1.5 封包解析处理
-        // 示例: #2/user/pass! (CM_LOGIN)
-        // 简单展示消息回显与处理
+        _dispatcher?.Dispatch(session, packet);
     }
 
     private static void OnWorldTick(long tick, double deltaMs)

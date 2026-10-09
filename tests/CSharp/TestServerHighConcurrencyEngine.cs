@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Mir2.Server.Core;
 using Mir2.Server.Maps;
 using Mir2.Server.Network;
+using System.Text;
 using Xunit;
 
 namespace Mir2Client.Tests;
@@ -105,5 +106,147 @@ public class TestServerHighConcurrencyEngine
         tickEngine.Stop();
 
         Assert.True(tickCount >= 2, $"100ms 调度器在 350ms 内应至少触发 2 次，实际: {tickCount}");
+    }
+
+    [Fact]
+    public async Task TestE2E_FullLoginAndCharacterEnterLifecycle()
+    {
+        int testPort = 17002;
+        var aoi = new NinePatchAoi<ClientSession>(400, 400);
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(aoi);
+        var gateway = new TcpGateway(testPort);
+        gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.Start();
+
+        var tickEngine = new GameWorldTick(gateway);
+        tickEngine.Start();
+
+        try
+        {
+            using var client = new System.Net.Sockets.TcpClient();
+            await client.ConnectAsync("127.0.0.1", testPort);
+            var stream = client.GetStream();
+
+            byte[] readBuf = new byte[2048];
+
+            // 1. 客户端发送 CM_QUERYVERSION (2001)
+            byte[] qv = Encoding.ASCII.GetBytes("#2001/0/0/0/0/!");
+            await stream.WriteAsync(qv);
+            await stream.FlushAsync();
+
+            // 等待一个 100ms Tick 合包冲刷回传
+            await Task.Delay(150);
+            int readLen1 = await stream.ReadAsync(readBuf);
+            string resp1 = Encoding.ASCII.GetString(readBuf, 0, readLen1);
+            Assert.Contains("#500/", resp1); // SM_PASSOK (500)
+
+            // 2. 客户端发送 CM_LOGIN (2) 账号密码登录
+            byte[] loginPkt = Encoding.ASCII.GetBytes("#2/hero123/pass888/!");
+            await stream.WriteAsync(loginPkt);
+            await stream.FlushAsync();
+
+            await Task.Delay(150);
+            int readLen2 = await stream.ReadAsync(readBuf);
+            string resp2 = Encoding.ASCII.GetString(readBuf, 0, readLen2);
+            Assert.Contains("#530/", resp2); // SM_LOGINSUCCESS (530)
+
+            // 3. 客户端发送 CM_QUERYCHRINFO (119) 查询角色
+            byte[] queryPkt = Encoding.ASCII.GetBytes("#119/!");
+            await stream.WriteAsync(queryPkt);
+            await stream.FlushAsync();
+
+            await Task.Delay(150);
+            int readLen3 = await stream.ReadAsync(readBuf);
+            string resp3 = Encoding.ASCII.GetString(readBuf, 0, readLen3);
+            Assert.Contains($"#{ProtocolConsts.SM_QUERYCHAR_OK}/", resp3); // SM_QUERYCHAR_OK (523 官方实证)
+
+            // 4. 客户端发送 CM_SELECTCHAR (103) 选择角色进入游戏
+            byte[] selCharPkt = Encoding.ASCII.GetBytes("#103/hero123_战神!");
+            await stream.WriteAsync(selCharPkt);
+            await stream.FlushAsync();
+
+            await Task.Delay(150);
+            int readLen4 = await stream.ReadAsync(readBuf);
+            string resp4 = Encoding.ASCII.GetString(readBuf, 0, readLen4);
+            // 验证服务端回传的进入地图与角色初始化包 (合包在单个 TCP 响应中送达)
+            Assert.Contains($"#{ProtocolConsts.SM_LOGON_DELPHI}/", resp4);   // SM_LOGON_DELPHI (50)
+            Assert.Contains($"#{ProtocolConsts.SM_NEWMAP_DELPHI}/", resp4);  // SM_NEWMAP_DELPHI (521)
+            Assert.Contains($"#{ProtocolConsts.SM_MYSTATUS}/", resp4);   // SM_MYSTATUS (708 官方实证)
+        }
+        finally
+        {
+            tickEngine.Stop();
+            gateway.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task TestE2E_NinePatchBroadcasting_BetweenMultipleClients()
+    {
+        int testPort = 17003;
+        var aoi = new NinePatchAoi<ClientSession>(400, 400);
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(aoi);
+        var gateway = new TcpGateway(testPort);
+        gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.Start();
+
+        var tickEngine = new GameWorldTick(gateway);
+        tickEngine.Start();
+
+        try
+        {
+            // 客户端 A (在比奇省中心 160, 160)
+            using var clientA = new System.Net.Sockets.TcpClient();
+            await clientA.ConnectAsync("127.0.0.1", testPort);
+            var streamA = clientA.GetStream();
+            await streamA.WriteAsync(Encoding.ASCII.GetBytes("#103/玩家A/160/160!")); // 选角进入并定位在 160, 160
+            await streamA.FlushAsync();
+
+            // 客户端 B (同屏邻近 162, 160)
+            using var clientB = new System.Net.Sockets.TcpClient();
+            await clientB.ConnectAsync("127.0.0.1", testPort);
+            var streamB = clientB.GetStream();
+            await streamB.WriteAsync(Encoding.ASCII.GetBytes("#103/玩家B/162/160!"));
+            await streamB.FlushAsync();
+
+            // 客户端 C (远端银杏山谷 330, 270)
+            using var clientC = new System.Net.Sockets.TcpClient();
+            await clientC.ConnectAsync("127.0.0.1", testPort);
+            var streamC = clientC.GetStream();
+            await streamC.WriteAsync(Encoding.ASCII.GetBytes("#103/远端玩家C/330/270!"));
+            await streamC.FlushAsync();
+
+            // 等待入场包消化
+            await Task.Delay(200);
+
+            // 清空各自的接收缓冲
+            byte[] flushBuf = new byte[4096];
+            while (streamA.DataAvailable) await streamA.ReadAsync(flushBuf);
+            while (streamB.DataAvailable) await streamB.ReadAsync(flushBuf);
+            while (streamC.DataAvailable) await streamC.ReadAsync(flushBuf);
+
+            // 客户端 A 发起行走动作 CM_WALK: 移动到 161, 160, 朝向 2 (右)
+            byte[] walkPkt = Encoding.ASCII.GetBytes("#3011/161/160/2!");
+            await streamA.WriteAsync(walkPkt);
+            await streamA.FlushAsync();
+
+            // 等待 100ms 心跳末尾合包冲刷下发广播
+            await Task.Delay(150);
+
+            // 1. 同屏客户端 B 必须收到客户端 A 的移动广播 SM_OBJECTWALK (241)
+            Assert.True(streamB.DataAvailable, "同屏邻近客户端 B 必须收到九宫格广播");
+            byte[] readB = new byte[2048];
+            int lenB = await streamB.ReadAsync(readB);
+            string respB = Encoding.ASCII.GetString(readB, 0, lenB);
+            Assert.Contains($"#{ProtocolConsts.SM_OBJECTWALK}/", respB);
+
+            // 2. 远端客户端 C 必须未收到任何广播 (九宫格严格隔离，0 冗余下行带宽)
+            Assert.False(streamC.DataAvailable, "远端客户端 C 坚决不能收到其他 Zone 的移动广播");
+        }
+        finally
+        {
+            tickEngine.Stop();
+            gateway.Stop();
+        }
     }
 }
