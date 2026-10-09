@@ -38,3 +38,4 @@ tests/CSharp/bin/
 tests/CSharp/obj/
 *.user
 *.suo
+/doc
