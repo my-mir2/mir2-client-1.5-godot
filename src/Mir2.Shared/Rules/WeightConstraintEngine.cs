@@ -1,6 +1,6 @@
 using System;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大热血传奇 1.5 官方三大物理独立负重体系 (纯 C# 实现)
@@ -47,9 +47,14 @@ public static class WeightConstraintEngine
         return (int)(50.0 + Math.Round((level / divisor) * level));
     }
 
+    public static int CalcGoldWeight(int gold)
+    {
+        return gold > 0 ? gold / GoldWeightUnit : 0;
+    }
+
     public static int CalcTotalBagWeight(int itemsTotalWeight, int gold)
     {
-        int goldWeight = gold / GoldWeightUnit;
+        int goldWeight = CalcGoldWeight(gold);
         return itemsTotalWeight + goldWeight;
     }
 

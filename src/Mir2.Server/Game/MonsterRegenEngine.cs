@@ -190,6 +190,20 @@ public sealed class MonsterRegenEngine
         return null;
     }
 
+    public List<MonsterInstance> GetMonstersInArea(int mapId, int minX, int minY, int maxX, int maxY)
+    {
+        var list = new List<MonsterInstance>();
+        foreach (var kvp in _monsters)
+        {
+            var m = kvp.Value;
+            if (!m.IsDead && m.MapId == mapId && m.X >= minX && m.X <= maxX && m.Y >= minY && m.Y <= maxY)
+            {
+                list.Add(m);
+            }
+        }
+        return list;
+    }
+
     public readonly record struct MonsterAiActionResult(
         int MonsterUid,
         string MonsterName,

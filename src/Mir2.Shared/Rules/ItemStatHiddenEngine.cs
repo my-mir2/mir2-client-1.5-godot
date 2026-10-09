@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 装备极品属性、特戒隐藏机制、药水与数值对抗公式引擎 (细节 111 ~ 130)

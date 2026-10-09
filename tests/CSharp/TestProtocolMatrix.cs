@@ -1375,7 +1375,7 @@ public class TestProtocolMatrix
     [Fact]
     public void TestWarrior_FireHit_CooldownAndDoubleFireWindow()
     {
-        var tracker = new Mir2Client.Game.WarriorCombatEngine.FireHitTracker();
+        var tracker = new Mir2.Shared.Rules.WarriorCombatEngine.FireHitTracker();
 
         // 1. T=1000: 首次凝聚烈火剑法
         var cast1 = tracker.Cast(1000);
@@ -1412,27 +1412,27 @@ public class TestProtocolMatrix
     public void TestWarrior_Stabbing_PiercingShieldAndDefense()
     {
         // 1. 距离判定: 朝向 0 (正北, Y - 1)
-        var distMelee = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CheckHitDistance(100, 100, 100, 99, 0);
-        Assert.Equal(Mir2Client.Game.WarriorCombatEngine.StabbingTracker.HitDistanceType.MeleeClose, distMelee);
+        var distMelee = Mir2.Shared.Rules.WarriorCombatEngine.StabbingTracker.CheckHitDistance(100, 100, 100, 99, 0);
+        Assert.Equal(Mir2.Shared.Rules.WarriorCombatEngine.StabbingTracker.HitDistanceType.MeleeClose, distMelee);
 
-        var distStab = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CheckHitDistance(100, 100, 100, 98, 0);
-        Assert.Equal(Mir2Client.Game.WarriorCombatEngine.StabbingTracker.HitDistanceType.StabbingFar, distStab);
+        var distStab = Mir2.Shared.Rules.WarriorCombatEngine.StabbingTracker.CheckHitDistance(100, 100, 100, 98, 0);
+        Assert.Equal(Mir2.Shared.Rules.WarriorCombatEngine.StabbingTracker.HitDistanceType.StabbingFar, distStab);
 
         // 2. 贴身第 1 格: 受到目标防御 15 和魔法盾 60% 减伤
         // raw=50 -> 50 - 15 = 35 -> 35 * (1 - 0.6) = 14
-        var meleeDmg = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CalculateDamage(
+        var meleeDmg = Mir2.Shared.Rules.WarriorCombatEngine.StabbingTracker.CalculateDamage(
             50, distMelee, autoStab: true, targetAc: 15, targetShieldReduction: 0.6);
         Assert.False(meleeDmg.isArmorPiercing);
         Assert.Equal(14, meleeDmg.finalDamage);
 
         // 3. 隔位第 2 格开启刺杀: 完全无视防御与魔法盾，造成满额 50 穿透伤害
-        var stabDmg = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CalculateDamage(
+        var stabDmg = Mir2.Shared.Rules.WarriorCombatEngine.StabbingTracker.CalculateDamage(
             50, distStab, autoStab: true, targetAc: 15, targetShieldReduction: 0.6);
         Assert.True(stabDmg.isArmorPiercing);
         Assert.Equal(50, stabDmg.finalDamage);
 
         // 4. 隔位第 2 格若关闭刺杀: 退化为常规防御和护盾减免
-        var noStabDmg = Mir2Client.Game.WarriorCombatEngine.StabbingTracker.CalculateDamage(
+        var noStabDmg = Mir2.Shared.Rules.WarriorCombatEngine.StabbingTracker.CalculateDamage(
             50, distStab, autoStab: false, targetAc: 15, targetShieldReduction: 0.6);
         Assert.False(noStabDmg.isArmorPiercing);
         Assert.Equal(14, noStabDmg.finalDamage);
@@ -1442,7 +1442,7 @@ public class TestProtocolMatrix
     public void TestWarrior_ShoulderDash_LevelAndObstacleCollision()
     {
         // 1. 等级压制撞开: 等级 35 冲撞等级 30，朝向 2 (正东, X + 1)
-        var pushRes = Mir2Client.Game.WarriorCombatEngine.ShoulderDash.ExecuteDash(
+        var pushRes = Mir2.Shared.Rules.WarriorCombatEngine.ShoulderDash.ExecuteDash(
             selfLevel: 35,
             selfX: 100,
             selfY: 100,
@@ -1457,7 +1457,7 @@ public class TestProtocolMatrix
         Assert.False(pushRes.SelfStunned);
 
         // 2. 等级不足反弹顿挫: 等级 35 冲撞等级 38，撞击失败自身顿挫
-        var failRes = Mir2Client.Game.WarriorCombatEngine.ShoulderDash.ExecuteDash(
+        var failRes = Mir2.Shared.Rules.WarriorCombatEngine.ShoulderDash.ExecuteDash(
             selfLevel: 35,
             selfX: 100,
             selfY: 100,
@@ -1471,7 +1471,7 @@ public class TestProtocolMatrix
         Assert.Contains("反弹硬直", failRes.Message);
 
         // 3. 撞墙反弹: 第 1 格为墙壁阻挡
-        var wallRes = Mir2Client.Game.WarriorCombatEngine.ShoulderDash.ExecuteDash(
+        var wallRes = Mir2.Shared.Rules.WarriorCombatEngine.ShoulderDash.ExecuteDash(
             selfLevel: 35,
             selfX: 100,
             selfY: 100,
@@ -1484,7 +1484,7 @@ public class TestProtocolMatrix
         Assert.Contains("撞击墙体", wallRes.Message);
 
         // 4. 目标身后受墙壁阻挡: 目标就位第 1 格受撞硬直，自身保持原地
-        var blockedBehindRes = Mir2Client.Game.WarriorCombatEngine.ShoulderDash.ExecuteDash(
+        var blockedBehindRes = Mir2.Shared.Rules.WarriorCombatEngine.ShoulderDash.ExecuteDash(
             selfLevel: 35,
             selfX: 100,
             selfY: 100,
@@ -1502,7 +1502,7 @@ public class TestProtocolMatrix
     [Fact]
     public void TestWarrior_DoubleFireHit_ConsecutiveBursts()
     {
-        var tracker = new Mir2Client.Game.WarriorCombatEngine.FireHitTracker();
+        var tracker = new Mir2.Shared.Rules.WarriorCombatEngine.FireHitTracker();
 
         // 0.0s: 开启烈火蓄力
         tracker.Cast(0);
@@ -1602,18 +1602,18 @@ public class TestProtocolMatrix
         // 1. 目标 0 抗毒时必中 (RandInt(7) 范围 0~6，恒 <= 6)
         for (int i = 0; i < 50; i++)
         {
-            Assert.True(Mir2Client.Game.TaoistCombatEngine.CheckPoisonHit(targetAntiPoison: 0));
+            Assert.True(Mir2.Shared.Rules.TaoistCombatEngine.CheckPoisonHit(targetAntiPoison: 0));
         }
 
         // 2. 持续时长计算: SC=20 时，绿毒 30 + 40 = 70s, 红毒 40 + 40 = 80s
-        int greenSec = Mir2Client.Game.TaoistCombatEngine.CalculatePoisonDurationSec(Mir2Client.Game.TaoistCombatEngine.PoisonType.Green, 20);
-        int redSec = Mir2Client.Game.TaoistCombatEngine.CalculatePoisonDurationSec(Mir2Client.Game.TaoistCombatEngine.PoisonType.Red, 20);
+        int greenSec = Mir2.Shared.Rules.TaoistCombatEngine.CalculatePoisonDurationSec(Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Green, 20);
+        int redSec = Mir2.Shared.Rules.TaoistCombatEngine.CalculatePoisonDurationSec(Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Red, 20);
         Assert.Equal(70, greenSec);
         Assert.Equal(80, redSec);
 
         // 3. 红毒 1.2 倍增伤 (tbyte_4BE3CC)
         int normalDmg = 50;
-        int vulDmg = Mir2Client.Game.TaoistCombatEngine.ApplyRedPoisonVulnerability(normalDmg, hasRedPoison: true);
+        int vulDmg = Mir2.Shared.Rules.TaoistCombatEngine.ApplyRedPoisonVulnerability(normalDmg, hasRedPoison: true);
         Assert.Equal(60, vulDmg); // 50 * 1.2 = 60
 
         // 4. 双毒独立槽位与 EntityManager 周期掉血
@@ -1631,12 +1631,12 @@ public class TestProtocolMatrix
 
         // 施加绿毒 (SC=15, 每跳扣 Math.Max(1, 15/3)+1 = 6 点)
         long t0 = 10000;
-        em.ApplyPoison(3001, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green, 30, sc: 15, t0);
+        em.ApplyPoison(3001, Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Green, 30, sc: 15, t0);
         var target = em.GetEntity(3001)!;
         Assert.Equal(1, target.PoisonMask); // Bit 0 置位
 
         // 施加红毒 (并发施加，形成双毒)
-        em.ApplyPoison(3001, Mir2Client.Game.TaoistCombatEngine.PoisonType.Red, 40, sc: 15, t0);
+        em.ApplyPoison(3001, Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Red, 40, sc: 15, t0);
         Assert.Equal(3, target.PoisonMask); // Bit 0 与 Bit 1 同时置位
 
         // T0 + 2500ms: 驱动绿毒第一跳掉血
@@ -1658,42 +1658,42 @@ public class TestProtocolMatrix
     {
         // 1. 施毒药包耐久单次扣 100
         var greenBag = new EquipItem { Name = "黄色毒粉(中)", Shape = 1, Dura = 250 };
-        var res1 = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        var res1 = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Green);
         Assert.True(res1.success);
         Assert.Equal(150, greenBag.Dura);
         Assert.False(res1.destroyed);
 
         // 药包类型不匹配
-        var misRes = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2Client.Game.TaoistCombatEngine.PoisonType.Red);
+        var misRes = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Red);
         Assert.False(misRes.success);
         Assert.Contains("类型不匹配", misRes.desc);
 
         // 扣除至销毁
-        var res2 = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        var res2 = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Green);
         Assert.True(res2.success);
         Assert.Equal(50, greenBag.Dura);
-        var res3 = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        var res3 = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Green);
         Assert.False(res3.success); // 剩余 50 < 100 无法施法
 
         // 2. 护身符消耗: 召唤骷髅扣 100 (1张)，召唤神兽扣 500 (5张)
         var talisman = new EquipItem { Name = "灵魂护身符(大)", Shape = 5, Dura = 600 };
-        var skelCost = Mir2Client.Game.TaoistCombatEngine.TryConsumeTalisman(talisman, Mir2Client.Game.TaoistCombatEngine.TalismanCostSkeleton);
+        var skelCost = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumeTalisman(talisman, Mir2.Shared.Rules.TaoistCombatEngine.TalismanCostSkeleton);
         Assert.True(skelCost.success);
         Assert.Equal(500, talisman.Dura);
 
-        var shinsuCost = Mir2Client.Game.TaoistCombatEngine.TryConsumeTalisman(talisman, Mir2Client.Game.TaoistCombatEngine.TalismanCostShinsu);
+        var shinsuCost = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumeTalisman(talisman, Mir2.Shared.Rules.TaoistCombatEngine.TalismanCostShinsu);
         Assert.True(shinsuCost.success);
         Assert.Equal(0, talisman.Dura);
         Assert.True(shinsuCost.destroyed);
 
         // 3. 随从 0~7 级属性规格
-        var skel0 = Mir2Client.Game.TaoistCombatEngine.GetSkeletonStats(0);
-        var skel7 = Mir2Client.Game.TaoistCombatEngine.GetSkeletonStats(7);
+        var skel0 = Mir2.Shared.Rules.TaoistCombatEngine.GetSkeletonStats(0);
+        var skel7 = Mir2.Shared.Rules.TaoistCombatEngine.GetSkeletonStats(7);
         Assert.Equal(100, skel0.MaxHp);
         Assert.Equal(296, skel7.MaxHp);
 
-        var dog0 = Mir2Client.Game.TaoistCombatEngine.GetShinsuStats(0);
-        var dog7 = Mir2Client.Game.TaoistCombatEngine.GetShinsuStats(7);
+        var dog0 = Mir2.Shared.Rules.TaoistCombatEngine.GetShinsuStats(0);
+        var dog7 = Mir2.Shared.Rules.TaoistCombatEngine.GetShinsuStats(7);
         Assert.Equal(200, dog0.MaxHp);
         Assert.Equal(795, dog7.MaxHp);
         Assert.Equal(14, dog7.Appr); // 7 级终极直立神兽外观
@@ -3301,7 +3301,7 @@ public class TestProtocolMatrix
             (104, 25, 100, 101, false)  // 正南贴身: 等级25 < 法师35 -> 落点有阻挡 -> 发生顿挫
         };
 
-        var pushResults = Mir2Client.Game.MageCombatEngine.RingOfFire.Execute(
+        var pushResults = Mir2.Shared.Rules.MageCombatEngine.RingOfFire.Execute(
             casterLevel: 35,
             casterX: 100,
             casterY: 100,
@@ -3335,21 +3335,21 @@ public class TestProtocolMatrix
 
         // 2. 诱惑之光 (Temptation) 驯服与定身状态机测试
         // (1) 不死系目标不可诱惑
-        var resUndead = Mir2Client.Game.MageCombatEngine.Temptation.Evaluate(35, 3, 20, 0, isUndeadOrBoss: true);
-        Assert.Equal(Mir2Client.Game.MageCombatEngine.Temptation.TameOutcome.Failed, resUndead.Outcome);
+        var resUndead = Mir2.Shared.Rules.MageCombatEngine.Temptation.Evaluate(35, 3, 20, 0, isUndeadOrBoss: true);
+        Assert.Equal(Mir2.Shared.Rules.MageCombatEngine.Temptation.TameOutcome.Failed, resUndead.Outcome);
 
         // (2) 成功驯服
-        var resTamed = Mir2Client.Game.MageCombatEngine.Temptation.Evaluate(35, 3, 20, 2, isUndeadOrBoss: false, roll: 30);
-        Assert.Equal(Mir2Client.Game.MageCombatEngine.Temptation.TameOutcome.Tamed, resTamed.Outcome);
+        var resTamed = Mir2.Shared.Rules.MageCombatEngine.Temptation.Evaluate(35, 3, 20, 2, isUndeadOrBoss: false, roll: 30);
+        Assert.Equal(Mir2.Shared.Rules.MageCombatEngine.Temptation.TameOutcome.Tamed, resTamed.Outcome);
 
         // (3) 达到 5 只随从上限仅能定身无法继续驯服
-        var resParalyzed = Mir2Client.Game.MageCombatEngine.Temptation.Evaluate(35, 3, 20, 5, isUndeadOrBoss: false, roll: 30);
-        Assert.Equal(Mir2Client.Game.MageCombatEngine.Temptation.TameOutcome.Paralyzed, resParalyzed.Outcome);
+        var resParalyzed = Mir2.Shared.Rules.MageCombatEngine.Temptation.Evaluate(35, 3, 20, 5, isUndeadOrBoss: false, roll: 30);
+        Assert.Equal(Mir2.Shared.Rules.MageCombatEngine.Temptation.TameOutcome.Paralyzed, resParalyzed.Outcome);
         Assert.True(resParalyzed.ParalyzeDurationSec > 0);
 
         // 3. 地狱雷光 (HellFire) 圣属性对不死系 200% 克制
-        int normalDmg = Mir2Client.Game.MageCombatEngine.HellFire.CalculateDamage(60, isUndead: false);
-        int undeadDmg = Mir2Client.Game.MageCombatEngine.HellFire.CalculateDamage(60, isUndead: true);
+        int normalDmg = Mir2.Shared.Rules.MageCombatEngine.HellFire.CalculateDamage(60, isUndead: false);
+        int undeadDmg = Mir2.Shared.Rules.MageCombatEngine.HellFire.CalculateDamage(60, isUndead: true);
         Assert.Equal(60, normalDmg);
         Assert.Equal(120, undeadDmg);
 
@@ -3371,49 +3371,49 @@ public class TestProtocolMatrix
     {
         // 1. 盛大官方 1.5 腕力检定 (武器 Slot 1) 与穿戴负重检定 (防具首饰)
         // 35 级战士 (Job 0): MaxHandWeight = 12 + round(35/13*35) = 12 + 94 = 106
-        int wMaxHand = Mir2Client.Game.WeightConstraintEngine.CalcMaxHandWeight(35, 0);
+        int wMaxHand = Mir2.Shared.Rules.WeightConstraintEngine.CalcMaxHandWeight(35, 0);
         Assert.True(wMaxHand >= 100);
 
         // 35 级法师 (Job 1): MaxHandWeight = 12 + round(35/90*35) = 12 + 14 = 26
-        int mMaxHand = Mir2Client.Game.WeightConstraintEngine.CalcMaxHandWeight(35, 1);
+        int mMaxHand = Mir2.Shared.Rules.WeightConstraintEngine.CalcMaxHandWeight(35, 1);
         Assert.True(mMaxHand <= 30);
 
         // 裁决之杖重量 80，法师 35 级佩戴被腕力拦截
-        bool canMageWearCaiJue = Mir2Client.Game.WeightConstraintEngine.CheckCanEquip(
+        bool canMageWearCaiJue = Mir2.Shared.Rules.WeightConstraintEngine.CheckCanEquip(
             level: 35, job: 1, equipSlot: 1, itemWeight: 80, currentTotalWearWeight: 10, out string reasonMage);
         Assert.False(canMageWearCaiJue);
         Assert.Contains("腕力不足", reasonMage);
 
         // 战士 35 级佩戴裁决之杖顺利通过
-        bool canWarriorWearCaiJue = Mir2Client.Game.WeightConstraintEngine.CheckCanEquip(
+        bool canWarriorWearCaiJue = Mir2.Shared.Rules.WeightConstraintEngine.CheckCanEquip(
             level: 35, job: 0, equipSlot: 1, itemWeight: 80, currentTotalWearWeight: 10, out string reasonWarrior);
         Assert.True(canWarriorWearCaiJue);
         Assert.Empty(reasonWarrior);
 
         // 提取物品重量
-        int tuLongWeight = Mir2Client.Game.WeightConstraintEngine.ExtractItemWeight("屠龙", "持久 33/33");
+        int tuLongWeight = Mir2.Shared.Rules.WeightConstraintEngine.ExtractItemWeight("屠龙", "持久 33/33");
         Assert.Equal(99, tuLongWeight);
-        int parsedDescWeight = Mir2Client.Game.WeightConstraintEngine.ExtractItemWeight("普通手镯", "重量 15 持久 8/8");
+        int parsedDescWeight = Mir2.Shared.Rules.WeightConstraintEngine.ExtractItemWeight("普通手镯", "重量 15 持久 8/8");
         Assert.Equal(15, parsedDescWeight);
 
         // 2. 道士施毒药粉与灵魂火符护身符消耗检定
         // (1) 药粉持久足额扣减
-        var pResOk = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(150, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        var pResOk = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumePoisonBag(150, Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Green);
         Assert.True(pResOk.success);
         Assert.False(pResOk.destroyed);
 
         // (2) 药粉持久耗尽拦截
-        var pResFail = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(50, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
+        var pResFail = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumePoisonBag(50, Mir2.Shared.Rules.TaoistCombatEngine.PoisonType.Green);
         Assert.False(pResFail.success);
         Assert.Contains("缺少", pResFail.desc);
 
         // (3) 灵魂火符护身符足额扣减
-        var tResOk = Mir2Client.Game.TaoistCombatEngine.TryConsumeTalisman(500, Mir2Client.Game.TaoistCombatEngine.ReqTalismanDuraFireBall);
+        var tResOk = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumeTalisman(500, Mir2.Shared.Rules.TaoistCombatEngine.ReqTalismanDuraFireBall);
         Assert.True(tResOk.success);
         Assert.Contains("消耗 1 张护身符", tResOk.desc);
 
         // (4) 灵魂火符护身符张数不足拦截
-        var tResFail = Mir2Client.Game.TaoistCombatEngine.TryConsumeTalisman(0, Mir2Client.Game.TaoistCombatEngine.ReqTalismanDuraFireBall);
+        var tResFail = Mir2.Shared.Rules.TaoistCombatEngine.TryConsumeTalisman(0, Mir2.Shared.Rules.TaoistCombatEngine.ReqTalismanDuraFireBall);
         Assert.False(tResFail.success);
         Assert.Contains("未佩戴护身符", tResFail.desc);
 
@@ -3432,36 +3432,36 @@ public class TestProtocolMatrix
     public void TestOfficialBatch3AndBatch4CombatAndWorldRulesFlow()
     {
         // 1. 半月弯刀 (HalfMoon): 扇面 4 格与副目标伤害衰减
-        var tiles = Mir2Client.Game.WarriorCombatEngine.HalfMoon.GetAffectedTiles(100, 100, dir: 0); // 朝上
+        var tiles = Mir2.Shared.Rules.WarriorCombatEngine.HalfMoon.GetAffectedTiles(100, 100, dir: 0); // 朝上
         Assert.Equal(4, tiles.Length);
         Assert.True(tiles[0].isMain); // 正前方主目标
         Assert.False(tiles[1].isMain);
-        int mainDmg = Mir2Client.Game.WarriorCombatEngine.HalfMoon.CalculateDamage(60, isMainTarget: true, skillLevel: 3);
-        int subDmg = Mir2Client.Game.WarriorCombatEngine.HalfMoon.CalculateDamage(60, isMainTarget: false, skillLevel: 3);
+        int mainDmg = Mir2.Shared.Rules.WarriorCombatEngine.HalfMoon.CalculateDamage(60, isMainTarget: true, skillLevel: 3);
+        int subDmg = Mir2.Shared.Rules.WarriorCombatEngine.HalfMoon.CalculateDamage(60, isMainTarget: false, skillLevel: 3);
         Assert.Equal(60, mainDmg);
         Assert.Equal(30, subDmg); // 3 级半月副目标 50% 伤害衰减
 
         // 2. 魔法盾碎裂与火墙重叠
-        var (absorbed, remHp, broken) = Mir2Client.Game.MageCombatEngine.MagicShield.ProcessShieldDamage(incomingDamage: 100, currentShieldHp: 30, shieldLevel: 3);
+        var (absorbed, remHp, broken) = Mir2.Shared.Rules.MageCombatEngine.MagicShield.ProcessShieldDamage(incomingDamage: 100, currentShieldHp: 30, shieldLevel: 3);
         Assert.Equal(30, absorbed);
         Assert.Equal(70, remHp);
         Assert.True(broken); // 盾破裂
-        int fire1 = Mir2Client.Game.MageCombatEngine.Firewall.CalculateTileDamage(40, 1);
-        int fire3 = Mir2Client.Game.MageCombatEngine.Firewall.CalculateTileDamage(40, 3);
+        int fire1 = Mir2.Shared.Rules.MageCombatEngine.Firewall.CalculateTileDamage(40, 1);
+        int fire3 = Mir2.Shared.Rules.MageCombatEngine.Firewall.CalculateTileDamage(40, 3);
         Assert.Equal(40, fire1);
         Assert.Equal(80, fire3); // 3 层重叠 200% 伤害
 
         // 3. 冰咆哮与瞬移
-        int blizzDmg = Mir2Client.Game.MageCombatEngine.Blizzard.CalculateDamage(80, 20);
+        int blizzDmg = Mir2.Shared.Rules.MageCombatEngine.Blizzard.CalculateDamage(80, 20);
         Assert.Equal(60, blizzDmg);
         var rng = new Random(42);
-        var teleRes = Mir2Client.Game.MageCombatEngine.Teleport.ResolveRandomLandingTile(400, 400, (x, y) => false, rng);
+        var teleRes = Mir2.Shared.Rules.MageCombatEngine.Teleport.ResolveRandomLandingTile(400, 400, (x, y) => false, rng);
         Assert.True(teleRes.success);
 
         // 4. 道士群体治愈术与双抗光环
-        int massHealVal = Mir2Client.Game.TaoistCombatEngine.MassHeal.CalculateHealAmount(sc: 30, skillLevel: 3);
+        int massHealVal = Mir2.Shared.Rules.TaoistCombatEngine.MassHeal.CalculateHealAmount(sc: 30, skillLevel: 3);
         Assert.True(massHealVal >= 60);
-        int buffDuration = Mir2Client.Game.TaoistCombatEngine.AuraBuffs.CalculateBuffDurationSec(sc: 25, skillLevel: 3);
+        int buffDuration = Mir2.Shared.Rules.TaoistCombatEngine.AuraBuffs.CalculateBuffDurationSec(sc: 25, skillLevel: 3);
         Assert.Equal(30 + 45 + 50, buffDuration);
 
         // 5. 七大特戒机制
@@ -3869,102 +3869,102 @@ public class TestProtocolMatrix
         var rng = new Random(42);
 
         // 细节 111: 装备掉落生成极品属性绿色属性文字
-        var sStat = Mir2Client.Game.ItemStatHiddenEngine.ItemSuperStatEngine.FormatExtraStat(3, "攻击力");
+        var sStat = Mir2.Shared.Rules.ItemStatHiddenEngine.ItemSuperStatEngine.FormatExtraStat(3, "攻击力");
         Assert.True(sStat.hasExtra);
         Assert.Equal("#00FF00", sStat.formattedColor);
         Assert.Equal("攻击力 +3", sStat.statText);
 
         // 细节 112: 幸运 +9 刀刀攻击上限，诅咒 +10 恒定攻击下限
-        int dcMax = Mir2Client.Game.ItemStatHiddenEngine.WeaponLuckCurseEngine.CalculateAttackPower(10, 30, totalLuck: 9, totalCurse: 0, rng);
+        int dcMax = Mir2.Shared.Rules.ItemStatHiddenEngine.WeaponLuckCurseEngine.CalculateAttackPower(10, 30, totalLuck: 9, totalCurse: 0, rng);
         Assert.Equal(30, dcMax);
-        int dcMin = Mir2Client.Game.ItemStatHiddenEngine.WeaponLuckCurseEngine.CalculateAttackPower(10, 30, totalLuck: 0, totalCurse: 10, rng);
+        int dcMin = Mir2.Shared.Rules.ItemStatHiddenEngine.WeaponLuckCurseEngine.CalculateAttackPower(10, 30, totalLuck: 0, totalCurse: 10, rng);
         Assert.Equal(10, dcMin);
 
         // 细节 113: 祝福油使用状态机
-        var bSucc = Mir2Client.Game.ItemStatHiddenEngine.BlessingOilEngine.ApplyBlessingOil(currentLuck: 2, currentCurse: 0, roll100: 10);
-        Assert.Equal(Mir2Client.Game.ItemStatHiddenEngine.BlessingOilEngine.BlessingResult.Success, bSucc.result);
+        var bSucc = Mir2.Shared.Rules.ItemStatHiddenEngine.BlessingOilEngine.ApplyBlessingOil(currentLuck: 2, currentCurse: 0, roll100: 10);
+        Assert.Equal(Mir2.Shared.Rules.ItemStatHiddenEngine.BlessingOilEngine.BlessingResult.Success, bSucc.result);
         Assert.Equal(3, bSucc.newLuck);
-        var bCurse = Mir2Client.Game.ItemStatHiddenEngine.BlessingOilEngine.ApplyBlessingOil(currentLuck: 2, currentCurse: 0, roll100: 95);
-        Assert.Equal(Mir2Client.Game.ItemStatHiddenEngine.BlessingOilEngine.BlessingResult.Cursed, bCurse.result);
+        var bCurse = Mir2.Shared.Rules.ItemStatHiddenEngine.BlessingOilEngine.ApplyBlessingOil(currentLuck: 2, currentCurse: 0, roll100: 95);
+        Assert.Equal(Mir2.Shared.Rules.ItemStatHiddenEngine.BlessingOilEngine.BlessingResult.Cursed, bCurse.result);
         Assert.Equal(1, bCurse.newCurse);
 
         // 细节 114: 准确与敏捷对抗公式
-        float hitRate = Mir2Client.Game.ItemStatHiddenEngine.AccuracyAgilityEngine.CalculateHitRate(attackerAccuracy: 15, defenderAgility: 10);
+        float hitRate = Mir2.Shared.Rules.ItemStatHiddenEngine.AccuracyAgilityEngine.CalculateHitRate(attackerAccuracy: 15, defenderAgility: 10);
         Assert.True(hitRate > 0.5f);
 
         // 细节 115: 白色虎齿项链魔法躲避
-        bool mEvaded = Mir2Client.Game.ItemStatHiddenEngine.MagicEvadeEngine.CheckMagicEvade(necklaceEvadePercent: 50, roll100: 30);
+        bool mEvaded = Mir2.Shared.Rules.ItemStatHiddenEngine.MagicEvadeEngine.CheckMagicEvade(necklaceEvadePercent: 50, roll100: 30);
         Assert.True(mEvaded);
 
         // 细节 116: 辟毒手镯中毒躲避与减伤恢复
-        var pRes = Mir2Client.Game.ItemStatHiddenEngine.PoisonResistanceEngine.CalculateResistance(30, 20, 15);
+        var pRes = Mir2.Shared.Rules.ItemStatHiddenEngine.PoisonResistanceEngine.CalculateResistance(30, 20, 15);
         Assert.True(pRes.poisonEvaded);
         Assert.Equal(0.8f, pRes.durationMultiplier);
 
         // 细节 117: 记忆套装天地合一全队召集
-        var memRes = Mir2Client.Game.ItemStatHiddenEngine.MemoryRecallEngine.ValidateRecall(isLeader: true, hasFullMemorySet: true, "@天地合一");
+        var memRes = Mir2.Shared.Rules.ItemStatHiddenEngine.MemoryRecallEngine.ValidateRecall(isLeader: true, hasFullMemorySet: true, "@天地合一");
         Assert.True(memRes.canRecall);
 
         // 细节 118: 祈祷套装佩戴齐全全服宝宝叛变公告
-        var prayRes = Mir2Client.Game.ItemStatHiddenEngine.PrayerCataclysmEngine.CheckPrayerSuit(isFullSet: true);
+        var prayRes = Mir2.Shared.Rules.ItemStatHiddenEngine.PrayerCataclysmEngine.CheckPrayerSuit(isFullSet: true);
         Assert.True(prayRes.triggerCataclysm);
         Assert.Contains("复仇", prayRes.globalBroadcast);
 
         // 细节 119: 神秘装备未戴问号与神水解绑
-        var mystBefore = Mir2Client.Game.ItemStatHiddenEngine.MysticItemEngine.EvaluateMystic(isEquipped: false, usedHolyWater: false);
+        var mystBefore = Mir2.Shared.Rules.ItemStatHiddenEngine.MysticItemEngine.EvaluateMystic(isEquipped: false, usedHolyWater: false);
         Assert.Equal("???", mystBefore.displayStats);
-        var mystAfter = Mir2Client.Game.ItemStatHiddenEngine.MysticItemEngine.EvaluateMystic(isEquipped: true, usedHolyWater: true);
+        var mystAfter = Mir2.Shared.Rules.ItemStatHiddenEngine.MysticItemEngine.EvaluateMystic(isEquipped: true, usedHolyWater: true);
         Assert.False(mystAfter.isBound);
 
         // 细节 120: 幽灵手套 + 幽灵项链隐藏属性
-        var ghost = Mir2Client.Game.ItemStatHiddenEngine.GhostSuitEngine.Evaluate(hasGloves: true, hasNecklace: true, incomingDmg: 100);
+        var ghost = Mir2.Shared.Rules.ItemStatHiddenEngine.GhostSuitEngine.Evaluate(hasGloves: true, hasNecklace: true, incomingDmg: 100);
         Assert.Equal(1, ghost.attackSpeedBonus);
         Assert.Equal(10, ghost.reflectDamage);
 
         // 细节 121: 龙之手镯对雷电术伤害加成 10%
-        int dDmg = Mir2Client.Game.ItemStatHiddenEngine.DragonBraceletEngine.ApplyBonus(rawDamage: 100, braceletCount: 2);
+        int dDmg = Mir2.Shared.Rules.ItemStatHiddenEngine.DragonBraceletEngine.ApplyBonus(rawDamage: 100, braceletCount: 2);
         Assert.Equal(120, dDmg);
 
         // 细节 122: 三眼手镯对火符伤害加成 10%
-        int tDmg = Mir2Client.Game.ItemStatHiddenEngine.ThreeEyeBraceletEngine.ApplyBonus(rawDamage: 100, braceletCount: 1);
+        int tDmg = Mir2.Shared.Rules.ItemStatHiddenEngine.ThreeEyeBraceletEngine.ApplyBonus(rawDamage: 100, braceletCount: 1);
         Assert.Equal(110, tDmg);
 
         // 细节 123: 骑士手镯破防机制
-        var kDef = Mir2Client.Game.ItemStatHiddenEngine.KnightBraceletEngine.CalculateEffectiveDefense(targetMinDef: 10, targetMaxDef: 20, hasKnightBracelet: true);
+        var kDef = Mir2.Shared.Rules.ItemStatHiddenEngine.KnightBraceletEngine.CalculateEffectiveDefense(targetMinDef: 10, targetMaxDef: 20, hasKnightBracelet: true);
         Assert.Equal(0, kDef.effMinDef);
 
         // 细节 124: 心灵手镯提升道士施毒术毒伤跳频 20%
-        float pInt = Mir2Client.Game.ItemStatHiddenEngine.SoulBraceletEngine.GetPoisonIntervalSeconds(hasSoulBracelet: true);
+        float pInt = Mir2.Shared.Rules.ItemStatHiddenEngine.SoulBraceletEngine.GetPoisonIntervalSeconds(hasSoulBracelet: true);
         Assert.Equal(2.4f, pInt);
 
         // 细节 125: 狂风套攻速加成
-        float wDur = Mir2Client.Game.ItemStatHiddenEngine.WindSpeedEngine.CalculateAttackDuration(1.0f, windPieces: 2);
+        float wDur = Mir2.Shared.Rules.ItemStatHiddenEngine.WindSpeedEngine.CalculateAttackDuration(1.0f, windPieces: 2);
         Assert.Equal(0.8f, wDur);
 
         // 细节 126: 红宝石与铂金戒指隐藏抗性
-        var res = Mir2Client.Game.ItemStatHiddenEngine.RubyPlatinumEngine.GetResistance(ruby: true, platinum: true);
+        var res = Mir2.Shared.Rules.ItemStatHiddenEngine.RubyPlatinumEngine.GetResistance(ruby: true, platinum: true);
         Assert.Equal(15, res.fireResistance);
         Assert.Equal(15, res.poisonResistance);
 
         // 细节 127: 强效太阳水瞬回 50/50 且不占排队 CD
-        var sunW = Mir2Client.Game.ItemStatHiddenEngine.SunWaterPotionEngine.DrinkSunWater();
+        var sunW = Mir2.Shared.Rules.ItemStatHiddenEngine.SunWaterPotionEngine.DrinkSunWater();
         Assert.Equal(50, sunW.instantHp);
         Assert.Equal(50, sunW.instantMp);
         Assert.True(sunW.ignoresQueue);
 
         // 细节 128: 万年雪霜 100/100 与疗伤药 200/200 瞬回
-        var gin = Mir2Client.Game.ItemStatHiddenEngine.HighHealPotionEngine.DrinkPotion("万年雪霜");
+        var gin = Mir2.Shared.Rules.ItemStatHiddenEngine.HighHealPotionEngine.DrinkPotion("万年雪霜");
         Assert.Equal(100, gin.instantHp);
-        var heal = Mir2Client.Game.ItemStatHiddenEngine.HighHealPotionEngine.DrinkPotion("疗伤药");
+        var heal = Mir2.Shared.Rules.ItemStatHiddenEngine.HighHealPotionEngine.DrinkPotion("疗伤药");
         Assert.Equal(200, heal.instantHp);
 
         // 细节 129: 超重状态角色移动速度减半且无法奔跑
-        var ow = Mir2Client.Game.ItemStatHiddenEngine.OverweightSpeedEngine.EvaluateMovement(isOverweight: true);
+        var ow = Mir2.Shared.Rules.ItemStatHiddenEngine.OverweightSpeedEngine.EvaluateMovement(isOverweight: true);
         Assert.False(ow.canRun);
         Assert.Equal(0.5f, ow.moveSpeedMultiplier);
 
         // 细节 130: 饥饿度机制
-        int hDc = Mir2Client.Game.ItemStatHiddenEngine.HungerPenaltyEngine.ApplyHunger(100, hungerPercent: 0);
+        int hDc = Mir2.Shared.Rules.ItemStatHiddenEngine.HungerPenaltyEngine.ApplyHunger(100, hungerPercent: 0);
         Assert.Equal(90, hDc);
     }
 

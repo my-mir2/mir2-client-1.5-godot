@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Mir2.Shared.Rules;
 
 namespace Mir2.Shared.Models;
 
@@ -115,6 +116,19 @@ public sealed class PlayerState
     public bool BoFireHit { get; set; } // 烈火剑法火焰蓄力 (+0x52F)
     public byte HitPlus { get; set; } = 5; // 攻杀附加伤害 (+0x23D)
     public byte FireHitPlus { get; set; } = 14; // 烈火系数 (+0x23E)
+
+    // ==================== 官方 1.5 战法道权威物理判定引擎实例 ====================
+    public WarriorCombatEngine.FireHitTracker FireHitTracker { get; } = new();
+    public WarriorCombatEngine.StabbingTracker StabbingTracker { get; } = new();
+
+    // 施毒术状态机 (IDA 0x49350C / sub_4C7720)
+    public bool HasGreenPoison { get; set; }
+    public long GreenPoisonExpireMs { get; set; }
+    public long NextGreenPoisonTickMs { get; set; }
+    public int GreenPoisonSc { get; set; }
+
+    public bool HasRedPoison { get; set; }
+    public long RedPoisonExpireMs { get; set; }
 
     // 官方 9 大装备槽位数组
     public EquipItem?[] Equipment { get; } = new EquipItem?[9];
@@ -548,5 +562,129 @@ public sealed class PlayerState
             RecalculateAttributes();
         }
         return res;
+    }
+
+    /// <summary>
+    /// 服务端权威附着红绿毒 (IDA 0x49350C / sub_4C7720)
+    /// </summary>
+    public void ApplyPoison(TaoistCombatEngine.PoisonType type, int durationSec, int sc, long nowMs)
+    {
+        if (type == TaoistCombatEngine.PoisonType.Green)
+        {
+            HasGreenPoison = true;
+            GreenPoisonSc = sc;
+            GreenPoisonExpireMs = nowMs + durationSec * 1000L;
+            NextGreenPoisonTickMs = nowMs + TaoistCombatEngine.PoisonTickIntervalMs;
+            IncHealth = 0; // 绿毒立即清空生命回复池 (IDA 0x4B7100)
+        }
+        else if (type == TaoistCombatEngine.PoisonType.Red)
+        {
+            HasRedPoison = true;
+            RedPoisonExpireMs = nowMs + durationSec * 1000L;
+        }
+    }
+
+    /// <summary>
+    /// 服务端权威绿毒 Tick 结算 (每 2.5 秒触发一次掉血并清空回血池)
+    /// </summary>
+    public (bool tookDamage, int damage, bool greenExpired, bool redExpired) ProcessPoisonTick(long nowMs)
+    {
+        bool tookDamage = false;
+        int damage = 0;
+        bool greenExpired = false;
+        bool redExpired = false;
+
+        if (HasGreenPoison)
+        {
+            if (nowMs >= GreenPoisonExpireMs)
+            {
+                HasGreenPoison = false;
+                greenExpired = true;
+            }
+            else if (nowMs >= NextGreenPoisonTickMs)
+            {
+                NextGreenPoisonTickMs = nowMs + TaoistCombatEngine.PoisonTickIntervalMs;
+                damage = TaoistCombatEngine.CalculateGreenPoisonTickDamage(GreenPoisonSc);
+                IncHealth = 0; // 封禁回血
+                Hp = Math.Max(0, Hp - damage);
+                tookDamage = true;
+            }
+        }
+
+        if (HasRedPoison && nowMs >= RedPoisonExpireMs)
+        {
+            HasRedPoison = false;
+            redExpired = true;
+        }
+
+        return (tookDamage, damage, greenExpired, redExpired);
+    }
+
+    /// <summary>
+    /// 服务端权威计算物理攻击力 (结合武器与项链幸运/诅咒与运九套满攻爆发)
+    /// </summary>
+    public int CalculateAttackDamageWithLuck(int minDc, int maxDc, Random rng)
+    {
+        int totalLuck = 0;
+        int totalCurse = 0;
+        var weapon = Equipment[(int)OfficialEquipSlot.Weapon];
+        if (weapon != null)
+        {
+            totalLuck += weapon.Luck;
+            totalCurse += weapon.Curse;
+        }
+        var neck = Equipment[(int)OfficialEquipSlot.Necklace];
+        if (neck != null)
+        {
+            totalLuck += neck.Luck;
+        }
+        return ItemStatHiddenEngine.WeaponLuckCurseEngine.CalculateAttackPower(minDc, maxDc, totalLuck, totalCurse, rng);
+    }
+
+    /// <summary>
+    /// 服务端权威重算三大物理负重上限 (结合职业、等级与超负载戒指)
+    /// </summary>
+    public void RecalculateAuthoritativeWeights(int bagGold = 0)
+    {
+        BaseMaxHandWeight = WeightConstraintEngine.CalcMaxHandWeight(Level, Job);
+        BaseMaxWearWeight = WeightConstraintEngine.CalcMaxWearWeight(Level, Job);
+        BaseMaxBagWeight = WeightConstraintEngine.CalcMaxBagWeight(Level, Job);
+
+        var w = SpecialRings.ApplyOverloadRing(BaseMaxBagWeight, BaseMaxWearWeight, BaseMaxHandWeight, HasOverloadRing);
+        MaxBagWeight = w.maxWeight;
+        MaxWearWeight = w.maxWearWeight;
+        MaxHandWeight = w.maxHandWeight;
+
+        // 计算当前穿戴总重
+        int currentWear = 0;
+        for (int i = 0; i < Equipment.Length; i++)
+        {
+            var item = Equipment[i];
+            if (item != null && i != (int)OfficialEquipSlot.Weapon && i != (int)OfficialEquipSlot.Lighting)
+            {
+                currentWear += item.Weight;
+            }
+        }
+        WearWeight = currentWear;
+
+        // 计算当前手持重量
+        var weapon = Equipment[(int)OfficialEquipSlot.Weapon];
+        HandWeight = weapon?.Weight ?? 0;
+
+        // 计算背包负重
+        int curBag = WeightConstraintEngine.CalcGoldWeight(bagGold);
+        for (int i = 0; i < BagItems.Count; i++)
+        {
+            curBag += BagItems[i].Weight;
+        }
+        BagWeight = curBag;
+    }
+
+    /// <summary>
+    /// 服务端权威校验穿戴装备是否超过腕力或穿戴负重
+    /// </summary>
+    public bool CheckCanEquipAuthoritative(OfficialEquipSlot slot, int itemWeight, out string reason)
+    {
+        return WeightConstraintEngine.CheckCanEquip(Level, Job, (int)slot, itemWeight, WearWeight, out reason);
     }
 }

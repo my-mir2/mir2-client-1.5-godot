@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using Mir2.Shared.Protocols.Modern;
+using Mir2.Shared.Rules;
 using Mir2Client.Audio;
 using Mir2Client.Core;
 using Mir2Client.Game;
@@ -1210,7 +1211,28 @@ namespace Mir2Client.UI
                 return;
             }
 
-            switch (magicId)
+            void SendCastSkillPacket(short magicId, int targetX, int targetY, int targetUid = 0)
+            {
+            if (_net == null || !_net.IsConnectedToServer) return;
+            if (_net.UseModernBinaryProtocol)
+            {
+                Span<byte> spellPayload = stackalloc byte[9];
+                new BinaryProtocol.SpellIntentPayload
+                {
+                    TargetUid = targetUid,
+                    SpellId = (byte)magicId,
+                    TargetX = (short)targetX,
+                    TargetY = (short)targetY
+                }.Write(spellPayload);
+                _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSpell, spellPayload);
+            }
+            else
+            {
+                _net.SendPacket(PacketEncoder.Spell(magicId, (short)targetX, (short)targetY));
+            }
+        }
+
+        switch (magicId)
             {
                 case 3: // 基本剑术 (被动)
                     HudInstance?.AddChat("技能", "基本剑术为被动技能，攻击时自动提升精准。", new Color(1f, 0.9f, 0.5f));
@@ -1228,11 +1250,8 @@ namespace Mir2Client.UI
 
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     MagicManagerInstance?.PlayMagic(magicId, playerTile, targetTile);
-                    if (_net != null && _net.IsConnectedToServer)
-                    {
-                        _net.SendPacket(PacketEncoder.Spell(6, (short)targetTile.X, (short)targetTile.Y));
-                    }
-                    else if (_isSandbox)
+                    SendCastSkillPacket(6, targetTile.X, targetTile.Y, _selectedTargetUid);
+                    if (_isSandbox)
                     {
                         EntityManager.EntityData? poisonTarget = null;
                         foreach (var ent in EntityManagerInstance.AllEntities)
@@ -1320,10 +1339,7 @@ namespace Mir2Client.UI
                             : "抗拒火环呼啸而过，周围没有可以推动的目标。";
                         HudInstance?.AddChat("技能", fireMsg, new Color(1f, 0.5f, 0.2f));
                     }
-                    if (_net != null && _net.IsConnectedToServer)
-                    {
-                        _net.SendPacket(PacketEncoder.Spell(8, (short)PlayerInstance.TileX, (short)PlayerInstance.TileY));
-                    }
+                    SendCastSkillPacket(8, PlayerInstance.TileX, PlayerInstance.TileY);
                     break;
 
                 case 9: // 诱惑之光 (Temptation)
@@ -1370,10 +1386,7 @@ namespace Mir2Client.UI
                             }
                         }
                     }
-                    if (_net != null && _net.IsConnectedToServer)
-                    {
-                        _net.SendPacket(PacketEncoder.Spell(9, (short)targetTile.X, (short)targetTile.Y));
-                    }
+                    SendCastSkillPacket(9, targetTile.X, targetTile.Y, _selectedTargetUid);
                     break;
 
                 case 12: // 刺杀剑术
@@ -1400,11 +1413,8 @@ namespace Mir2Client.UI
                     }
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     MagicManagerInstance?.PlayMagic(13, playerTile, targetTile);
-                    if (_net != null && _net.IsConnectedToServer)
-                    {
-                        _net.SendPacket(PacketEncoder.Spell(13, (short)targetTile.X, (short)targetTile.Y));
-                    }
-                    else if (_isSandbox)
+                    SendCastSkillPacket(13, targetTile.X, targetTile.Y, _selectedTargetUid);
+                    if (_isSandbox)
                     {
                         CheckSandboxSpellHit(13, targetTile);
                         HudInstance?.AddChat("法术", $"【灵魂火符】呼啸飞出！{consumeRes.desc}", new Color(1f, 0.8f, 0.2f));
@@ -1436,10 +1446,7 @@ namespace Mir2Client.UI
                         }
                         HudInstance?.AddChat("技能", $"地狱雷光轰然降临！强劲圣雷震荡波波及周围 {hitCount} 个目标！", new Color(0.4f, 0.9f, 1f));
                     }
-                    if (_net != null && _net.IsConnectedToServer)
-                    {
-                        _net.SendPacket(PacketEncoder.Spell(22, (short)PlayerInstance.TileX, (short)PlayerInstance.TileY));
-                    }
+                    SendCastSkillPacket(22, PlayerInstance.TileX, PlayerInstance.TileY);
                     break;
 
                 case 25: // 半月弯刀
@@ -1470,7 +1477,14 @@ namespace Mir2Client.UI
                     }
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.FireHit(0, (short)dir));
+                        if (_net.UseModernBinaryProtocol)
+                        {
+                            SendCastSkillPacket(26, PlayerInstance.TileX, PlayerInstance.TileY);
+                        }
+                        else
+                        {
+                            _net.SendPacket(PacketEncoder.FireHit(0, (short)dir));
+                        }
                     }
                     else if (_isSandbox)
                     {
@@ -1535,7 +1549,14 @@ namespace Mir2Client.UI
                     }
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.Motaebo((short)dir));
+                        if (_net.UseModernBinaryProtocol)
+                        {
+                            SendCastSkillPacket(25, PlayerInstance.TileX, PlayerInstance.TileY);
+                        }
+                        else
+                        {
+                            _net.SendPacket(PacketEncoder.Motaebo((short)dir));
+                        }
                     }
                     break;
 

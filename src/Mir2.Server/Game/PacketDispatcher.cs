@@ -180,6 +180,10 @@ public sealed class PacketDispatcher
                 HandleEatItem(session, remaining);
                 break;
 
+            case ProtocolConsts.CM_WEARITEM: // 1003 官方穿戴装备 (负重与腕力权威校验)
+                HandleWearItemPacket(session, remaining);
+                break;
+
             case ProtocolConsts.CM_GROUPMODE: // 1019 组队模式切换
                 HandleGroupMode(session, remaining);
                 break;
@@ -450,46 +454,11 @@ public sealed class PacketDispatcher
                     return; // 和平模式受限
                 }
 
-                // 2. 物理命中判定 (1:1 官方 Delphi M2 sub_4C1EF4 @ L12704: RandInt(Defender.Speed) >= Attacker.Hit)
-                int rollSpeed = OfficialClientRulesEngine.DelphiRandom.Shared.Next(defender.State.Speed + 1);
-                bool hit = rollSpeed < session.State.Hit;
+                int dist = Math.Max(Math.Abs(defender.X - session.X), Math.Abs(defender.Y - session.Y));
+                var (rawDmg, hit, isArmorPiercing, isFireHit, died) = ResolveAuthoritativePhysicalCombat(session, defender, dist, nowMs);
 
-                if (hit)
+                if (hit && rawDmg > 0)
                 {
-                    // 物理基础伤害精算
-                    int rawDmg = OfficialClientRulesEngine.CombatMath.CalculatePhysicalDamage(15, 30, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
-
-                    // 攻杀剑术附加伤害 (0x4C1EF4 @ L12621)
-                    if (session.State.BoAttackKill)
-                    {
-                        session.State.BoAttackKill = false;
-                        rawDmg += session.State.HitPlus;
-                    }
-
-                    // 烈火剑法火焰爆发 (0x4C1EF4 @ L12627: ROUND(Damage / 100.0 * 10 * FireHitPlus))
-                    if (session.State.BoFireHit)
-                    {
-                        session.State.BoFireHit = false;
-                        int multiplier = 10 * session.State.FireHitPlus;
-                        rawDmg += (int)Math.Round((double)rawDmg / 100.0 * multiplier);
-                    }
-
-                    // 虹魔吸血判定 (0x4C1EF4 @ L12733: LeechWeight / 100.0)
-                    session.State.ProcessAttackLifesteal(rawDmg);
-
-                    // 麻痹戒指判定 (0x4C1EF4 @ L12729: HasParalysisRing && RandInt(AntiPoison + 5) == 0)
-                    if (session.State.HasParalysisRing)
-                    {
-                        int rollPara = OfficialClientRulesEngine.DelphiRandom.Shared.Next(defender.State.AntiPoison + 5);
-                        if (rollPara == 0)
-                        {
-                            defender.State.StatusBits[5] = true;
-                        }
-                    }
-
-                    // 伤害扣减 (含魔法盾、护身、复活戒指)
-                    var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = defender.State.TakeCombatDamageFull(rawDmg, nowMs);
-
                     // 受击后仰广播: SM_OBJECTSTRUCK (244)
                     BroadcastToNinePatch(defender, ProtocolConsts.SM_OBJECTSTRUCK, defender.SessionId, defender.X, defender.Y, rawDmg, defender.CharacterName, includeSelf: true);
 
@@ -528,29 +497,14 @@ public sealed class PacketDispatcher
                 var monster = RegenEngine.FindMonsterAt(session.CurrentMapId, targetX, targetY);
                 if (monster != null && !monster.IsDead)
                 {
-                    // 物理命中判定 (1:1 官方 Delphi M2 sub_4C1EF4 @ L12704)
-                    int rollSpeed = OfficialClientRulesEngine.DelphiRandom.Shared.Next(16);
-                    if (rollSpeed < session.State.Hit)
+                    int dist = Math.Max(Math.Abs(monster.X - session.X), Math.Abs(monster.Y - session.Y));
+                    var (rawDmg, hit, isFireHit, died) = ResolveAuthoritativeMonsterPhysicalCombat(session, monster, dist, nowMs);
+                    if (hit && rawDmg > 0)
                     {
-                        int rawDmg = OfficialClientRulesEngine.CombatMath.CalculatePhysicalDamage(15, 30, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
-                        if (session.State.BoAttackKill)
-                        {
-                            session.State.BoAttackKill = false;
-                            rawDmg += session.State.HitPlus;
-                        }
-                        if (session.State.BoFireHit)
-                        {
-                            session.State.BoFireHit = false;
-                            int multiplier = 10 * session.State.FireHitPlus;
-                            rawDmg += (int)Math.Round((double)rawDmg / 100.0 * multiplier);
-                        }
-
-                        monster.Hp = Math.Max(0, monster.Hp - rawDmg);
-
                         // 广播怪物受击后仰: SM_OBJECTSTRUCK (244)
                         BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, monster.Uid, monster.X, monster.Y, rawDmg, monster.Name, includeSelf: true);
 
-                        if (monster.IsDead)
+                        if (died)
                         {
                             RegenEngine.OnMonsterDied(monster.Uid);
 
@@ -623,71 +577,8 @@ public sealed class PacketDispatcher
             // 向九宫格广播施法动作: SM_OBJECTSPELL (243)
             BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSPELL, session.SessionId, session.X, session.Y, magicId, session.CharacterName, includeSelf: true);
 
-            // 特殊技能分支
-            if (magicId == 31) // 魔法盾
-            {
-                session.State.ActivateMagicShield(1, 30);
-                return;
-            }
-            if (magicId == 2 || magicId == 29) // 治愈术 / 群体治愈术
-            {
-                session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + 25);
-                session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
-                return;
-            }
-
-            // 伤害性法术 (雷电术=10, 火球术=1, 灵魂火符=13 等)
-            ClientSession? defender = null;
-            var spellMap = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
-            lock (_ninePatchBuffer)
-            {
-                spellMap.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
-                for (int i = 0; i < _ninePatchBuffer.Count; i++)
-                {
-                    var ent = _ninePatchBuffer[i];
-                    if (ent.SessionId != session.SessionId && (ent.SessionId == targetUid || (ent.X == targetX && ent.Y == targetY)))
-                    {
-                        defender = ent;
-                        break;
-                    }
-                }
-            }
-
-            if (defender != null && defender.State != null)
-            {
-                int magicDmg = OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(20, 35, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
-                var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = defender.State.TakeCombatDamageFull(magicDmg, nowMs);
-
-                // 受击后仰广播: SM_OBJECTSTRUCK (244)
-                BroadcastToNinePatch(defender, ProtocolConsts.SM_OBJECTSTRUCK, defender.SessionId, defender.X, defender.Y, magicDmg, defender.CharacterName, includeSelf: true);
-
-                // 同步目标血量
-                defender.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, defender.State.Hp, defender.State.MaxHp, defender.State.Mp, defender.State.MaxMp);
-
-                if (died)
-                {
-                    session.State.AddPkMurder();
-                    BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
-
-                    // 官方死亡爆装与爆背包结算 (IDA 0x4BB44C / 0x4BB6C8)
-                    var dropped = MonsterDropEngine.ExecuteDeathDrop(defender.State, OfficialClientRulesEngine.DelphiRandom.Shared);
-                    for (int d = 0; d < dropped.Count; d++)
-                    {
-                        var drop = dropped[d];
-                        spellMap.AddGroundItem(new GroundItemEntity
-                        {
-                            Uid = drop.ItemUid,
-                            Name = drop.ItemName,
-                            X = defender.X,
-                            Y = defender.Y,
-                            OwnerSessionId = session.SessionId, // 杀手独享 80 秒拾取保护权 (IDA 0x4C5CB0)
-                            DropTickMs = nowMs,
-                            Weight = 1
-                        });
-                        BroadcastToNinePatch(defender, ProtocolConsts.SM_GROUNDITEM, drop.ItemUid, defender.X, defender.Y, 0, drop.ItemName, includeSelf: true);
-                    }
-                }
-            }
+            // 权威法术与特技解析核心 (含烈火凝聚、刺杀开关、抗拒火环、诱惑之光、地狱雷光、施毒术、治愈术)
+            ResolveAuthoritativeSpell(session, magicId, targetUid, targetX, targetY, nowMs);
         }
     }
 
@@ -1522,13 +1413,11 @@ public sealed class PacketDispatcher
 
         if (defender != null && defender.State != null)
         {
-            // 距离校验 (战士普通近身攻击限 1 格，刺杀限 2 格)
             int dist = Math.Max(Math.Abs(defender.X - session.X), Math.Abs(defender.Y - session.Y));
-            if (dist <= 2)
-            {
-                int rawDmg = OfficialClientRulesEngine.CombatMath.CalculatePhysicalDamage(15, 30, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
-                var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = defender.State.TakeCombatDamageFull(rawDmg, nowMs);
+            var (rawDmg, hit, isArmorPiercing, isFireHit, died) = ResolveAuthoritativePhysicalCombat(session, defender, dist, nowMs);
 
+            if (hit && rawDmg > 0)
+            {
                 // 权威血量同步
                 Span<byte> hpSpan = stackalloc byte[8];
                 new BinaryProtocol.HealthSyncPayload
@@ -1553,24 +1442,27 @@ public sealed class PacketDispatcher
         var spell = BinaryProtocol.SpellIntentPayload.Read(payload);
 
         long nowMs = Environment.TickCount64;
-        // 施法公共冷却 GCD (1000ms)
-        if (session.LastSpellTimeMs > 0 && (nowMs - session.LastSpellTimeMs < 1000))
+        if (session.LastSpellTimeMs > 0 && (nowMs - session.LastSpellTimeMs < 500))
         {
             return; // 施法过快拦截
         }
         session.LastSpellTimeMs = nowMs;
 
-        // 蓝量扣除与校验 (假设施法消耗 10 点 MP)
         if (session.State != null)
         {
-            if (session.State.Mp < 10) return; // 蓝量不足
-            session.State.Mp -= 10;
+            var skill = SkillFormulas.GetSkill(spell.SpellId);
+            int mpCost = skill?.MpCost ?? 10;
+            if (session.State.Mp < mpCost) return; // 蓝量不足
+            session.State.Mp -= mpCost;
 
             // 广播施法动作
             Span<byte> actionSpan = stackalloc byte[6];
             actionSpan[0] = 0; // Spell Action
             actionSpan[1] = spell.SpellId;
             BroadcastBinaryToNinePatch(session, (ushort)BinaryProtocol.MsgType.BroadcastEntityAction, actionSpan, includeSelf: false);
+
+            // 权威法术与特技解析核心
+            ResolveAuthoritativeSpell(session, spell.SpellId, spell.TargetUid, spell.TargetX, spell.TargetY, nowMs);
 
             // 自身蓝量同步
             Span<byte> hpSpan = stackalloc byte[8];
@@ -1672,6 +1564,400 @@ public sealed class PacketDispatcher
                     sentCount++;
                     // 千人高密度同屏熔断保护：单屏单个动作广播目标上限锁定在 80 人以内，彻底阻断百万级网络广播风暴
                     if (sentCount >= maxTargets) break;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 服务端权威物理战斗精算与结算核心 (官方 1.5 权威真值)
+    /// 涵盖：敏捷/准确命中对抗、武器运九套爆发/诅咒下限、双烈火蓄力 2.6 倍暴击、隔位刺杀破盾破防、道士红毒 1.2 倍易伤、护身与复活戒指
+    /// </summary>
+    public (int damage, bool hit, bool isArmorPiercing, bool isFireHit, bool died) ResolveAuthoritativePhysicalCombat(
+        ClientSession attacker, ClientSession defender, int dist, long nowMs, bool forcePierce = false)
+    {
+        if (attacker.State == null || defender.State == null)
+            return (0, false, false, false, false);
+
+        // 1. 距离校验 (贴身 1 格，隔位刺杀 2 格，大于 2 格物理打不着)
+        if (dist > 2) return (0, false, false, false, false);
+
+        bool isArmorPiercing = forcePierce || (dist == 2 && attacker.State.StabbingTracker.AutoStab);
+        if (dist == 2 && !isArmorPiercing)
+        {
+            // 距离为 2 但未开刺杀，打不到目标
+            return (0, false, false, false, false);
+        }
+
+        // 2. 物理命中对抗 (IDA sub_4C1EF4: rollSpeed < Hit)
+        int rollSpeed = OfficialClientRulesEngine.DelphiRandom.Shared.Next(defender.State.Speed + 1);
+        bool hit = rollSpeed < attacker.State.Hit;
+        if (!hit)
+        {
+            return (0, false, isArmorPiercing, false, false);
+        }
+
+        // 3. 基础伤害精算 (结合武器与项链幸运/诅咒与运九套满攻爆发)
+        int rawDmg = attacker.State.CalculateAttackDamageWithLuck(15, 30, Random.Shared);
+
+        // 4. 攻杀剑气附加伤害
+        if (attacker.State.BoAttackKill)
+        {
+            attacker.State.BoAttackKill = false;
+            rawDmg += attacker.State.HitPlus;
+        }
+
+        // 5. 烈火剑法火焰爆发 (2.6 倍物理爆发，双烈火蓄力时钟)
+        bool isFireHit = false;
+        var (isFire, fireDmg, _) = attacker.State.FireHitTracker.ConsumeOnHit(rawDmg, nowMs);
+        if (isFire)
+        {
+            rawDmg = fireDmg;
+            isFireHit = true;
+        }
+        else if (attacker.State.BoFireHit)
+        {
+            attacker.State.BoFireHit = false;
+            int multiplier = 10 * attacker.State.FireHitPlus;
+            rawDmg += (int)Math.Round((double)rawDmg / 100.0 * multiplier);
+            isFireHit = true;
+        }
+
+        // 6. 道士红毒 1.2 倍易伤 (IDA sub_4C7720 / tbyte_4BE3CC)
+        if (defender.State.HasRedPoison)
+        {
+            rawDmg = TaoistCombatEngine.ApplyRedPoisonVulnerability(rawDmg, hasRedPoison: true);
+        }
+
+        // 7. 虹魔吸血判定 (0x4C1EF4 @ L12733)
+        attacker.State.ProcessAttackLifesteal(rawDmg);
+
+        // 8. 麻痹戒指判定
+        if (attacker.State.HasParalysisRing)
+        {
+            int rollPara = OfficialClientRulesEngine.DelphiRandom.Shared.Next(defender.State.AntiPoison + 5);
+            if (rollPara == 0)
+            {
+                defender.State.StatusBits[5] = true;
+            }
+        }
+
+        // 9. 伤害扣减结算 (隔位刺杀 isArmorPiercing 击穿魔法盾与基础护甲)
+        var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = defender.State.TakeCombatDamageFull(rawDmg, nowMs, isArmorPiercing: isArmorPiercing);
+
+        return (rawDmg, true, isArmorPiercing, isFireHit, died);
+    }
+
+    /// <summary>
+    /// 服务端权威怪物受击物理结算
+    /// </summary>
+    public (int damage, bool hit, bool isFireHit, bool died) ResolveAuthoritativeMonsterPhysicalCombat(
+        ClientSession attacker, MonsterInstance monster, int dist, long nowMs)
+    {
+        if (attacker.State == null || monster.IsDead)
+            return (0, false, false, false);
+
+        if (dist > 2) return (0, false, false, false);
+
+        bool isArmorPiercing = dist == 2 && attacker.State.StabbingTracker.AutoStab;
+        if (dist == 2 && !isArmorPiercing) return (0, false, false, false);
+
+        int rollSpeed = OfficialClientRulesEngine.DelphiRandom.Shared.Next(16);
+        bool hit = rollSpeed < attacker.State.Hit;
+        if (!hit) return (0, false, false, false);
+
+        int rawDmg = attacker.State.CalculateAttackDamageWithLuck(15, 30, Random.Shared);
+        if (attacker.State.BoAttackKill)
+        {
+            attacker.State.BoAttackKill = false;
+            rawDmg += attacker.State.HitPlus;
+        }
+
+        bool isFireHit = false;
+        var (isFire, fireDmg, _) = attacker.State.FireHitTracker.ConsumeOnHit(rawDmg, nowMs);
+        if (isFire)
+        {
+            rawDmg = fireDmg;
+            isFireHit = true;
+        }
+
+        monster.Hp = Math.Max(0, monster.Hp - rawDmg);
+        return (rawDmg, true, isFireHit, monster.IsDead);
+    }
+
+    /// <summary>
+    /// 服务端权威法术与特技解析核心 (官方 1.5 权威实证)
+    /// 包含烈火剑法蓄力、刺杀开关、抗拒火环推人、诱惑之光定身/驯服、地狱雷光不死克制、施毒术红绿毒
+    /// </summary>
+    public void ResolveAuthoritativeSpell(ClientSession session, short magicId, int targetUid, int targetX, int targetY, long nowMs)
+    {
+        if (session.State == null) return;
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+
+        // 1. 烈火剑法凝聚火焰 (MagicId = 26)
+        if (magicId == 26)
+        {
+            var (castSuccess, reason) = session.State.FireHitTracker.Cast(nowMs);
+            session.State.BoFireHit = castSuccess;
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, reason);
+            return;
+        }
+
+        // 2. 刺杀剑术开关切换 (MagicId = 12)
+        if (magicId == 12)
+        {
+            bool active = session.State.StabbingTracker.ToggleAutoStab();
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, active ? "已开启刺杀剑气 (隔位破盾破防)" : "已关闭刺杀剑气");
+            return;
+        }
+
+        // 3. 魔法盾 (MagicId = 31)
+        if (magicId == 31)
+        {
+            session.State.ActivateMagicShield(3, 30);
+            return;
+        }
+
+        // 4. 抗拒火环 (MagicId = 8)
+        if (magicId == 8)
+        {
+            var surrounding = new List<(int uid, int level, int x, int y, bool isBoss)>();
+            lock (_ninePatchBuffer)
+            {
+                map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                {
+                    var ent = _ninePatchBuffer[i];
+                    if (ent.SessionId != session.SessionId && Math.Abs(ent.X - session.X) <= 1 && Math.Abs(ent.Y - session.Y) <= 1)
+                    {
+                        surrounding.Add((ent.SessionId, ent.State?.Level ?? 1, ent.X, ent.Y, isBoss: false));
+                    }
+                }
+            }
+            if (RegenEngine != null)
+            {
+                var monsters = RegenEngine.GetMonstersInArea(session.CurrentMapId, session.X - 1, session.Y - 1, session.X + 1, session.Y + 1);
+                for (int i = 0; i < monsters.Count; i++)
+                {
+                    var m = monsters[i];
+                    if (!m.IsDead)
+                    {
+                        surrounding.Add((m.Uid, 20, m.X, m.Y, isBoss: m.Name.Contains("教主")));
+                    }
+                }
+            }
+
+            var pushResults = MageCombatEngine.RingOfFire.Execute(session.State.Level, session.X, session.Y, surrounding, (x, y) => !map.IsWalkable(x, y));
+            for (int i = 0; i < pushResults.Count; i++)
+            {
+                var pr = pushResults[i];
+                if (pr.Pushed)
+                {
+                    ClientSession? targetPlayer = null;
+                    lock (_ninePatchBuffer)
+                    {
+                        for (int j = 0; j < _ninePatchBuffer.Count; j++)
+                        {
+                            if (_ninePatchBuffer[j].SessionId == pr.Uid)
+                            {
+                                targetPlayer = _ninePatchBuffer[j];
+                                break;
+                            }
+                        }
+                    }
+                    if (targetPlayer != null)
+                    {
+                        int oldX = targetPlayer.X;
+                        int oldY = targetPlayer.Y;
+                        targetPlayer.X = pr.FinalX;
+                        targetPlayer.Y = pr.FinalY;
+                        map.Aoi.UpdatePosition(targetPlayer, oldX, oldY, pr.FinalX, pr.FinalY, out _, out _);
+                        SendPositionPullback(targetPlayer, pr.FinalX, pr.FinalY, targetPlayer.Direction);
+                        BroadcastToNinePatch(targetPlayer, ProtocolConsts.SM_OBJECTRUN, targetPlayer.SessionId, pr.FinalX, pr.FinalY, targetPlayer.Direction, targetPlayer.CharacterName, includeSelf: true);
+                    }
+                }
+            }
+            return;
+        }
+
+        // 5. 施毒术 (MagicId = 6)
+        if (magicId == 6)
+        {
+            ClientSession? targetPlayer = null;
+            lock (_ninePatchBuffer)
+            {
+                map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                {
+                    var ent = _ninePatchBuffer[i];
+                    if (ent.SessionId != session.SessionId && (ent.SessionId == targetUid || (ent.X == targetX && ent.Y == targetY)))
+                    {
+                        targetPlayer = ent;
+                        break;
+                    }
+                }
+            }
+            if (targetPlayer != null && targetPlayer.State != null)
+            {
+                bool hit = TaoistCombatEngine.CheckPoisonHit(targetPlayer.State.AntiPoison, Random.Shared);
+                if (hit)
+                {
+                    var pType = !targetPlayer.State.HasGreenPoison ? TaoistCombatEngine.PoisonType.Green : TaoistCombatEngine.PoisonType.Red;
+                    int duration = TaoistCombatEngine.CalculatePoisonDurationSec(pType, taoistSc: 25);
+                    targetPlayer.State.ApplyPoison(pType, duration, 25, nowMs);
+
+                    string pDesc = pType == TaoistCombatEngine.PoisonType.Green ? "中绿毒 (每2.5s持续掉血，清空回血池)" : "中红毒 (1.2倍易伤减防)";
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"施毒成功：目标已{pDesc}");
+                    targetPlayer.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"受到道士施毒术感染：{pDesc}");
+                }
+            }
+            return;
+        }
+
+        // 6. 地狱雷光 (MagicId = 22)
+        if (magicId == 22)
+        {
+            if (RegenEngine != null)
+            {
+                var monsters = RegenEngine.GetMonstersInArea(session.CurrentMapId, session.X - 1, session.Y - 1, session.X + 1, session.Y + 1);
+                for (int i = 0; i < monsters.Count; i++)
+                {
+                    var m = monsters[i];
+                    if (!m.IsDead)
+                    {
+                        bool isUndead = m.Name.Contains("尸") || m.Name.Contains("骷髅") || m.Name.Contains("骨");
+                        int dmg = MageCombatEngine.HellFire.CalculateDamage(40, isUndead);
+                        m.Hp = Math.Max(0, m.Hp - dmg);
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, m.Uid, m.X, m.Y, dmg, m.Name, includeSelf: true);
+                        if (m.IsDead)
+                        {
+                            RegenEngine.OnMonsterDied(m.Uid);
+                            BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, m.Uid, m.X, m.Y, 0, m.Name, includeSelf: true);
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        // 7. 治愈术 (MagicId = 2 / 29)
+        if (magicId == 2 || magicId == 29)
+        {
+            int heal = TaoistCombatEngine.MassHeal.CalculateHealAmount(sc: 25, skillLevel: 3);
+            session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + heal);
+            session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
+            return;
+        }
+
+        // 8. 常规单体法术 (雷电术=10, 火球术=1, 灵魂火符=13)
+        ClientSession? defender = null;
+        lock (_ninePatchBuffer)
+        {
+            map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+            for (int i = 0; i < _ninePatchBuffer.Count; i++)
+            {
+                var ent = _ninePatchBuffer[i];
+                if (ent.SessionId != session.SessionId && (ent.SessionId == targetUid || (ent.X == targetX && ent.Y == targetY)))
+                {
+                    defender = ent;
+                    break;
+                }
+            }
+        }
+        if (defender != null && defender.State != null)
+        {
+            int magicDmg = OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(20, 35, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
+            if (defender.State.HasRedPoison)
+            {
+                magicDmg = TaoistCombatEngine.ApplyRedPoisonVulnerability(magicDmg, hasRedPoison: true);
+            }
+            var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = defender.State.TakeCombatDamageFull(magicDmg, nowMs);
+            BroadcastToNinePatch(defender, ProtocolConsts.SM_OBJECTSTRUCK, defender.SessionId, defender.X, defender.Y, magicDmg, defender.CharacterName, includeSelf: true);
+            defender.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, defender.State.Hp, defender.State.MaxHp, defender.State.Mp, defender.State.MaxMp);
+            if (died)
+            {
+                session.State.AddPkMurder();
+                BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 服务端周期性 Tick 毒素结算 (每 2.5 秒触发一次绿毒扣血并清空回血池)
+    /// </summary>
+    public void TickWorldPoisons(long nowMs, IEnumerable<ClientSession> allSessions)
+    {
+        foreach (var session in allSessions)
+        {
+            if (session.State != null)
+            {
+                var (tookDmg, dmg, greenExpired, redExpired) = session.State.ProcessPoisonTick(nowMs);
+                if (tookDmg)
+                {
+                    BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, session.SessionId, session.X, session.Y, dmg, session.CharacterName, includeSelf: true);
+                    session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
+                    if (session.State.Hp <= 0)
+                    {
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, session.SessionId, session.X, session.Y, 0, session.CharacterName, includeSelf: true);
+                    }
+                }
+                if (greenExpired)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "绿毒效果已消散。");
+                }
+                if (redExpired)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "红毒效果已消散。");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 服务端权威穿戴装备校验 (负重与腕力硬性拦截)
+    /// </summary>
+    public bool HandleWearItem(ClientSession session, int bagSlot, OfficialEquipSlot equipSlot)
+    {
+        if (session.State == null) return false;
+        if (bagSlot < 0 || bagSlot >= session.State.BagItems.Count) return false;
+
+        var item = session.State.BagItems[bagSlot];
+        if (!session.State.CheckCanEquipAuthoritative(equipSlot, item.Weight, out string reason))
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"穿戴失败：{reason}");
+            return false;
+        }
+
+        session.State.BagItems.RemoveAt(bagSlot);
+        var oldItem = session.State.Equipment[(int)equipSlot];
+        session.State.Equipment[(int)equipSlot] = item;
+        if (oldItem != null)
+        {
+            session.State.BagItems.Add(oldItem);
+        }
+        session.State.RecalculateAuthoritativeWeights(session.State.Gold);
+        session.State.RecalculateAttributes();
+        return true;
+    }
+
+    private void HandleWearItemPacket(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: bagSlot/equipSlot
+        int slash = payload.IndexOf('/');
+        if (slash < 0) return;
+        if (int.TryParse(payload[..slash], out int bagSlot) &&
+            byte.TryParse(payload[(slash + 1)..], out byte equipSlot))
+        {
+            if (equipSlot < 9)
+            {
+                bool success = HandleWearItem(session, bagSlot, (OfficialEquipSlot)equipSlot);
+                if (success)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_TAKEON_OK, session.SessionId, equipSlot, 0, 0);
+                }
+                else
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_TAKEON_FAIL, session.SessionId, equipSlot, 0, 0);
                 }
             }
         }

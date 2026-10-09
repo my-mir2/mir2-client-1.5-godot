@@ -1,6 +1,6 @@
 using System;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 原版道士核心战斗与召唤兽引擎 (IDA 0x49350C（已证client无函数） / sub_4C7720 / sub_4BDEB8 / sub_4D35B0 权威实证)

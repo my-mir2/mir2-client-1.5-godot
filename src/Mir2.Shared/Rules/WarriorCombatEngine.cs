@@ -1,6 +1,6 @@
 using System;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 原版战士三大特技核心判定引擎 (IDA sub_49B8E0 / sub_49B310 / sub_49BC20 权威实证)
@@ -79,6 +79,8 @@ public static class WarriorCombatEngine
     public sealed class StabbingTracker
     {
         public bool AutoStabEnabled { get; set; } = true; // 官方默认开启刺杀开关
+        public bool AutoStab { get => AutoStabEnabled; set => AutoStabEnabled = value; }
+        public bool ToggleAutoStab() => AutoStabEnabled = !AutoStabEnabled;
 
         public enum HitDistanceType
         {
