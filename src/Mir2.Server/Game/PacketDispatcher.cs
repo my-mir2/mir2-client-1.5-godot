@@ -167,8 +167,15 @@ public sealed class PacketDispatcher
                 HandleStorageSaveGold(session, remaining);
                 break;
 
-            case 1018: // CM_TAKEGOLD 官方支取金币
-                HandleStorageTakeGold(session, remaining);
+            case ProtocolConsts.CM_REVIVE: // 1018 官方死亡复活/重新开始 (IDA 0x481efc, bridge.rs:63)
+                if (session.State != null && session.State.Hp <= 0)
+                {
+                    HandleRevive(session, remaining);
+                }
+                else
+                {
+                    HandleStorageTakeGold(session, remaining);
+                }
                 break;
 
             case ProtocolConsts.CM_CHECKPASSWORD: // 1046 官方二级密码校验
@@ -584,8 +591,16 @@ public sealed class PacketDispatcher
 
     private void HandleSay(ClientSession session, ReadOnlySpan<char> payload)
     {
+        // 兼容带包头参数格式 (recog/param/tag/series/msg) 或纯消息文本
+        ReadOnlySpan<char> text = payload;
+        int lastSlash = payload.LastIndexOf('/');
+        if (lastSlash >= 0 && lastSlash + 1 < payload.Length)
+        {
+            text = payload[(lastSlash + 1)..];
+        }
+
         // 1. 官方控制指令判断 (IDA 0x4D1E54 TPlayObject.Command)
-        if (payload.Equals("@AttackMode", StringComparison.OrdinalIgnoreCase))
+        if (text.Equals("@AttackMode", StringComparison.OrdinalIgnoreCase))
         {
             if (session.State != null)
             {
@@ -604,9 +619,72 @@ public sealed class PacketDispatcher
             return;
         }
 
-        // 2. 普通聊天广播到周围九宫格
+        // 2. 盛大官方特戒传送指令 (IDA 0x4D1E54 / SpecialRingEngine.TeleportRing)
+        if (text.StartsWith("@move", StringComparison.OrdinalIgnoreCase))
+        {
+            var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+            var (valid, tx, ty, err) = SpecialRingEngine.TeleportRing.ParseCommand(text.ToString(), map.Width, map.Height, (x, y) => !map.IsWalkable(x, y));
+            if (valid)
+            {
+                int oldX = session.X;
+                int oldY = session.Y;
+                session.X = tx;
+                session.Y = ty;
+                map.Aoi.UpdatePosition(session, oldX, oldY, tx, ty, out _, out _);
+
+                // 强制同步玩家坐标与拉回
+                SendPositionPullback(session, tx, ty, session.Direction);
+                BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTRUN, session.SessionId, tx, ty, session.Direction, session.CharacterName, includeSelf: false);
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【传送戒指】瞬移至 ({tx}, {ty}) 成功！");
+            }
+            else
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"传送失败：{err}");
+            }
+            return;
+        }
+
+        // 3. 普通聊天广播到周围九宫格
         string msg = $"{session.CharacterName}: {payload}";
         BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSAY, session.SessionId, session.X, session.Y, 0, msg, includeSelf: true);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 死亡复活权威裁决 (IDA 0x481EFC / bridge.rs:63 CM_REVIVE 1018)
+    /// </summary>
+    public void HandleRevive(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null || session.State.Hp > 0) return;
+
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+        int oldX = session.X;
+        int oldY = session.Y;
+
+        // 1. 恢复状态与满血满魔
+        session.State.Hp = session.State.MaxHp;
+        session.State.Mp = session.State.MaxMp;
+        session.State.HasGreenPoison = false;
+        session.State.HasRedPoison = false;
+        session.State.IncHealth = 0;
+        session.State.IncSpell = 0;
+
+        // 2. 传送回安全区 (比奇省银杏山谷 330, 270)
+        int respawnX = 330;
+        int respawnY = 270;
+        session.X = respawnX;
+        session.Y = respawnY;
+
+        // 3. 更新九宫格 AOI 空间索引
+        map.Aoi.UpdatePosition(session, oldX, oldY, respawnX, respawnY, out _, out _);
+
+        // 4. 下发官方复活应答: SM_REVIVE (501)
+        session.EnqueuePacket(ProtocolConsts.SM_REVIVE, session.SessionId, respawnX, respawnY, 0, session.CharacterName);
+
+        // 5. 刷新玩家自身血蓝与状态: SM_MYSTATUS (504)
+        session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
+
+        // 6. 广播新坐标正常站立状态给周围九宫格玩家: SM_SENDUSERSTATE (503)
+        BroadcastToNinePatch(session, ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, respawnX, respawnY, session.Direction, session.CharacterName, includeSelf: false);
     }
 
     /// <summary>

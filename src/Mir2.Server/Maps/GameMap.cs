@@ -117,6 +117,34 @@ public sealed class GameMap
             return (true, candidate, string.Empty);
         }
     }
+
+    /// <summary>
+    /// 清理存活超过 maxLifeMs (默认2分钟) 的地面物品，防止内存堆积与泄露
+    /// </summary>
+    public int CleanExpiredGroundItems(long nowMs, long maxLifeMs = 120_000)
+    {
+        int removedCount = 0;
+        foreach (var kvp in _groundItems)
+        {
+            var list = kvp.Value;
+            lock (list)
+            {
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    if (nowMs - list[i].DropTickMs > maxLifeMs)
+                    {
+                        list.RemoveAt(i);
+                        removedCount++;
+                    }
+                }
+            }
+            if (list.Count == 0)
+            {
+                _groundItems.TryRemove(kvp.Key, out _);
+            }
+        }
+        return removedCount;
+    }
 }
 
 /// <summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -22,6 +23,7 @@ public sealed class TcpGateway
 
     public int Port { get; }
     public int ActiveConnectionsCount => _sessions.Count;
+    public IEnumerable<ClientSession> AllSessions => _sessions.Values;
 
     // 协议处理委托: (Session, CM_包完整字符串)
     public Action<ClientSession, string>? PacketReceivedHandler { get; set; }

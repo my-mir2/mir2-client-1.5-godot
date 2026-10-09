@@ -540,8 +540,23 @@ namespace Mir2Client.UI
                 HudInstance.QuickItemUsed += (slot, item) =>
                 {
                     // 盛大官方 1.5 快捷栏使用物品发包 CM_EATITEM (1006)
-                    _net?.SendPacket(PacketEncoder.EatItem(slot, item));
-                    ApplyPotionRecovery(item);
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        if (_net.UseModernBinaryProtocol)
+                        {
+                            Span<byte> itemPayload = stackalloc byte[4];
+                            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(itemPayload, slot);
+                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentUseItem, itemPayload);
+                        }
+                        else
+                        {
+                            _net.SendPacket(PacketEncoder.EatItem(slot, item));
+                        }
+                    }
+                    else if (_isSandbox)
+                    {
+                        ApplyPotionRecovery(item);
+                    }
                 };
 
                 HudInstance.ChatSent += OnChatSent;
@@ -610,8 +625,14 @@ namespace Mir2Client.UI
                     }
                     else
                     {
-                        _net?.SendPacket(PacketEncoder.EatItem(slot, item));
-                        ApplyPotionRecovery(item);
+                        if (_net != null && _net.IsConnectedToServer)
+                        {
+                            _net.SendPacket(PacketEncoder.EatItem(slot, item));
+                        }
+                        else if (_isSandbox)
+                        {
+                            ApplyPotionRecovery(item);
+                        }
                     }
                 };
                 HudInstance.WearItemRequested += (bagSlot, equipSlot) =>
@@ -2037,8 +2058,8 @@ namespace Mir2Client.UI
                 HudInstance?.OnPlayerPositionChanged(PlayerInstance.TileX, PlayerInstance.TileY);
             }
 
-            // 驱动盛大官方 1.5 药水缓回 Tick 灌注 (每 250ms 注入一次生命/魔法)
-            if (PlayerInstance != null && !PlayerInstance.IsDead && HudInstance != null)
+            // 驱动盛大官方 1.5 药水缓回 Tick 灌注 (仅单机沙盒模式模拟；联网模式完全由服务端 SM_HEALTHSPELLCHANGED 权威驱动)
+            if (_isSandbox && PlayerInstance != null && !PlayerInstance.IsDead && HudInstance != null)
             {
                 if (PotionRecoverySystem.ProcessTick(nowTick, out int hpTick, out int mpTick))
                 {

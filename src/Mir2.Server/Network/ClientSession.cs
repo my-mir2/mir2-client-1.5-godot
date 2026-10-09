@@ -150,6 +150,26 @@ public sealed class ClientSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// 获取当前累积在发送缓冲区中的下行 UTF8 协议文本（主要用于测试与审计验证）
+    /// </summary>
+    public string GetBufferedPacketsString()
+    {
+        lock (_sendLock)
+        {
+            if (_sendBufferOffset == 0) return string.Empty;
+            return Encoding.UTF8.GetString(_sendBuffer, 0, _sendBufferOffset);
+        }
+    }
+
+    /// <summary>
+    /// 检查累积缓冲区中是否包含指定字串包
+    /// </summary>
+    public bool HasBufferedPacket(string subPacket)
+    {
+        return GetBufferedPacketsString().Contains(subPacket);
+    }
+
     public void Dispose()
     {
         lock (_sendLock)
