@@ -98,14 +98,76 @@ if ( RandInt(Defender->Speed) >= Attacker->Hit ) {
 
 ---
 
-## 4. 关键函数物理地址对照表
+## 4. 角色与生物死亡掉落物理真值 (Drop Engine)
+
+### 4.1 死亡爆背包物品 (TCreature.ScatterBagItems @ 0x4BB44C)
+```c
+// IDA 0x4BB44C @ L228~L239
+bool isRedName = (GetPkPoint(Creature) >= 2); // 红名判定
+for (int i = BagList.Count - 1; i >= 0; i--) {
+    // 白名每个格子 1/3 几率掉落；红名玩家每个格子 100% 必爆！
+    if ( isRedName || (RandInt(3) == 0) ) {
+        DropItemToGround(Creature, BagList[i]);
+        BagList.Delete(i);
+    }
+}
+```
+- **物理事实**：白名玩家死亡仅有 33.3% 概率随机爆落背包各格物品；红名杀人犯死亡**背包全部物品 100% 爆空**！
+
+### 4.2 死亡爆身上穿戴装备 (TCreature.DropUseItems @ 0x4BB6C8)
+```c
+// IDA 0x4BB6C8 @ L328~L367
+int dropRate = (GetPkPoint(Creature) <= 2) ? 30 : 15; // 白名 1/30, 红名 1/15 (暴增 100%)
+for (int slot = 0; slot < 9; slot++) { // 严格遍历官方 9 大装备槽位
+    if ( RandInt(dropRate) == 0 ) {
+        if ( !IsProtectedItem(Equipment[slot]) ) { // 检查防爆与特殊保护标志
+            DropEquipToGround(Creature, Equipment[slot]);
+            Equipment[slot] = null;
+        }
+    }
+}
+```
+- **物理事实**：
+  1. 官方原版只遍历 `slot = 0..8`（**9 大槽位绝对封闭分母**）；
+  2. 白名平民穿戴装备掉落率为 **1/30**（约 3.3%）；
+  3. 红名玩家穿戴装备掉落率为 **1/15**（约 6.7%，概率直接翻倍，极其凶险！）。
+
+---
+
+## 5. 怪物全服分级刷新心跳与时间片保护 (TUserEngine.RegenMonsters @ 0x4ADF04)
+
+```c
+// IDA 0x4ADF04 @ L444~L475
+DWORD startTick = GetTickCount();
+while ( remainingCount > 0 ) {
+    int targetX = CenterX - Radius + RandInt(2 * Radius + 1);
+    int targetY = CenterY - Radius + RandInt(2 * Radius + 1);
+    SpawnMonster(Map, MonsterId, targetX, targetY);
+    
+    // 【核心时间片熔断保护】：单次心跳执行时间若超过阈值，立即熔断退出，留待下一 Tick 调度！
+    if ( GetTickCount() - startTick > MAX_REGEN_TIME_SLICE_MS ) {
+        break; // 彻底消灭单帧 Lag Spike，保障千人同屏高主频极其平滑
+    }
+    remainingCount--;
+}
+```
+- **物理事实**：官方 M2 在刷怪循环中加入了时间片切片保护，防止一次性刷成千上万只怪物撑爆 CPU 单核，保证网络通信与玩家移动始终不卡帧。
+
+---
+
+## 6. 关键函数物理地址对照表
 
 | 函数地址 (Hex) | 函数大小 | 官方模块 | 函数名 / 职责说明 |
 | :--- | :--- | :--- | :--- |
 | `0x4C1EF4` | 2202 字节 | `TCreature` | `TCreature._Attack` (物理攻击核心结算、命中判定、剑法附加、特戒触发) |
 | `0x4BDD20` | 324 字节 | `TCreature` | `TCreature.StruckDamage` (受击减伤抵扣、魔法盾吸收) |
 | `0x4D1E54` | 5178 字节 | `TPlayObject` | `TPlayObject.Command` (玩家指令解释器、PK模式切换、宠物控制) |
-| `0x4AE174` | 字符串 | `TUserEngine` | `TUserEngine.RegenMonsters` (全服怪物刷新心跳) |
-| `0x4B0A60` | 字符串 | `TUserEngine` | `TUserEngine.MakeNewHuman` (玩家登入实体实例化与属性装载) |
+| `0x4BB44C` | 446 字节 | `TCreature` | `TCreature.ScatterBagItems` (死亡爆背包：白名 1/3，红名 100%) |
+| `0x4BB6C8` | 867 字节 | `TCreature` | `TCreature.DropUseItems` (死亡爆 9 槽装备：白名 1/30，红名 1/15) |
+| `0x4ADF04` | 613 字节 | `TUserEngine` | `TUserEngine.RegenMonsters` (全服怪物刷新心跳与时间片熔断保护) |
+| `0x4B1638` | 1306 字节 | `TUserEngine` | `TUserEngine.ProcessMonsters` (怪物巡逻、索敌与攻击心跳) |
+| `0x4AFD28` | 3149 字节 | `TUserEngine` | `TUserEngine.MakeNewHuman` (玩家登入实体实例化与属性装载) |
 | `0x4B87C4` | 890 字节 | `TUserEngine` | `TUserEngine.SendDefMessage` (官方封包封装与网络投递) |
+| `0x4C5CB0` | 1306 字节 | `TCreature` | `TCreature.PickUp` (拾取地上物品判定) |
+
 

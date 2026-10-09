@@ -350,6 +350,14 @@ public sealed class PacketDispatcher
                     {
                         session.State?.AddPkMurder();
                         BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
+
+                        // 官方死亡爆装与爆背包结算 (IDA 0x4BB44C / 0x4BB6C8)
+                        var dropped = MonsterDropEngine.ExecuteDeathDrop(defender.State, OfficialClientRulesEngine.DelphiRandom.Shared);
+                        for (int d = 0; d < dropped.Count; d++)
+                        {
+                            var drop = dropped[d];
+                            BroadcastToNinePatch(defender, ProtocolConsts.SM_GROUNDITEM, drop.ItemUid, defender.X, defender.Y, 0, drop.ItemName, includeSelf: true);
+                        }
                     }
                 }
             }
@@ -447,6 +455,14 @@ public sealed class PacketDispatcher
                 {
                     session.State.AddPkMurder();
                     BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
+
+                    // 官方死亡爆装与爆背包结算 (IDA 0x4BB44C / 0x4BB6C8)
+                    var dropped = MonsterDropEngine.ExecuteDeathDrop(defender.State, OfficialClientRulesEngine.DelphiRandom.Shared);
+                    for (int d = 0; d < dropped.Count; d++)
+                    {
+                        var drop = dropped[d];
+                        BroadcastToNinePatch(defender, ProtocolConsts.SM_GROUNDITEM, drop.ItemUid, defender.X, defender.Y, 0, drop.ItemName, includeSelf: true);
+                    }
                 }
             }
         }
