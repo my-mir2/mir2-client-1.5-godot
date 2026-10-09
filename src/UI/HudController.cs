@@ -1561,6 +1561,16 @@ public partial class HudController : CanvasLayer
 
     private int _playerLevel = 35;
     private int _playerJob = 0; // 0: 战, 1: 法, 2: 道
+    private int _dcMax = 35;
+    private int _mcMax = 20;
+    private int _scMax = 20;
+
+    public void UpdateAbilities(int dcMax, int mcMax, int scMax)
+    {
+        _dcMax = dcMax;
+        _mcMax = mcMax;
+        _scMax = scMax;
+    }
 
     public void SetPlayerJobAndLevel(int job, int level)
     {
@@ -3306,6 +3316,15 @@ public partial class HudController : CanvasLayer
         if (!WeightConstraintEngine.CheckCanEquip(_playerLevel, _playerJob, equipSlot, itemWeight, curWearWeight, out string weightReason))
         {
             AddChat("系统", $"[负重拦截] {weightReason}", new Color(1f, 0.3f, 0.3f));
+            return;
+        }
+
+        // 盛大官方 1.5 装备等级与三维属性门槛检定 (如屠龙35级、六大重装40级、裁决攻击30等)
+        var (canWearAttr, reqReason) = OfficialClientRulesEngine.SpecialItemAndSetRules.CheckEquipRequirement(
+            bagItem.Value.Name, _playerLevel, _dcMax, _mcMax, _scMax);
+        if (!canWearAttr)
+        {
+            AddChat("系统", $"[穿戴拦截] 该装备无法佩戴: {reqReason}", new Color(1f, 0.3f, 0.3f));
             return;
         }
 

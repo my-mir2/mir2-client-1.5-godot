@@ -206,4 +206,84 @@ public static class OfficialClientRulesEngine
             return ("#FFFFFF", false); // 白名
         }
     }
+
+    // ============================================================================
+    // 6. 官方 1.5 七大特戒与装备佩戴门槛本地判定引擎
+    // ============================================================================
+    public static class SpecialItemAndSetRules
+    {
+        public enum SpecialRingType
+        {
+            None = 0,
+            Paralysis = 1,   // 麻痹戒指 (攻击 1/15 几率麻痹目标 5 秒)
+            Protection = 2,  // 护身戒指 (受击以 MP 代扣 HP，比例 1:1.5)
+            Revive = 3,      // 复活戒指 (致命伤瞬间恢复满 HP，消耗 1 点持久)
+            Invisibility = 4,// 隐身戒指 (怪物完全无视，移动不破隐)
+            Teleport = 5,    // 传送戒指 (@move / 客户端点击小地图瞬移)
+            Load = 6,        // 超负载戒指 (背包腕力负重上限翻倍)
+            Fire = 7         // 火焰戒指 (战士/道士可直接施放小火球)
+        }
+
+        public static SpecialRingType IdentifySpecialRing(string itemName) => itemName switch
+        {
+            "麻痹戒指" => SpecialRingType.Paralysis,
+            "护身戒指" => SpecialRingType.Protection,
+            "复活戒指" => SpecialRingType.Revive,
+            "隐身戒指" => SpecialRingType.Invisibility,
+            "传送戒指" => SpecialRingType.Teleport,
+            "超负载戒指" => SpecialRingType.Load,
+            "火焰戒指" => SpecialRingType.Fire,
+            _ => SpecialRingType.None
+        };
+
+        /// <summary>
+        /// 麻痹戒指攻击判定 (1/15 概率触发 5 秒麻痹硬直)
+        /// </summary>
+        public static bool CheckParalysisTrigger(DelphiRandom rng) => rng.Next(15) == 0;
+
+        /// <summary>
+        /// 护身戒指伤害抵扣计算 (以 MP 吸收伤害)
+        /// </summary>
+        public static (int absorbedDmg, int remainingDmg, int mpConsumed) CalculateProtectionDamage(int damage, int curMp)
+        {
+            if (damage <= 0 || curMp <= 0) return (0, damage, 0);
+            int neededMp = (int)(damage * 1.5f);
+            if (curMp >= neededMp)
+            {
+                return (damage, 0, neededMp);
+            }
+            else
+            {
+                int absorb = (int)(curMp / 1.5f);
+                return (absorb, damage - absorb, curMp);
+            }
+        }
+
+        /// <summary>
+        /// 装备穿戴门槛判定 (根据角色等级与三维属性检查是否满足佩戴要求)
+        /// </summary>
+        public static (bool canWear, string rejectReason) CheckEquipRequirement(
+            string itemName, int playerLevel, int dcMax, int mcMax, int scMax)
+        {
+            if (string.IsNullOrEmpty(itemName)) return (true, string.Empty);
+
+            // 盛大官方 1.5 代表性高阶神兵与重装门槛 (对齐 IDA ItemDB 与 Delphi sub_48A7BC)
+            if (itemName.Contains("裁决之杖") && dcMax < 30) return (false, "需要攻击力达到 30 点");
+            if (itemName.Contains("骨玉权杖") && mcMax < 17) return (false, "需要魔法力达到 17 点");
+            if (itemName.Contains("龙纹剑") && scMax < 17) return (false, "需要道术力达到 17 点");
+            if (itemName.Contains("屠龙") && playerLevel < 35) return (false, "需要等级达到 35 级");
+            if (itemName.Contains("嗜魂法杖") && playerLevel < 35) return (false, "需要等级达到 35 级");
+            if (itemName.Contains("霸者之刃") && playerLevel < 38) return (false, "需要等级达到 38 级");
+
+            // 六大重装 (天魔神甲/圣战宝甲/法神披风/霓裳羽衣/天尊道袍/天师长袍)
+            if ((itemName.Contains("天魔神甲") || itemName.Contains("圣战宝甲") ||
+                 itemName.Contains("法神披风") || itemName.Contains("霓裳羽衣") ||
+                 itemName.Contains("天尊道袍") || itemName.Contains("天师长袍")) && playerLevel < 40)
+            {
+                return (false, "需要等级达到 40 级");
+            }
+
+            return (true, string.Empty);
+        }
+    }
 }
