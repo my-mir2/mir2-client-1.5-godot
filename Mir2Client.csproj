@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace></RootNamespace>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests/CSharp/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/CSharp/**;src/Mir2.Shared/**;src/Mir2.Server/**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="src\Mir2.Shared\Mir2.Shared.csproj" />
+  </ItemGroup>
 </Project>

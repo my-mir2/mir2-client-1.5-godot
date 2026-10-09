@@ -19,5 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Mir2Client.csproj" />
+    <ProjectReference Include="..\..\src\Mir2.Shared\Mir2.Shared.csproj" />
   </ItemGroup>
 </Project>
