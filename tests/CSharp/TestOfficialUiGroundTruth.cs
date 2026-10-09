@@ -140,10 +140,10 @@ public class TestOfficialUiGroundTruth
     public void TestSecurityPasswordDialog_ProtocolAndMasking()
     {
         // 官方二级安全密码协议号 SM_NEEDPASSWORD = 2014, 与 mir-shared / Delphi DPassword 100% 对齐
-        Assert.Equal(2014, Mir2Client.Net.ProtocolConsts.SM_NEEDPASSWORD);
-        Assert.Equal(2015, Mir2Client.Net.ProtocolConsts.SM_PASSWORDSTATUS);
-        Assert.Equal(2016, Mir2Client.Net.ProtocolConsts.SM_GETREGINFO);
-        Assert.Equal(2017, Mir2Client.Net.ProtocolConsts.SM_PASSWORD);
+        Assert.Equal(2014, ProtocolConsts.SM_NEEDPASSWORD);
+        Assert.Equal(2015, ProtocolConsts.SM_PASSWORDSTATUS);
+        Assert.Equal(2016, ProtocolConsts.SM_GETREGINFO);
+        Assert.Equal(2017, ProtocolConsts.SM_PASSWORD);
 
         // 验证 MessageBoxDialog 的面板尺寸与输入框位置 (IDA sub_486DF0 @ 0x4872f0: Width=452, Height=179, Input Left=35, Top=75, W=382, H=16)
         Assert.Equal(452.0f, MessageBoxDialog.PanelWidth);
@@ -220,8 +220,8 @@ public class TestOfficialUiGroundTruth
     public void TestAttackModeAndDayNight_OfficialGroundTruth()
     {
         // 1. 协议号铁证 (IDA sub_467920 case 766 @ 0x468A2B & 快捷键 0x4964aa)
-        Assert.Equal(1019, Mir2Client.Net.ProtocolConsts.CM_CHANGEATTACKMODE);
-        Assert.Equal(766, Mir2Client.Net.ProtocolConsts.SM_ATTACKMODECHANGED);
+        Assert.Equal(1019, ProtocolConsts.CM_CHANGEATTACKMODE);
+        Assert.Equal(766, ProtocolConsts.SM_ATTACKMODECHANGED);
         Assert.Equal(766, Mir2Client.Net.ServerMessageRouter.SM_ATTACKMODECHANGED);
 
         // 2. HUD 攻击模式图标物理坐标与贴图映射 (IDA sub_48B2A0 0x48b8e0..0x48b92b)
@@ -367,19 +367,19 @@ public class TestOfficialUiGroundTruth
         // 6. 模态窗 IDA sub_486DF0 尺寸 Prguse_0360 (452x179), 按钮 OK(130, 126), Cancel(242, 126)
         Assert.Equal(452.0f, MessageBoxDialog.PanelWidth);
         Assert.Equal(179.0f, MessageBoxDialog.PanelHeight);
-        Assert.Equal(1039, Net.ProtocolConsts.CM_GUILD_KICK_MEMBER);
-        Assert.Equal(1044, Net.ProtocolConsts.CM_GUILD_ALLY_REQUEST);
-        Assert.Equal(1045, Net.ProtocolConsts.CM_GUILD_BREAK_ALLY);
-        Assert.Equal(1041, Net.ProtocolConsts.CM_GUILD_UPDATE_RANK);
-        Assert.Equal(1037, Net.ProtocolConsts.CM_GUILD_MEMBER_LIST);
-        Assert.Equal(1040, Net.ProtocolConsts.CM_GUILD_NOTICE_UPDATE);
-        Assert.Equal(757, Net.ProtocolConsts.SM_GUILDADDMEMBEROK);
-        Assert.Equal(754, Net.ProtocolConsts.SM_GUILDADDMEMBERFAIL);
-        Assert.Equal(759, Net.ProtocolConsts.SM_GUILDDELMEMBEROK);
-        Assert.Equal(760, Net.ProtocolConsts.SM_GUILDDELMEMBERFAIL);
-        Assert.Equal(762, Net.ProtocolConsts.SM_BUILDGUILDOK);
-        Assert.Equal(763, Net.ProtocolConsts.SM_BUILDGUILDFAIL);
-        Assert.Equal(761, Net.ProtocolConsts.SM_GUILDRANKUPDATEFAIL);
+        Assert.Equal(1039, ProtocolConsts.CM_GUILD_KICK_MEMBER);
+        Assert.Equal(1044, ProtocolConsts.CM_GUILD_ALLY_REQUEST);
+        Assert.Equal(1045, ProtocolConsts.CM_GUILD_BREAK_ALLY);
+        Assert.Equal(1041, ProtocolConsts.CM_GUILD_UPDATE_RANK);
+        Assert.Equal(1037, ProtocolConsts.CM_GUILD_MEMBER_LIST);
+        Assert.Equal(1040, ProtocolConsts.CM_GUILD_NOTICE_UPDATE);
+        Assert.Equal(757, ProtocolConsts.SM_GUILDADDMEMBEROK);
+        Assert.Equal(754, ProtocolConsts.SM_GUILDADDMEMBERFAIL);
+        Assert.Equal(759, ProtocolConsts.SM_GUILDDELMEMBEROK);
+        Assert.Equal(760, ProtocolConsts.SM_GUILDDELMEMBERFAIL);
+        Assert.Equal(762, ProtocolConsts.SM_BUILDGUILDOK);
+        Assert.Equal(763, ProtocolConsts.SM_BUILDGUILDFAIL);
+        Assert.Equal(761, ProtocolConsts.SM_GUILDRANKUPDATEFAIL);
     }
 
     [Fact]
@@ -417,7 +417,7 @@ public class TestOfficialUiGroundTruth
     public void TestButchMechanics_OfficialDelphiGroundTruth()
     {
         // 1. 协议铁证 (Delphi ClMain.pas:4019 SendButchAnimal & Grobal2.pas CM_BUTCH)
-        Assert.Equal(1007, Mir2Client.Net.ProtocolConsts.CM_BUTCHITEM);
+        Assert.Equal(1007, ProtocolConsts.CM_BUTCHITEM);
 
         // 2. Alt 键割肉手势与坐下姿态 (Delphi ClMain.pas:2890 ssAlt in Shift -> SendMsg(CM_SITDOWN))
         int butchAction = (int)Mir2Client.Render.ActionType.SitDown;
@@ -460,8 +460,8 @@ public class TestOfficialUiGroundTruth
     public void TestEntityActionDigUpAndFlyAxe_OfficialGroundTruth()
     {
         // 1. 盛大官方 1.5 实体动作族真值验证 (scratch/ida_processmsg.c 行 1276~1296: case 8, 14, 15, 16, 18, 19, 24)
-        Assert.Equal(15, Mir2Client.Net.ProtocolConsts.SM_DIGUP_ACTION_DELPHI);
-        Assert.Equal(16, Mir2Client.Net.ProtocolConsts.SM_FLYAXE_ACTION_DELPHI);
+        Assert.Equal(15, ProtocolConsts.SM_DIGUP_ACTION_DELPHI);
+        Assert.Equal(16, ProtocolConsts.SM_FLYAXE_ACTION_DELPHI);
 
         // 2. EntityManager 破土状态维护实证 (case 15: *(_BYTE *)(v71 + 220) = 1)
         var em = new Mir2Client.Game.EntityManager();
@@ -491,7 +491,7 @@ public class TestOfficialUiGroundTruth
 
         // 3. 官方 1.5 case 50 进入世界组队初始状态协议实证 (scratch/ida_processmsg.c 行 1425: byte_4F94F8 = (_BYTE)v64 == 1)
         var pktLogon = new Mir2Client.Net.ServerPacket(
-            ident: Mir2Client.Net.ProtocolConsts.SM_LOGON_DELPHI,
+            ident: ProtocolConsts.SM_LOGON_DELPHI,
             recog: 8888,
             param: 100,
             tag: 100,

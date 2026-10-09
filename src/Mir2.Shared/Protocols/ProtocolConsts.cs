@@ -1,4 +1,4 @@
-namespace Mir2Client.Net;
+namespace Mir2.Shared.Protocols;
 
 /// <summary>
 /// 盛大官方 1.5 原版网络通信协议全集 (MIR_final_v3_p.exe 权威实证)

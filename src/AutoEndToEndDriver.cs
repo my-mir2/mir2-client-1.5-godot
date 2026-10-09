@@ -1728,7 +1728,7 @@ public partial class AutoEndToEndDriver : Node
                     // 4. 模拟服务端下发行会添加成员失败模态通知 (SM_GUILDADDMEMBERFAIL 754)
                     byte[] extra = System.Text.Encoding.UTF8.GetBytes("目标玩家不在视野范围内或已加入其他行会");
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_GUILDADDMEMBERFAIL,
+                        ProtocolConsts.SM_GUILDADDMEMBERFAIL,
                         0,
                         0,
                         0,
@@ -1762,26 +1762,26 @@ public partial class AutoEndToEndDriver : Node
                     GD.Print("[AutoE2E] === 验证官方 1.5 仓库音效、保管箱满仓、打造失败与行会通知模态协议 (SM 702/707/711/714/772) ===");
                     // 1. 模拟播放存取金币音效 (SM_STORAGE_SOUND 711)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_STORAGE_SOUND,
+                        ProtocolConsts.SM_STORAGE_SOUND,
                         0, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 2. 模拟仓库满仓错误弹窗 (SM_SAVEITEM_FULL 702)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_SAVEITEM_FULL,
+                        ProtocolConsts.SM_SAVEITEM_FULL,
                         0, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 3. 模拟打造特修物品失败 (SM_MAKEOBJECT_FAIL 714, recog=3 金币不足)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_MAKEOBJECT_FAIL,
+                        ProtocolConsts.SM_MAKEOBJECT_FAIL,
                         3, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 4. 模拟官方行会通用下发模态通知 (SM_GUILD_MODALMSG 772)
                     byte[] gMsg = System.Text.Encoding.UTF8.GetBytes("行会掌门已开启全员行会攻城总动员！");
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_GUILD_MODALMSG,
+                        ProtocolConsts.SM_GUILD_MODALMSG,
                         0, 0, 0, gMsg
                     ));
                 }
@@ -1797,31 +1797,31 @@ public partial class AutoEndToEndDriver : Node
                     GD.Print("[AutoE2E] === 验证官方 1.5 铁匠铺修理、买卖失败模态弹窗与空间瞬移突变 (SM 649/651/669/670/674/804/806/807) ===");
                     // 1. 模拟出售失败模态弹窗 (SM_SELL_FAIL_DELPHI 649)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_SELL_FAIL_DELPHI,
+                        ProtocolConsts.SM_SELL_FAIL_DELPHI,
                         0, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 2. 模拟购买失败模态弹窗 (SM_BUY_FAIL_DELPHI 651, recog=3 金币不足)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_BUY_FAIL_DELPHI,
+                        ProtocolConsts.SM_BUY_FAIL_DELPHI,
                         3, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 3. 模拟铁匠铺修理失败模态弹窗 (SM_REPAIRFAIL_DELPHI 670)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_REPAIRFAIL_DELPHI,
+                        ProtocolConsts.SM_REPAIRFAIL_DELPHI,
                         0, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 4. 模拟交易面对面未对齐模态弹窗 (SM_DEALTRY_FAIL 674)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_DEALTRY_FAIL,
+                        ProtocolConsts.SM_DEALTRY_FAIL,
                         0, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 5. 模拟空间瞬移位移突变 (SM_TELEPORT 804, x=330, y=270)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_TELEPORT,
+                        ProtocolConsts.SM_TELEPORT,
                         0, 330, 270, Array.Empty<byte>()
                     ));
                 }
@@ -1838,37 +1838,37 @@ public partial class AutoEndToEndDriver : Node
                     // 1. 模拟收到组队邀请确认弹窗 (SM_GROUP_INVITE_CONFIRM 658)
                     byte[] inviter = System.Text.Encoding.UTF8.GetBytes("风云九哥");
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_GROUP_INVITE_CONFIRM,
+                        ProtocolConsts.SM_GROUP_INVITE_CONFIRM,
                         0, 0, 0, inviter
                     ));
 
                     // 2. 模拟组队模式开关变动回显 (SM_GROUP_MODE_CHANGED 660, 开启组队)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_GROUP_MODE_CHANGED,
+                        ProtocolConsts.SM_GROUP_MODE_CHANGED,
                         1, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 3. 模拟邀请入组反馈错误 (SM_MAPDESCRIPTION 661, recog=-3 对方已有编组)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_MAPDESCRIPTION,
+                        ProtocolConsts.SM_MAPDESCRIPTION,
                         -3, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 4. 模拟创建编组失败模态弹窗 (SM_CREATEGROUP_FAIL 664, recog=-1 编组未成立或等级不够)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_CREATEGROUP_FAIL,
+                        ProtocolConsts.SM_CREATEGROUP_FAIL,
                         -1, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 5. 模拟踢出/退组失败模态弹窗 (SM_LEAVEGROUP_FAIL 665, recog=-3 不在编组中)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_LEAVEGROUP_FAIL,
+                        ProtocolConsts.SM_LEAVEGROUP_FAIL,
                         -3, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 6. 模拟解散编组清空 (SM_DISMISS_GROUP 666)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_DISMISS_GROUP,
+                        ProtocolConsts.SM_DISMISS_GROUP,
                         0, 0, 0, Array.Empty<byte>()
                     ));
                 }
@@ -1884,61 +1884,61 @@ public partial class AutoEndToEndDriver : Node
                     GD.Print("[AutoE2E] === 验证官方 1.5 升级、饥饿度、小地图、掉落物消失与行会失败模态 (SM 653/657/708/710/805/758/760/761/769/771) ===");
                     // 1. 模拟角色升级协议 (SM_LEVELUP_DELPHI 653, level=40)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_LEVELUP_DELPHI,
+                        ProtocolConsts.SM_LEVELUP_DELPHI,
                         40, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 2. 模拟角色饥饿度/体态变动 (SM_MYSTATUS 708, hunger=85)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_MYSTATUS,
+                        ProtocolConsts.SM_MYSTATUS,
                         85, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 3. 模拟小地图雷达校准 (SM_READMINIMAP_OK 710)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_READMINIMAP_OK,
+                        ProtocolConsts.SM_READMINIMAP_OK,
                         1, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 4. 模拟实体增益/减益状态同步 (SM_CHARSTATUSCHANGED 657)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_CHARSTATUSCHANGED,
+                        ProtocolConsts.SM_CHARSTATUSCHANGED,
                         1001, 10, 0, Array.Empty<byte>()
                     ));
 
                     // 5. 模拟地表掉落物拾取/消失 (SM_ITEMHIDE 805)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_ITEMHIDE,
+                        ProtocolConsts.SM_ITEMHIDE,
                         9999, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 6. 模拟加入行会失败模态 (SM_GUILDJOINFAIL 758, recog=2 对方已入其他行会)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_GUILDJOINFAIL,
+                        ProtocolConsts.SM_GUILDJOINFAIL,
                         2, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 7. 模拟行会踢人失败模态 (SM_GUILDDELMEMBERFAIL 760, recog=3 不能开除掌门人)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_GUILDDELMEMBERFAIL,
+                        ProtocolConsts.SM_GUILDDELMEMBERFAIL,
                         3, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 8. 模拟行会更改封号失败 (SM_GUILDRANKUPDATEFAIL 761, recog=-2 封号长度不符)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_GUILDRANKUPDATEFAIL,
+                        ProtocolConsts.SM_GUILDRANKUPDATEFAIL,
                         -2, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 9. 模拟行会结盟失败 (SM_GUILDMAKEALLYFAIL 769, recog=-2 对方拒绝结盟)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_GUILDMAKEALLYFAIL,
+                        ProtocolConsts.SM_GUILDMAKEALLYFAIL,
                         -2, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 10. 模拟行会解盟失败 (SM_GUILDBREAKALLYFAIL 771, recog=-2 该行会不是同盟行会)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_GUILDBREAKALLYFAIL,
+                        ProtocolConsts.SM_GUILDBREAKALLYFAIL,
                         -2, 0, 0, Array.Empty<byte>()
                     ));
                 }
@@ -1954,55 +1954,55 @@ public partial class AutoEndToEndDriver : Node
                     GD.Print("[AutoE2E] === 验证官方 1.5 选服列表、脱装回滚、估价耐久与油灯持久 (SM 520/523/524/528/620/640/642/654/655/663/704/709/712) ===");
                     // 1. 模拟选服与角色查询/删角
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_SERVERLIST,
+                        ProtocolConsts.SM_SERVERLIST,
                         1, 0, 0, Array.Empty<byte>()
                     ));
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_QUERYCHAR_OK,
+                        ProtocolConsts.SM_QUERYCHAR_OK,
                         1, 0, 0, Array.Empty<byte>()
                     ));
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_DELCHAR_FAIL_DELPHI,
+                        ProtocolConsts.SM_DELCHAR_FAIL_DELPHI,
                         0, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 2. 模拟脱装失败原子回滚 (SM_TAKEOFF_FAIL 620, slot=1 衣服)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_TAKEOFF_FAIL,
+                        ProtocolConsts.SM_TAKEOFF_FAIL,
                         0, 1, 0, Array.Empty<byte>()
                     ));
 
                     // 3. 模拟商店估价与物品持久 (SM_QUERYPRICE_REC 640, SM_DURACHANGE_REC 642)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_QUERYPRICE_REC,
+                        ProtocolConsts.SM_QUERYPRICE_REC,
                         25000, 0, 0, Array.Empty<byte>()
                     ));
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_DURACHANGE_REC,
+                        ProtocolConsts.SM_DURACHANGE_REC,
                         12000, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 4. 模拟油灯蜡烛持久消耗 (SM_LAMPCHANGEDURA 655, dura=320)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_LAMPCHANGEDURA,
+                        ProtocolConsts.SM_LAMPCHANGEDURA,
                         320, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 5. 模拟踢出组员成功 (SM_KICKMEMBER_OK 663)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_KICKMEMBER_OK,
+                        ProtocolConsts.SM_KICKMEMBER_OK,
                         0, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 6. 模拟仓库物品列表刷新 (SM_USERSTORAGE_ITEMS 704)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_USERSTORAGE_ITEMS,
+                        ProtocolConsts.SM_USERSTORAGE_ITEMS,
                         0, 0, 0, Array.Empty<byte>()
                     ));
 
                     // 7. 模拟技能遗忘删除 (SM_DELUSERMAGIC_DELPHI 709, magicId=12)
                     gameView.ServerMessageRouterInstance?.OnPacket(new Mir2Client.Net.ServerPacket(
-                        Mir2Client.Net.ProtocolConsts.SM_DELUSERMAGIC_DELPHI,
+                        ProtocolConsts.SM_DELUSERMAGIC_DELPHI,
                         12, 0, 0, Array.Empty<byte>()
                     ));
                 }
