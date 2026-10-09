@@ -456,8 +456,8 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_CREATEGROUP_FAIL: // 664: 创建编组失败模态弹窗 (IDA 0x46A42E)
                 HandleCreateGroupFail(packet);
                 break;
-            case ProtocolConsts.SM_LEAVEGROUP_FAIL: // 665: 踢出/退出编组失败模态弹窗 (IDA 0x46A4CE)
-                HandleLeaveGroupFail(packet);
+            case ProtocolConsts.SM_LEAVEGROUP_FAIL: // 665: 踢出/退出编组失败模态弹窗 (Recog < 0) 或 割肉成功广播 (Recog >= 0)
+                HandleLeaveGroupFailOrButch(packet);
                 break;
             case ProtocolConsts.SM_DISMISS_GROUP: // 666: 盛大官方 1.5 组队成员重绘回调与解散处理 (IDA case 666: (*(void (**)(void))(*(_DWORD *)dword_4F94FC + 64))())
                 _hud?.GroupPanel?.RefreshMembers();
@@ -1984,11 +1984,35 @@ public sealed class ServerMessageRouter
     }
 
     /// <summary>
-    /// 处理踢出/退出编组失败 (SM_LEAVEGROUP_FAIL 665)
-    /// 严格对齐官方 Delphi sub_467920 (0x46A4CE)
+    /// 处理踢出/退出编组失败 (SM_LEAVEGROUP_FAIL 665, Recog < 0) 或 割肉成功广播 (SM_BUTCH 665, Recog >= 0)
+    /// 严格对齐官方 Delphi sub_467920 (0x46A4CE / case 665) 与 bridge.rs:2592
     /// </summary>
-    private void HandleLeaveGroupFail(ServerPacket pkt)
+    private void HandleLeaveGroupFailOrButch(ServerPacket pkt)
     {
+        if (pkt.Recog >= 0)
+        {
+            string itemName = !string.IsNullOrEmpty(pkt.ExtraStr) ? pkt.ExtraStr : DecodeExtraText(pkt.Extra);
+            if (string.IsNullOrEmpty(itemName)) itemName = "肉块";
+
+            int uid = pkt.Recog;
+            bool isLocal = _gameView?.PlayerInstance != null && (uid == 0 || uid == _gameView.SessionId || uid == _gameView.PlayerInstance.Uid);
+            if (isLocal)
+            {
+                _hud?.AddChat("割肉", $"[割肉] 割肉成功，获得了【{itemName}】。", new Color(1f, 0.85f, 0.2f));
+                AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick);
+            }
+            else if (_entityManager != null && uid > 0)
+            {
+                var ent = _entityManager.GetEntity(uid);
+                if (ent != null)
+                {
+                    ent.Direction = (byte)(pkt.Param & 7);
+                }
+            }
+            SafeLog($"[SM] 割肉广播 (SM_BUTCH=665, uid={uid}, item={itemName})");
+            return;
+        }
+
         string errMsg = pkt.Recog switch
         {
             -1 => "编组还未成立或者你还不够等级创建。", // 官方 IDA 0x46BA44

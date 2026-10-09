@@ -3099,6 +3099,44 @@ public class TestProtocolMatrix
         Assert.Equal(2, moveDir);
         Assert.True(moveIsRun);
     }
+
+    [Fact]
+    public void TestOfficialButcherProtocolFlow()
+    {
+        // 1. 验证割肉协议号常量严格对齐
+        Assert.Equal(1007, ProtocolConsts.CM_BUTCHITEM);
+        Assert.Equal(665, ProtocolConsts.SM_BUTCH);
+        Assert.Equal(665, ProtocolConsts.SM_LEAVEGROUP_FAIL);
+
+        // 2. 编码 CM_BUTCHITEM 发包验证 (携带被割怪物 UID=1005 与目标坐标 330, 270)
+        byte[] butchPacket = PacketEncoder.ButchItem(1005, 330, 270);
+        Assert.NotNull(butchPacket);
+        Assert.True(butchPacket[0] >= (byte)'0' && butchPacket[0] <= (byte)'9');
+        Assert.Equal((byte)'\n', butchPacket[^1]);
+
+        var decoded = PacketDecoder.Parse(butchPacket.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_BUTCHITEM, decoded.Ident);
+        Assert.Equal(1005, decoded.Recog);
+        Assert.Equal(330, decoded.Param);
+        Assert.Equal(270, decoded.Tag);
+
+        // 3. 模拟 SM_BUTCH (665, Recog >= 0) 割肉下行广播解构
+        var butcherPacket = new ServerPacket(665, 1005, 0, 0, Encoding.UTF8.GetBytes("品质18的鹿肉"));
+        Assert.True(butcherPacket.Recog >= 0);
+        Assert.Equal("品质18的鹿肉", butcherPacket.ExtraStr);
+
+        // 4. 模拟 SM_LEAVEGROUP_FAIL (665, Recog < 0) 退组失败解构
+        var failPacket = new ServerPacket(665, -1, 0, 0, Array.Empty<byte>());
+        Assert.True(failPacket.Recog < 0);
+        string errMsg = failPacket.Recog switch
+        {
+            -1 => "编组还未成立或者你还不够等级创建。",
+            -2 => "这个被加进编组的名字是不正确的。",
+            -3 => "你仍旧不在编组中。",
+            _ => "组队操作失败。"
+        };
+        Assert.Equal("编组还未成立或者你还不够等级创建。", errMsg);
+    }
 }
 
 

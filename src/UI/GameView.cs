@@ -1470,10 +1470,22 @@ namespace Mir2Client.UI
             PlayerInstance.Direction = dir;
             PlayerInstance.Anim.SetAction(ActionType.SitDown, dir);
 
-            // 2. 真实网络发包
+            // 2. 检索目标地块上的死者尸体 UID (对齐 bridge.rs:886 pkt.recog)
+            int targetUid = 0;
+            var corpses = EntityManagerInstance.GetEntitiesAt(tx, ty);
+            for (int i = 0; i < corpses.Count; i++)
+            {
+                if (corpses[i].IsDead)
+                {
+                    targetUid = corpses[i].Uid;
+                    break;
+                }
+            }
+
+            // 3. 真实网络发包
             if (_net != null && _net.IsConnectedToServer)
             {
-                _net.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_BUTCHITEM, 0, (short)tx, (short)ty));
+                _net.SendPacket(PacketEncoder.ButchItem(targetUid, (short)tx, (short)ty));
             }
             else if (_isSandbox)
             {

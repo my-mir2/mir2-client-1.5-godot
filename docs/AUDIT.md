@@ -7827,11 +7827,26 @@
       - 在 `src/Net/ServerMessageRouter.cs` 中实现 240、241、242 与 251 的完整路由分发与坐标解析；
       - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialEntityActionAndMoveProtocolFlow` 单元测试，脱机测试总数提升至 **215 / 215 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+  - [x] **71. 盛大官方 1.5 Alt+割肉发包目标尸体 UID 绑定与割肉下行 665 歧义消除闭环 (CM_BUTCHITEM 1007 / SM_BUTCH 665)** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据 `sub_465BB8` (ClMain.pas:2890 ssAlt in Shift -> SendButchAnimal / case 1007)、`scratch/ida_processmsg.c` 行 378~388 (case 665) 与 Rust 服务端 `mir2-my/bridge.rs` (行 41/359/886/2592)：
+        1. 割肉上行发包实体 UID 缺失坏账根除：
+           服务端网关接收 `CM_BUTCHITEM (1007)` 时严格取 `pkt.recog as u64` 作为目标被屠宰怪物 ID；此前客户端在 `PerformButcher` 中硬编码发送 `recog = 0`，未对目标瓦片上的怪物尸体进行检索，导致服务端无法获知割肉目标；
+        2. 下行 665 协议号双端严重歧义消除：
+           官方 1.5 二进制 `case 665` 物理指令为：当 `Recog < 0` 时为退出/踢出编组失败模态弹窗（-1/-2/-3 错误码）；而当服务端下发割肉成功广播 `SM_BUTCH (665)` 时，携带的 `Recog` 为怪物实体 UID（>= 0），负载为肉品名称（如“品质18的鹿肉”）；此前客户端将 665 恒定误判为编组失败弹窗，导致每次割肉均弹出“退出编组失败”模态框阻断；
+        3. 双向自愈与状态闭环：
+           在 `GameView.cs` 中增加目标地块尸体 UID 检索，并使用 `PacketEncoder.ButchItem(targetUid, tx, ty)` 精准发包；在 `ServerMessageRouter.cs` 中将 665 分流为 `Recog >= 0`（割肉成功广播入包并播放金币/物品点击音效）与 `Recog < 0`（退组失败模态框）。
+    - **精准重构**：
+      - 在 `src/Net/ProtocolConsts.cs` 中补齐 `SM_BUTCH = 665` 常量别名；
+      - 在 `src/UI/GameView.cs` 的 `PerformButcher` 中检索目标地块上的死者尸体 UID 并传给发包器；
+      - 在 `src/Net/ServerMessageRouter.cs` 中实现 `HandleLeaveGroupFailOrButch` 消除 665 歧义；
+      - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialButcherProtocolFlow` 单元测试，脱机测试总数提升至 **216 / 216 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **215 / 215 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **216 / 216 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
