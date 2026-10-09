@@ -5,6 +5,7 @@ using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Rules;
 
 namespace Mir2.Server.Game;
 
@@ -71,6 +72,10 @@ public sealed class PacketDispatcher
 
             case ProtocolConsts.CM_RUN: // 3013 跑步 (2格)
                 HandleMove(session, remaining, isRun: true);
+                break;
+
+            case ProtocolConsts.CM_HIT: // 3014 物理攻击
+                HandleHit(session, remaining);
                 break;
 
             case ProtocolConsts.CM_SAY: // 3030 聊天通道
@@ -174,8 +179,36 @@ public sealed class PacketDispatcher
             int.TryParse(ySpan, out int newY) &&
             int.TryParse(dirSpan, out int dir))
         {
+            // 1. 地图边界物理约束 (比奇省 400x400)
+            if (newX < 0 || newX >= 400 || newY < 0 || newY >= 400) return;
+
             int oldX = session.X;
             int oldY = session.Y;
+
+            // 2. 步长与防瞬移物理校验 (行走限 1 格，跑步限 2 格)
+            int maxDist = isRun ? 2 : 1;
+            int deltaX = Math.Abs(newX - oldX);
+            int deltaY = Math.Abs(newY - oldY);
+            if (deltaX > maxDist || deltaY > maxDist)
+            {
+                // 非法瞬移拉回当前坐标: SM_SENDUSERSTATE (250)
+                session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, oldX, oldY, dir, session.CharacterName);
+                return;
+            }
+
+            // 3. 移动速度反外挂检测 (最小间隔校验)
+            long nowMs = Environment.TickCount64;
+            if (session.LastMoveTimeMs > 0)
+            {
+                var (isSpeedHack, shouldRollback) = EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(nowMs, session.LastMoveTimeMs);
+                if (isSpeedHack && shouldRollback)
+                {
+                    // 移动过快判定外挂拉回
+                    session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, oldX, oldY, dir, session.CharacterName);
+                    return;
+                }
+            }
+            session.LastMoveTimeMs = nowMs;
 
             // 更新实体坐标
             session.X = newX;
@@ -187,6 +220,35 @@ public sealed class PacketDispatcher
             // 广播移动数据帧: 行走 SM_OBJECTWALK (241) / 跑步 SM_OBJECTRUN (240)
             short smCode = isRun ? ProtocolConsts.SM_OBJECTRUN : ProtocolConsts.SM_OBJECTWALK;
             BroadcastToNinePatch(session, smCode, session.SessionId, newX, newY, dir, session.CharacterName, includeSelf: false);
+        }
+    }
+
+    private void HandleHit(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 格式: 目标X/目标Y/朝向 (CM_HIT)
+        int slash1 = payload.IndexOf('/');
+        if (slash1 < 0) return;
+        ReadOnlySpan<char> xSpan = payload[..slash1];
+        ReadOnlySpan<char> rest = payload[(slash1 + 1)..];
+        int slash2 = rest.IndexOf('/');
+        if (slash2 < 0) return;
+        ReadOnlySpan<char> ySpan = rest[..slash2];
+        ReadOnlySpan<char> dirSpan = rest[(slash2 + 1)..];
+
+        if (int.TryParse(xSpan, out int targetX) &&
+            int.TryParse(ySpan, out int targetY) &&
+            int.TryParse(dirSpan, out int dir))
+        {
+            long nowMs = Environment.TickCount64;
+            // 攻击速度校验 (间隔必须 >= 680ms)
+            if (session.LastAttackTimeMs > 0 && !EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(nowMs, session.LastAttackTimeMs))
+            {
+                return; // 挥刀过快拦截
+            }
+            session.LastAttackTimeMs = nowMs;
+
+            // 向九宫格广播普通物理挥刀动作: SM_OBJECTHIT (242)
+            BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTHIT, session.SessionId, session.X, session.Y, dir, session.CharacterName, includeSelf: false);
         }
     }
 

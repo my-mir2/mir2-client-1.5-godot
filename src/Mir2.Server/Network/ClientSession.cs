@@ -31,6 +31,9 @@ public sealed class ClientSession : IDisposable
     public int CurrentMapId { get; set; }
     public int X { get; set; }
     public int Y { get; set; }
+    public long LastMoveTimeMs { get; set; }
+    public long LastAttackTimeMs { get; set; }
+    public long LastSpellTimeMs { get; set; }
     public bool IsConnected => _socket.Connected;
 
     public ClientSession(int sessionId, Socket socket)
@@ -59,7 +62,7 @@ public sealed class ClientSession : IDisposable
             // 构造官方 1.5 封包字符串格式
             // 示例: #50/1001/0/0/0/extra!
             var packetStr = $"#{ident}/{recog}/{param}/{tag}/{series}/{extra}!";
-            int written = Encoding.ASCII.GetBytes(packetStr, _sendBuffer.AsSpan(_sendBufferOffset));
+            int written = Encoding.UTF8.GetBytes(packetStr, _sendBuffer.AsSpan(_sendBufferOffset));
             _sendBufferOffset += written;
         }
     }

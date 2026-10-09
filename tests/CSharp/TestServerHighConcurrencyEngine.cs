@@ -221,9 +221,9 @@ public class TestServerHighConcurrencyEngine
 
             // 清空各自的接收缓冲
             byte[] flushBuf = new byte[4096];
-            while (streamA.DataAvailable) await streamA.ReadAsync(flushBuf);
-            while (streamB.DataAvailable) await streamB.ReadAsync(flushBuf);
-            while (streamC.DataAvailable) await streamC.ReadAsync(flushBuf);
+            while (streamA.DataAvailable) _ = await streamA.ReadAsync(flushBuf, 0, flushBuf.Length);
+            while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
+            while (streamC.DataAvailable) _ = await streamC.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 客户端 A 发起行走动作 CM_WALK: 移动到 161, 160, 朝向 2 (右)
             byte[] walkPkt = Encoding.ASCII.GetBytes("#3011/161/160/2!");
@@ -236,12 +236,82 @@ public class TestServerHighConcurrencyEngine
             // 1. 同屏客户端 B 必须收到客户端 A 的移动广播 SM_OBJECTWALK (241)
             Assert.True(streamB.DataAvailable, "同屏邻近客户端 B 必须收到九宫格广播");
             byte[] readB = new byte[2048];
-            int lenB = await streamB.ReadAsync(readB);
+            int lenB = await streamB.ReadAsync(readB, 0, readB.Length);
             string respB = Encoding.ASCII.GetString(readB, 0, lenB);
             Assert.Contains($"#{ProtocolConsts.SM_OBJECTWALK}/", respB);
 
             // 2. 远端客户端 C 必须未收到任何广播 (九宫格严格隔离，0 冗余下行带宽)
             Assert.False(streamC.DataAvailable, "远端客户端 C 坚决不能收到其他 Zone 的移动广播");
+        }
+        finally
+        {
+            tickEngine.Stop();
+            gateway.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task TestE2E_Security_TeleportRollback_And_CombatHitBroadcast()
+    {
+        int testPort = 17004;
+        var aoi = new NinePatchAoi<ClientSession>(400, 400);
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(aoi);
+        var gateway = new TcpGateway(testPort);
+        gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.Start();
+
+        var tickEngine = new GameWorldTick(gateway);
+        tickEngine.Start();
+
+        try
+        {
+            using var clientA = new System.Net.Sockets.TcpClient();
+            await clientA.ConnectAsync("127.0.0.1", testPort);
+            var streamA = clientA.GetStream();
+            await streamA.WriteAsync(Encoding.UTF8.GetBytes("#103/战士A/200/200!"));
+            await streamA.FlushAsync();
+
+            using var clientB = new System.Net.Sockets.TcpClient();
+            await clientB.ConnectAsync("127.0.0.1", testPort);
+            var streamB = clientB.GetStream();
+            await streamB.WriteAsync(Encoding.UTF8.GetBytes("#103/道士B/201/200!"));
+            await streamB.FlushAsync();
+
+            await Task.Delay(200);
+
+            byte[] flushBuf = new byte[4096];
+            while (streamA.DataAvailable) _ = await streamA.ReadAsync(flushBuf, 0, flushBuf.Length);
+            while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
+
+            // 1. 尝试瞬移 (从 200, 200 瞬移到 250, 250) -> 触发服务端防外挂拉回
+            byte[] cheatTeleportPkt = Encoding.UTF8.GetBytes("#3011/250/250/0!");
+            await streamA.WriteAsync(cheatTeleportPkt);
+            await streamA.FlushAsync();
+
+            await Task.Delay(150);
+
+            // 客户端 A 必须收到 SM_SENDUSERSTATE (250) 坐标强制重置为原本的 (200, 200)
+            Assert.True(streamA.DataAvailable, "瞬移必须被服务器拉回并发送校正包");
+            byte[] rollbackBuf = new byte[2048];
+            int rollbackLen = await streamA.ReadAsync(rollbackBuf, 0, rollbackBuf.Length);
+            string rollbackResp = Encoding.UTF8.GetString(rollbackBuf, 0, rollbackLen);
+            Assert.Contains($"#{ProtocolConsts.SM_SENDUSERSTATE}/", rollbackResp);
+            Assert.Contains("/200/200/", rollbackResp); // 坐标未被篡改，依然是 200, 200
+
+            // 2. 战士 A 发起普通挥刀 CM_HIT (3014) 朝向 1
+            byte[] hitPkt = Encoding.UTF8.GetBytes("#3014/201/200/1!");
+            await streamA.WriteAsync(hitPkt);
+            await streamA.FlushAsync();
+
+            await Task.Delay(150);
+
+            // 同屏道士 B 必须收到挥刀动作广播 SM_OBJECTHIT (242)
+            Assert.True(streamB.DataAvailable, "同屏道士 B 必须收到挥刀动作广播");
+            byte[] hitBuf = new byte[2048];
+            int hitLen = await streamB.ReadAsync(hitBuf, 0, hitBuf.Length);
+            string hitResp = Encoding.UTF8.GetString(hitBuf, 0, hitLen);
+            Assert.Contains($"#{ProtocolConsts.SM_OBJECTHIT}/", hitResp);
+            Assert.Contains("/200/200/1/战士A", hitResp);
         }
         finally
         {

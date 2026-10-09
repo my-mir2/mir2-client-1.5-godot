@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 经济摆摊、社交系统、客户端底层防护与反作弊引擎 (细节 231 ~ 250)

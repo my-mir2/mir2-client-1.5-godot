@@ -87,7 +87,7 @@ public sealed class TcpGateway
                 int bytesRead = await socket.ReceiveAsync(buffer.AsMemory(0, buffer.Length), SocketFlags.None);
                 if (bytesRead == 0) break; // 客户端主动断开
 
-                string rawChunk = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                string rawChunk = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                 sb.Append(rawChunk);
 
                 // 处理分包与粘包 (官方 1.5 封包以 '!' 结尾)

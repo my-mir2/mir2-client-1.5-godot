@@ -4508,101 +4508,101 @@ public class TestProtocolMatrix
     public void TestOfficialDetails_Batch14_EconomySecurity()
     {
         // 细节 231: 玩家安全区摆摊模式 (招牌文字、盘坐姿态)
-        var (isStalling, stallPose, sTitle) = Mir2Client.Game.EconomySecurityEngine.PlayerStallModeEngine.SetupStall(true, "极品屠龙大甩卖！");
+        var (isStalling, stallPose, sTitle) = EconomySecurityEngine.PlayerStallModeEngine.SetupStall(true, "极品屠龙大甩卖！");
         Assert.True(isStalling);
         Assert.Equal("SitDown", stallPose);
         Assert.Equal("极品屠龙大甩卖！", sTitle);
 
         // 细节 232: 摆摊物品标价金币合法性安全检查 (防 0 元购、负数与溢出)
-        Assert.False(Mir2Client.Game.EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(0));
-        Assert.False(Mir2Client.Game.EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(-100));
-        Assert.True(Mir2Client.Game.EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(50000));
+        Assert.False(EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(0));
+        Assert.False(EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(-100));
+        Assert.True(EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(50000));
 
         // 细节 233: 购买摆摊物品背包空间与金币原子扣除
-        var (buyOk, remBuyerGold, sellerEarn, _) = Mir2Client.Game.EconomySecurityEngine.StallPurchaseAtomicEngine.ExecutePurchase(
+        var (buyOk, remBuyerGold, sellerEarn, _) = EconomySecurityEngine.StallPurchaseAtomicEngine.ExecutePurchase(
             buyerGold: 10000, bagFreeSlots: 5, price: 3000);
         Assert.True(buyOk);
         Assert.Equal(7000, remBuyerGold);
         Assert.Equal(3000, sellerEarn);
 
         // 细节 234: 交易双向锁定后 3 秒防换物倒计时冷却
-        var (canConfirm, remLockSec) = Mir2Client.Game.EconomySecurityEngine.TradeConfirmDelayEngine.CheckConfirmDelay(1.5f);
+        var (canConfirm, remLockSec) = EconomySecurityEngine.TradeConfirmDelayEngine.CheckConfirmDelay(1.5f);
         Assert.False(canConfirm);
         Assert.Equal(1.5f, remLockSec);
 
         // 细节 235: 行会宣战与结盟状态显示 (绿色同盟、红色敌对)
-        string allyCol = Mir2Client.Game.EconomySecurityEngine.GuildDiplomacyColorEngine.GetTitleColor(
-            Mir2Client.Game.EconomySecurityEngine.GuildDiplomacyColorEngine.DiplomacyStatus.Ally);
+        string allyCol = EconomySecurityEngine.GuildDiplomacyColorEngine.GetTitleColor(
+            EconomySecurityEngine.GuildDiplomacyColorEngine.DiplomacyStatus.Ally);
         Assert.Equal("#00FF00", allyCol);
-        string hostCol = Mir2Client.Game.EconomySecurityEngine.GuildDiplomacyColorEngine.GetTitleColor(
-            Mir2Client.Game.EconomySecurityEngine.GuildDiplomacyColorEngine.DiplomacyStatus.Hostile);
+        string hostCol = EconomySecurityEngine.GuildDiplomacyColorEngine.GetTitleColor(
+            EconomySecurityEngine.GuildDiplomacyColorEngine.DiplomacyStatus.Hostile);
         Assert.Equal("#FF0000", hostCol);
 
         // 细节 236: 行会封号自定义 (IDA sub_48A7B0 限制 14 字符)
-        var (validTitle, _) = Mir2Client.Game.EconomySecurityEngine.GuildTitleLengthEngine.SanitizeTitle("七大行会护法");
+        var (validTitle, _) = EconomySecurityEngine.GuildTitleLengthEngine.SanitizeTitle("七大行会护法");
         Assert.True(validTitle);
 
         // 细节 237: 师徒系统出师声望奖励 (师傅 +35，徒弟祝福卷轴)
-        var (mPres, aGift) = Mir2Client.Game.EconomySecurityEngine.MasterApprenticeEngine.GraduateApprentice();
+        var (mPres, aGift) = EconomySecurityEngine.MasterApprenticeEngine.GraduateApprentice();
         Assert.Equal(35, mPres);
         Assert.Equal("出师祝福卷轴", aGift);
 
         // 细节 238: 婚姻系统求婚协议消耗结婚戒指
-        var (propOk, propNotice) = Mir2Client.Game.EconomySecurityEngine.MarriageCeremonyEngine.ProposeMarriage(true, "白衣小仙女");
+        var (propOk, propNotice) = EconomySecurityEngine.MarriageCeremonyEngine.ProposeMarriage(true, "白衣小仙女");
         Assert.True(propOk);
         Assert.Contains("白衣小仙女", propNotice);
 
         // 细节 239: 天下第一雕像每周属性与外观同步更新
-        Assert.True(Mir2Client.Game.EconomySecurityEngine.StatueWeeklySyncEngine.NeedsSync(42, 41));
+        Assert.True(EconomySecurityEngine.StatueWeeklySyncEngine.NeedsSync(42, 41));
 
         // 细节 240: 沙巴克税金每日凌晨 0 点自动入城主私库 (5% 抽成)
-        int cityTax = Mir2Client.Game.EconomySecurityEngine.SabukDailyTaxEngine.SettleDailyTax(1000000);
+        int cityTax = EconomySecurityEngine.SabukDailyTaxEngine.SettleDailyTax(1000000);
         Assert.Equal(50000, cityTax);
 
         // 细节 241: 沙巴克藏宝阁密道凭证检定
         var bagItems = new HashSet<string> { "藏宝阁通行证", "金创药" };
-        Assert.True(Mir2Client.Game.EconomySecurityEngine.TreasurePavilionPassEngine.CanEnter(bagItems));
+        Assert.True(EconomySecurityEngine.TreasurePavilionPassEngine.CanEnter(bagItems));
 
         // 细节 242: 客户端移动加速作弊检测 (间隔 < 380ms 强制拉回)
-        var (speedHack, rollback) = Mir2Client.Game.EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(1300, 1000); // 间隔 300ms
+        var (speedHack, rollback) = EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(1300, 1000); // 间隔 300ms
         Assert.True(speedHack);
         Assert.True(rollback);
 
         // 细节 243: 客户端挥刀出刀速度检测 (攻击间隔 < 680ms 忽略无效攻击)
-        Assert.False(Mir2Client.Game.EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(1500, 1000)); // 间隔 500ms
-        Assert.True(Mir2Client.Game.EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(1800, 1000));  // 间隔 800ms
+        Assert.False(EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(1500, 1000)); // 间隔 500ms
+        Assert.True(EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(1800, 1000));  // 间隔 800ms
 
         // 细节 244: 客户端法术公共 CD 检测 (施法间隔 < 850ms 拦截)
-        var (spellAllowed, _) = Mir2Client.Game.EconomySecurityEngine.SpellGlobalCdEngine.CheckSpellCast(1500, 1000);
+        var (spellAllowed, _) = EconomySecurityEngine.SpellGlobalCdEngine.CheckSpellCast(1500, 1000);
         Assert.False(spellAllowed);
 
         // 细节 245: 客户端穿人穿怪外挂检测 (物理重叠强制拉回)
         var solidEntities = new HashSet<(int x, int y)> { (10, 10) };
-        Assert.True(Mir2Client.Game.EconomySecurityEngine.NoclipDetectorEngine.CheckNoclip(10, 10, solidEntities));
+        Assert.True(EconomySecurityEngine.NoclipDetectorEngine.CheckNoclip(10, 10, solidEntities));
 
         // 细节 246: 本地内存保护与状态锁 (禁止本地伪造血量回写)
-        int trueHp = Mir2Client.Game.EconomySecurityEngine.MemoryStateLockEngine.SynchronizeServerHp(localHp: 99999, verifiedServerHp: 320);
+        int trueHp = EconomySecurityEngine.MemoryStateLockEngine.SynchronizeServerHp(localHp: 99999, verifiedServerHp: 320);
         Assert.Equal(320, trueHp);
 
         // 细节 247: 音频 WIL 资源异步多线程预加载防卡顿
-        Mir2Client.Game.EconomySecurityEngine.AudioPreloadQueueEngine.EnqueueSound(101);
-        Assert.Equal(101, Mir2Client.Game.EconomySecurityEngine.AudioPreloadQueueEngine.DequeueNext());
+        EconomySecurityEngine.AudioPreloadQueueEngine.EnqueueSound(101);
+        Assert.Equal(101, EconomySecurityEngine.AudioPreloadQueueEngine.DequeueNext());
 
         // 细节 248: UI 窗体层级置顶与 Esc 逐级关闭堆栈
-        var zStack = new Mir2Client.Game.EconomySecurityEngine.UiZOrderStackEngine();
+        var zStack = new EconomySecurityEngine.UiZOrderStackEngine();
         zStack.Push("BagView");
         zStack.Push("EquipView");
         Assert.Equal("EquipView", zStack.PopTop());
         Assert.Equal("BagView", zStack.PopTop());
 
         // 细节 249: 全屏与窗口化自由切换等比自适应黑边拉伸 (800x600)
-        var (vW, vH, oX, oY) = Mir2Client.Game.EconomySecurityEngine.AspectFitScalerEngine.CalculateAspectFit(1600, 900);
+        var (vW, vH, oX, oY) = EconomySecurityEngine.AspectFitScalerEngine.CalculateAspectFit(1600, 900);
         Assert.Equal(1200, vW);
         Assert.Equal(900, vH);
         Assert.Equal(200, oX); // 两侧黑边 200px
 
         // 细节 250: 客户端异常捕获与 Crash Dump 日志归档
-        string dump = Mir2Client.Game.EconomySecurityEngine.CrashDumpLoggerEngine.FormatCrashDump("NullReferenceException", "at GameView.Update()");
+        string dump = EconomySecurityEngine.CrashDumpLoggerEngine.FormatCrashDump("NullReferenceException", "at GameView.Update()");
         Assert.Contains("CRASH_DUMP", dump);
     }
 
