@@ -70,6 +70,149 @@ public sealed class GameMap
         }
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 原始 .map 二进制文件物理碰撞网格加载器
+    /// 文件结构: 52 字节 Header + W*H*12 字节列优先单元格
+    /// FloorRaw & 0x8000 != 0 表示该瓦片为不可通行物理阻挡 (山体、建筑、墙体、河流)
+    /// </summary>
+    public bool LoadMapFile(string mapFilePath)
+    {
+        if (!System.IO.File.Exists(mapFilePath)) return false;
+
+        try
+        {
+            using var fs = new System.IO.FileStream(mapFilePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read);
+            if (fs.Length < 52) return false;
+
+            byte[] header = new byte[52];
+            fs.ReadExactly(header);
+
+            int fileWidth = header[0] | (header[1] << 8);
+            int fileHeight = header[2] | (header[3] << 8);
+
+            int totalCells = fileWidth * fileHeight;
+            int totalBytes = totalCells * 12;
+            if (fs.Length < 52 + totalBytes) return false;
+
+            byte[] cellBuffer = new byte[totalBytes];
+            fs.ReadExactly(cellBuffer);
+
+            // 按照列优先布局将阻挡状态灌入高吞吐 BitArray
+            int checkWidth = Math.Min(Width, fileWidth);
+            int checkHeight = Math.Min(Height, fileHeight);
+
+            for (int x = 0; x < checkWidth; x++)
+            {
+                for (int y = 0; y < checkHeight; y++)
+                {
+                    int offset = (x * fileHeight + y) * 12;
+                    short floorRaw = (short)(cellBuffer[offset] | (cellBuffer[offset + 1] << 8));
+                    bool isBlocked = (floorRaw & unchecked((short)0x8000)) != 0;
+                    SetWalkable(x, y, !isBlocked);
+                }
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Bresenham 视线射线穿透检测 (Line of Sight)
+    /// 判定从 (x0, y0) 到 (x1, y1) 之间是否有不可通行的物理墙体阻挡 (用于法师雷电术、道士火符防隔墙打击)
+    /// </summary>
+    public bool CheckLineOfSight(int x0, int y0, int x1, int y1)
+    {
+        int dx = Math.Abs(x1 - x0);
+        int dy = Math.Abs(y1 - y0);
+        int sx = x0 < x1 ? 1 : -1;
+        int sy = y0 < y1 ? 1 : -1;
+        int err = dx - dy;
+
+        int currX = x0;
+        int currY = y0;
+
+        while (true)
+        {
+            if (currX == x1 && currY == y1)
+            {
+                return true; // 射线成功到达终点，无障碍阻挡
+            }
+
+            // 中途经过的格子必须为可通行地面
+            if ((currX != x0 || currY != y0) && !IsWalkable(currX, currY))
+            {
+                return false; // 被物理山体或墙体遮挡
+            }
+
+            int e2 = 2 * err;
+            if (e2 > -dy)
+            {
+                err -= dy;
+                currX += sx;
+            }
+            if (e2 < dx)
+            {
+                err += dx;
+                currY += sy;
+            }
+        }
+    }
+
+    // ==================== 官方 1.4/1.5 地表火墙实体容器 (FireWall) ====================
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, List<FireWallEntity>> _fireWalls = new();
+
+    public void AddFireWall(FireWallEntity fire)
+    {
+        long key = MakeCoordKey(fire.X, fire.Y);
+        var list = _fireWalls.GetOrAdd(key, _ => new List<FireWallEntity>());
+        lock (list)
+        {
+            list.Add(fire);
+        }
+    }
+
+    public List<FireWallEntity> GetFireWallsAt(int x, int y)
+    {
+        long key = MakeCoordKey(x, y);
+        if (_fireWalls.TryGetValue(key, out var list))
+        {
+            lock (list)
+            {
+                return new List<FireWallEntity>(list);
+            }
+        }
+        return new List<FireWallEntity>();
+    }
+
+    public int CleanExpiredFireWalls(long nowMs)
+    {
+        int cleaned = 0;
+        foreach (var kvp in _fireWalls)
+        {
+            var list = kvp.Value;
+            lock (list)
+            {
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    if (nowMs >= list[i].ExpireTimeMs)
+                    {
+                        list.RemoveAt(i);
+                        cleaned++;
+                    }
+                }
+            }
+            if (list.Count == 0)
+            {
+                _fireWalls.TryRemove(kvp.Key, out _);
+            }
+        }
+        return cleaned;
+    }
+
     // ==================== 官方 1.4/1.5 地面物品容器与 80 秒保护期 (IDA 0x4C5CB0) ====================
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, List<GroundItemEntity>> _groundItems = new();
 
@@ -161,5 +304,18 @@ public sealed class GroundItemEntity
     public int Weight { get; init; } = 1;
     public int OwnerSessionId { get; set; }
     public long DropTickMs { get; init; }
+}
+
+/// <summary>
+/// 盛大官方 1.5 地表火墙实体
+/// </summary>
+public sealed class FireWallEntity
+{
+    public int Uid { get; init; }
+    public int X { get; init; }
+    public int Y { get; init; }
+    public int CasterSessionId { get; init; }
+    public int Damage { get; init; }
+    public long ExpireTimeMs { get; init; }
 }
 

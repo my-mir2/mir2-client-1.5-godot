@@ -245,4 +245,170 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         Assert.Equal(30, killer.State.BagWeight);
         Assert.True(killer.HasBufferedPacket("#200/8888/30/0/0/裁决之杖!"));
     }
+
+    [Fact]
+    public void Test_Map_LoadMapFile_And_Bresenham_CheckLineOfSight()
+    {
+        var map = new GameMap(0, "比奇省测试", 100, 100);
+
+        // 1. 测试 Bresenham 视线射线穿透检测 (空旷地形无阻挡)
+        bool clearSight = map.CheckLineOfSight(10, 10, 10, 20);
+        Assert.True(clearSight);
+
+        // 2. 在 (10, 15) 设置城墙阻挡
+        map.SetWalkable(10, 15, false);
+        Assert.False(map.IsWalkable(10, 15));
+
+        // 再次视线检测，应被 (10, 15) 墙体阻挡
+        bool blockedSight = map.CheckLineOfSight(10, 10, 10, 20);
+        Assert.False(blockedSight);
+
+        // 终点本身如果不可走，但在中途没有阻挡时不应误判 (攻击目标站立点)
+        map.SetWalkable(10, 15, true);
+        map.SetWalkable(10, 20, false);
+        bool sightToTarget = map.CheckLineOfSight(10, 10, 10, 20);
+        Assert.True(sightToTarget);
+
+        // 3. 验证真实 .map 文件读取与边界容错
+        string mapPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "maps", "Map", "0.map");
+        if (System.IO.File.Exists(mapPath))
+        {
+            bool loaded = map.LoadMapFile(mapPath);
+            Assert.True(loaded);
+        }
+    }
+
+    [Fact]
+    public void Test_Warrior_HalfMoon_Authoritative_AoE_And_Damage_Decay()
+    {
+        var (mapMgr, _, _, dispatcher, map) = CreateTestEnvironment();
+
+        // 战士位于 (100, 100)，朝向为 0 (北 / 正上方: X不变, Y变小)
+        var warrior = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 100,
+            Y = 100,
+            Direction = 0,
+            CharacterName = "终极战士",
+            State = new PlayerState
+            {
+                Job = 0,
+                Hp = 300,
+                MaxHp = 300,
+                Mp = 100,
+                MaxMp = 100
+            }
+        };
+        map.Aoi.Enter(warrior, 100, 100);
+
+        // 朝向 0 时，扇面 4 个格子:
+        // 主目标: (100, 99)
+        // 副目标1: (99, 99)
+        // 副目标2: (101, 99)
+        // 副目标3: (99, 100)
+        var mainTarget = new ClientSession(2001, null!)
+        {
+            CurrentMapId = 0,
+            X = 100,
+            Y = 99,
+            CharacterName = "主受击者",
+            State = new PlayerState { Hp = 100, MaxHp = 100 }
+        };
+        map.Aoi.Enter(mainTarget, 100, 99);
+
+        var subTarget1 = new ClientSession(2002, null!)
+        {
+            CurrentMapId = 0,
+            X = 99,
+            Y = 99,
+            CharacterName = "副受击者1",
+            State = new PlayerState { Hp = 100, MaxHp = 100 }
+        };
+        map.Aoi.Enter(subTarget1, 99, 99);
+
+        var outTarget = new ClientSession(2003, null!)
+        {
+            CurrentMapId = 0,
+            X = 100,
+            Y = 105, // 扇面外
+            CharacterName = "安全吃瓜群众",
+            State = new PlayerState { Hp = 100, MaxHp = 100 }
+        };
+        map.Aoi.Enter(outTarget, 100, 105);
+
+        // 战士释放半月弯刀 (MagicId = 25, CM_SPELL = 3017: targetUid/magicId/targetX/targetY)
+        // 数据包: #3017/0/25/100/99/!
+        dispatcher.Dispatch(warrior, "#3017/0/25/100/99/!");
+
+        // 验证主目标受到 100% 伤害 (主目标掉血量 > 0)
+        int mainDmg = 100 - mainTarget.State.Hp;
+        Assert.True(mainDmg >= 15 && mainDmg <= 30);
+
+        // 验证副目标受到 35% 衰减伤害
+        int subDmg = 100 - subTarget1.State.Hp;
+        Assert.Equal(WarriorCombatEngine.HalfMoon.CalculateDamage(mainDmg, isMainTarget: false, skillLevel: 3), subDmg);
+
+        // 验证扇面外吃瓜群众毫发无损 -> 仍然 100 HP
+        Assert.Equal(100, outTarget.State.Hp);
+    }
+
+    [Fact]
+    public void Test_Mage_FireWall_Authoritative_GroundEntity_And_StepIn_Damage()
+    {
+        var (mapMgr, _, _, dispatcher, map) = CreateTestEnvironment();
+
+        var mage = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 50,
+            Y = 50,
+            CharacterName = "终极法师",
+            State = new PlayerState
+            {
+                Job = 1,
+                Hp = 100,
+                MaxHp = 100,
+                Mp = 200,
+                MaxMp = 200
+            }
+        };
+        map.Aoi.Enter(mage, 50, 50);
+
+        // 法师在 (52, 52) 释放火墙术 (MagicId = 22: targetUid/magicId/targetX/targetY)
+        // 生成 2x2 地表火焰: (52,52), (53,52), (52,53), (53,53)
+        dispatcher.Dispatch(mage, "#3017/0/22/52/52/!");
+
+        var fires = map.GetFireWallsAt(52, 52);
+        Assert.Single(fires);
+        Assert.Equal(1001, fires[0].CasterSessionId);
+        Assert.True(fires[0].Damage > 0);
+
+        // 敌人以行走方式踏入 (52, 52) 踩火 (CM_WALK = 3001)
+        var victim = new ClientSession(2001, null!)
+        {
+            CurrentMapId = 0,
+            X = 52,
+            Y = 51,
+            CharacterName = "踩火受害者",
+            State = new PlayerState { Hp = 100, MaxHp = 100 }
+        };
+        map.Aoi.Enter(victim, 52, 51);
+
+        // 踏入火墙: 从 (52, 51) 走到 (52, 52), dir = 4 (向下)
+        // 数据包: #3011/52/52/4/0/! (CM_WALK = 3011)
+        dispatcher.Dispatch(victim, "#3011/52/52/4/0/!");
+
+        Assert.Equal(52, victim.X);
+        Assert.Equal(52, victim.Y);
+        // 踩火伤害结算后 HP 应扣减
+        Assert.True(victim.State.Hp < 100);
+
+        // 模拟世界心跳过期清理
+        long farFuture = Environment.TickCount64 + 30_000;
+        int cleaned = map.CleanExpiredFireWalls(farFuture);
+        Assert.True(cleaned >= 4);
+        Assert.Empty(map.GetFireWallsAt(52, 52));
+    }
 }
+

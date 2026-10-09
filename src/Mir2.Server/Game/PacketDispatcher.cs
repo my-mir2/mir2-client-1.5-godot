@@ -349,6 +349,11 @@ public sealed class PacketDispatcher
         if (slash2 < 0) return;
         ReadOnlySpan<char> ySpan = rest[..slash2];
         ReadOnlySpan<char> dirSpan = rest[(slash2 + 1)..];
+        int slash3 = dirSpan.IndexOf('/');
+        if (slash3 >= 0)
+        {
+            dirSpan = dirSpan[..slash3];
+        }
 
         if (int.TryParse(xSpan, out int newX) &&
             int.TryParse(ySpan, out int newY) &&
@@ -402,6 +407,21 @@ public sealed class PacketDispatcher
             // 广播移动数据帧: 行走 SM_OBJECTWALK (241) / 跑步 SM_OBJECTRUN (240)
             short smCode = isRun ? ProtocolConsts.SM_OBJECTRUN : ProtocolConsts.SM_OBJECTWALK;
             BroadcastToNinePatch(session, smCode, session.SessionId, newX, newY, dir, session.CharacterName, includeSelf: false);
+
+            // 踏入火墙踩火权威伤害结算 (IDA sub_4C7720 / MageCombatEngine.Firewall)
+            var fires = map.GetFireWallsAt(newX, newY);
+            if (fires.Count > 0 && session.State != null && session.State.Hp > 0)
+            {
+                int baseFireDmg = fires[0].Damage;
+                int totalFireDmg = MageCombatEngine.Firewall.CalculateTileDamage(baseFireDmg, fires.Count);
+                var (finalHp, finalMp, died, _, _, _) = session.State.TakeCombatDamageFull(totalFireDmg, nowMs);
+                BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, session.SessionId, newX, newY, totalFireDmg, session.CharacterName, includeSelf: true);
+                session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
+                if (died)
+                {
+                    BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, session.SessionId, newX, newY, 0, session.CharacterName, includeSelf: true);
+                }
+            }
         }
     }
 
@@ -557,6 +577,11 @@ public sealed class PacketDispatcher
         if (slash3 < 0) return;
         ReadOnlySpan<char> xSpan = rest2[..slash3];
         ReadOnlySpan<char> ySpan = rest2[(slash3 + 1)..];
+        int slash4 = ySpan.IndexOf('/');
+        if (slash4 >= 0)
+        {
+            ySpan = ySpan[..slash4];
+        }
 
         if (int.TryParse(uidSpan, out int targetUid) &&
             short.TryParse(magicSpan, out short magicId) &&
@@ -1892,8 +1917,8 @@ public sealed class PacketDispatcher
             return;
         }
 
-        // 6. 地狱雷光 (MagicId = 22)
-        if (magicId == 22)
+        // 6. 地狱雷光 (MagicId = 21)
+        if (magicId == 21)
         {
             if (RegenEngine != null)
             {
@@ -1927,7 +1952,85 @@ public sealed class PacketDispatcher
             return;
         }
 
-        // 8. 常规单体法术 (雷电术=10, 火球术=1, 灵魂火符=13)
+        // 8. 半月弯刀 (MagicId = 25) 扇面 4 目标结算 (IDA sub_4C1EF4)
+        if (magicId == 25)
+        {
+            var affectedTiles = WarriorCombatEngine.HalfMoon.GetAffectedTiles(session.X, session.Y, session.Direction);
+            int baseDmg = session.State.CalculateAttackDamageWithLuck(15, 30, Random.Shared);
+
+            foreach (var (tx, ty, isMain) in affectedTiles)
+            {
+                int dmg = WarriorCombatEngine.HalfMoon.CalculateDamage(baseDmg, isMain, skillLevel: 3);
+
+                // 结算该格子的玩家
+                lock (_ninePatchBuffer)
+                {
+                    map.Aoi.GetEntitiesInNinePatch(tx, ty, _ninePatchBuffer);
+                    for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                    {
+                        var target = _ninePatchBuffer[i];
+                        if (target.SessionId != session.SessionId && target.X == tx && target.Y == ty && target.State != null && target.State.Hp > 0)
+                        {
+                            var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = target.State.TakeCombatDamageFull(dmg, nowMs);
+                            BroadcastToNinePatch(target, ProtocolConsts.SM_OBJECTSTRUCK, target.SessionId, target.X, target.Y, dmg, target.CharacterName, includeSelf: true);
+                            target.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, target.State.Hp, target.State.MaxHp, target.State.Mp, target.State.MaxMp);
+                            if (died)
+                            {
+                                session.State.AddPkMurder();
+                                BroadcastToNinePatch(target, ProtocolConsts.SM_DEATH_ACTION_DELPHI, target.SessionId, target.X, target.Y, 0, target.CharacterName, includeSelf: true);
+                            }
+                        }
+                    }
+                }
+
+                // 结算该格子的怪物
+                if (RegenEngine != null)
+                {
+                    var m = RegenEngine.FindMonsterAt(session.CurrentMapId, tx, ty);
+                    if (m != null && !m.IsDead)
+                    {
+                        m.Hp = Math.Max(0, m.Hp - dmg);
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, m.Uid, m.X, m.Y, dmg, m.Name, includeSelf: true);
+                        if (m.IsDead)
+                        {
+                            RegenEngine.OnMonsterDied(m.Uid);
+                            BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, m.Uid, m.X, m.Y, 0, m.Name, includeSelf: true);
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        // 9. 火墙术 (MagicId = 22) 生成 2x2 地表火焰实体并广播
+        if (magicId == 22)
+        {
+            int fireDmg = OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(15, 25, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
+            long expireMs = nowMs + 20_000; // 存活 20 秒
+
+            for (int fx = targetX; fx <= targetX + 1; fx++)
+            {
+                for (int fy = targetY; fy <= targetY + 1; fy++)
+                {
+                    if (map.IsWalkable(fx, fy))
+                    {
+                        map.AddFireWall(new FireWallEntity
+                        {
+                            Uid = 90000 + (fx * 1000 + fy) % 10000,
+                            X = fx,
+                            Y = fy,
+                            CasterSessionId = session.SessionId,
+                            Damage = fireDmg,
+                            ExpireTimeMs = expireMs
+                        });
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, fx, fy, 21, "火墙", includeSelf: true);
+                    }
+                }
+            }
+            return;
+        }
+
+        // 10. 常规单体法术 (雷电术=10, 火球术=1, 灵魂火符=13)
         ClientSession? defender = null;
         lock (_ninePatchBuffer)
         {

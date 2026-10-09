@@ -38,6 +38,12 @@ public static class Program
         // 1. 初始化地图管理器与主地图比奇省 (400x400 格子)
         _mapManager = new MapManager();
         var mainMap = new GameMap(0, "比奇省", 400, 400);
+        string mapPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "resources", "maps", "Map", "0.map");
+        if (System.IO.File.Exists(mapPath))
+        {
+            mainMap.LoadMapFile(mapPath);
+            Console.WriteLine("[Mir2.Server] 比奇省官方真实物理碰撞网格装载成功。");
+        }
         _mapManager.RegisterMap(mainMap);
         Console.WriteLine("[Mir2.Server] 比奇省地图 AOI 空间索引初始化完成 (尺寸: 400x400, 划分 25x25=625 个 Zone).");
 
@@ -175,6 +181,13 @@ public static class Program
         {
             var map = _mapManager.GetMap(0);
             map?.CleanExpiredGroundItems(nowMs);
+        }
+
+        // 5. 地表火墙生命周期清理 (每 10 个 Tick 清理一次过期火墙实体)
+        if (tick % 10 == 0 && _mapManager != null)
+        {
+            var map = _mapManager.GetMap(0);
+            map?.CleanExpiredFireWalls(nowMs);
         }
     }
 
