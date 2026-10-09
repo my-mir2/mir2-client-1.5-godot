@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Models;
 
 /// <summary>
 /// 盛大官方 1.5 全量 80 种怪物生态、动作帧率、音效与挖肉规则权威全集 (Official 1.5 Monster Compendium)

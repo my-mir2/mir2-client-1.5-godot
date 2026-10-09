@@ -961,7 +961,7 @@ public class TestProtocolMatrix
     [Fact]
     public void TestSpecialRings_ProtectRing_FormulaAndFlow()
     {
-        var ps = new Mir2Client.Game.PlayerState
+        var ps = new PlayerState
         {
             Hp = 100,
             MaxHp = 100,
@@ -970,7 +970,7 @@ public class TestProtocolMatrix
         };
 
         // 佩戴护身戒指 (槽位 7: 左戒指, Shape 118)
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem
         {
             Uid = 9001,
             Name = "护身戒指",
@@ -1000,14 +1000,14 @@ public class TestProtocolMatrix
         Assert.Equal(77, hp3);
 
         // 4. 脱下护身戒指
-        ps.TakeOffItem(Mir2Client.Game.OfficialEquipSlot.RingL);
+        ps.TakeOffItem(OfficialEquipSlot.RingL);
         Assert.False(ps.HasProtectRing);
     }
 
     [Fact]
     public void TestSpecialRings_ReviveRing_CooldownAndBreak()
     {
-        var ps = new Mir2Client.Game.PlayerState
+        var ps = new PlayerState
         {
             BaseMaxHp = 200,
             Hp = 50,
@@ -1017,7 +1017,7 @@ public class TestProtocolMatrix
             ReviveRingDura = 2000 // 初始内部持久 2000 (可复活 2 次)
         };
 
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingR, new Mir2Client.Game.EquipItem
+        ps.WearItem(OfficialEquipSlot.RingR, new EquipItem
         {
             Uid = 9002,
             Name = "复活戒指",
@@ -1053,8 +1053,8 @@ public class TestProtocolMatrix
     [Fact]
     public void TestSpecialRings_ParalysisRing_ProbabilityAndAntiParalysis()
     {
-        var ps = new Mir2Client.Game.PlayerState();
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        var ps = new PlayerState();
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem
         {
             Uid = 9003,
             Name = "麻痹戒指",
@@ -1082,7 +1082,7 @@ public class TestProtocolMatrix
     [Fact]
     public void TestSpecialRings_OverloadRing_WeightsDoubled()
     {
-        var ps = new Mir2Client.Game.PlayerState
+        var ps = new PlayerState
         {
             BaseMaxBagWeight = 200,
             BaseMaxWearWeight = 60,
@@ -1096,7 +1096,7 @@ public class TestProtocolMatrix
         Assert.Equal(40, ps.MaxHandWeight);
 
         // 佩戴超负载戒指 (Shape 119)
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingR, new Mir2Client.Game.EquipItem
+        ps.WearItem(OfficialEquipSlot.RingR, new EquipItem
         {
             Uid = 9004,
             Name = "超负载戒指",
@@ -1109,7 +1109,7 @@ public class TestProtocolMatrix
         Assert.Equal(80, ps.MaxHandWeight);
 
         // 脱下超负载戒指恢复
-        ps.TakeOffItem(Mir2Client.Game.OfficialEquipSlot.RingR);
+        ps.TakeOffItem(OfficialEquipSlot.RingR);
         Assert.False(ps.HasOverloadRing);
         Assert.Equal(200, ps.MaxBagWeight);
         Assert.Equal(60, ps.MaxWearWeight);
@@ -1119,8 +1119,8 @@ public class TestProtocolMatrix
     [Fact]
     public void TestSpecialRings_InvisibleRing_MonsterTargeting()
     {
-        var ps = new Mir2Client.Game.PlayerState();
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        var ps = new PlayerState();
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem
         {
             Uid = 9005,
             Name = "隐身戒指",
@@ -1131,24 +1131,24 @@ public class TestProtocolMatrix
         Assert.True(ps.StatusBits[8]); // 隐身状态位激活
 
         // 普通怪物索敌忽略
-        bool canTargetNormal = Mir2Client.Game.SpecialRings.CheckMonsterCanTarget(ps.HasInvisibleRing, monsterCanDetectInvis: false);
+        bool canTargetNormal = SpecialRings.CheckMonsterCanTarget(ps.HasInvisibleRing, monsterCanDetectInvis: false);
         Assert.False(canTargetNormal);
 
         // 破隐视破怪 (如月魔蜘蛛、楔蛾) 可锁定
-        bool canTargetBoss = Mir2Client.Game.SpecialRings.CheckMonsterCanTarget(ps.HasInvisibleRing, monsterCanDetectInvis: true);
+        bool canTargetBoss = SpecialRings.CheckMonsterCanTarget(ps.HasInvisibleRing, monsterCanDetectInvis: true);
         Assert.True(canTargetBoss);
 
         // 脱下隐身戒指恢复
-        ps.TakeOffItem(Mir2Client.Game.OfficialEquipSlot.RingL);
+        ps.TakeOffItem(OfficialEquipSlot.RingL);
         Assert.False(ps.HasInvisibleRing);
         Assert.False(ps.StatusBits[8]);
-        Assert.True(Mir2Client.Game.SpecialRings.CheckMonsterCanTarget(ps.HasInvisibleRing, monsterCanDetectInvis: false));
+        Assert.True(SpecialRings.CheckMonsterCanTarget(ps.HasInvisibleRing, monsterCanDetectInvis: false));
     }
 
     [Fact]
     public void TestSpecialRings_TeleportRing_CommandExecution()
     {
-        var ps = new Mir2Client.Game.PlayerState
+        var ps = new PlayerState
         {
             MapX = 330,
             MapY = 270
@@ -1160,7 +1160,7 @@ public class TestProtocolMatrix
         Assert.Equal(330, ps.MapX);
 
         // 2. 佩戴传送戒指
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingR, new Mir2Client.Game.EquipItem
+        ps.WearItem(OfficialEquipSlot.RingR, new EquipItem
         {
             Uid = 9006,
             Name = "传送戒指",
@@ -1189,10 +1189,10 @@ public class TestProtocolMatrix
     public void TestSpecialRings_FlameAndHealingRing_SkillsGranted()
     {
         // 战士角色 (Job = 0)
-        var ps = new Mir2Client.Game.PlayerState { Job = 0 };
+        var ps = new PlayerState { Job = 0 };
 
         // 佩戴火焰戒指赋予火球术 (MagicId = 1)
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem
         {
             Uid = 9007,
             Name = "火焰戒指",
@@ -1201,7 +1201,7 @@ public class TestProtocolMatrix
         Assert.Contains(1, ps.GrantedRingSkills);
 
         // 佩戴防御戒指赋予治愈术 (MagicId = 2)
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingR, new Mir2Client.Game.EquipItem
+        ps.WearItem(OfficialEquipSlot.RingR, new EquipItem
         {
             Uid = 9008,
             Name = "防御戒指",
@@ -1210,7 +1210,7 @@ public class TestProtocolMatrix
         Assert.Contains(2, ps.GrantedRingSkills);
 
         // 脱下火焰戒指注销火球术
-        ps.TakeOffItem(Mir2Client.Game.OfficialEquipSlot.RingL);
+        ps.TakeOffItem(OfficialEquipSlot.RingL);
         Assert.DoesNotContain(1, ps.GrantedRingSkills);
         Assert.Contains(2, ps.GrantedRingSkills);
     }
@@ -1218,7 +1218,7 @@ public class TestProtocolMatrix
     [Fact]
     public void TestSpecialSets_MemoryRecallSuite_TeammateRecall()
     {
-        var ps = new Mir2Client.Game.PlayerState
+        var ps = new PlayerState
         {
             MapX = 330,
             MapY = 270,
@@ -1226,10 +1226,10 @@ public class TestProtocolMatrix
         };
 
         // 佩戴记忆套装 4 件
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Helmet, new Mir2Client.Game.EquipItem { Name = "记忆头盔", Shape = 125 });
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Necklace, new Mir2Client.Game.EquipItem { Name = "记忆项链", Shape = 123 });
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.ArmringL, new Mir2Client.Game.EquipItem { Name = "记忆手镯", Shape = 124 });
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem { Name = "记忆戒指", Shape = 122 });
+        ps.WearItem(OfficialEquipSlot.Helmet, new EquipItem { Name = "记忆头盔", Shape = 125 });
+        ps.WearItem(OfficialEquipSlot.Necklace, new EquipItem { Name = "记忆项链", Shape = 123 });
+        ps.WearItem(OfficialEquipSlot.ArmringL, new EquipItem { Name = "记忆手镯", Shape = 124 });
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem { Name = "记忆戒指", Shape = 122 });
 
         Assert.True(ps.HasRecallSet);
 
@@ -1259,14 +1259,14 @@ public class TestProtocolMatrix
     [Fact]
     public void TestSpecialSets_PrayerApocalypseSuite_TriggerAndBroken()
     {
-        var ps = new Mir2Client.Game.PlayerState();
+        var ps = new PlayerState();
 
         // 佩戴祈祷之刃、头盔、项链、手镯、戒指 5 件全齐
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Weapon, new Mir2Client.Game.EquipItem { Name = "祈祷之刃", Shape = 24 });
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Helmet, new Mir2Client.Game.EquipItem { Name = "祈祷头盔", Shape = 122 });
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Necklace, new Mir2Client.Game.EquipItem { Name = "祈祷项链", Shape = 121 });
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.ArmringL, new Mir2Client.Game.EquipItem { Name = "祈祷手镯", Shape = 123 });
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem { Name = "祈祷戒指", Shape = 124 });
+        ps.WearItem(OfficialEquipSlot.Weapon, new EquipItem { Name = "祈祷之刃", Shape = 24 });
+        ps.WearItem(OfficialEquipSlot.Helmet, new EquipItem { Name = "祈祷头盔", Shape = 122 });
+        ps.WearItem(OfficialEquipSlot.Necklace, new EquipItem { Name = "祈祷项链", Shape = 121 });
+        ps.WearItem(OfficialEquipSlot.ArmringL, new EquipItem { Name = "祈祷手镯", Shape = 123 });
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem { Name = "祈祷戒指", Shape = 124 });
 
         Assert.True(ps.HasPrayerSet);
 
@@ -1275,17 +1275,17 @@ public class TestProtocolMatrix
         Assert.True(res.triggered);
         Assert.True(res.petRebellion);
         Assert.Contains("神之祈祷", res.broadcastMsg);
-        Assert.Equal(Mir2Client.Game.OfficialEquipSlot.Helmet, res.brokenSlot);
+        Assert.Equal(OfficialEquipSlot.Helmet, res.brokenSlot);
 
         // 验证该部件已碎裂卸下销毁，套装状态不再激活
-        Assert.Null(ps.Equipment[(int)Mir2Client.Game.OfficialEquipSlot.Helmet]);
+        Assert.Null(ps.Equipment[(int)OfficialEquipSlot.Helmet]);
         Assert.False(ps.HasPrayerSet);
     }
 
     [Fact]
     public void TestSpecialSets_MagicBloodSuite_AttributesConversion()
     {
-        var ps = new Mir2Client.Game.PlayerState
+        var ps = new PlayerState
         {
             BaseMaxHp = 100,
             BaseMaxMp = 200,
@@ -1294,18 +1294,18 @@ public class TestProtocolMatrix
         };
 
         // 1. 佩戴单件魔血项链 (Shape 135): HP + 25, MP - 25
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Necklace, new Mir2Client.Game.EquipItem { Name = "魔血项链", Shape = 135 });
+        ps.WearItem(OfficialEquipSlot.Necklace, new EquipItem { Name = "魔血项链", Shape = 135 });
         Assert.Equal(125, ps.MaxHp);
         Assert.Equal(175, ps.MaxMp);
         Assert.False(ps.HasMagicBloodSet);
 
         // 2. 佩戴魔血手镯 (Shape 134)
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.ArmringL, new Mir2Client.Game.EquipItem { Name = "魔血手镯", Shape = 134 });
+        ps.WearItem(OfficialEquipSlot.ArmringL, new EquipItem { Name = "魔血手镯", Shape = 134 });
         Assert.Equal(150, ps.MaxHp);
         Assert.Equal(150, ps.MaxMp);
 
         // 3. 佩戴魔血戒指 (Shape 133): 3 件全齐额外 +50 (总共 +125 HP, -125 MP)
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem { Name = "魔血戒指", Shape = 133 });
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem { Name = "魔血戒指", Shape = 133 });
         Assert.True(ps.HasMagicBloodSet);
         Assert.Equal(225, ps.MaxHp);
         Assert.Equal(75, ps.MaxMp);
@@ -1320,12 +1320,12 @@ public class TestProtocolMatrix
     [Fact]
     public void TestSpecialSets_RainbowMagicSuite_LifestealAndBonusHit()
     {
-        var ps = new Mir2Client.Game.PlayerState { Hp = 50, MaxHp = 100 };
+        var ps = new PlayerState { Hp = 50, MaxHp = 100 };
 
         // 佩戴虹魔项链、手镯、戒指 3 件 (Shape 138, 137, 136)
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.Necklace, new Mir2Client.Game.EquipItem { Name = "虹魔项链", Shape = 138 });
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.ArmringL, new Mir2Client.Game.EquipItem { Name = "虹魔手镯", Shape = 137 });
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem { Name = "虹魔戒指", Shape = 136 });
+        ps.WearItem(OfficialEquipSlot.Necklace, new EquipItem { Name = "虹魔项链", Shape = 138 });
+        ps.WearItem(OfficialEquipSlot.ArmringL, new EquipItem { Name = "虹魔手镯", Shape = 137 });
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem { Name = "虹魔戒指", Shape = 136 });
 
         Assert.True(ps.HasRainbowSet);
         Assert.Equal(30, ps.LeechWeight); // 30% 吸血权重
@@ -1347,10 +1347,10 @@ public class TestProtocolMatrix
     [Fact]
     public void TestEquipment_BrokenZeroDurability_DisablesSpecialAttributes()
     {
-        var ps = new Mir2Client.Game.PlayerState { Hp = 100, MaxHp = 100, BaseMaxWearWeight = 20 };
+        var ps = new PlayerState { Hp = 100, MaxHp = 100, BaseMaxWearWeight = 20 };
 
         // 1. 正常穿戴有效超负载戒指 (MaxDura=5000, Dura=4500)
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem
         {
             Name = "超负载戒指",
             Shape = 119,
@@ -1361,7 +1361,7 @@ public class TestProtocolMatrix
         Assert.Equal(40, ps.MaxWearWeight); // 负重翻倍
 
         // 2. 该超负载戒指磨损耗尽破损 (MaxDura=5000, Dura=0)
-        ps.WearItem(Mir2Client.Game.OfficialEquipSlot.RingL, new Mir2Client.Game.EquipItem
+        ps.WearItem(OfficialEquipSlot.RingL, new EquipItem
         {
             Name = "超负载戒指",
             Shape = 119,
@@ -1527,8 +1527,8 @@ public class TestProtocolMatrix
     public void TestTrade_TwoPhaseLockAndSafetyChecks()
     {
         var tm = new Mir2Client.Game.TradeManager();
-        var ps = new Mir2Client.Game.PlayerState { Gold = 1000000 };
-        ps.BagItems.Add(new Mir2Client.Game.EquipItem { Uid = 101, Name = "裁决之杖" });
+        var ps = new PlayerState { Gold = 1000000 };
+        ps.BagItems.Add(new EquipItem { Uid = 101, Name = "裁决之杖" });
 
         tm.StartTrade("传奇战士", 2001);
         Assert.Equal(Mir2Client.Game.TradeState.Trading, tm.State);
@@ -1556,7 +1556,7 @@ public class TestProtocolMatrix
 
         // 4. 对方放入金币与物品，双方共同锁定进入 Locked 状态
         tm.RemoteChangeGold(500000);
-        tm.RemoteAddItem(0, new Mir2Client.Game.EquipItem { Uid = 202, Name = "骨玉权杖" });
+        tm.RemoteAddItem(0, new EquipItem { Uid = 202, Name = "骨玉权杖" });
         tm.SetRemoteLocked(true);
         tm.LockTrade();
         Assert.Equal(Mir2Client.Game.TradeState.Locked, tm.State);
@@ -1575,7 +1575,7 @@ public class TestProtocolMatrix
         tm.LockTrade();
         for (int i = ps.BagItems.Count; i < 40; i++)
         {
-            ps.BagItems.Add(new Mir2Client.Game.EquipItem { Uid = 300 + i, Name = "金创药" });
+            ps.BagItems.Add(new EquipItem { Uid = 300 + i, Name = "金创药" });
         }
         var bagFullRes = tm.ConfirmTrade(ps);
         Assert.False(bagFullRes.success);
@@ -1657,7 +1657,7 @@ public class TestProtocolMatrix
     public void TestTaoist_PoisonBagAndTalisman_DurabilityConsumption()
     {
         // 1. 施毒药包耐久单次扣 100
-        var greenBag = new Mir2Client.Game.EquipItem { Name = "黄色毒粉(中)", Shape = 1, Dura = 250 };
+        var greenBag = new EquipItem { Name = "黄色毒粉(中)", Shape = 1, Dura = 250 };
         var res1 = Mir2Client.Game.TaoistCombatEngine.TryConsumePoisonBag(greenBag, Mir2Client.Game.TaoistCombatEngine.PoisonType.Green);
         Assert.True(res1.success);
         Assert.Equal(150, greenBag.Dura);
@@ -1676,7 +1676,7 @@ public class TestProtocolMatrix
         Assert.False(res3.success); // 剩余 50 < 100 无法施法
 
         // 2. 护身符消耗: 召唤骷髅扣 100 (1张)，召唤神兽扣 500 (5张)
-        var talisman = new Mir2Client.Game.EquipItem { Name = "灵魂护身符(大)", Shape = 5, Dura = 600 };
+        var talisman = new EquipItem { Name = "灵魂护身符(大)", Shape = 5, Dura = 600 };
         var skelCost = Mir2Client.Game.TaoistCombatEngine.TryConsumeTalisman(talisman, Mir2Client.Game.TaoistCombatEngine.TalismanCostSkeleton);
         Assert.True(skelCost.success);
         Assert.Equal(500, talisman.Dura);
@@ -1702,7 +1702,7 @@ public class TestProtocolMatrix
     [Fact]
     public void TestMage_MagicShield_DamageAbsorptionAndPiercingBreak()
     {
-        var ps = new Mir2Client.Game.PlayerState { Hp = 100, MaxHp = 100, Mp = 100 };
+        var ps = new PlayerState { Hp = 100, MaxHp = 100, Mp = 100 };
 
         // 1. 激活 3 级魔法盾 (减伤吸收)
         ps.ActivateMagicShield(level: 3, durationSec: 30);
@@ -1774,7 +1774,7 @@ public class TestProtocolMatrix
         Assert.Equal(11, jumpCode); // DC +2 代码
 
         // 4. 试刀开刀测试 (sub_4C27C0)
-        var ps = new Mir2Client.Game.PlayerState();
+        var ps = new PlayerState();
         var weapon = new EquipItem
         {
             Uid = 9001,
@@ -1802,7 +1802,7 @@ public class TestProtocolMatrix
     [Fact]
     public void TestPkRule_MurderLevelGuardExecutionAndRedVillageRespawn()
     {
-        var ps = new Mir2Client.Game.PlayerState { Name = "红名狂魔", Hp = 100, MaxHp = 100 };
+        var ps = new PlayerState { Name = "红名狂魔", Hp = 100, MaxHp = 100 };
         Assert.False(ps.IsRedName);
         Assert.False(ps.IsYellowName);
         Assert.Equal(0, ps.PkLevel);
@@ -3170,28 +3170,28 @@ public class TestProtocolMatrix
     public void TestOfficialPotionRecoveryAndGoldDefenseFlow()
     {
         // 1. 盛大官方 1.5 经典药水元数据解析验证
-        var metaSun = Mir2Client.Game.PotionSystem.ParsePotion("太阳水");
+        var metaSun = PotionSystem.ParsePotion("太阳水");
         Assert.True(metaSun.IsInstant);
         Assert.Equal(30, metaSun.TotalHp);
         Assert.Equal(40, metaSun.TotalMp);
 
-        var metaFrost = Mir2Client.Game.PotionSystem.ParsePotion("万年雪霜");
+        var metaFrost = PotionSystem.ParsePotion("万年雪霜");
         Assert.True(metaFrost.IsInstant);
         Assert.Equal(120, metaFrost.TotalHp);
         Assert.Equal(120, metaFrost.TotalMp);
 
-        var metaRedSuper = Mir2Client.Game.PotionSystem.ParsePotion("强效金创药");
+        var metaRedSuper = PotionSystem.ParsePotion("强效金创药");
         Assert.False(metaRedSuper.IsInstant);
         Assert.Equal(90, metaRedSuper.TotalHp);
         Assert.Equal(0, metaRedSuper.TotalMp);
 
-        var metaBlueSuper = Mir2Client.Game.PotionSystem.ParsePotion("强效魔法药");
+        var metaBlueSuper = PotionSystem.ParsePotion("强效魔法药");
         Assert.False(metaBlueSuper.IsInstant);
         Assert.Equal(0, metaBlueSuper.TotalHp);
         Assert.Equal(150, metaBlueSuper.TotalMp);
 
         // 2. 药水系统瞬回与缓回双轨行为测试
-        var potionSys = new Mir2Client.Game.PotionSystem();
+        var potionSys = new PotionSystem();
         long now = 10000;
 
         // (1) 瞬回喝药：立即生效，缓冲池不增加
@@ -3466,64 +3466,64 @@ public class TestProtocolMatrix
 
         // 5. 七大特戒机制
         // (1) 麻痹戒指
-        Assert.Equal(5, Mir2Client.Game.SpecialRingEngine.ParalysisRing.ParalyzeDurationSec);
+        Assert.Equal(5, SpecialRingEngine.ParalysisRing.ParalyzeDurationSec);
         // (2) 复活戒指致死重生
-        var revOk = Mir2Client.Game.SpecialRingEngine.RevivalRing.ProcessFatalDamage(currentDura: 5, maxHp: 300, maxMp: 150);
+        var revOk = SpecialRingEngine.RevivalRing.ProcessFatalDamage(currentDura: 5, maxHp: 300, maxMp: 150);
         Assert.True(revOk.revived);
         Assert.Equal(300, revOk.newHp);
         Assert.Equal(4, revOk.remainingDura);
-        var revBroken = Mir2Client.Game.SpecialRingEngine.RevivalRing.ProcessFatalDamage(currentDura: 0, maxHp: 300, maxMp: 150);
+        var revBroken = SpecialRingEngine.RevivalRing.ProcessFatalDamage(currentDura: 0, maxHp: 300, maxMp: 150);
         Assert.False(revBroken.revived);
         // (3) 护身戒指蓝抵扣血
-        var (hDmg1, cMp1, rMp1) = Mir2Client.Game.SpecialRingEngine.ProtectionRing.AbsorbDamage(incomingDamage: 50, currentMp: 100);
+        var (hDmg1, cMp1, rMp1) = SpecialRingEngine.ProtectionRing.AbsorbDamage(incomingDamage: 50, currentMp: 100);
         Assert.Equal(0, hDmg1); // 扣 0 点血
         Assert.Equal(50, cMp1); // 扣 50 点蓝
         Assert.Equal(50, rMp1);
-        var (hDmg2, cMp2, rMp2) = Mir2Client.Game.SpecialRingEngine.ProtectionRing.AbsorbDamage(incomingDamage: 80, currentMp: 30);
+        var (hDmg2, cMp2, rMp2) = SpecialRingEngine.ProtectionRing.AbsorbDamage(incomingDamage: 80, currentMp: 30);
         Assert.Equal(50, hDmg2); // 剩余 50 点伤害穿透扣血
         Assert.Equal(30, cMp2);
         Assert.Equal(0, rMp2);
         // (4) 隐身戒指破隐
-        bool isInv1 = Mir2Client.Game.SpecialRingEngine.InvisibilityRing.IsInvisible(isWearing: true, lastAttackTick: 1000, nowTick: 4000);
-        bool isInv2 = Mir2Client.Game.SpecialRingEngine.InvisibilityRing.IsInvisible(isWearing: true, lastAttackTick: 3000, nowTick: 4000);
+        bool isInv1 = SpecialRingEngine.InvisibilityRing.IsInvisible(isWearing: true, lastAttackTick: 1000, nowTick: 4000);
+        bool isInv2 = SpecialRingEngine.InvisibilityRing.IsInvisible(isWearing: true, lastAttackTick: 3000, nowTick: 4000);
         Assert.True(isInv1);
         Assert.False(isInv2); // 刚出刀 1 秒内破隐
         // (5) 传送戒指命令解析
-        var tpOk = Mir2Client.Game.SpecialRingEngine.TeleportRing.ParseCommand("@move 330 270", 400, 400, (x, y) => false);
+        var tpOk = SpecialRingEngine.TeleportRing.ParseCommand("@move 330 270", 400, 400, (x, y) => false);
         Assert.True(tpOk.valid);
         Assert.Equal(330, tpOk.targetX);
         Assert.Equal(270, tpOk.targetY);
 
         // 6. 套装机制
         // (1) 虹魔套吸血 10%
-        int vampHp = Mir2Client.Game.SuitEffectEngine.RainbowMagicSuit.CalcVampiricHeal(120, isWearingSuit: true);
+        int vampHp = SuitEffectEngine.RainbowMagicSuit.CalcVampiricHeal(120, isWearingSuit: true);
         Assert.Equal(12, vampHp);
         // (2) 魔血套蓝转血
-        var (bonusHp, penaltyMp) = Mir2Client.Game.SuitEffectEngine.DemonBloodSuit.CalculateStatModifiers(3);
+        var (bonusHp, penaltyMp) = SuitEffectEngine.DemonBloodSuit.CalculateStatModifiers(3);
         Assert.Equal(75, bonusHp);
         Assert.Equal(60, penaltyMp);
         // (3) 祈祷套全服天谴
-        var (cataclysm, msg, neckBroken) = Mir2Client.Game.SuitEffectEngine.PrayerSuit.EvaluatePrayerCataclysm(isFullSetWearing: true);
+        var (cataclysm, msg, neckBroken) = SuitEffectEngine.PrayerSuit.EvaluatePrayerCataclysm(isFullSetWearing: true);
         Assert.True(cataclysm);
         Assert.True(neckBroken);
         Assert.Contains("叛变", msg);
 
         // 7. 武器升级与开刀
-        int oreDura1 = Mir2Client.Game.WeaponUpgradeEngine.CalculateDuraChange(25, rng);
+        int oreDura1 = WeaponUpgradeEngine.CalculateDuraChange(25, rng);
         Assert.Equal(-3, oreDura1); // 纯度不足掉 3 点持久
-        int oreDura2 = Mir2Client.Game.WeaponUpgradeEngine.CalculateDuraChange(70, rng);
+        int oreDura2 = WeaponUpgradeEngine.CalculateDuraChange(70, rng);
         Assert.Equal(1, oreDura2);  // 纯度高涨 1 点持久
-        var (outcome, newBonus, duraD, _) = Mir2Client.Game.WeaponUpgradeEngine.EvaluateSlash(currentBonus: 6, totalOrePurity: 65, jewelryStatPoints: 10, rng);
-        Assert.True(outcome == Mir2Client.Game.WeaponUpgradeEngine.UpgradeOutcome.Success || outcome == Mir2Client.Game.WeaponUpgradeEngine.UpgradeOutcome.Failed);
+        var (outcome, newBonus, duraD, _) = WeaponUpgradeEngine.EvaluateSlash(currentBonus: 6, totalOrePurity: 65, jewelryStatPoints: 10, rng);
+        Assert.True(outcome == WeaponUpgradeEngine.UpgradeOutcome.Success || outcome == WeaponUpgradeEngine.UpgradeOutcome.Failed);
 
         // 8. PK 名字颜色状态机与大刀卫士秒杀
-        var colWhite = Mir2Client.Game.PkJusticeEngine.DetermineNameColor(pkPoints: 0, isGrayAttacking: false);
-        var colYellow = Mir2Client.Game.PkJusticeEngine.DetermineNameColor(pkPoints: 0, isGrayAttacking: true);
-        var colRed = Mir2Client.Game.PkJusticeEngine.DetermineNameColor(pkPoints: 150, isGrayAttacking: false);
-        Assert.Equal(Mir2Client.Game.PkJusticeEngine.NameColorType.White, colWhite);
-        Assert.Equal(Mir2Client.Game.PkJusticeEngine.NameColorType.Yellow, colYellow);
-        Assert.Equal(Mir2Client.Game.PkJusticeEngine.NameColorType.Red, colRed);
-        var guardStrike = Mir2Client.Game.PkJusticeEngine.CheckGuardHostility(guardX: 100, guardY: 100, targetX: 103, targetY: 104, colRed);
+        var colWhite = PkJusticeEngine.DetermineNameColor(pkPoints: 0, isGrayAttacking: false);
+        var colYellow = PkJusticeEngine.DetermineNameColor(pkPoints: 0, isGrayAttacking: true);
+        var colRed = PkJusticeEngine.DetermineNameColor(pkPoints: 150, isGrayAttacking: false);
+        Assert.Equal(PkJusticeEngine.NameColorType.White, colWhite);
+        Assert.Equal(PkJusticeEngine.NameColorType.Yellow, colYellow);
+        Assert.Equal(PkJusticeEngine.NameColorType.Red, colRed);
+        var guardStrike = PkJusticeEngine.CheckGuardHostility(guardX: 100, guardY: 100, targetX: 103, targetY: 104, colRed);
         Assert.True(guardStrike.attack);
         Assert.Equal(9999, guardStrike.damage); // 大刀卫士绝对秒杀
 
@@ -4759,38 +4759,38 @@ public class TestProtocolMatrix
     public void TestOfficialDetails_Batch18_ItemPropertyCompendium()
     {
         // 细节 563: 炼狱重量 60，等级 26
-        Assert.True(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("炼狱", out var lianYu));
+        Assert.True(ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("炼狱", out var lianYu));
         Assert.Equal(60, lianYu.Weight);
         Assert.Equal(25, lianYu.MaxDc);
 
         // 细节 567: 血饮准确 +5
-        Assert.True(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("血饮", out var xueYin));
+        Assert.True(ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("血饮", out var xueYin));
         Assert.Equal(5, xueYin.Accuracy);
 
         // 细节 569: 裁决之杖攻击 0-30，重量 80
-        Assert.True(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("裁决之杖", out var caiJue));
+        Assert.True(ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("裁决之杖", out var caiJue));
         Assert.Equal(80, caiJue.Weight);
         Assert.Equal(30, caiJue.MaxDc);
 
         // 细节 572: 屠龙腕力 50 强制检定
-        Assert.True(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.CheckDragonSlayerHandWeight(52));
-        Assert.False(Mir2Client.Game.ItemPropertyCompendiumEngine.WeaponDictionaryEngine.CheckDragonSlayerHandWeight(48));
+        Assert.True(ItemPropertyCompendiumEngine.WeaponDictionaryEngine.CheckDragonSlayerHandWeight(52));
+        Assert.False(ItemPropertyCompendiumEngine.WeaponDictionaryEngine.CheckDragonSlayerHandWeight(48));
 
         // 细节 588: 天魔神甲防御 5-12，魔防 4-7，攻击 1-2
-        var tArmor = Mir2Client.Game.ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetHeavyArmorStats("天魔神甲");
+        var tArmor = ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetHeavyArmorStats("天魔神甲");
         Assert.Equal(5, tArmor.acMin);
         Assert.Equal(12, tArmor.acMax);
         Assert.Equal(2, tArmor.dcMax);
 
         // 细节 637: 麻痹戒指石化概率
-        var (_, _, pProc) = Mir2Client.Game.ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetParalysisRingEffect(hasRing: true, roll100: 3);
+        var (_, _, pProc) = ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetParalysisRingEffect(hasRing: true, roll100: 3);
         Assert.True(pProc);
 
         // 细节 649/650: 太阳水与雪霜瞬回
-        var (sHp, sMp, sInst) = Mir2Client.Game.ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetPotionRestore("强效太阳水");
+        var (sHp, sMp, sInst) = ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetPotionRestore("强效太阳水");
         Assert.Equal(50, sHp);
         Assert.True(sInst);
-        var (gHp, gMp, _) = Mir2Client.Game.ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetPotionRestore("万年雪霜");
+        var (gHp, gMp, _) = ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetPotionRestore("万年雪霜");
         Assert.Equal(100, gHp);
     }
 

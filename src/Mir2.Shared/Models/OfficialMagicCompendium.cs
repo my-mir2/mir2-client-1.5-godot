@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Models;
 
 /// <summary>
 /// 盛大官方 1.5 战法道全量 32 门技能官方视听、时序与动作权威全集 (Official 1.5 Magic Compendium)

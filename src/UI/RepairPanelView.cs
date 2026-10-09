@@ -177,7 +177,7 @@ public partial class RepairPanelView : Control, IManagedWindow
         }
 
         // 盛大官方 1.5 铁匠铺特修二次确认弹窗 (IDA sub_486DF0 / ShowRepairConfirm)
-        var (newDura, newMaxDura, goldCost) = Mir2Client.Game.OfficialClientRulesEngine.DurabilityRules.PerformSpecialRepair(15, 25, 5000);
+        var (newDura, newMaxDura, goldCost) = OfficialClientRulesEngine.DurabilityRules.PerformSpecialRepair(15, 25, 5000);
         var msgBox = GetOrFindMessageBox();
         if (msgBox != null)
         {

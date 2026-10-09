@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 武器升级与开刀试刀引擎 (Delphi 权威 1:1 还原)

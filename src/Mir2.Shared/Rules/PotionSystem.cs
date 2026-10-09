@@ -1,6 +1,6 @@
 using System;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 药水与生命魔法回复系统 (Potion Recovery System)

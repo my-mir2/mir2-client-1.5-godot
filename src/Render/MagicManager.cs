@@ -466,7 +466,7 @@ namespace Mir2Client.Render
         /// </summary>
         public void PlayOfficialMagic(int magicId, Vector2 startWorld, Vector2 targetWorld, Node? targetNode = null)
         {
-            var def = Mir2Client.Game.OfficialMagicCompendium.Get(magicId);
+            var def = OfficialMagicCompendium.Get(magicId);
             if (def == null) return;
 
             // 1. 播放官方起手施法音效
@@ -479,7 +479,7 @@ namespace Mir2Client.Render
 
             switch (def.CastType)
             {
-                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.TargetProjectile:
+                case OfficialMagicCompendium.MagicCastType.TargetProjectile:
                     var proj = new Projectile
                     {
                         MagicId = magicId,
@@ -503,7 +503,7 @@ namespace Mir2Client.Render
                     _flyingProjectiles.Add(proj);
                     break;
 
-                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.GroundAoE: // 火墙 (MagicId 22)
+                case OfficialMagicCompendium.MagicCastType.GroundAoE: // 火墙 (MagicId 22)
                     var gm = new GroundMagic
                     {
                         TilePos = new Vector2I((int)(targetWorld.X / 48), (int)(targetWorld.Y / 32)),
@@ -523,7 +523,7 @@ namespace Mir2Client.Render
                     _groundMagics.Add(gm);
                     break;
 
-                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.SelfAoE: // 地狱雷光 (MagicId 18)
+                case OfficialMagicCompendium.MagicCastType.SelfAoE: // 地狱雷光 (MagicId 18)
                     // 官方 1.5 铁证：地狱雷光以施法者为中心，同时向周围 8 个方向爆发雷光
                     int[] offsetsX = [0, -48, 48, 0, 0, -48, 48, -48, 48];
                     int[] offsetsY = [0, 0, 0, -32, 32, -32, -32, 32, 32];
@@ -535,7 +535,7 @@ namespace Mir2Client.Render
                     if (def.SoundHit > 0) AudioManager.Instance?.PlaySoundId(def.SoundHit);
                     break;
 
-                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.DirectionalBeam: // 疾光电影 (MagicId 10) / 地狱火 (MagicId 8)
+                case OfficialMagicCompendium.MagicCastType.DirectionalBeam: // 疾光电影 (MagicId 10) / 地狱火 (MagicId 8)
                     var dir = (targetWorld - startWorld).Normalized();
                     if (dir.LengthSquared() < 0.001f) dir = new Vector2(1, 0);
                     int beamSteps = magicId == 10 ? 12 : 5; // 疾光电影 12 格，地狱火 5 格
@@ -547,7 +547,7 @@ namespace Mir2Client.Render
                     if (def.SoundHit > 0) AudioManager.Instance?.PlaySoundId(def.SoundHit);
                     break;
 
-                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.SelfCast:
+                case OfficialMagicCompendium.MagicCastType.SelfCast:
                     if (magicId == 31) // 魔法盾
                     {
                         AttachEffectToEntity(targetNode ?? this, 31, 30f, true);
@@ -558,9 +558,9 @@ namespace Mir2Client.Render
                     }
                     break;
 
-                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.TargetDirect:
-                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.TargetArea:
-                case Mir2Client.Game.OfficialMagicCompendium.MagicCastType.Summon:
+                case OfficialMagicCompendium.MagicCastType.TargetDirect:
+                case OfficialMagicCompendium.MagicCastType.TargetArea:
+                case OfficialMagicCompendium.MagicCastType.Summon:
                 default:
                     CreateImpact(magicId, targetWorld, def.EffectStartFrame, Math.Max(1, def.EffectFrameCount), loader);
                     if (def.SoundHit > 0) AudioManager.Instance?.PlaySoundId(def.SoundHit);

@@ -1,6 +1,6 @@
 using System;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 玛法正义与 PK 仇恨规则引擎 (纯 C# 实现)

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 客户端本地数值、Delphi 伪随机数发生器、命中波动、持久与药水权威全集 (Official 1.5 Client Rules Engine)

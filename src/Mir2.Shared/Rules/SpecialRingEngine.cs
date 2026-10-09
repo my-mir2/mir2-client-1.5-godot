@@ -1,6 +1,6 @@
 using System;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 七大特戒核心规则与被动触发引擎 (纯 C# 实现)

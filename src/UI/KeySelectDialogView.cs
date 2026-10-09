@@ -194,7 +194,7 @@ public partial class KeySelectDialogView : Control, IManagedWindow
         if (_iconRect != null)
         {
             int iconIdx = 0;
-            var meta = Mir2Client.Game.SkillFormulas.GetSkill((short)magicId);
+            var meta = SkillFormulas.GetSkill((short)magicId);
             if (meta.HasValue)
             {
                 iconIdx = meta.Value.IconIndex;

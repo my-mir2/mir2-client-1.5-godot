@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 全量 160+ 装备道具词条、极品变异权重与持久度磨损引擎 (细节 551 ~ 650)

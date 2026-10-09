@@ -4,22 +4,21 @@
 // ============================================================================
 
 using System;
-using Godot;
 
-namespace Mir2Client.Game
+namespace Mir2.Shared.Rules
 {
     public static class PlayerAuditEngine
     {
-        public static readonly Vector2I[] DirOffsets = new[]
+        public static readonly MapGridOffset[] DirOffsets = new[]
         {
-            new Vector2I(0, -1),  // 0: 上
-            new Vector2I(1, -1),  // 1: 右上
-            new Vector2I(1, 0),   // 2: 右
-            new Vector2I(1, 1),   // 3: 右下
-            new Vector2I(0, 1),   // 4: 下
-            new Vector2I(-1, 1),  // 5: 左下
-            new Vector2I(-1, 0),  // 6: 左
-            new Vector2I(-1, -1), // 7: 左上
+            new MapGridOffset(0, -1),  // 0: 上
+            new MapGridOffset(1, -1),  // 1: 右上
+            new MapGridOffset(1, 0),   // 2: 右
+            new MapGridOffset(1, 1),   // 3: 右下
+            new MapGridOffset(0, 1),   // 4: 下
+            new MapGridOffset(-1, 1),  // 5: 左下
+            new MapGridOffset(-1, 0),  // 6: 左
+            new MapGridOffset(-1, -1), // 7: 左上
         };
 
         public readonly struct ShopPriceResult

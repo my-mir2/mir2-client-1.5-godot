@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Models;
 
 /// <summary>
 /// 盛大官方 1.5 权威 9 大装备槽位编号 (MIR_final_v3_p.exe 实证)

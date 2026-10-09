@@ -1,6 +1,6 @@
 using System;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 经典升级经验表（对齐 Rust LevelConfig g_dwOldNeedExps，M2Share.pas L2164-2215）。

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 原版 7 大特戒与 4 大套装隐藏属性状态与结算引擎 (M2Server sub_4C03B0 / sub_4BE3FC / sub_4C7720 / sub_4C1EF4 / ProcessSpiritSuite 铁证)

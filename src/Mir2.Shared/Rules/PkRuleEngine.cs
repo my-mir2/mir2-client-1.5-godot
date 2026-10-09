@@ -1,6 +1,6 @@
 using System;
 
-namespace Mir2Client.Game;
+namespace Mir2.Shared.Rules;
 
 /// <summary>
 /// 盛大官方 1.5 PK 红黄名与城镇守卫规则引擎 (Delphi 权威 1:1 还原)
