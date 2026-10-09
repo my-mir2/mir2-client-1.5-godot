@@ -543,6 +543,7 @@ public sealed class ServerMessageRouter
                 _hud?.CloseRepairPanel();
                 if (packet.Param > 0 && packet.Tag > 0)
                 {
+                    _hud?.OnServerItemRepaired(packet.Param, packet.Tag, packet.ExtraStr);
                     _hud?.AddChat("修理", $"[铁匠铺] 装备修理完毕，耐久恢复为 {packet.Param}/{packet.Tag}，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
                 }
                 else

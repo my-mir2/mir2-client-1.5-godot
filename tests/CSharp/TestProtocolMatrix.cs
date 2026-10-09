@@ -3260,6 +3260,83 @@ public class TestProtocolMatrix
             }
         }
     }
+
+    [Fact]
+    public void TestOfficialMageCombatAndItemSplitFlow()
+    {
+        // 1. 盛大官方 1.5 抗拒火环 (RingOfFire, MagicId = 8) 等级压制与周围推开验证
+        var surrounding = new List<(int uid, int level, int x, int y, bool isBoss)>
+        {
+            (101, 30, 101, 100, false), // 正东贴身: 等级30 < 法师35 -> 应该被推至 (102, 100)
+            (102, 38, 100, 99, false),  // 正北贴身: 等级38 > 法师35 -> 等级压制推不动
+            (103, 30, 99, 100, true),   // 正西贴身: 首领Boss -> 免疫推开
+            (104, 25, 100, 101, false)  // 正南贴身: 等级25 < 法师35 -> 落点有阻挡 -> 发生顿挫
+        };
+
+        var pushResults = Mir2Client.Game.MageCombatEngine.RingOfFire.Execute(
+            casterLevel: 35,
+            casterX: 100,
+            casterY: 100,
+            surroundingEntities: surrounding,
+            isTileBlocked: (x, y) => x == 100 && y == 102 // 正南落点阻挡
+        );
+
+        Assert.Equal(4, pushResults.Count);
+
+        // (1) 正东目标成功推开
+        var rEast = pushResults.Find(r => r.Uid == 101);
+        Assert.True(rEast.Pushed);
+        Assert.Equal(102, rEast.FinalX);
+        Assert.Equal(100, rEast.FinalY);
+        Assert.False(rEast.BlockedByObstacle);
+
+        // (2) 正北目标等级过高推不动
+        var rNorth = pushResults.Find(r => r.Uid == 102);
+        Assert.False(rNorth.Pushed);
+        Assert.Contains("等级", rNorth.FailReason);
+
+        // (3) 正西目标为 Boss 免疫
+        var rWest = pushResults.Find(r => r.Uid == 103);
+        Assert.False(rWest.Pushed);
+        Assert.Contains("首领", rWest.FailReason);
+
+        // (4) 正南目标推开撞墙顿挫
+        var rSouth = pushResults.Find(r => r.Uid == 104);
+        Assert.False(rSouth.Pushed);
+        Assert.True(rSouth.BlockedByObstacle);
+
+        // 2. 诱惑之光 (Temptation) 驯服与定身状态机测试
+        // (1) 不死系目标不可诱惑
+        var resUndead = Mir2Client.Game.MageCombatEngine.Temptation.Evaluate(35, 3, 20, 0, isUndeadOrBoss: true);
+        Assert.Equal(Mir2Client.Game.MageCombatEngine.Temptation.TameOutcome.Failed, resUndead.Outcome);
+
+        // (2) 成功驯服
+        var resTamed = Mir2Client.Game.MageCombatEngine.Temptation.Evaluate(35, 3, 20, 2, isUndeadOrBoss: false, roll: 30);
+        Assert.Equal(Mir2Client.Game.MageCombatEngine.Temptation.TameOutcome.Tamed, resTamed.Outcome);
+
+        // (3) 达到 5 只随从上限仅能定身无法继续驯服
+        var resParalyzed = Mir2Client.Game.MageCombatEngine.Temptation.Evaluate(35, 3, 20, 5, isUndeadOrBoss: false, roll: 30);
+        Assert.Equal(Mir2Client.Game.MageCombatEngine.Temptation.TameOutcome.Paralyzed, resParalyzed.Outcome);
+        Assert.True(resParalyzed.ParalyzeDurationSec > 0);
+
+        // 3. 地狱雷光 (HellFire) 圣属性对不死系 200% 克制
+        int normalDmg = Mir2Client.Game.MageCombatEngine.HellFire.CalculateDamage(60, isUndead: false);
+        int undeadDmg = Mir2Client.Game.MageCombatEngine.HellFire.CalculateDamage(60, isUndead: true);
+        Assert.Equal(60, normalDmg);
+        Assert.Equal(120, undeadDmg);
+
+        // 4. 背包物品拆分 (SplitItem) 持久力/数量提取与更新算法测试
+        string duraDesc = "[color=#c0c0c0]重量 1   持久力 15/20[/color]";
+        int curDura = Mir2Client.UI.HudController.ExtractItemCountOrDura(duraDesc);
+        Assert.Equal(15, curDura);
+
+        string updatedDuraDesc = Mir2Client.UI.HudController.UpdateItemCountOrDura(duraDesc, 10);
+        Assert.Contains("持久力 10/20", updatedDuraDesc);
+
+        string countDesc = "[color=#c0c0c0]超级金创药捆 数量 6[/color]";
+        int curCount = Mir2Client.UI.HudController.ExtractItemCountOrDura(countDesc);
+        Assert.Equal(6, curCount);
+    }
 }
 
 

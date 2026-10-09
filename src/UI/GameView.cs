@@ -1187,6 +1187,102 @@ namespace Mir2Client.UI
                     }
                     break;
 
+                case 8: // 抗拒火环 (Ring of Fire)
+                    PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+                    AudioManager.Instance?.PlaySoundId(134);
+                    if (_isSandbox)
+                    {
+                        var surrounding = new List<(int uid, int level, int x, int y, bool isBoss)>();
+                        foreach (var ent in EntityManagerInstance.AllEntities)
+                        {
+                            if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead)
+                            {
+                                surrounding.Add((ent.Uid, 25, ent.TileX, ent.TileY, false));
+                            }
+                        }
+                        var pushResults = MageCombatEngine.RingOfFire.Execute(
+                            casterLevel: PlayerStateInstance.Level,
+                            casterX: PlayerInstance.TileX,
+                            casterY: PlayerInstance.TileY,
+                            surroundingEntities: surrounding,
+                            isTileBlocked: (x, y) => !(MapRendererInstance?.IsPassable(x, y) ?? true)
+                        );
+                        int pushedCount = 0;
+                        foreach (var res in pushResults)
+                        {
+                            if (res.Pushed)
+                            {
+                                pushedCount++;
+                                var ent = EntityManagerInstance.GetEntity(res.Uid);
+                                if (ent != null)
+                                {
+                                    ent.TileX = res.FinalX;
+                                    ent.TileY = res.FinalY;
+                                    EntityManagerInstance.TriggerStruck(ent.Uid, 5, Math.Max(0, ent.Hp - 5));
+                                }
+                            }
+                        }
+                        string fireMsg = pushedCount > 0
+                            ? $"抗拒火环轰鸣！强劲火流震退了周围 {pushedCount} 个目标！"
+                            : "抗拒火环呼啸而过，周围没有可以推动的目标。";
+                        HudInstance?.AddChat("技能", fireMsg, new Color(1f, 0.5f, 0.2f));
+                    }
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Spell(8, (short)PlayerInstance.TileX, (short)PlayerInstance.TileY));
+                    }
+                    break;
+
+                case 9: // 诱惑之光 (Temptation)
+                    PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+                    AudioManager.Instance?.PlaySoundId(135);
+                    if (_isSandbox)
+                    {
+                        EntityManager.EntityData? targetMonster = null;
+                        foreach (var ent in EntityManagerInstance.AllEntities)
+                        {
+                            if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead && ent.TileX == targetTile.X && ent.TileY == targetTile.Y)
+                            {
+                                targetMonster = ent;
+                                break;
+                            }
+                        }
+                        if (targetMonster != null)
+                        {
+                            var tameRes = MageCombatEngine.Temptation.Evaluate(
+                                casterLevel: PlayerStateInstance.Level,
+                                skillLevel: 3,
+                                monsterLevel: 25,
+                                currentPetCount: 0,
+                                isUndeadOrBoss: false
+                            );
+                            if (tameRes.Outcome == MageCombatEngine.Temptation.TameOutcome.Tamed)
+                            {
+                                targetMonster.MasterUid = EntityManagerInstance.LocalPlayerUid;
+                                targetMonster.PetLevel = 1;
+                                if (_entityNodes.TryGetValue(targetMonster.Uid, out var node))
+                                {
+                                    node.SetPetInfo(1, Username);
+                                }
+                                HudInstance?.AddChat("技能", $"【诱惑成功】目标【{targetMonster.Name}】已被驯服为您的随从！", new Color(0.3f, 1f, 0.4f));
+                            }
+                            else if (tameRes.Outcome == MageCombatEngine.Temptation.TameOutcome.Paralyzed)
+                            {
+                                targetMonster.IsFrozen = true;
+                                HudInstance?.AddChat("技能", $"【心智迷离】目标【{targetMonster.Name}】受到强光定身麻痹 {tameRes.ParalyzeDurationSec} 秒！", new Color(1f, 0.9f, 0.2f));
+                            }
+                            else
+                            {
+                                HudInstance?.AddChat("技能", $"诱惑之光闪烁，【{targetMonster.Name}】抵抗了心智侵蚀。", new Color(0.8f, 0.8f, 0.8f));
+                            }
+                        }
+                    }
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Spell(9, (short)targetTile.X, (short)targetTile.Y));
+                    }
+                    break;
+
                 case 12: // 刺杀剑术
                     PlayerInstance.Anim.SetAction(ActionType.LongHit, dir);
                     AudioManager.Instance?.PlaySoundId(1);
@@ -1197,6 +1293,36 @@ namespace Mir2Client.UI
                     else if (_isSandbox)
                     {
                         CheckSandboxMeleeHit(dir, 35, isStabSkill: true);
+                    }
+                    break;
+
+                case 22: // 地狱雷光 (HellFire)
+                    PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
+                    AudioManager.Instance?.PlaySoundId(132);
+                    if (_isSandbox)
+                    {
+                        int hitCount = 0;
+                        int px = PlayerInstance.TileX;
+                        int py = PlayerInstance.TileY;
+                        foreach (var ent in EntityManagerInstance.AllEntities)
+                        {
+                            if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead)
+                            {
+                                int dist = Math.Max(Math.Abs(ent.TileX - px), Math.Abs(ent.TileY - py));
+                                if (dist <= 2) // 周围 2 格范围圣雷震荡
+                                {
+                                    bool isUndead = ent.Name.Contains("僵尸") || ent.Name.Contains("骷髅") || ent.Name.Contains("尸王");
+                                    int dmg = MageCombatEngine.HellFire.CalculateDamage(50, isUndead);
+                                    EntityManagerInstance.TriggerStruck(ent.Uid, dmg, Math.Max(0, ent.Hp - dmg));
+                                    hitCount++;
+                                }
+                            }
+                        }
+                        HudInstance?.AddChat("技能", $"地狱雷光轰然降临！强劲圣雷震荡波波及周围 {hitCount} 个目标！", new Color(0.4f, 0.9f, 1f));
+                    }
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        _net.SendPacket(PacketEncoder.Spell(22, (short)PlayerInstance.TileX, (short)PlayerInstance.TileY));
                     }
                     break;
 

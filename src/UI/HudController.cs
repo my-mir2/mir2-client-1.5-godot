@@ -597,10 +597,48 @@ public partial class HudController : CanvasLayer
                                 var details = _bagItemDetails[slot];
                                 string name = details?.Name ?? $"背包物品 #{slot + 1}";
                                 string desc = details?.Desc ?? "[color=#c0c0c0]重量 1   持久力 10/10[/color]\n[color=#ffff00]攻击 0-1[/color]";
+
+                                // 盛大官方 1.5 装备悬停对比：若按住 Shift 且身上有对应槽位穿戴，呼出 ShowComparisonTooltip
+                                if (Input.IsKeyPressed(Key.Shift))
+                                {
+                                    int targetEquipSlot = GetBestEquipSlotForBagItem(name);
+                                    if (targetEquipSlot >= 0 && targetEquipSlot < 9 && _equipItemDetails[targetEquipSlot] != null)
+                                    {
+                                        var curEquip = _equipItemDetails[targetEquipSlot]!.Value;
+                                        ShowComparisonTooltip(curEquip.Name, curEquip.Desc, name, desc, btn.GlobalPosition);
+                                        return;
+                                    }
+                                }
                                 ShowSlotTooltip(name, desc, btn.GlobalPosition, showFloating: false);
                             }
                         };
                         btn.MouseExited += HideSlotTooltip;
+                        btn.GuiInput += (ev) =>
+                        {
+                            // 官方 1.5 Ctrl+点击堆叠物品触发拆分输入模态框 (SplitDlg)
+                            if (ev is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left && mb.CtrlPressed)
+                            {
+                                var item = _bagItemDetails[slot];
+                                if (item != null)
+                                {
+                                    int curCount = ExtractItemCountOrDura(item.Value.Desc ?? "");
+                                    if (curCount > 1)
+                                    {
+                                        _messageBoxDialog?.ShowInput($"请输入拆分数量 (1 ~ {curCount - 1})：", "1", (input) =>
+                                        {
+                                            if (int.TryParse(input.Trim(), out var cnt) && cnt > 0)
+                                            {
+                                                SplitBagItem(slot, cnt);
+                                            }
+                                        });
+                                    }
+                                    else
+                                    {
+                                        AddChat("系统", $"[背包] [{item.Value.Name}] 数量不足，无法继续拆分。", new Color(1f, 0.4f, 0.4f));
+                                    }
+                                }
+                            }
+                        };
                         grid.AddChild(btn);
                     }
                 }
@@ -3603,6 +3641,135 @@ public partial class HudController : CanvasLayer
         {
             AddChat("系统", $"[{title}] {msg}", new Color(1f, 0.3f, 0.3f));
             onConfirm?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// 解析物品描述中的持久力或数量
+    /// </summary>
+    public static int ExtractItemCountOrDura(string desc)
+    {
+        if (string.IsNullOrWhiteSpace(desc)) return 1;
+        // 匹配 "持久力 X/Y"
+        int duraIdx = desc.IndexOf("持久力");
+        if (duraIdx >= 0)
+        {
+            int slashIdx = desc.IndexOf('/', duraIdx);
+            if (slashIdx > duraIdx)
+            {
+                int numStart = duraIdx + 3;
+                while (numStart < slashIdx && !char.IsDigit(desc[numStart])) numStart++;
+                int numEnd = numStart;
+                while (numEnd < slashIdx && char.IsDigit(desc[numEnd])) numEnd++;
+                if (numEnd > numStart && int.TryParse(desc[numStart..numEnd], out var d)) return d;
+            }
+        }
+        // 匹配 "数量 X"
+        int cntIdx = desc.IndexOf("数量");
+        if (cntIdx >= 0)
+        {
+            int numStart = cntIdx + 2;
+            while (numStart < desc.Length && !char.IsDigit(desc[numStart])) numStart++;
+            int numEnd = numStart;
+            while (numEnd < desc.Length && char.IsDigit(desc[numEnd])) numEnd++;
+            if (numEnd > numStart && int.TryParse(desc[numStart..numEnd], out var c)) return c;
+        }
+        return 1;
+    }
+
+    /// <summary>
+    /// 更新物品描述中的持久力或数量
+    /// </summary>
+    public static string UpdateItemCountOrDura(string desc, int newCount)
+    {
+        if (string.IsNullOrWhiteSpace(desc)) return desc;
+        int duraIdx = desc.IndexOf("持久力 ");
+        if (duraIdx >= 0)
+        {
+            int slashIdx = desc.IndexOf('/', duraIdx);
+            if (slashIdx > duraIdx)
+            {
+                string prefix = desc[..(duraIdx + 4)];
+                string suffix = desc[slashIdx..];
+                return $"{prefix}{newCount}{suffix}";
+            }
+        }
+        return desc;
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 背包物品拆分 (SplitDlg, 对齐 IDA sub_48DE20 TFrmDlg_DItemGridSplit)
+    /// 按住 Ctrl 单击背包物品弹出拆分输入框，将物品数量/持久拆分为两份放入背包空槽
+    /// </summary>
+    public bool SplitBagItem(int slot, int splitCount)
+    {
+        if (slot < 0 || slot >= 40) return false;
+        var item = _bagItemDetails[slot];
+        if (item == null || splitCount <= 0) return false;
+
+        int emptySlot = FindFirstEmptyBagSlot();
+        if (emptySlot == -1)
+        {
+            AddChat("系统", "[背包] 背包已满，无法拆分物品！", new Color(1f, 0.4f, 0.4f));
+            return false;
+        }
+
+        string desc = item.Value.Desc ?? "";
+        int currentCount = ExtractItemCountOrDura(desc);
+        if (currentCount <= 1 || splitCount >= currentCount)
+        {
+            AddChat("系统", $"[背包] 该物品无法拆分为 {splitCount} 份 (当前最大可拆分数量: {currentCount - 1})。", new Color(1f, 0.4f, 0.4f));
+            return false;
+        }
+
+        int remainingCount = currentCount - splitCount;
+        string updatedDesc = UpdateItemCountOrDura(desc, remainingCount);
+        string newDesc = UpdateItemCountOrDura(desc, splitCount);
+
+        var tex = _bagSlots[slot]?.ItemTexture;
+
+        // 刷新原槽位
+        _bagItemDetails[slot] = (item.Value.Name, updatedDesc);
+
+        // 放入新槽位
+        _bagItemDetails[emptySlot] = (item.Value.Name, newDesc);
+        if (_bagSlots[emptySlot] != null && tex != null)
+        {
+            _bagSlots[emptySlot]!.ItemTexture = tex;
+        }
+
+        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick);
+        AddChat("系统", $"[背包] 成功将 [{item.Value.Name}] 拆分出 {splitCount} 份至背包第 {emptySlot + 1} 格。", new Color(0.4f, 1f, 0.5f));
+        return true;
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 铁匠铺修理成功回写装备实际耐久与最大耐久 (SM_REPAIROK_DELPHI 669)
+    /// </summary>
+    public void OnServerItemRepaired(int dura, int duraMax, string? itemName)
+    {
+        // 1. 若当前选中了背包槽位，更新对应物品描述中的持久力
+        if (_selectedBagSlot >= 0 && _selectedBagSlot < 40 && _bagItemDetails[_selectedBagSlot] != null)
+        {
+            var item = _bagItemDetails[_selectedBagSlot]!.Value;
+            string updatedDesc = $"[color=#c0c0c0]重量 1   持久力 {dura}/{duraMax}[/color]\n[color=#ffff00]攻击 0-1[/color]";
+            _bagItemDetails[_selectedBagSlot] = (item.Name, updatedDesc);
+            AddChat("修理", $"[铁匠铺] 背包第 {_selectedBagSlot + 1} 格 [{item.Name}] 耐久度已刷新为 {dura}/{duraMax}。", new Color(0.3f, 1f, 0.5f));
+        }
+        else
+        {
+            // 2. 否则查找背包中同名物品或第一个非空物品更新
+            for (int i = 0; i < 40; i++)
+            {
+                if (_bagItemDetails[i] != null && (string.IsNullOrEmpty(itemName) || _bagItemDetails[i]!.Value.Name == itemName))
+                {
+                    var item = _bagItemDetails[i]!.Value;
+                    string updatedDesc = $"[color=#c0c0c0]重量 1   持久力 {dura}/{duraMax}[/color]\n[color=#ffff00]攻击 0-1[/color]";
+                    _bagItemDetails[i] = (item.Name, updatedDesc);
+                    AddChat("修理", $"[铁匠铺] 背包第 {i + 1} 格 [{item.Name}] 耐久度已刷新为 {dura}/{duraMax}。", new Color(0.3f, 1f, 0.5f));
+                    break;
+                }
+            }
         }
     }
 }

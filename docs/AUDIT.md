@@ -7860,11 +7860,31 @@
       - 在 `src/UI/HudController.cs` 中增加丢弃金币全角转半角防御与血球平滑爬升插值；
       - 在 `src/Render/EntityNode.cs` 中增加随从名牌格式与 0~7 级名牌变色阶梯；
       - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialPotionRecoveryAndGoldDefenseFlow` 单元测试，脱机测试总数提升至 **217 / 217 项 100% 全部通过**。
+  - [x] **73. 盛大官方 1.5 法师战斗引擎 (抗拒火环周围推开/诱惑之光定身驯服/地狱雷光不死双倍)、背包物品拆分 (SplitDlg) 与铁匠铺修理持久回写闭环 (`MageCombatEngine.cs`, `GameView.cs`, `HudController.cs`, `ServerMessageRouter.cs`, `TestProtocolMatrix.cs`)** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据盛大官方 1.5 原版二进制技能与 UI 交互规范：
+        1. 法师战斗引擎物理闭环：
+           针对此前战士与道士均有独立战斗引擎，唯独法师核心技能缺失独立机制的坏账，新增 `src/Game/MageCombatEngine.cs`：
+           - **抗拒火环 (MagicId = 8)**：遍历自身周围 8 格实体，实现官方权威等级压制 (`Caster.Level > Target.Level`)、Boss 免疫推开、推向外侧 1 格与地形阻挡碰撞顿挫；
+           - **诱惑之光 (MagicId = 9)**：实现不死系/魔王心智免疫、等级压制判定、最多 5 只随从上限控制、以及定身（黄名）与驯服（绿名随从）状态机；
+           - **地狱雷光 (MagicId = 22)**：以自身为中心爆发 2 格范围圣属性雷电，严格执行不死系怪物（僵尸/骷髅/尸王）200% 双倍伤害克制；
+        2. 背包物品拆分 (SplitDlg, IDA sub_48DE20 TFrmDlg_DItemGridSplit)：
+           在 `HudController.cs` 中实现 `SplitBagItem(slot, splitCount)`、`ExtractItemCountOrDura` 与 `UpdateItemCountOrDura`，并在背包格子上打通 `Ctrl + 左键` 弹出官方拆分输入模态框，将堆叠数量/持久拆分为两份放入空闲槽位；
+        3. 装备悬停 Shift 实时对比 Tooltip：
+           在背包格子 `MouseEntered` 中增加 `Input.IsKeyPressed(Key.Shift)` 检测，若身上对应部位已有装备穿戴，直接呼出 `ShowComparisonTooltip` 展示现有装备与背包装备属性差异对比；
+        4. 铁匠铺修理 (SM_REPAIROK_DELPHI 669) 持久力回写闭环：
+           服务端下发 669 修理成功时，`Param` 为当前持久，`Tag` 为最大持久。在 `ServerMessageRouter.cs` 中联动 `HudController.OnServerItemRepaired`，将耐久度数值精准回写至对应物品的持久力描述中。
+    - **精准重构**：
+      - 新增 `src/Game/MageCombatEngine.cs` 纯 C# 引擎；
+      - 在 `src/UI/GameView.cs` 中打通 MagicId 8 (抗拒火环)、9 (诱惑之光) 与 22 (地狱雷光) 的施法驱动与伤害判定；
+      - 在 `src/UI/HudController.cs` 中实现背包物品 Ctrl 拆分弹窗、Shift 装备对比 Tooltip 与修理耐久度属性回写；
+      - 在 `src/Net/ServerMessageRouter.cs` 中将 669 修理结果接入 `OnServerItemRepaired`；
+      - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialMageCombatAndItemSplitFlow` 单元测试，脱机测试总数提升至 **218 / 218 项 100% 全部通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **217 / 217 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **218 / 218 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
