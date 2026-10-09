@@ -169,15 +169,39 @@ public partial class RepairPanelView : Control, IManagedWindow
 
     private void OnConfirm()
     {
-        Visible = false;
         if (_isStorageMode)
         {
+            Visible = false;
             EmitSignal(SignalName.StorageDepositConfirmed, _targetBagSlot, _targetItemName);
+            return;
+        }
+
+        // 盛大官方 1.5 铁匠铺特修二次确认弹窗 (IDA sub_486DF0 / ShowRepairConfirm)
+        var (newDura, newMaxDura, goldCost) = Mir2Client.Game.OfficialClientRulesEngine.DurabilityRules.PerformSpecialRepair(15, 25, 5000);
+        var msgBox = GetOrFindMessageBox();
+        if (msgBox != null)
+        {
+            msgBox.ShowMessage(
+                $"【铁匠铺特殊修理】\n\n装备: [{_targetItemName}]\n修理后持久: {newDura}/{newMaxDura}\n预计花费金币: {goldCost} 金币\n\n确定要进行特殊修理吗？",
+                hasCancel: true,
+                onConfirm: () =>
+                {
+                    Visible = false;
+                    EmitSignal(SignalName.RepairConfirmed, _targetBagSlot, true);
+                });
         }
         else
         {
-            EmitSignal(SignalName.RepairConfirmed, 0, true);
+            Visible = false;
+            EmitSignal(SignalName.RepairConfirmed, _targetBagSlot, true);
         }
+    }
+
+    private MessageBoxDialog? GetOrFindMessageBox()
+    {
+        var hud = GetParent() as HudController;
+        if (hud?.MessageBoxDialog != null) return hud.MessageBoxDialog;
+        return GetTree().Root.FindChild("MessageBoxDialog", true, false) as MessageBoxDialog;
     }
 
     private void OnClose()

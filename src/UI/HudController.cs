@@ -456,6 +456,22 @@ public partial class HudController : CanvasLayer
                 ZIndex = 1 // 位于底座上方，裁切透明部分自然显露金属空槽
             };
             AddChild(_orbTextureRect);
+
+            // 盛大官方 1.5 规则：血球魔球玻璃罩高光层 (Prguse_0004 覆盖于血球魔球上，位于 ZIndex=2，提供真实玻璃球曲面反光立体质感)
+            var orbGlassTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0004.png");
+            if (orbGlassTex != null)
+            {
+                var orbGlassOverlay = new TextureRect
+                {
+                    Name = "HudOrbGlassOverlay",
+                    Texture = orbGlassTex,
+                    Position = new Vector2(40, 440),
+                    Size = new Vector2(92, 90),
+                    MouseFilter = Control.MouseFilterEnum.Ignore,
+                    ZIndex = 2
+                };
+                AddChild(orbGlassOverlay);
+            }
         }
 
         // 挂载官方 1.5 等级、经验条与负重条 (IDA sub_48B2A0 @ 0x48b840 & 0x48b8d0, Prguse_0007 76x13)
@@ -1113,6 +1129,11 @@ public partial class HudController : CanvasLayer
         // 服务端协议将仓库作为商人窗口的 Storage 模式,故不再创建非官方的 StoragePanelView (Prguse_0402)。
 
         _shopPanelView = new ShopPanelView();
+        _shopPanelView.BuyRequested += (npcUid, itemIdx, count) =>
+        {
+            AddChat("商店", $"[交易] 正在向 NPC 购买第 {itemIdx + 1} 项商品，数量: {count}...", new Color(1f, 0.9f, 0.4f));
+            GD.Print($"[HudController] 商店购买请求: npcUid={npcUid}, itemIdx={itemIdx}, count={count}");
+        };
         _shopPanelView.TakeBackRequested += (storageSlot, itemName) =>
         {
             // 向外界派发官方取回仓库物品事件 (CM_USERSTORAGEWITHDRAW 1032)
@@ -1123,6 +1144,12 @@ public partial class HudController : CanvasLayer
         AddChild(_shopPanelView);
 
         _repairPanelView = new RepairPanelView();
+        _repairPanelView.RepairConfirmed += (bagSlot, isSpecial) =>
+        {
+            string modeStr = isSpecial ? "特殊修理" : "普通修理";
+            AddChat("修理", $"[铁匠铺] 正在申请对背包第 {bagSlot + 1} 格装备进行{modeStr}...", new Color(0.4f, 1f, 0.5f));
+            GD.Print($"[HudController] 装备修理请求: slot={bagSlot}, isSpecial={isSpecial}");
+        };
         _repairPanelView.StorageDepositConfirmed += (bagSlot, itemName) =>
         {
             // 向外界派发官方存入仓库物品事件 (CM_USERSTORAGEDEPOSIT 1031)
@@ -1521,6 +1548,7 @@ public partial class HudController : CanvasLayer
         {
             _expBar.MaxValue = maxExp > 0 ? maxExp : 1;
             _expBar.Value = Math.Clamp(curExp, 0, (long)_expBar.MaxValue);
+            _expBar.Modulate = new Color(0.35f, 0.9f, 1.0f); // 官方经典青蓝色经验条
         }
         // 官方能力页第 0 行 (IDA sub_488AF4 0x48935e: 100*[+48h]/[+4Ch],保留 2 位小数并追加 "%")
         _statusPanelView?.UpdateAbilityValue(0, maxExp > 0 ? $"{100.0 * curExp / maxExp:F2}%" : "0.00%");
@@ -1532,6 +1560,8 @@ public partial class HudController : CanvasLayer
         {
             _weightBar.MaxValue = maxWeight > 0 ? maxWeight : 1;
             _weightBar.Value = Math.Clamp(curWeight, 0, (int)_weightBar.MaxValue);
+            // 盛大官方 1.5 规则：负重超限时呈鲜红警示色，未超限时为翠绿色
+            _weightBar.Modulate = curWeight > maxWeight ? new Color(1f, 0.25f, 0.25f) : new Color(0.25f, 0.95f, 0.35f);
         }
         // 官方能力页第 1 行 背包重量 (IDA 0x4893f4: [+50h]/[+52h] 两个 word,超限时红色 0x0000FF)
         _statusPanelView?.UpdateAbilityValue(1, $"{curWeight}/{maxWeight}", curWeight > maxWeight);

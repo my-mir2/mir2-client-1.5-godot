@@ -258,6 +258,14 @@ public partial class ShopPanelView : Control, IManagedWindow
 
     private void OnBuyCurrentSelection()
     {
+        RequestBuyWithCount(1);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 商店批量购买 (支持按住 Ctrl 点击批量购买 1~99 份药水与耗材)
+    /// </summary>
+    public void RequestBuyWithCount(int count)
+    {
         if (_selectedIndex >= 0 && _selectedIndex < _items.Count)
         {
             if (_currentMode == ShopMode.Storage)
@@ -266,9 +274,17 @@ public partial class ShopPanelView : Control, IManagedWindow
             }
             else
             {
-                EmitSignal(SignalName.BuyRequested, _npcUid, _selectedIndex, 1);
+                int buyCount = Math.Clamp(count, 1, 99);
+                EmitSignal(SignalName.BuyRequested, _npcUid, _selectedIndex, buyCount);
             }
         }
+    }
+
+    private MessageBoxDialog? GetOrFindMessageBox()
+    {
+        var hud = GetParent() as HudController;
+        if (hud?.MessageBoxDialog != null) return hud.MessageBoxDialog;
+        return GetTree().Root.FindChild("MessageBoxDialog", true, false) as MessageBoxDialog;
     }
 
     public void SetMode(ShopMode mode)
@@ -447,14 +463,28 @@ public partial class ShopPanelView : Control, IManagedWindow
                 {
                     if (mb.ButtonIndex == MouseButton.Left)
                     {
-                        if (mb.DoubleClick)
+                        SelectRow(globalIdx);
+                        if (mb.CtrlPressed && _currentMode == ShopMode.Buy)
                         {
-                            SelectRow(globalIdx);
-                            OnBuyCurrentSelection();
+                            var msgBox = GetOrFindMessageBox();
+                            if (msgBox != null)
+                            {
+                                msgBox.ShowInput($"请输入购买 [{item.Name}] 的数量 (1 ~ 99)：", "1", (input) =>
+                                {
+                                    if (int.TryParse(input.Trim(), out var cnt) && cnt > 0)
+                                    {
+                                        RequestBuyWithCount(cnt);
+                                    }
+                                });
+                            }
+                            else
+                            {
+                                OnBuyCurrentSelection();
+                            }
                         }
-                        else
+                        else if (mb.DoubleClick)
                         {
-                            SelectRow(globalIdx);
+                            OnBuyCurrentSelection();
                         }
                     }
                 }
