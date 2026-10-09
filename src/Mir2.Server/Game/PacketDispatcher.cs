@@ -1646,9 +1646,9 @@ public sealed class PacketDispatcher
     }
 
     /// <summary>
-    /// 千人同屏九宫格视距降采样广播 (LOD Spatial Partitioning)
+    /// 千人同屏九宫格视距降采样与高密度目标上限熔断广播 (LOD Spatial Partitioning & Density Cap)
     /// </summary>
-    public void BroadcastBinaryToNinePatch(ClientSession source, ushort msgId, ReadOnlySpan<byte> payload, bool includeSelf = false, int maxDist = 15)
+    public void BroadcastBinaryToNinePatch(ClientSession source, ushort msgId, ReadOnlySpan<byte> payload, bool includeSelf = false, int maxDist = 15, int maxTargets = 80)
     {
         var map = _mapManager.GetMap(source.CurrentMapId) ?? _mapManager.DefaultMap;
         lock (_ninePatchBuffer)
@@ -1656,6 +1656,7 @@ public sealed class PacketDispatcher
             _ninePatchBuffer.Clear();
             map.Aoi.GetEntitiesInNinePatch(source.X, source.Y, _ninePatchBuffer);
 
+            int sentCount = 0;
             for (int i = 0; i < _ninePatchBuffer.Count; i++)
             {
                 var target = _ninePatchBuffer[i];
@@ -1668,6 +1669,9 @@ public sealed class PacketDispatcher
                 if (target.UseModernProtocol)
                 {
                     target.EnqueueBinaryPacket(msgId, payload);
+                    sentCount++;
+                    // 千人高密度同屏熔断保护：单屏单个动作广播目标上限锁定在 80 人以内，彻底阻断百万级网络广播风暴
+                    if (sentCount >= maxTargets) break;
                 }
             }
         }

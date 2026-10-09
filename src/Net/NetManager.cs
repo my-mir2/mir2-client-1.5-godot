@@ -3,18 +3,22 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Godot;
+using Mir2.Shared.Protocols.Modern;
 using Mir2Client.Utils;
 
 namespace Mir2Client.Net;
 
 /// <summary>
 /// 盛大官方 1.5 客户端 TCP 网络通信管理器 (基于 .NET 原生 TcpClient 与 Godot 信号)
-/// 彻底解耦 Godot 引擎层 StreamPeerTcp，具备跨版本绝对兼容性与高吞吐网络吞吐能力
+/// 彻底解耦 Godot 引擎层 StreamPeerTcp，原生支持现代紧凑二进制 TCP-Pack 与消特征动态混淆
 /// </summary>
 public partial class NetManager : Node
 {
     [Signal]
     public delegate void PacketReceivedEventHandler(short smCode, byte[] data);
+
+    [Signal]
+    public delegate void BinaryPacketReceivedEventHandler(ushort msgId, byte[] payload);
 
     [Signal]
     public delegate void ControlFrameReceivedEventHandler(string frame);
@@ -49,12 +53,18 @@ public partial class NetManager : Node
     private float _reconnectTimer = 0.0f;
     private bool _autoReconnect = false;
 
+    // 现代二进制协议与消特征状态机
+    public bool UseModernBinaryProtocol { get; set; } = true;
+    public PacketCipher? Cipher { get; set; }
+    private ushort _sendSequence = 0;
+    private readonly MemoryStream _recvStream = new();
+
     public ConnectionState State => _state;
     public bool IsConnectedToServer => _state == ConnectionState.Connected;
 
     public override void _Ready()
     {
-        GD.Print("[NetManager] .NET 原生 TcpClient 通信引擎已就绪");
+        GD.Print("[NetManager] 现代二进制 TCP-Pack 与原生通信引擎已就绪");
     }
 
     public void ConnectTo(string host, int port, bool autoReconnect = false)
@@ -106,6 +116,55 @@ public partial class NetManager : Node
         _client = null;
         _state = ConnectionState.Disconnected;
         _packetBuffer.Clear();
+        _recvStream.SetLength(0);
+    }
+
+    /// <summary>
+    /// 客户端发送现代紧凑二进制意图帧 (Direct-Blit 零分配，就地消特征混淆)
+    /// </summary>
+    public void SendBinaryIntent(ushort msgId, ReadOnlySpan<byte> payload)
+    {
+        if (_state != ConnectionState.Connected || _stream == null) return;
+
+        int totalLen = BinaryProtocol.HeaderSize + payload.Length;
+        byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(totalLen);
+        try
+        {
+            ushort seq = ++_sendSequence;
+            var header = new BinaryProtocol.PacketHeader
+            {
+                Magic = BinaryProtocol.DefaultMagic,
+                MsgId = msgId,
+                PayloadLength = (ushort)payload.Length,
+                Sequence = seq
+            };
+
+            var span = buffer.AsSpan(0, totalLen);
+            var headerSpan = span[0..BinaryProtocol.HeaderSize];
+            var payloadSpan = span[BinaryProtocol.HeaderSize..];
+
+            header.Write(headerSpan);
+            payload.CopyTo(payloadSpan);
+
+            // 如果开启了消特征混淆，就地混淆帧头与载荷
+            if (Cipher != null)
+            {
+                Cipher.ProcessHeader(headerSpan);
+                Cipher.ProcessPayload(payloadSpan, seq);
+            }
+
+            _stream.Write(buffer, 0, totalLen);
+            _stream.Flush();
+        }
+        catch (Exception ex)
+        {
+            GD.PushError($"[NetManager] SendBinaryIntent error: {ex.Message}");
+            HandleDisconnect("send error");
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     public void SendPacket(byte[] data)
@@ -166,11 +225,21 @@ public partial class NetManager : Node
                 int read = _stream.Read(_readBuffer, 0, _readBuffer.Length);
                 if (read > 0)
                 {
-                    byte[] bytes = new byte[read];
-                    Buffer.BlockCopy(_readBuffer, 0, bytes, 0, read);
-                    _packetBuffer.Append(bytes);
                     _lastRecvTick = Time.GetTicksMsec();
-                    ProcessRecvBuf();
+
+                    // 1. 判断是否为现代二进制 TCP-Pack 流
+                    if (UseModernBinaryProtocol)
+                    {
+                        _recvStream.Write(_readBuffer, 0, read);
+                        ProcessBinaryRecvBuf();
+                    }
+                    else
+                    {
+                        byte[] bytes = new byte[read];
+                        Buffer.BlockCopy(_readBuffer, 0, bytes, 0, read);
+                        _packetBuffer.Append(bytes);
+                        ProcessRecvBuf();
+                    }
                 }
                 else
                 {
@@ -192,6 +261,56 @@ public partial class NetManager : Node
             {
                 HandleDisconnect("read timeout");
             }
+        }
+    }
+
+    private void ProcessBinaryRecvBuf()
+    {
+        var rawBytes = _recvStream.GetBuffer();
+        int available = (int)_recvStream.Length;
+        int consumed = 0;
+        Span<byte> headerBytes = stackalloc byte[BinaryProtocol.HeaderSize];
+
+        while (available - consumed >= BinaryProtocol.HeaderSize)
+        {
+            rawBytes.AsSpan(consumed, BinaryProtocol.HeaderSize).CopyTo(headerBytes);
+
+            Cipher?.ProcessHeader(headerBytes);
+            var header = BinaryProtocol.PacketHeader.Read(headerBytes);
+
+            if (header.Magic != BinaryProtocol.DefaultMagic)
+            {
+                // 魔数不匹配，可能为传统文本包回退
+                break;
+            }
+
+            int totalPacketSize = BinaryProtocol.HeaderSize + header.PayloadLength;
+            if (available - consumed < totalPacketSize)
+            {
+                // 半包等待
+                break;
+            }
+
+            // 完整包提取
+            byte[] payload = new byte[header.PayloadLength];
+            if (header.PayloadLength > 0)
+            {
+                rawBytes.AsSpan(consumed + BinaryProtocol.HeaderSize, header.PayloadLength).CopyTo(payload);
+                Cipher?.ProcessPayload(payload, header.Sequence);
+            }
+
+            consumed += totalPacketSize;
+            EmitSignal(SignalName.BinaryPacketReceived, header.MsgId, payload);
+        }
+
+        if (consumed > 0)
+        {
+            int remaining = available - consumed;
+            if (remaining > 0)
+            {
+                Buffer.BlockCopy(rawBytes, consumed, rawBytes, 0, remaining);
+            }
+            _recvStream.SetLength(remaining);
         }
     }
 

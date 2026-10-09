@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Mir2.Shared.Protocols.Modern;
 using Mir2Client.Audio;
 using Mir2Client.Core;
 using Mir2Client.Game;
@@ -377,10 +378,25 @@ namespace Mir2Client.UI
 
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        byte[] pkt = isRun
-                            ? PacketEncoder.Run((short)tx, (short)ty, (short)dir)
-                            : PacketEncoder.Walk((short)tx, (short)ty, (short)dir);
-                        _net.SendPacket(pkt);
+                        if (_net.UseModernBinaryProtocol)
+                        {
+                            Span<byte> movePayload = stackalloc byte[6];
+                            new BinaryProtocol.MoveIntentPayload
+                            {
+                                TargetX = (short)tx,
+                                TargetY = (short)ty,
+                                Direction = (byte)(dir & 7),
+                                IsRun = (byte)(isRun ? 1 : 0)
+                            }.Write(movePayload);
+                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentMove, movePayload);
+                        }
+                        else
+                        {
+                            byte[] pkt = isRun
+                                ? PacketEncoder.Run((short)tx, (short)ty, (short)dir)
+                                : PacketEncoder.Walk((short)tx, (short)ty, (short)dir);
+                            _net.SendPacket(pkt);
+                        }
                     }
                 };
 
@@ -435,7 +451,22 @@ namespace Mir2Client.UI
                         var offset = PlayerAuditEngine.DirOffsets[dir & 7];
                         short targetX = (short)(PlayerInstance.TileX + offset.X);
                         short targetY = (short)(PlayerInstance.TileY + offset.Y);
-                        _net.SendPacket(PacketEncoder.Hit((short)(dir & 7), targetX, targetY));
+
+                        if (_net.UseModernBinaryProtocol)
+                        {
+                            Span<byte> attackPayload = stackalloc byte[6];
+                            new BinaryProtocol.AttackIntentPayload
+                            {
+                                TargetUid = _selectedTargetUid,
+                                Direction = (byte)(dir & 7),
+                                SkillType = 0
+                            }.Write(attackPayload);
+                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentAttack, attackPayload);
+                        }
+                        else
+                        {
+                            _net.SendPacket(PacketEncoder.Hit((short)(dir & 7), targetX, targetY));
+                        }
                     }
                     else if (_isSandbox)
                     {
@@ -566,12 +597,21 @@ namespace Mir2Client.UI
                     _net?.SendPacket(PacketEncoder.NpcSelect(npcUid, npcName, index));
                 };
 
-                // 官方 1.5 物品使用/吃药、穿戴、脱下网络发包 (CM_EATITEM 1006 / CM_WEARITEM 1003 / CM_TAKEOFFITEM 1004)
+                // 现代二进制意图吃药与官方兼容发包
                 HudInstance.UseItemRequested += (slot, item) =>
                 {
                     if (PlayerInstance?.IsDead == true) return;
-                    _net?.SendPacket(PacketEncoder.EatItem(slot, item));
-                    ApplyPotionRecovery(item);
+                    if (_net != null && _net.IsConnectedToServer && _net.UseModernBinaryProtocol)
+                    {
+                        Span<byte> itemPayload = stackalloc byte[4];
+                        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(itemPayload, slot);
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentUseItem, itemPayload);
+                    }
+                    else
+                    {
+                        _net?.SendPacket(PacketEncoder.EatItem(slot, item));
+                        ApplyPotionRecovery(item);
+                    }
                 };
                 HudInstance.WearItemRequested += (bagSlot, equipSlot) =>
                 {
@@ -2000,6 +2040,7 @@ namespace Mir2Client.UI
             _net = net;
             ServerMessageRouterInstance = new ServerMessageRouter(HudInstance, EntityManagerInstance, this, GroundItemManagerInstance);
             _net.PacketReceived += ServerMessageRouterInstance.OnPacket;
+            _net.BinaryPacketReceived += OnBinaryPacketReceived;
             SessionId = sId;
             Username = uname;
             if (PlayerInstance != null)
@@ -2007,6 +2048,48 @@ namespace Mir2Client.UI
                 PlayerInstance.CharacterName = uname;
                 PlayerInstance.Level = ulevel;
                 PlayerInstance.UpdateNameLabelText();
+            }
+        }
+
+        /// <summary>
+        /// 处理现代紧凑二进制服务端权威状态同步 (反外挂强制拉回、权威血量同步等)
+        /// </summary>
+        public void OnBinaryPacketReceived(ushort msgId, byte[] payload)
+        {
+            switch ((BinaryProtocol.MsgType)msgId)
+            {
+                case BinaryProtocol.MsgType.SyncPosition:
+                    if (payload.Length >= 6)
+                    {
+                        var sync = BinaryProtocol.PositionSyncPayload.Read(payload);
+                        if (sync.ForcePullback == 1)
+                        {
+                            // 权威拉回！主角如果发生越界、加速或穿墙，立即强行修正并停止当前步伐
+                            PlayerInstance?.SetTilePos(sync.X, sync.Y);
+                            HudInstance?.AddChat("系统", $"【安全防御】坐标异常已被服务端权威拉回 -> ({sync.X}, {sync.Y})", new Color(1f, 0.2f, 0.2f));
+                        }
+                        else
+                        {
+                            PlayerInstance?.SetTilePos(sync.X, sync.Y);
+                        }
+                    }
+                    break;
+
+                case BinaryProtocol.MsgType.BroadcastHealthSync:
+                    if (payload.Length >= 8)
+                    {
+                        var hpSync = BinaryProtocol.HealthSyncPayload.Read(payload);
+                        if (PlayerInstance != null)
+                        {
+                            PlayerInstance.Hp = hpSync.Hp;
+                            PlayerInstance.Mp = hpSync.Mp;
+                            PlayerInstance.MaxHp = hpSync.MaxHp;
+                            PlayerInstance.MaxMp = hpSync.MaxMp;
+                            HudInstance?.UpdateHp(hpSync.Hp, hpSync.MaxHp);
+                            HudInstance?.UpdateMp(hpSync.Mp, hpSync.MaxMp);
+                        }
+                    }
+                    break;
             }
         }
 
