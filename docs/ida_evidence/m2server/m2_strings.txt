@@ -1,0 +1,1339 @@
+0x402e08: SOFTWARE\Borland\Delphi\RTL
+0x402e24: FPUMaskValue
+0x403b83: Portions Copyright (c) 1983,99 Borland
+0x405fb0: kernel32.dll
+0x405fc0: GetLongPathNameA
+0x406190: Software\Borland\Locales
+0x4061ac: Software\Borland\Delphi\Locales
+0x407c84: Magellan MSWHEEL
+0x407c98: MouseZ
+0x407ca0: MSWHEEL_ROLLMSG
+0x407cb0: MSH_WHEELSUPPORT_MSG
+0x407cc8: MSH_SCROLL_LINES_MSG
+0x40b0f8: AM/PM
+0x40d44c: m/d/yy
+0x40d45c: mmmm d, yyyy
+0x40d4a4:  AMPM
+0x40d4b4: AMPM 
+0x40d4d0: :mm:ss
+0x40d6b0: DVCLAL
+0x40d770: kernel32.dll
+0x40d780: GetDiskFreeSpaceExA
+0x40eb64: False
+0x412030: %s[%d]
+0x4128a4: Strings
+0x4142c0: Owner
+0x415448: False
+0x415dec: %s_%d
+0x416fc4: False
+0x41789c: Owner
+0x4178b8: .Owner
+0x418238: TThreadWindow
+0x41a9c0: clBlack
+0x41a9d0: clMaroon
+0x41a9e4: clGreen
+0x41a9f4: clOlive
+0x41aa04: clNavy
+0x41aa14: clPurple
+0x41aa28: clTeal
+0x41aa38: clGray
+0x41aa48: clSilver
+0x41aa5c: clRed
+0x41aa6c: clLime
+0x41aa7c: clYellow
+0x41aa90: clBlue
+0x41aaa0: clFuchsia
+0x41aab4: clAqua
+0x41aac4: clWhite
+0x41aad4: clScrollBar
+0x41aae8: clBackground
+0x41ab00: clActiveCaption
+0x41ab18: clInactiveCaption
+0x41ab34: clMenu
+0x41ab44: clWindow
+0x41ab58: clWindowFrame
+0x41ab70: clMenuText
+0x41ab84: clWindowText
+0x41ab9c: clCaptionText
+0x41abb4: clActiveBorder
+0x41abcc: clInactiveBorder
+0x41abe8: clAppWorkSpace
+0x41ac00: clHighlight
+0x41ac14: clHighlightText
+0x41ac2c: clBtnFace
+0x41ac40: clBtnShadow
+0x41ac54: clGrayText
+0x41ac68: clBtnText
+0x41ac7c: clInactiveCaptionText
+0x41ac9c: clBtnHighlight
+0x41acb4: cl3DDkShadow
+0x41accc: cl3DLight
+0x41ace0: clInfoText
+0x41acf4: clInfoBk
+0x41ad08: clNone
+0x41ad7c: ANSI_CHARSET
+0x41ad94: DEFAULT_CHARSET
+0x41adac: SYMBOL_CHARSET
+0x41adc4: MAC_CHARSET
+0x41add8: SHIFTJIS_CHARSET
+0x41adf4: HANGEUL_CHARSET
+0x41ae0c: JOHAB_CHARSET
+0x41ae24: GB2312_CHARSET
+0x41ae3c: CHINESEBIG5_CHARSET
+0x41ae58: GREEK_CHARSET
+0x41ae70: TURKISH_CHARSET
+0x41ae88: HEBREW_CHARSET
+0x41aea0: ARABIC_CHARSET
+0x41aeb8: BALTIC_CHARSET
+0x41aed0: RUSSIAN_CHARSET
+0x41aee8: THAI_CHARSET
+0x41af00: EASTEUROPE_CHARSET
+0x41af1c: OEM_CHARSET
+0x41b384: Default
+0x422438: GetMonitorInfoA
+0x4224bc: GetSystemMetrics
+0x422550: MonitorFromRect
+0x4225e4: MonitorFromWindow
+0x42267c: MonitorFromPoint
+0x422750: GetMonitorInfoA
+0x422760: DISPLAY
+0x422828: GetMonitorInfoW
+0x422838: DISPLAY
+0x422900: GetMonitorInfo
+0x422910: DISPLAY
+0x422a34: EnumDisplayMonitors
+0x422aa8: USER32.DLL
+0x422da8: comctl32.dll
+0x422db8: InitializeFlatSB
+0x422dcc: UninitializeFlatSB
+0x422de0: FlatSB_GetScrollProp
+0x422df8: FlatSB_SetScrollProp
+0x422e10: FlatSB_EnableScrollBar
+0x422e28: FlatSB_ShowScrollBar
+0x422e40: FlatSB_GetScrollRange
+0x422e58: FlatSB_GetScrollInfo
+0x422e70: FlatSB_GetScrollPos
+0x422e84: FlatSB_SetScrollPos
+0x422e98: FlatSB_SetScrollInfo
+0x422ec0: Range
+0x428318: BUTTON
+0x428660: BUTTON
+0x428804: Delphi Picture
+0x428814: Delphi Component
+0x42a930: crDefault
+0x42a944: crArrow
+0x42a954: crCross
+0x42a964: crIBeam
+0x42a974: crSizeNESW
+0x42a988: crSizeNS
+0x42a99c: crSizeNWSE
+0x42a9b0: crSizeWE
+0x42a9c4: crUpArrow
+0x42a9d8: crHourGlass
+0x42a9ec: crDrag
+0x42a9fc: crNoDrop
+0x42aa10: crHSplit
+0x42aa24: crVSplit
+0x42aa38: crMultiDrag
+0x42aa4c: crSQLWait
+0x42aa70: crAppStart
+0x42aa84: crHelp
+0x42aa94: crHandPoint
+0x42aaa8: crSizeAll
+0x42aabc: crSize
+0x42c6e4: %s (%s)
+0x42e970: IsControl
+0x437b84: USER32
+0x437b8c: WINNLSEnableIME
+0x437b9c: IMM32.DLL
+0x437ba8: ImmGetContext
+0x437bb8: ImmReleaseContext
+0x437bcc: ImmGetConversionStatus
+0x437be4: ImmSetConversionStatus
+0x437bfc: ImmSetOpenStatus
+0x437c10: ImmSetCompositionWindow
+0x437c28: ImmSetCompositionFontA
+0x437c40: ImmGetCompositionStringA
+0x437c5c: ImmIsIME
+0x437c68: ImmNotifyIME
+0x437ee4: Delphi%.8X
+0x437ef0: ControlOfs%.8X%.8X
+0x43a214: Bitmap
+0x43b544: 1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ
+0x43c488: ShortCutText
+0x44309c: TPUtilWindow
+0x445114: PixelsPerInch
+0x44512c: TextHeight
+0x445140: IgnoreFontProperty
+0x446b18: MDICLIENT
+0x4499a4: System\CurrentControlSet\Control\Keyboard Layouts\%.8x
+0x4499dc: layout text
+0x44a338: TApplication
+0x44a4d4: MAINICON
+0x44b0d4: vcltest3.dll
+0x44b0e4: RegisterAutomation
+0x44f334: Cancel
+0x44f344: Abort
+0x44f354: Retry
+0x44f364: Ignore
+0x44f380: NoToAll
+0x44f390: YesToAll
+0x44f904: Image
+0x44f914: Message
+0x44fa9c: commdlg_help
+0x44faac: commdlg_FindReplace
+0x44fac0: WndProcPtr%.8X%.8X
+0x450ff4: WSAStartup
+0x451094: WSACleanup
+0x4513c8: WSAASyncGetHostByName
+0x4513ec: WSAASyncGetServByName
+0x451668: listen
+0x4516d4: connect
+0x451794: getpeername
+0x451bb4: WSACancelASyncRequest
+0x451bd4: closesocket
+0x4522f0: ASync Lookup
+0x453820: BLACK
+0x453830: BROWN
+0x453840: MARGENTA
+0x453854: GREEN
+0x453864: LTGREEN
+0x453884: LTBLUE
+0x453894: PURPLE
+0x4538b4: LTCYAN
+0x4538d4: LTGRAY
+0x4538e4: YELLOW
+0x453904: WHITE
+0x453930: CIRCLE
+0x453940: SQUARE
+0x453960: RIGHT
+0x453970: CENTER
+0x4571fc: BBCANCEL
+0x457208: BBHELP
+0x457210: BBYES
+0x457220: BBCLOSE
+0x457228: BBABORT
+0x457230: BBRETRY
+0x457238: BBIGNORE
+0x457244: BBALL
+0x45b30c: SpinUp
+0x45b388: SpinDown
+0x45c2c0: 0.0.0.0
+0x45c9d0: %d.%d.%d.%d
+0x45d6d0: Apartment
+0x45d95c: ole32.dll
+0x45d968: CoCreateInstanceEx
+0x45d97c: CoInitializeEx
+0x45d98c: CoAddRefServerProcess
+0x45d9a4: CoReleaseServerProcess
+0x45d9bc: CoResumeClassObjects
+0x45d9d4: CoSuspendClassObjects
+0x463384: Unknown
+0x463394: String
+0x4633a4: SmallInt
+0x4633b8: Integer
+0x4633d8: Boolean
+0x4633e8: Float
+0x4633f8: Currency
+0x463438: DateTime
+0x46344c: Bytes
+0x46345c: VarBytes
+0x463470: AutoInc
+0x4634a0: Graphic
+0x4634b0: FmtMemo
+0x4634c0: ParadoxOle
+0x4634d4: dBaseOle
+0x4634e8: TypedBinary
+0x4634fc: Cursor
+0x46350c: FixedChar
+0x463520: WideString
+0x463534: LargeInt
+0x463554: Array
+0x463564: Reference
+0x463578: DataSet
+0x463588: OraBlob
+0x463598: OraClob
+0x4635a8: Variant
+0x4635b8: Interface
+0x4635cc: Dispatch
+0x463760: %s: %s
+0x4640e4: Required
+0x464698: %s[%d]
+0x464d8c: %s[%d]
+0x4657e8: AttributeSet
+0x465800: Calculated
+0x465814: Lookup
+0x465874: Boolean
+0x4658f4: DateTime
+0x46592c: Float
+0x465958: Integer
+0x465998: Variant
+0x465b38: FIELD
+0x466160: Boolean
+0x4661c0: DateTime
+0x4661f8: Float
+0x466224: Integer
+0x466250: String
+0x466970: Variant
+0x467d58: Variant
+0x469d14: UnNamed
+0x46b050: <Primary>
+0x46e13c: %s.%s
+0x470e20: DISTINCT
+0x470e40: ASCENDING
+0x470e64: DESCENDING
+0x470e78: SELECT
+0x470ee8: WHERE
+0x470ef8: GROUP
+0x470f14: HAVING
+0x470f24: UNION
+0x470f50: UPDATE
+0x470f60: ORDER
+0x473f5c: count
+0x473f6c: COUNT(*)
+0x47433c: COUNT(*)
+0x474350: GETDATE
+0x474390: COUNT
+0x4743b0: MONTH
+0x4743dc: MINUTE
+0x4743ec: SECOND
+0x474610: UPPER
+0x474620: LOWER
+0x474630: SUBSTRING
+0x474654: TRIMLEFT
+0x474668: TRIMRIGHT
+0x47468c: MONTH
+0x4746b8: MINUTE
+0x4746c8: SECOND
+0x4746d8: GETDATE
+0x474738: COUNT
+0x47bbf8: %s%s:"%s";
+0x47c7d8: USER NAME
+0x47cb14: STANDARD
+0x47cb28: \DATABASES\%s\DB INFO
+0x47cb58: \DATABASES\%s\DB OPEN
+0x47ccfc: %s=%s
+0x47ce7c: STANDARD
+0x47ceac: DEFAULT DRIVER
+0x47cec4: PARADOX
+0x47ced4: %s=%s
+0x47cee4: ENABLE BCD
+0x47cef8: FALSE
+0x47cf08: \DRIVERS\%s\DB OPEN
+0x47d438: DEFAULT DRIVER
+0x47d450: STANDARD
+0x47d464: PARADOX
+0x47d560: \DATABASES\%s
+0x47d9c0: SMBuffer
+0x47d9e4: %s.%s
+0x47e418: %s_%d
+0x47ed9c: STANDARD
+0x47ef6c: USER NAME
+0x47ef80: PASSWORD
+0x47f0c0: PASSWORD
+0x47f3f4: USER NAME
+0x47f408: PASSWORD
+0x47f734: MTS CONTEXT OBJECT
+0x480ab4: %s_%d
+0x4843dc: ParamData
+0x48546c: Default
+0x485950: select * from StdItems
+0x48598c: StdMode
+0x48599c: Shape
+0x4859ac: Weight
+0x4859bc: AniCount
+0x4859d0: Source
+0x4859e0: Reserved
+0x4859f4: Looks
+0x485a04: DuraMax
+0x485aa0: NeedLevel
+0x485ab4: Price
+0x485ddc: MonItems\
+0x4861d0: select * from Monster
+0x486210: RaceImg
+0x48623c: Undead
+0x48624c: CoolEye
+0x4862a4: DCMAX
+0x4862cc: SPEED
+0x4862e8: WALK_SPD
+0x4862fc: WalkStep
+0x486310: WalkWait
+0x486324: ATTACK_SPD
+0x4866a0: select * from Magic
+0x4866bc: MagId
+0x4866cc: MagName
+0x4866dc: EffectType
+0x4866f0: Effect
+0x486700: Spell
+0x486710: Power
+0x486720: MaxPower
+0x486740: NeedL1
+0x486750: NeedL2
+0x486760: NeedL3
+0x486770: L1Train
+0x486780: L2Train
+0x486790: L3Train
+0x4867a0: Delay
+0x4867b0: DefSpell
+0x4867c4: DefPower
+0x4867d8: DefMaxPower
+0x4867ec: Descr
+0x486c04: MonGen.txt
+0x486d0c: MapQuest_def\
+0x4874c4: MapInfo.txt
+0x48751c: FIGHT
+0x48752c: FIGHT3
+0x487558: NORECONNECT
+0x487584: CHECKQUEST
+0x487598: NEEDSET_ON
+0x4875ac: NEEDSET_OFF
+0x4875c0: NEEDHOLE
+0x4875d4: NORECALL
+0x4875e8: NORANDOMMOVE
+0x487600: NODRUG
+0x487620: NOPOSITIONMOVE
+0x48783c: Adminlist.txt
+0x487bbc: Merchant.txt
+0x48815c: Merchant.txt
+0x4884ec: Npcs.txt
+0x488a50: Npcs.txt
+0x488cc0: GuardList.txt
+0x488ec8: MakeItem.txt
+0x4890b0: StartPoint.txt
+0x489234: MiniMap.txt
+0x4893f8: UnbindList.txt
+0x489748: MapQuest.txt
+0x489784: GROUP
+0x489ba0: QuestDiary\
+0x48a418: CHECK
+0x48a440: CHECKMARRY
+0x48a454: CHECKUNIT
+0x48a468: RANDOM
+0x48a478: GENDER
+0x48a488: DAYTIME
+0x48a498: CHECKLEVEL
+0x48a4ac: CHECKJOB
+0x48a4c0: CHECKITEM
+0x48a4d4: CHECKITEMW
+0x48a4e8: CHECKGOLD
+0x48a4fc: ISTAKEITEM
+0x48a510: CHECKDURA
+0x48a524: CHECKDURAEVA
+0x48a53c: DAYOFWEEK
+0x48a56c: CHECKPKPOINT
+0x48a584: CHECKLUCKYPOINT
+0x48a59c: CHECKMONMAP
+0x48a5b0: CHECKMONAREA
+0x48a5c8: CHECKHUM
+0x48a5dc: CHECKBAGGAGE
+0x48a5f4: CHECKNAMELIST
+0x48a60c: EQUAL
+0x48a61c: LARGE
+0x48a62c: SMALL
+0x48aec8: RESET
+0x48aed8: MARRY
+0x48aee8: SETUNIT
+0x48aef8: RESETUNIT
+0x48af2c: TAKEW
+0x48af3c: CLOSE
+0x48af4c: MAPMOVE
+0x48af68: BREAK
+0x48af78: TIMERECALL
+0x48af8c: BREAKTIMERECALL
+0x48afa4: PARAM1
+0x48afb4: PARAM2
+0x48afc4: PARAM3
+0x48afd4: PARAM4
+0x48afe4: TAKECHECKITEM
+0x48affc: MONGEN
+0x48b00c: MONCLEAR
+0x48b060: EXCHANGEMAP
+0x48b074: RECALLMAP
+0x48b088: ADDBATCH
+0x48b09c: BATCHDELAY
+0x48b0b0: BATCHMOVE
+0x48b0c4: PLAYDICE
+0x48b0d8: ADDNAMELIST
+0x48b0ec: DELNAMELIST
+0x48b100: FREEPK
+0x48b110: ENDQUEST
+0x48b2d8: #CALL
+0x48b300: QuestDiary\
+0x48b324: goto 
+0x48b334: script error, load fail: 
+0x48b61c: #SETHOME
+0x48b630: #DEFINE
+0x48b640: #INCLUDE
+0x48b654: Defines\
+0x48b668: script error, load fail: 
+0x48c3b4: @HOME
+0x48c3c4: @main
+0x48c3f0: #ELSEACT
+0x48c404: {Quest
+0x48c414: {~Quest
+0x48c43c: #RAND
+0x48c44c: [goods]
+0x48c46c: #ELSESAY
+0x48c480: script error: 
+0x48c498:  line:
+0x48c4c0: File open failure : 
+0x48c568: Npc_def\
+0x48c720: .\Envir\Market_Saved\
+0x48c8f0: .\Envir\Market_Saved\
+0x48ca3c: .\Envir\Market_Prices\
+0x48cba8: .\Envir\Market_Prices\
+0x48cd04: .\Envir\Market_Upg\
+0x48ce38: .\Envir\Market_Upg\
+0x48d204: .\!setup.txt
+0x48d21c: 127.0.0.1
+0x48d234: IDSAddr
+0x48d244: Server
+0x48d254: IDSPort
+0x48d264:  not found
+0x48d990: [Exception] FrmIdSoc.DecodeSocStr
+0x48db38: [Exception] FrmIdSoc.GetPasswdSuccess
+0x48dc1c: [Exception] FrmIdSoc.GetCancelAdmission
+0x48dfe8: [RunSock->FrmIdSoc] GetAdmission exception
+0x48e14c: [Exception] FrmIdSoc.GetCancelAdmission
+0x48e9b0: SabukW.txt
+0x48e9d4: 0150 û
+0x48ea00: D701 - map not found !!
+0x48ea20: [Error] UserCastle.Initialize MainDoor.UnitObj = nil
+0x48ea60: [Error] UserCastle.Initialize LeftWall.UnitObj = nil
+0x48eaa0: [Error] UserCastle.Initialize CenterWall.UnitObj = nil
+0x48eae0: [Error] UserCastle.Initialize RightWall.UnitObj = nil
+0x48eb20: [Error] UserCastle.Initialize Archer -> UnitObj = nil
+0x48eb60: <Critical Error> UserCastle : [Defense]->CastleMap is invalid value
+0x48ebc4: SabukW.txt
+0x48ed14: AttackSabukWall.txt
+0x48ed30:        "
+0x48ef98: AttackSabukWall.txt
+0x48f46c: CastleName
+0x48f480: setup
+0x48f490: OwnGuild
+0x48f4a4: ChangeDate
+0x48f4b8: WarDate
+0x48f4c8: IncomeToday
+0x48f4dc: TotalGold
+0x48f4f0: TodayIncome
+0x48f504: MainDoorOpen
+0x48f51c: defense
+0x48f52c: MainDoorHP
+0x48f540: LeftWallHP
+0x48f554: CenterWallHP
+0x48f56c: RightWallHP
+0x48f580: Archer_
+0x48f5b4: Guard_
+0x48fbbc: CastleName
+0x48fbd0: setup
+0x48fbe0: OwnGuild
+0x48fbf4: ChangeDate
+0x48fc08: WarDate
+0x48fc18: IncomeToday
+0x48fc2c: TotalGold
+0x48fc40: TodayIncome
+0x48fc60: CastleMap
+0x48fc74: defense
+0x48fc84: MainDoorX
+0x48fc98: MainDoorY
+0x48fcac: MainDoorName
+0x48fcc4: MainDoorOpen
+0x48fcdc: MainDoorHP
+0x48fcf0: LeftWallX
+0x48fd04: LeftWallY
+0x48fd18: LeftWallName
+0x48fd30: LeftWallHP
+0x48fd44: CenterWallX
+0x48fd58: CenterWallY
+0x48fd6c: CenterWallName
+0x48fd84: CenterWallHP
+0x48fd9c: RightWallX
+0x48fdb0: RightWallY
+0x48fdc4: RightWallName
+0x48fddc: RightWallHP
+0x48fdf0: Archer_
+0x48fe24: Archer
+0x48fe34: Guard_
+0x49024c: [SabukWall War Started]
+0x49026c: [Sabuk War Has 10 minuets left.] 
+0x490630: 23	0	0	0	autosave	Gold	
+0x490844: Gold	
+0x490a50: Gold	
+0x491054:     \
+0x4913ac: SabukW.txt
+0x4913c0: (*) "
+0x4913d0: " Took SabukWall
+0x4913ec: [Sabuk]  
+0x491400:  Took
+0x491544: [Sabuk Wall War Ended]
+0x491bd8: .\Notice\
+0x491e74: Error in loading notice text. file name is 
+0x492080: Error in loading notice text. file name is 
+0x4946b4: Shinsu
+0x49633c: [Exception] FrmIdSoc.DecodeSocStr
+0x496cec: [Exception] FrmIdSoc.DecodeSocStr
+0x496e90: [Exception] MsgGetUserServerChange..
+0x498210: Notice
+0x498220: GuildWar
+0x498234: GuildAll
+0x49856c: Notice
+0x498594: GuildWar
+0x4985a8: GuildAll
+0x498a44: GuildChief
+0x499b10:  *In War With(Extended)*
+0x499b34:  [In War With.]       
+0x49a234:  Guilds... 
+0x49a248: no guild file loaded...
+0x49b294: $OWNERGUILD
+0x49b2a8: GameManagerconsultation
+0x49b2c8: <$OWNERGUILD>
+0x49b2e0: $LORD
+0x49b300: <$LORD>
+0x49b310: $GUILDWARFEE
+0x49b328: <$GUILDWARFEE>
+0x49b340: $CASTLEWARDATE
+0x49b358: <$CASTLEWARDATE>
+0x49b374: No war scheduled !\ \<Main/@main>
+0x49b3a0: War is now on!\ \<Back/@main>
+0x49b3c8: $LISTOFWAR
+0x49b3dc: <$LISTOFWAR>
+0x49b41c: $USERNAME
+0x49b430: <$USERNAME>
+0x49b444: $STR(
+0x49b5ec: loading fail.... => 
+0x49b60c: file not found => 
+0x49b7c4: loading fail.... => 
+0x49b7e4: saving fail.... => 
+0x49b9b0: loading fail.... => 
+0x49b9d0: saving fail.... => 
+0x49b9ec: file not found => 
+0x49bc50: [NECKLACE]
+0x49bc64: [RING]
+0x49bc74: [ARMRING]
+0x49bc88: [WEAPON]
+0x49bc9c: [HELMET]
+0x49be4b: [Lady]:       
+0x49bebd: [Lady]:Hope 
+0x49bed2:  will love each other forever ^^
+0x49c7d8: SUNRAISE
+0x49c7f8: SUNSET
+0x49c808: NIGHT
+0x49c86c: Warrior
+0x49c87c: Wizard
+0x49c88c: Taoist
+0x49d178: [NECKLACE]
+0x49d18c: [RING]
+0x49d19c: [ARMRING]
+0x49d1b0: [WEAPON]
+0x49d1c4: [HELMET]
+0x49d64c: Gold	
+0x49e90c: @main
+0x49ec08: Npc_def\
+0x49f02c: Market_Def\
+0x49fce0: Merchant RefillGoods Exception..
+0x49fe8c: $PRICERATE
+0x49fea0: <$PRICERATE>
+0x49feb8: $UPGRADEWEAPONFEE
+0x49fed4: <$UPGRADEWEAPONFEE>
+0x49fef0: $USERWEAPON
+0x49ff04: <$USERWEAPON>
+0x49ff1c: Weapon
+0x49ff7c: @main
+0x4a0048: "Failure in saving upgradinglist - 
+0x4a0c44: ~@upgradenow_ing
+0x4a0c8c: ~@upgradenow_ok
+0x4a0ca4: ~@upgradenow_fail
+0x4a12f8: ~@getbackupgnow_ok
+0x4a1314: ~@getbackupgnow_ing
+0x4a1330: ~@getbackupgnow_fail
+0x4a1370: @exit
+0x4a15e4: Here we can repair items perfectly, at a price...\What would you like to repair...?\ \ <Main/@main>
+0x4a1a90: @s_repair
+0x4a1ab4: @sell
+0x4a1ac4: @repair
+0x4a1ad4: @makedrug
+0x4a1ae8: @prices
+0x4a1af8: @storage
+0x4a1b0c: @getback
+0x4a1b20: @upgradenow
+0x4a1b34: @getbackupgnow
+0x4a1b4c: @exit
+0x4a1b5c: [Exception] TMerchant.UserSelect... 
+0x4a2018: @s_repair
+0x4a227c: @fail_s_repair
+0x4a2294: Sorry, I cant special repair this item\ \ \<Main/@main>
+0x4a22d4: @s_repair
+0x4a22e8: The item has been repaired perfectly :)\ \<Main/@main>
+0x4a2328: ~@repair
+0x4a304c: [Exception] Merchant.Run..
+0x4a311c: @main
+0x4a3440: More gold needed
+0x4a345c:   Not A Guild 
+0x4a3590: ~@request_ok
+0x4a35a8: Cant Do This. 
+0x4a35c0: Relic needed..
+0x4a35d8: You Own Sabuk!
+0x4a3754: @@buildguildnow
+0x4a376c: @@guildwar
+0x4a3780: @@donate
+0x4a3794: @requestcastlewarnow
+0x4a37b4: @exit
+0x4a37c4: [Exception] TGuildOfficial.UserSelect... 
+0x4a39ec: HitPower 
+0x4a3a0c: Average  
+0x4a3b04: TotalPower  
+0x4a3b28: TotalAverage 
+0x4a3e2c: $CASTLEGOLD
+0x4a3e40: <$CASTLEGOLD>
+0x4a3e58: $TODAYINCOME
+0x4a3e70: <$TODAYINCOME>
+0x4a3e88: $CASTLEDOORSTATE
+0x4a3ea4: Broken
+0x4a3ed4: <$CASTLEDOORSTATE>
+0x4a3ef0: $REPAIRDOORGOLD
+0x4a3f08: <$REPAIRDOORGOLD>
+0x4a3f24: $REPAIRWALLGOLD
+0x4a3f3c: <$REPAIRWALLGOLD>
+0x4a3f58: $GUARDFEE
+0x4a3f6c: <$GUARDFEE>
+0x4a3f80: $ARCHERFEE
+0x4a3f94: <$ARCHERFEE>
+0x4a3fac: $GUARDRULE
+0x4a4038: Repaired
+0x4a404c: Not Broken..  
+0x4a4064: Not Enough Gold
+0x4a4100: Repaired
+0x4a4114: Not Broken..  
+0x4a412c: Need more gold
+0x4a42d0: Hired...
+0x4a42e4: Cannot Hire
+0x4a42fc: Already Hired..
+0x4a432c: Need more gold
+0x4a4518: Hired Guard
+0x4a4530: Cant Repair 
+0x4a4548: Already Hired...
+0x4a4578: Need more gold
+0x4a4a60: @@withdrawal
+0x4a4aa4: More gold is needed..
+0x4a4ae8: @main
+0x4a4af8: @@receipts
+0x4a4b54: @openmaindoor
+0x4a4b6c: @closemaindoor
+0x4a4b84: @repairdoornow
+0x4a4b9c: @repairwallnow1
+0x4a4bb4: @repairwallnow2
+0x4a4bcc: @repairwallnow3
+0x4a4be4: @hireguardnow
+0x4a4bfc: @hireguards
+0x4a4c10: @hirearchernow
+0x4a4c28: @exit
+0x4a4c38: Access Denied.
+0x4a4c50: [Exception] TMerchant.UserSelect... 
+0x4a54a8: [Exception] TStickMonster VisbleActors Dispose(..)
+0x4aba78: Shinsu1
+0x4acadc: Merchant Initalize fail... *Merchant Initalize fail... (m.PEnvir=nil) 
+0x4acd99: Npc Initalize fail... 
+0x4ae174: [TUserEngine] RegenMonsters exception
+0x4af694: [Exception] WriteShiftUserData..
+0x4b0980: chg-server-fail-1 [
+0x4b099c: ] -> [
+0x4b09b8: chg-server-fail-2 [
+0x4b09f8: [Error] hum.PEnvir = nil
+0x4b0a1c: chg-server-fail-3 [
+0x4b0a44: chg-server-fail-4 [
+0x4b0a60: [TUserEngine] MakeNewHuman exception
+0x4b13fc: [UsrEngn] Exception Ready, Save, Load... 
+0x4b1430: [UsrEngn] ClosePlayer.Delete - Free
+0x4b145c: [UsrEngn] ClosePlayer.Delete
+0x4b1484: [UsrEngn] Exception RunNotice in ProcessHumans
+0x4b14bc: [UsrEngn] Exception Hum.Operate in ProcessHumans
+0x4b14f8: [UsrEngn] Exception Hum.Finalize in ProcessHumans 
+0x4b1534: [UsrEngn] Exception RunSocket.CloseUser in ProcessHumans 
+0x4b1578: [UsrEngn] ProcessHumans
+0x4b1b70: [UsrEngn] ProcessMonsters
+0x4b1cd4: [UsrEngn] ProcessMerchants
+0x4b1e38: [UsrEngn] ProcessNpcs
+0x4b1ff0: [UsrEngn] ProcessMissions
+0x4b22fc:  User = 
+0x4b2310: [UsrEngn] Riase Exception..
+0x4b2660: [Exception] ProcessUserMessage..
+0x4b4068: [RunDB] DB Wait Error 
+0x4b51b4: [FrnEngn] raise exception..
+0x4b63b8: [TEnvirnoment] MoveToMovingObject exception
+0x4b65dc: [TEnvirnoment] AddToMap exception
+0x4b66e4: [TEnvirnoment] AddToMapMineEvent exception
+0x4b6920: [TEnvirnoment] DeleteFromMap -> Except 1 **
+0x4b6954: [TEnvirnoment] DeleteFromMap -> Except 2 **
+0x4b6a4c: [TEnvirnoment] VerifyMapTime exception
+0x4b6c10: [TEnvirnoment] ArroundDoorOpened exception
+0x4b6e14: MapQuest_def\
+0x4b726c: file not found..  
+0x4b84a8: [Exception] TCreatre.Destroy
+0x4b8e94: [TCreature] GetMapCreatures exception
+0x4b937c: [Exception] TCreatre.SendRefMsg
+0x4b94a0: [TCreature] UpdateVisibleGay exception
+0x4b94d0: [TCreature] UpdateVisibleGay-2 exception
+0x4ba1a4: nil PEnvir
+0x4ba1b8: ObjBase SearchViewRange 0
+0x4ba1f0:  SearchViewRange 1-
+0x4ba20c:  SearchViewRange 2
+0x4ba228:  SearchViewRange 3
+0x4baf24: [Exception] MsgTargetList.Clear
+0x4baf4c: [Exception] VisbleItems Dispose(..)
+0x4baf78: [Exception] VisbleItems.Clear
+0x4bafa0: [Exception] VisbleEvents.Clear
+0x4bafc8: [Exception] VisbleActors Dispose(..)
+0x4baff8: [Exception] VisbleActors.Clear
+0x4bb020: [TCreature] EnterAnotherMap exception
+0x4bb614: [Exception] TCreature.ScatterBagItems
+0x4bba54: [Exception] TCreature.DropUseItems
+0x4bc5d8: [Exception] TCreature.Die 1
+0x4bc5fc: You murdered
+0x4bc614: 	killed u]
+0x4bc628: Protected by law of defense
+0x4bc650: [Exception] TCreature.Die 2
+0x4bc69c: ######
+0x4bc6f4: [Exception] TCreature.Die 3
+0x4bc958: Thrusting On
+0x4bc970: Thrusting Off
+0x4bc9d8: HalfMoon On
+0x4bc9f0: HalfMoon Off
+0x4bca70: Fire Spirits Summoned
+0x4bca94: Too Week
+0x4bd48c: Cannot use here
+0x4bd678: Weapon gains luck
+0x4bd758: Wep part rep .
+0x4bd7e8: Wep Full rep
+0x4bdaac: You Won 1ST Prize!!!
+0x4bdacc: You Won 2nd Prize!!!
+0x4bdaec: You Won 3rd Prize!!!
+0x4bdb0c: You Won 4th Prize!!!
+0x4bdb2c: You Won 5th Prize!!!
+0x4bdb4c: You Won 6th Prize!!!
+0x4bdbac: Won nothing :(
+0x4be844: [Exception] TCreature.GainExp
+0x4c00b0: Healing
+0x4c0224: Healing
+0x4c1254: Weapon is cursed
+0x4c1442: 's Man]
+0x4c1453: 's Wife]
+0x4c27a0: [Exception] TCreature._Attack
+0x4c2ba4: The weapon broke
+0x4c2bec: Refine Successfull
+0x4c3528: Too Weak
+0x4c3680: Poisoned
+0x4c39d4: Group Disorganised
+0x4c3c78: Can't Leave group while you are leader
+0x4c42a4: [Exception] TCreatre.WalkTo
+0x4c4974: [Exception] TCreature.RunTo
+0x4c5218: 2Heavy
+0x4c5228: Cant wear it
+0x4c61f8: Gold	
+0x4c6220: Unable to pick up item
+0x4c66cc: Cannot use here
+0x4c66e8: DC Increased   
+0x4c670c: MC Increased 
+0x4c6724: SC Increased 
+0x4c673c: Aspeed Increased 
+0x4c6758: HP Increased 
+0x4c6770: MP Increased   
+0x4c6d20: AC Inc. 4 
+0x4c6e30: AMC Increase
+0x4c7700: [Exception] TCreature.UseLamp
+0x4c8630: [Exception] TCreature.Run 0
+0x4c8654: The Ring made you live
+0x4c8674: [Exception] TCreature.Run 1
+0x4c8698: [Exception] TCreature.Run 2
+0x4c86bc: [Exception] TCreature.Run 3
+0x4c86e0: [Exception] TCreature.Run 4
+0x4c8704: AC Returned
+0x4c871c: AMC Returned
+0x4c8738: DC Returned   
+0x4c8750: MC Returned 
+0x4c8768: SC Returned 
+0x4c8780: Aspeed Returned 
+0x4c879c: HP Returned 
+0x4c87b4: MP Returned   
+0x4c87cc: [Exception] TCreature.Run 5
+0x4c87f0: [Exception] TCreature.Run 6
+0x4ca5d0: Verson Error
+0x4ca624: [Mode: Attack All]
+0x4ca644: [Mode: Peaceful]
+0x4ca668: [Mode: Group Attack]
+0x4ca68c: [Mode: Guild Attack]
+0x4ca6b0: [Mode: Red & White]
+0x4ca6d4: To change do: CTRL-H
+0x4ca6f4: Welcome to our server. Translated by DeathWish & Mordeth. Enjoy...    
+0x4ca764:  is on a guild war with 
+0x4ca824: Made by the FTSM Team
+0x4cab24: yyyy-mm-dd hh:mm:ss
+0x4cad54: Exception SendSocket..
+0x4cb108: [11002-Walk] 
+0x4cb630: BlackOre
+0x4cc1fc: +ULNG
+0x4cc21c: +UWID
+0x4cc3f4:  AtLevel 
+0x4cc408:  Changed
+0x4cc51c:   not found
+0x4cc5f4:  : PK point = 0.
+0x4cc610:   not found
+0x4cc6f0:  PK point = 
+0x4cc708:   not found
+0x4cc7b8: Wizard
+0x4ccb7c: Mission Failed
+0x4cd17c: 
+MakeItem] 
+0x4cd4d0:  Erased 
+0x4cd4e4:  Gold..
+0x4cd508: Gold	
+0x4cd7bc:  +Gold  
+0x4cd7d0:  Succsesful.
+0x4cd7fc: Gold	
+0x4cda08: Gold 
+0x4cda24: Gold	
+0x4cdd10: ChgLv] 
+0x4cdd88: [AdjLevel] 
+0x4cdf60: ChgExp] 
+0x4cdfdc: [AdjustEXP] -> 
+0x4ce374:   not found
+0x4ce5a8: All Guilds Reloaded
+0x4ce6d8:   not found
+0x4ce834:   not found
+0x4ce9e4:   not found
+0x4ced9c: GuildNam 
+0x4cedbc: GuildChief
+0x4ceee4: Deleted 
+0x4ceef8: Not Found
+0x4cefd8: 's point : 
+0x4cefec:  is not valid guild name
+0x4cf2e0: Guild Contest ON
+0x4cf2fc:  -Guild War Started
+0x4cf324:  -Guilds Are: 
+0x4cf33c: this command is not usable on this map!
+0x4cf554: Stop Fighting
+0x4cf7e8:  point / 
+0x4cf7fc:  dead
+0x4cf824: ------------------------------------
+0x4cf854: this command is not usable on this map!
+0x4cfd50:   not found
+0x4cffbc: SabukGuild is: 
+0x4cffd4:  now..
+0x4cffe4:  Guild Name Wrong..
+0x4d02ec: Reload npc information is successful : 
+0x4d05ac:  No Chat! +
+0x4d05cc:   not found
+0x4d06fc: Released from chatting
+0x4d0728:   not found
+0x4d1760:  Rejects
+0x4d1790:   not found
+0x4d1968: [Allow chat with:  
+0x4d1990: [Ban Chat: 
+0x4d1d38: marriedl
+0x4d1d4a: opelevel
+0x4d1dab: Your Man 
+0x4d1dcf:  has come online.   
+0x4d1dec:  has come online. 
+0x4d1e07:  inside 
+0x4d1e18:  At    
+0x4d1e28:  misses you so much. 
+0x4d1e46:  is offline. 
+0x4d3d60:  to break up with you."   \\ <Ok  /@agree_unmarry>  <No Way/@exit>
+0x4d3e00: se?" ^.^\\\<Sure/@agree_marry>  <No Way/@exit> 
+0x4d3e3e: get married 
+0x4d3e53: times   
+0x4d53d4: RejectWhisper
+0x4d53e8: AllowPriv
+0x4d53fc: RejectPriv
+0x4d5410: AllowWhisper
+0x4d5434: BanShout
+0x4d5448: AllowShout
+0x4d545c: [LetShout]
+0x4d5470: [BanShout]
+0x4d5484: BanTrade
+0x4d5498: [LetTrade]
+0x4d54ac: [BanTrade]
+0x4d54c0: AllowGuild
+0x4d54d4: [AllowGuild]
+0x4d54ec: [RejectGuild]
+0x4d5504: AuthAlly
+0x4d5518: [AllowAlly]
+0x4d5530: [RejectAlly]
+0x4d5548: Alliance
+0x4d5558: EndAlliance
+0x4d556c: LeaveGuild
+0x4d5580: AllowGuildChat
+0x4d5598: RejectGuildChat
+0x4d55b0: Allowing Guild Chat
+0x4d55d0: Rejecting Guild Chat
+0x4d5600: AttackMode
+0x4d5614: [Attack All]
+0x4d562c: [Peaceful]
+0x4d5644: [Group Attack]
+0x4d565c: [Guild Attack]
+0x4d5674: [Red & White]
+0x4d569c: Pet : Rest
+0x4d56b4: Pet : Attack
+0x4d5734: Cannot use here
+0x4d5750: Searching
+0x4d5780: :Located on this map.
+0x4d57a0:  Not on this map...
+0x4d57bc:  Is not found..
+0x4d57d4: allowgrecall
+0x4d57ec: AllowRecall
+0x4d5804: Recall Allowed
+0x4d581c: Recall Denied
+0x4d5834: grouprecall
+0x4d5848: didnt allow...
+0x4d5860: Seconds to go 
+0x4d589c: PositionMove
+0x4d58c4: MobLevel
+0x4d58d8: MobCount
+0x4d58ec: Mob Count:
+0x4d5900: Human
+0x4d5910: Players:
+0x4d5958: SuperTing
+0x4d596c: Shutup
+0x4d597c: ReleaseShutup
+0x4d5994: ShutupList
+0x4d59a8: GameMaster
+0x4d59bc: Game master mode
+0x4d59d8: Release  game master mode 
+0x4d59fc: Observer
+0x4d5a10: Observer mode
+0x4d5a28: Release  observer mode
+0x4d5a48: Superman
+0x4d5a5c: Invincible Mode
+0x4d5a74: Normal mode
+0x4d5a88: Level
+0x4d5a98: SabukWallGold
+0x4d5ab0: SabukWall Found:
+0x4d5acc: ,  Todays income:
+0x4d5ae8: Recall
+0x4d5b10: ] = ON
+0x4d5b20: ] = OFF
+0x4d5b30: @flag user_name number_of_flag
+0x4d5b58: showopen
+0x4d5b6c: @showopen user_name number_of_unit
+0x4d5b98: showunit
+0x4d5bac: @showunit user_name number_of_unit
+0x4d5bd8: Attack
+0x4d5bf4: RecallMob
+0x4d5c08: LuckyPoint
+0x4d5c1c: : BodyLuck= 
+0x4d5c40:  Luck = 
+0x4d5cf4: ReloadGuild
+0x4d5d08: ReloadLineNotice
+0x4d5d24: Notice\LineNotice.txt
+0x4d5d44: Notice\LineNotice.txt file is reloaded...
+0x4d5d78: ReadAbuseInformation
+0x4d5d98: !Abuse.txt
+0x4d5dc4: Backstep
+0x4d5dd8: soulball
+0x4d5de8: FreePenalty
+0x4d5dfc: PKpoint
+0x4d5e0c: IncPkPoint
+0x4d5e20: ChangeLuck
+0x4d5e34: Hunger
+0x4d5e54: Training
+0x4d5e68: DeleteSkill
+0x4d5e7c: ChangeJob
+0x4d5e90: ChangeGender
+0x4d5ea8: NameColor
+0x4d5ebc: Mission
+0x4d5ecc: MobPlace
+0x4d5ee0: Transparency
+0x4d5ef8: DeleteItem
+0x4d5f0c: Level0
+0x4d5f1c: QuestBegin
+0x4d5f30: setflag
+0x4d5f40: @setflag user_name number_of_flag set_value
+0x4d5f74: setopen
+0x4d5f94: @setopen user_name number_of_unit set_value
+0x4d5fc8: setunit
+0x4d5fd0: :  unit set [
+0x4d5fe8: @setunit user_name number_of_unit set_value
+0x4d601c: Reconnection
+0x4d6034: DisableFilter
+0x4d604c: [Filter Disabled] 
+0x4d6068: [Filter Enabled]  
+0x4d6084: CHGUSERFULL
+0x4d6098: USERFULL 
+0x4d60ac: CHGZENFASTSTEP
+0x4d60c4: ZENFASTSTEP 
+0x4d60dc: current monthly 
+0x4d60f8: total timeusage 
+0x4d6114: last mon totalu 
+0x4d6130: gross total cnt 
+0x4d614c: gross reset cnt 
+0x4d6168: ContestPoint
+0x4d6180: StartContest
+0x4d6198: EndContest
+0x4d61ac: Announcement
+0x4d61c4: OXQuizRoom
+0x4d61f4: DelGold
+0x4d6204: AddGold
+0x4d6214: Test_GOLD_Change
+0x4d6240: Makeweap
+0x4d624c: 	[Refine] 
+0x4d6260: ReloadAdmin
+0x4d6294: ReloadNpc
+0x4d62a8: ReloadMonItems
+0x4d62c0: Monster drop files reloaded...
+0x4d62f4: ReloadDiary
+0x4d6308: QuestDiarys reload failure...
+0x4d6330: QuestDiarys reload sucessful
+0x4d6358: AdjustLevel
+0x4d636c: AdjustExp
+0x4d6380: AddGuild
+0x4d6394: DelGuild
+0x4d63a8: ChangeSabukLord
+0x4d63c0: ForcedWallconquestWar
+0x4d63e0: AddToItemEvent
+0x4d63f8: AddToItemEvent
+0x4d6410: AddToItemEventAsPieces
+0x4d6430: ItemEventList
+0x4d6448: [Item event list]
+0x4d6464: StartingGiftNo
+0x4d647c: Starting no. of gift certificate 
+0x4d64a8: DeleteAllItemEven
+0x4d64c4: DeleteAllItemOfItemEvent
+0x4d64e8: StartItemEvent
+0x4d6500: start of item event
+0x4d651c: end of item event
+0x4d6538: ItemEventTerm
+0x4d6550: term of item event = 
+0x4d657c: AdjustTestLevel
+0x4d6594: OPTraining
+0x4d65a8: OPDeleteSkill
+0x4d65c0: ChangeWeaponDura
+0x4d65dc: ReloadGuildAll
+0x4d65f4: [Spamming Rule Chat Has Been Temporarily Banned]
+0x4d6640: Users On: 
+0x4d6654: total 
+0x4d6664: Total over servers: 
+0x4d6698: You cannot shout until level 8
+0x4d66c8:   Seconds till you can shout.
+0x4d6704: No Chat!
+0x4da390: Spirits lost
+0x4da3a8: +UFIR
+0x4da3b8: [Exception] TUserHuman.Operate 1
+0x4da3e4: +FAIL/
+0x4da3f4: +GOOD/
+0x4da448:  Sender
+0x4da468:  lP1 
+0x4da478:  lP2 
+0x4da488:  lP3 
+0x4da574: Notice
+0x4da6a4: [Exception] TUserHuman.RunNotice
+0x4db004: You can not take off
+0x4db2c4: You can not take off
+0x4db990: You found nothing
+0x4dd444: Canceled
+0x4de4a4: Hit Deal Too Fast!
+0x4de4e0: Gold	
+0x4de4f0: Successful
+0x4de504: You ask for confirm
+0x4de524: Player asks for confirmation of deal
+0x4deba0: <Notice>
+0x4debb4: <KillGuilds>
+0x4debcc: <AllyGuilds>
+0x4dfbd0: .\!runaddr.txt
+0x4dff0c: Gate 
+0x4dff1c:  Opened..
+0x4dff30: Not ready 
+0x4e0050: Exception] SocketRead
+0x4e0348: Gate 
+0x4e0358:  Closed..
+0x4e0764: [RunSock] TRunSocket.CloseUser exception 1
+0x4e0798: [RunSock] TRunSocket.CloseUser exception 2
+0x4e07cc: [RunSock] TRunSocket.CloseUser exception 3
+0x4e0800: [RunSock] TRunSocket.CloseUser exception 4
+0x4e0834: [RunSock] TRunSocket.CloseUser exception
+0x4e0fe0: [RunSock] TRunSocket.DoClientCertification.GetCertification exception 
+0x4e135c: [RunSock] LoadPlay... TRunSocket.DoClientCertification exception
+0x4e13b4: [RunSock] TRunSocket.DoClientCertification exception 
+0x4e16c8: [Exception] ExecGateMsg.. 
+0x4e18a8: Exception] ExecGateBuffers->pBuffer
+0x4e18d4: Exception] ExecGateBuffers->@pwork,ExecGateMsg
+0x4e190c: Exception] ExecGateBuffers->FreeMem
+0x4e1cb4: Exception SendGateBuffers..
+0x4e1f2c: [RunSock] TRunSocket.Run exception
+0x4e3570: .\Log\
+0x4e35a8: Ready to load ini file..
+0x4e35cc: .\!setup.txt
+0x4e35e4: ServerIndex
+0x4e35f8: Server
+0x4e3608: ServerName
+0x4e361c: ServerNumber
+0x4e3634: FALSE
+0x4e3644: VentureServer
+0x4e366c: TestServer
+0x4e3680: TestLevel
+0x4e3694: TestGold
+0x4e36a8: TestServerUserLimit
+0x4e36c4: ServiceMode
+0x4e36d8: NonPKServer
+0x4e36ec: ViewHackMessage
+0x4e3704: ViewAdmissionFailure
+0x4e3730: HomeMap
+0x4e3740: HomeX
+0x4e3750: HomeY
+0x4e3760: 127.0.0.1
+0x4e3778: DBAddr
+0x4e3788: DBPort
+0x4e3798: ItemNumber
+0x4e37ac: Setup
+0x4e37bc: HumLimit
+0x4e37d0: MonLimit
+0x4e37e4: ZenLimit
+0x4e37f8: NpcLimit
+0x4e380c: SocLimit
+0x4e3820: DecLimit
+0x4e3834: SendBlock
+0x4e3848: CheckBlock
+0x4e385c: AvailableBlock
+0x4e3874: GateLoad
+0x4e3888: UserFull
+0x4e389c: ZenFastStep
+0x4e38b0: MsgSrvAddr
+0x4e38c4: MsgSrvPort
+0x4e38d8: 192.168.0.152
+0x4e38f0: LogServerAddr
+0x4e3908: LogServerPort
+0x4e3920: DiscountForNightTime
+0x4e3940: HalfFeeStart
+0x4e3958: HalfFeeEnd
+0x4e3978: BaseDir
+0x4e3988: Share
+0x4e3998: GuildDir
+0x4e39ac: GuildFile
+0x4e39c0: VentureDir
+0x4e39d4: ConLogDir
+0x4e39e8: CastleDir
+0x4e39fc: .\Envir\
+0x4e3a10: EnvirDir
+0x4e3a24: .\Map\
+0x4e3a34: MapDir
+0x4e3a44: ClientFile1
+0x4e3a58: ClientFile2
+0x4e3a6c: ClientFile3
+0x4e3a80: ClothsMan
+0x4e3a94: Names
+0x4e3aa4: ClothsWoman
+0x4e3ab8: WoodenSword
+0x4e3acc: Candle
+0x4e3adc: BasicDrug
+0x4e3af0: GoldStone
+0x4e3b04: SilverStone
+0x4e3b18: SteelStone
+0x4e3b2c: CopperStone
+0x4e3b40: BlackStone
+0x4e3b54: Zuma1
+0x4e3b64: Zuma2
+0x4e3b74: Zuma3
+0x4e3b84: Zuma4
+0x4e3ba0: Spider
+0x4e3bb0: WomaHorn
+0x4e3bc4: ZumaPiece
+0x4e3bd8: !setup.txt loaded..
+0x4e3bf4: Error! Cannot find !setup.txt...
+0x4e3dd0: .\!setup.txt
+0x4e3de8: ItemNumber
+0x4e3dfc: Setup
+0x4e406c: !servertable.txt
+0x4e4088: File not found... <!servertable.txt>
+0x4e41e0: GetMultiServerAddrPort Fail.. IntToStr(servernum)
+0x4e46b4: M.txt
+0x4e47b0: Loading client version information..
+0x4e47e0: Loading client version information failed. check !setup.txt -> [setup] -> clientfile1,..
+0x4e4ef0: sizeof(THuman) <> SIZEOFTHUMAN
+0x4e4f18: Loading StdItem.DB...
+0x4e4f38: StdItems.DB : ItemsDB Load Code =   
+0x4e4f68: StdItem.DB loaded.
+0x4e4f84: Loading MiniMap.txt...
+0x4e4fa4: MiniMap.txt : MiniMap Load Code =   
+0x4e4fd4: MiniMap information loaded.
+0x4e4ff8: Loading MapFiles...
+0x4e5040: Mapfile loaded.
+0x4e5058: Loading Monster.DB...
+0x4e5078: Monster.DB : 
+0x4e50a4: Monster.DB loaded.
+0x4e50c0: Loading Magic.DB...
+0x4e50dc: Magic.DB : 
+0x4e5108: Magic.DB loaded.
+0x4e5124: Loading MonGen.txt...
+0x4e5144: MonGen.txt : ļ
+0x4e5170: MonGen.txt loaded.
+0x4e518c: Loading UnbindList.txt...
+0x4e51b0: UnbindList.txt : ع
+0x4e51e0: UnbindList information loaded.
+0x4e5208: Loading MapQuest.txt...
+0x4e5228: MapQuest.txt : 
+0x4e5258: MapQuest information loaded.
+0x4e5280: Loading QuestDiary\*.txt...
+0x4e52a4: QuestDiary\*.txt : 
+0x4e52d8: QuestDiary information loaded.
+0x4e5300: !Abuse.txt
+0x4e5314: !Abuse.txt loaded..
+0x4e5330: Notice\LineNotice.txt
+0x4e5350: Notice\LineNotice.txt loaded..
+0x4e5378: Notice\LineNotice.txt loading failure.
+0x4e53a8: AdminList loaded..
+0x4e53c4: GuildList loaded..
+0x4e53e0: Castle initialized..
+0x4e5400: starttimer exception...
+0x4e5d24: Error on writing ErrorLog.
+0x4e5e00: UsrRot
+0x4e6248: IDSoc initialized..
+0x4e6264: GlobalEnvir loaded..
+0x4e6284: MakeStoneMines...
+0x4e62a0: merchant.txt : 
+0x4e62d0: Merchant loaded...
+0x4e62ec: Guardlist.txt : 
+0x4e631c: Npc.txt : 
+0x4e6348: Npc loaded..
+0x4e6360: MakeItem.txt : 
+0x4e6390: MakeItem loaded..
+0x4e63ac: StartPoint.txt : 
+0x4e63dc: StartPoints loaded..
+0x4e63fc: F-Engine Resumed..
+0x4e6418: U-Engine initialized..
+0x4e6438: startsever exception..
+0x4e6750: Do You Want To Quit ?
+0x4e6980: .\!setup.txt
+0x4e6998: HumLimit
+0x4e69ac: Server
+0x4e69bc: MonLimit
+0x4e69d0: ZenLimit
+0x4e69e4: SocLimit
+0x4e69f8: DecLimit
+0x4e6a0c: NpcLimit
+0x4e6a20: SendBlock
+0x4e6a34: CheckBlock
+0x4e6a48: GateLoad
+0x4e6a6c: FALSE
+0x4e6a7c: ViewHackMessage
+0x4e6a94: ViewAdmissionFailure
+0x4e6c84: .\!setup.txt
+0x4e6c9c: 192.168.0.152
+0x4e6cb4: LogServerAddr
+0x4e6ccc: Server
+0x4e6cdc: LogServerPort
+0x4e6cf4: ClientFile1
+0x4e6d08: Setup
+0x4e6d18: ClientFile2
+0x4e6d2c: ClientFile3
+0x4e8034: Runtime error     at 00000000
+0x4e8054: Error
+0x4e8433: MS Sans Serif
+0x4e9b1e: Software\Borland\Database Engine
+0x4e9b3f: DLLPATH
+0x4e9b47: LIBLDRMUX
+0x4e9b51: Not Enough Memory
+0x4e9b63: DLLINITFUNCTION
+0x4e9b73: IDAPI32.DLL
+0x4e9b7f: DLLEXITFUNCTION
+0x4e9b8f: DLLEXITFUNCTION2
+0x4e9ba0: IDAPI32.DLL
+0x4e9bac: DbiInitFn
+0x4e9bb6: DbiExit

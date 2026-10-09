@@ -290,23 +290,47 @@ public sealed class PacketDispatcher
                 }
             }
 
-            if (defender != null && defender.State != null)
+            if (defender != null && defender.State != null && session.State != null)
             {
-                // 物理命中判定 (1:1 官方公式)
-                bool hit = OfficialClientRulesEngine.CombatMath.CheckPhysicalHit(20, 10, OfficialClientRulesEngine.DelphiRandom.Shared);
+                // 1. 官方 PK 模式规则判定 (0x4D1E54 btAttackMode)
+                // 模式 1: [Mode: Peaceful] 和平模式，禁止攻击白名玩家
+                if (session.State.AttackMode == 1 && !defender.State.IsRedName && !defender.State.IsYellowName)
+                {
+                    return; // 和平模式受限
+                }
+
+                // 2. 物理命中判定 (1:1 官方 Delphi M2 sub_4C1EF4 @ L12704: RandInt(Defender.Speed) >= Attacker.Hit)
+                int rollSpeed = OfficialClientRulesEngine.DelphiRandom.Shared.Next(defender.State.Speed + 1);
+                bool hit = rollSpeed < session.State.Hit;
+
                 if (hit)
                 {
-                    // 物理伤害精算
+                    // 物理基础伤害精算
                     int rawDmg = OfficialClientRulesEngine.CombatMath.CalculatePhysicalDamage(15, 30, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
 
-                    // 虹魔吸血判定
-                    session.State?.ProcessAttackLifesteal(rawDmg);
-
-                    // 麻痹戒指判定
-                    if (session.State != null)
+                    // 攻杀剑术附加伤害 (0x4C1EF4 @ L12621)
+                    if (session.State.BoAttackKill)
                     {
-                        var (isParalyzed, _) = session.State.TryParalyzeTarget(0);
-                        if (isParalyzed)
+                        session.State.BoAttackKill = false;
+                        rawDmg += session.State.HitPlus;
+                    }
+
+                    // 烈火剑法火焰爆发 (0x4C1EF4 @ L12627: ROUND(Damage / 100.0 * 10 * FireHitPlus))
+                    if (session.State.BoFireHit)
+                    {
+                        session.State.BoFireHit = false;
+                        int multiplier = 10 * session.State.FireHitPlus;
+                        rawDmg += (int)Math.Round((double)rawDmg / 100.0 * multiplier);
+                    }
+
+                    // 虹魔吸血判定 (0x4C1EF4 @ L12733: LeechWeight / 100.0)
+                    session.State.ProcessAttackLifesteal(rawDmg);
+
+                    // 麻痹戒指判定 (0x4C1EF4 @ L12729: HasParalysisRing && RandInt(AntiPoison + 5) == 0)
+                    if (session.State.HasParalysisRing)
+                    {
+                        int rollPara = OfficialClientRulesEngine.DelphiRandom.Shared.Next(defender.State.AntiPoison + 5);
+                        if (rollPara == 0)
                         {
                             defender.State.StatusBits[5] = true;
                         }
@@ -430,7 +454,27 @@ public sealed class PacketDispatcher
 
     private void HandleSay(ClientSession session, ReadOnlySpan<char> payload)
     {
-        // 聊天广播到周围九宫格
+        // 1. 官方控制指令判断 (IDA 0x4D1E54 TPlayObject.Command)
+        if (payload.Equals("@AttackMode", StringComparison.OrdinalIgnoreCase))
+        {
+            if (session.State != null)
+            {
+                session.State.AttackMode = (byte)(session.State.AttackMode >= 4 ? 0 : session.State.AttackMode + 1);
+                string modeStr = session.State.AttackMode switch
+                {
+                    0 => "[Mode: Attack All]",
+                    1 => "[Mode: Peaceful]",
+                    2 => "[Mode: Group Attack]",
+                    3 => "[Mode: Guild Attack]",
+                    4 => "[Mode: Red/White Name]",
+                    _ => "[Mode: Attack All]"
+                };
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, modeStr);
+            }
+            return;
+        }
+
+        // 2. 普通聊天广播到周围九宫格
         string msg = $"{session.CharacterName}: {payload}";
         BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSAY, session.SessionId, session.X, session.Y, 0, msg, includeSelf: true);
     }

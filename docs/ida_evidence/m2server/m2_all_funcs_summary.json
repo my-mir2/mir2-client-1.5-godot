@@ -1,0 +1,1261 @@
+{
+  "total_functions": 7467,
+  "interesting_functions_count": 251,
+  "interesting_functions": [
+    {
+      "ea": "0x4029b0",
+      "name": "@System@@TRUNC$qqrv",
+      "size": 26
+    },
+    {
+      "ea": "0x407654",
+      "name": "CheckMenuItem",
+      "size": 6
+    },
+    {
+      "ea": "0x407704",
+      "name": "EnableMenuItem",
+      "size": 6
+    },
+    {
+      "ea": "0x4077f4",
+      "name": "GetMenuItemCount",
+      "size": 6
+    },
+    {
+      "ea": "0x4077fc",
+      "name": "GetMenuItemID",
+      "size": 6
+    },
+    {
+      "ea": "0x407804",
+      "name": "GetMenuItemInfoA",
+      "size": 6
+    },
+    {
+      "ea": "0x4078bc",
+      "name": "InsertMenuItemA",
+      "size": 6
+    },
+    {
+      "ea": "0x407914",
+      "name": "KillTimer",
+      "size": 6
+    },
+    {
+      "ea": "0x407a34",
+      "name": "SetMenuItemInfoA",
+      "size": 6
+    },
+    {
+      "ea": "0x407a64",
+      "name": "SetTimer",
+      "size": 6
+    },
+    {
+      "ea": "0x411f20",
+      "name": "@Classes@TCollectionItem@Changed$qqro",
+      "size": 33
+    },
+    {
+      "ea": "0x411f44",
+      "name": "@Classes@TCollectionItem@GetIndex$qqrv",
+      "size": 21
+    },
+    {
+      "ea": "0x41203c",
+      "name": "@Classes@TCollectionItem@SetCollection$qqrp19Classes@TCollection",
+      "size": 40
+    },
+    {
+      "ea": "0x41206c",
+      "name": "@Classes@TCollectionItem@SetIndex$qqri",
+      "size": 47
+    },
+    {
+      "ea": "0x41225c",
+      "name": "@Classes@TCollection@GetItemAttr$qqrii",
+      "size": 32
+    },
+    {
+      "ea": "0x412578",
+      "name": "@Classes@TCollection@InsertItem$qqrp23Classes@TCollectionItem",
+      "size": 90
+    },
+    {
+      "ea": "0x413648",
+      "name": "@Classes@TStringList@ExchangeItems$qqrii",
+      "size": 35
+    },
+    {
+      "ea": "0x4137ec",
+      "name": "@Classes@TStringList@InsertItem$qqrix17System@AnsiString",
+      "size": 102
+    },
+    {
+      "ea": "0x4188e8",
+      "name": "@Classes@TComponent@Notification$qqrp18Classes@TComponent18Classes@TOperation",
+      "size": 90
+    },
+    {
+      "ea": "0x418fe8",
+      "name": "@Idcontext@TIdContext@BeforeRun$qqrv",
+      "size": 20
+    },
+    {
+      "ea": "0x41c244",
+      "name": "@Idcontext@TIdContext@BeforeRun$qqrv_0",
+      "size": 20
+    },
+    {
+      "ea": "0x4221ec",
+      "name": "@Contnrs@TOrderedList@PeekItem$qqrv",
+      "size": 17
+    },
+    {
+      "ea": "0x422200",
+      "name": "@Contnrs@TOrderedList@PopItem$qqrv",
+      "size": 30
+    },
+    {
+      "ea": "0x426e74",
+      "name": "@Stdctrls@TCustomLabel@Notification$qqrp18Classes@TComponent18Classes@TOperation",
+      "size": 45
+    },
+    {
+      "ea": "0x42cca0",
+      "name": "@Controls@TControl@Notification$qqrp18Classes@TComponent18Classes@TOperation",
+      "size": 65
+    },
+    {
+      "ea": "0x42ead0",
+      "name": "@Controls@TControl@WMNCLButtonDown$qqrr24Messages@TWMNCHitMessage",
+      "size": 27
+    },
+    {
+      "ea": "0x432ae4",
+      "name": "@Controls@TWinControl@WMNCHitTest$qqrr21Messages@TWMNCHitTest",
+      "size": 33
+    },
+    {
+      "ea": "0x432c7c",
+      "name": "@Controls@TWinControl@CMDesignHitTest$qqrr17Messages@TWMMouse",
+      "size": 31
+    },
+    {
+      "ea": "0x436134",
+      "name": "@Controls@TDockTree@InternalHitTest$qqrrx14Windows@TPointri",
+      "size": 140
+    },
+    {
+      "ea": "0x4368e0",
+      "name": "@Controls@TDockTree@PruneZone$qqrp18Controls@TDockZone",
+      "size": 89
+    },
+    {
+      "ea": "0x4386b0",
+      "name": "@Actnlist@TCustomActionList@Notification$qqrp18Classes@TComponent18Classes@TOperation",
+      "size": 71
+    },
+    {
+      "ea": "0x43be2c",
+      "name": "@Menus@TMenuItem@$bctr$qqrp18Classes@TComponent",
+      "size": 121
+    },
+    {
+      "ea": "0x43bea8",
+      "name": "@Menus@TMenuItem@$bdtr$qqrv",
+      "size": 179
+    },
+    {
+      "ea": "0x43bf5c",
+      "name": "@Menus@TMenuItem@AppendTo$qqruio",
+      "size": 617
+    },
+    {
+      "ea": "0x43c1fc",
+      "name": "@Menus@TMenuItem@PopulateMenu$qqrv",
+      "size": 111
+    },
+    {
+      "ea": "0x43c26c",
+      "name": "@TMenuItem@ReadShortCutText$qqrp7TReader",
+      "size": 86
+    },
+    {
+      "ea": "0x43c2c4",
+      "name": "@Menus@TMenuItem@MergeWith$qqrp15Menus@TMenuItem",
+      "size": 36
+    },
+    {
+      "ea": "0x43c2e8",
+      "name": "@Menus@TMenuItem@Loaded$qqrv",
+      "size": 60
+    },
+    {
+      "ea": "0x43c324",
+      "name": "@Menus@TMenuItem@RebuildHandle$qqrv",
+      "size": 130
+    },
+    {
+      "ea": "0x43c3a8",
+      "name": "@Menus@TMenuItem@VerifyGroupIndex$qqriuc",
+      "size": 96
+    },
+    {
+      "ea": "0x43c408",
+      "name": "@Menus@TMenuItem@GetHandle$qqrv",
+      "size": 73
+    },
+    {
+      "ea": "0x43c454",
+      "name": "@Menus@TMenuItem@DefineProperties$qqrp14Classes@TFiler",
+      "size": 42
+    },
+    {
+      "ea": "0x43c6ac",
+      "name": "@Menus@TMenuItem@DrawItem$qqrp16Graphics@TCanvasrx13Windows@TRecto",
+      "size": 66
+    },
+    {
+      "ea": "0x43d818",
+      "name": "@Menus@TMenuItem@AdvancedDrawItem$qqrp16Graphics@TCanvasrx13Windows@TRect47System@%Set$t18Windows@Windows__1$iuc$0$iuc$12%o",
+      "size": 280
+    },
+    {
+      "ea": "0x43d930",
+      "name": "@Menus@TMenuItem@GetImageList$qqrv",
+      "size": 46
+    },
+    {
+      "ea": "0x43d9ac",
+      "name": "@Menus@TMenuItem@MeasureItem$qqrp16Graphics@TCanvasrit2",
+      "size": 498
+    },
+    {
+      "ea": "0x43dbb0",
+      "name": "@Menus@TMenuItem@SetBreak$qqr16Menus@TMenuBreak",
+      "size": 16
+    },
+    {
+      "ea": "0x43dbc0",
+      "name": "@Menus@TMenuItem@SetCaption$qqrx17System@AnsiString",
+      "size": 40
+    },
+    {
+      "ea": "0x43dc30",
+      "name": "@Menus@TMenuItem@SetChecked$qqro",
+      "size": 82
+    },
+    {
+      "ea": "0x43dc84",
+      "name": "@Menus@TMenuItem@SetEnabled$qqro",
+      "size": 119
+    },
+    {
+      "ea": "0x43dcfc",
+      "name": "@Menus@TMenuItem@SetGroupIndex$qqruc",
+      "size": 65
+    },
+    {
+      "ea": "0x43dd40",
+      "name": "@Menus@TMenuItem@GetAction$qqrv",
+      "size": 14
+    },
+    {
+      "ea": "0x43dd58",
+      "name": "@Menus@TMenuItem@GetCount$qqrv",
+      "size": 14
+    },
+    {
+      "ea": "0x43dd68",
+      "name": "@Menus@TMenuItem@GetItem$qqri",
+      "size": 35
+    },
+    {
+      "ea": "0x43dd8c",
+      "name": "@Menus@TMenuItem@SetShortCut$qqrus",
+      "size": 18
+    },
+    {
+      "ea": "0x43dda0",
+      "name": "@Menus@TMenuItem@SetVisible$qqro",
+      "size": 16
+    },
+    {
+      "ea": "0x43ddb0",
+      "name": "@Menus@TMenuItem@SetImageIndex$qqri",
+      "size": 16
+    },
+    {
+      "ea": "0x43ddc0",
+      "name": "@Menus@TMenuItem@GetMenuIndex$qqrv",
+      "size": 24
+    },
+    {
+      "ea": "0x43ddd8",
+      "name": "@Menus@TMenuItem@SetMenuIndex$qqri",
+      "size": 70
+    },
+    {
+      "ea": "0x43de20",
+      "name": "@TMenuItem@GetChildren$qqrynpqqrp10TComponent$vp10TComponent",
+      "size": 56
+    },
+    {
+      "ea": "0x43de78",
+      "name": "@Menus@TMenuItem@SetDefault$qqro",
+      "size": 92
+    },
+    {
+      "ea": "0x43ded4",
+      "name": "@Menus@TMenuItem@InitiateAction$qqrv",
+      "size": 15
+    },
+    {
+      "ea": "0x43dee4",
+      "name": "@Menus@TMenuItem@Insert$qqrip15Menus@TMenuItem",
+      "size": 173
+    },
+    {
+      "ea": "0x43df94",
+      "name": "@Menus@TMenuItem@Delete$qqri",
+      "size": 109
+    },
+    {
+      "ea": "0x43e004",
+      "name": "@Menus@TMenuItem@Click$qqrv",
+      "size": 112
+    },
+    {
+      "ea": "0x43e08c",
+      "name": "@Menus@TMenuItem@Add$qqrp15Menus@TMenuItem",
+      "size": 27
+    },
+    {
+      "ea": "0x43e0a8",
+      "name": "@Menus@TMenuItem@Remove$qqrp15Menus@TMenuItem",
+      "size": 40
+    },
+    {
+      "ea": "0x43e0d0",
+      "name": "@Menus@TMenuItem@MenuChanged$qqro",
+      "size": 57
+    },
+    {
+      "ea": "0x43e10c",
+      "name": "@Menus@TMenuItem@SubItemChanged$qqrp14System@TObjectp15Menus@TMenuItemo",
+      "size": 87
+    },
+    {
+      "ea": "0x43e18c",
+      "name": "@Menus@TMenuItem@SetAction$qqrp20Classes@TBasicAction",
+      "size": 109
+    },
+    {
+      "ea": "0x43e1fc",
+      "name": "@Menus@TMenuItem@SetBitmap$qqrp16Graphics@TBitmap",
+      "size": 49
+    },
+    {
+      "ea": "0x43e230",
+      "name": "@Menus@TMenuItem@InitiateActions$qqrv",
+      "size": 44
+    },
+    {
+      "ea": "0x43e25c",
+      "name": "@Menus@TMenuItem@GetParentComponent$qqrv",
+      "size": 20
+    },
+    {
+      "ea": "0x43e270",
+      "name": "@Menus@TMenuItem@SetParentComponent$qqrp18Classes@TComponent",
+      "size": 82
+    },
+    {
+      "ea": "0x43e2c4",
+      "name": "@Menus@TMenuItem@GetParentMenu$qqrv",
+      "size": 15
+    },
+    {
+      "ea": "0x43e2d4",
+      "name": "@Menus@TMenuItem@SetRadioItem$qqro",
+      "size": 41
+    },
+    {
+      "ea": "0x43e300",
+      "name": "@Menus@TMenuItem@ActionChange$qqrp14System@TObjecto",
+      "size": 230
+    },
+    {
+      "ea": "0x43e3e8",
+      "name": "@Menus@TMenuItem@DoActionChange$qqrp14System@TObject",
+      "size": 37
+    },
+    {
+      "ea": "0x43e450",
+      "name": "@Menus@TMenuItem@IsHelpContextStored$qqrv",
+      "size": 32
+    },
+    {
+      "ea": "0x43e470",
+      "name": "@Menus@TMenuItem@IsImageIndexStored$qqrv",
+      "size": 32
+    },
+    {
+      "ea": "0x43e490",
+      "name": "@Menus@TMenuItem@IsHelpContextStored$qqrv_0",
+      "size": 32
+    },
+    {
+      "ea": "0x43e4b0",
+      "name": "@Menus@TMenuItem@IsImageIndexStored$qqrv_0",
+      "size": 32
+    },
+    {
+      "ea": "0x43e4d0",
+      "name": "@Menus@TMenuItem@IsShortCutStored$qqrv",
+      "size": 32
+    },
+    {
+      "ea": "0x43e4f0",
+      "name": "@Menus@TMenuItem@IsVisibleStored$qqrv",
+      "size": 32
+    },
+    {
+      "ea": "0x43e510",
+      "name": "@Menus@TMenuItem@IsOnClickStored$qqrv",
+      "size": 32
+    },
+    {
+      "ea": "0x43e530",
+      "name": "@Menus@TMenuItem@AssignTo$qqrp19Classes@TPersistent",
+      "size": 120
+    },
+    {
+      "ea": "0x43e5a8",
+      "name": "@Menus@TMenuItem@Notification$qqrp18Classes@TComponent18Classes@TOperation",
+      "size": 49
+    },
+    {
+      "ea": "0x43e5dc",
+      "name": "@Menus@TMenuItem@SetSubMenuImages$qqrp24Imglist@TCustomImageList",
+      "size": 58
+    },
+    {
+      "ea": "0x43e618",
+      "name": "@Menus@TMenuItem@ImageListChange$qqrp14System@TObject",
+      "size": 11
+    },
+    {
+      "ea": "0x43e64c",
+      "name": "@Menus@TMenuItem@UpdateItems$qqrv",
+      "size": 17
+    },
+    {
+      "ea": "0x43e874",
+      "name": "@Menus@TMenuItem@InternalRethinkHotkeys$qqro",
+      "size": 1155
+    },
+    {
+      "ea": "0x43ed10",
+      "name": "@Menus@TMenuItem@SetAutoHotkeys$qqrx23Menus@TMenuItemAutoFlag",
+      "size": 16
+    },
+    {
+      "ea": "0x43ed20",
+      "name": "@Menus@TMenuItem@IsLine$qqrv",
+      "size": 21
+    },
+    {
+      "ea": "0x43ed44",
+      "name": "@Menus@TMenuItem@InternalRethinkLines$qqro",
+      "size": 315
+    },
+    {
+      "ea": "0x43ee80",
+      "name": "@Menus@TMenuItem@SetAutoLineReduction$qqrx23Menus@TMenuItemAutoFlag",
+      "size": 16
+    },
+    {
+      "ea": "0x43ee90",
+      "name": "@Menus@TMenuItem@GetAutoHotkeys$qqrv",
+      "size": 44
+    },
+    {
+      "ea": "0x43eebc",
+      "name": "@Menus@TMenuItem@GetAutoLineReduction$qqrv",
+      "size": 44
+    },
+    {
+      "ea": "0x43f01c",
+      "name": "@Menus@TMenu@UpdateItems$qqrv",
+      "size": 24
+    },
+    {
+      "ea": "0x43f0cc",
+      "name": "@Menus@TMenu@FindItem$qqri19Menus@TFindItemKind",
+      "size": 47
+    },
+    {
+      "ea": "0x43f6dc",
+      "name": "@Menus@TMenu@DoChange$qqrp15Menus@TMenuItemo",
+      "size": 23
+    },
+    {
+      "ea": "0x43f70c",
+      "name": "@Menus@TMenu@MenuChanged$qqrp14System@TObjectp15Menus@TMenuItemo",
+      "size": 49
+    },
+    {
+      "ea": "0x43f790",
+      "name": "@Menus@TMenu@Notification$qqrp18Classes@TComponent18Classes@TOperation",
+      "size": 43
+    },
+    {
+      "ea": "0x43fbc0",
+      "name": "@Menus@TMenu@SetAutoHotkeys$qqrx23Menus@TMenuItemAutoFlag",
+      "size": 16
+    },
+    {
+      "ea": "0x43fbe0",
+      "name": "@Menus@TMenu@SetAutoLineReduction$qqrx23Menus@TMenuItemAutoFlag",
+      "size": 16
+    },
+    {
+      "ea": "0x43fc10",
+      "name": "@Menus@TMainMenu@MenuChanged$qqrp14System@TObjectp15Menus@TMenuItemo",
+      "size": 88
+    },
+    {
+      "ea": "0x43fca0",
+      "name": "@Menus@TMainMenu@ItemChanged$qqrv",
+      "size": 42
+    },
+    {
+      "ea": "0x4404bc",
+      "name": "@Menus@TMenuItemStack@ClearItem$qqrp15Menus@TMenuItem",
+      "size": 59
+    },
+    {
+      "ea": "0x4404f8",
+      "name": "@Menus@DrawMenuItem$qqrp15Menus@TMenuItemp16Graphics@TCanvasrx13Windows@TRect47System@%Set$t18Windows@Windows__1$iuc$0$iuc$12%",
+      "size": 241
+    },
+    {
+      "ea": "0x444d88",
+      "name": "@Forms@TCustomForm@Notification$qqrp18Classes@TComponent18Classes@TOperation",
+      "size": 266
+    },
+    {
+      "ea": "0x4460d4",
+      "name": "@Forms@TCustomForm@SetObjectMenuItem$qqrp15Menus@TMenuItem",
+      "size": 33
+    },
+    {
+      "ea": "0x4460f8",
+      "name": "@Forms@TCustomForm@SetWindowMenu$qqrp15Menus@TMenuItem",
+      "size": 39
+    },
+    {
+      "ea": "0x4476d8",
+      "name": "@Forms@TCustomForm@WMNCLButtonDown$qqrr24Messages@TWMNCHitMessage",
+      "size": 141
+    },
+    {
+      "ea": "0x4490b4",
+      "name": "@Forms@TCustomDockForm@WMNCHitTest$qqrr21Messages@TWMNCHitTest",
+      "size": 37
+    },
+    {
+      "ea": "0x4490dc",
+      "name": "@Forms@TCustomDockForm@WMNCLButtonDown$qqrr24Messages@TWMNCHitMessage",
+      "size": 149
+    },
+    {
+      "ea": "0x44b734",
+      "name": "@Forms@TApplication@Run$qqrv",
+      "size": 180
+    },
+    {
+      "ea": "0x44c048",
+      "name": "@Forms@TApplication@StartHintTimer$qqri16Forms@TTimerMode",
+      "size": 56
+    },
+    {
+      "ea": "0x44c080",
+      "name": "@Forms@TApplication@StopHintTimer$qqrv",
+      "size": 31
+    },
+    {
+      "ea": "0x44c1ac",
+      "name": "@Forms@TApplication@HintTimerExpired$qqrv",
+      "size": 50
+    },
+    {
+      "ea": "0x44e83c",
+      "name": "@Extctrls@TTimer@$bctr$qqrp18Classes@TComponent",
+      "size": 78
+    },
+    {
+      "ea": "0x44e88c",
+      "name": "@Extctrls@TTimer@$bdtr$qqrv",
+      "size": 56
+    },
+    {
+      "ea": "0x44e9e4",
+      "name": "@Extctrls@TTimer@SetOnTimer$qqrynpqqrp14System@TObject$v",
+      "size": 24
+    },
+    {
+      "ea": "0x44fc2c",
+      "name": "closesocket",
+      "size": 6
+    },
+    {
+      "ea": "0x44fc64",
+      "name": "ioctlsocket",
+      "size": 6
+    },
+    {
+      "ea": "0x44fcac",
+      "name": "socket",
+      "size": 6
+    },
+    {
+      "ea": "0x451118",
+      "name": "@Scktcomp@TCustomWinSocket@$bdtr$qqrv",
+      "size": 105
+    },
+    {
+      "ea": "0x451188",
+      "name": "@Scktcomp@TCustomWinSocket@AsyncInitSocket$qqrx17System@AnsiStringt1t1usio",
+      "size": 567
+    },
+    {
+      "ea": "0x451404",
+      "name": "@Scktcomp@TCustomWinSocket@Close$qqrv",
+      "size": 9
+    },
+    {
+      "ea": "0x4514e8",
+      "name": "@Scktcomp@TCustomWinSocket@CMSocketMessage$qqrr25Scktcomp@TCMSocketMessage",
+      "size": 138
+    },
+    {
+      "ea": "0x45157c",
+      "name": "@Scktcomp@TCustomWinSocket@DeferFree$qqrv",
+      "size": 23
+    },
+    {
+      "ea": "0x451594",
+      "name": "@TCustomWinSocket@DoSetAsyncStyles$qqrv",
+      "size": 86
+    },
+    {
+      "ea": "0x4515f0",
+      "name": "@Scktcomp@TCustomWinSocket@DoListen$qqri",
+      "size": 96
+    },
+    {
+      "ea": "0x451670",
+      "name": "@Scktcomp@TCustomWinSocket@DoOpen$qqrv",
+      "size": 89
+    },
+    {
+      "ea": "0x4516dc",
+      "name": "@Scktcomp@TCustomWinSocket@GetHandle$qqrv",
+      "size": 28
+    },
+    {
+      "ea": "0x451830",
+      "name": "@Scktcomp@TCustomWinSocket@InitSocket$qqrx17System@AnsiStringt1t1uso",
+      "size": 151
+    },
+    {
+      "ea": "0x4518c8",
+      "name": "@Scktcomp@TCustomWinSocket@Listen$qqrx17System@AnsiStringt1t1usio",
+      "size": 264
+    },
+    {
+      "ea": "0x4519d0",
+      "name": "@Scktcomp@TCustomWinSocket@Open$qqrx17System@AnsiStringt1t1uso",
+      "size": 259
+    },
+    {
+      "ea": "0x451ad4",
+      "name": "@Scktcomp@TCustomWinSocket@Disconnect$qqri",
+      "size": 214
+    },
+    {
+      "ea": "0x451be0",
+      "name": "@TCustomWinSocket@DefaultHandler$qqrpv",
+      "size": 43
+    },
+    {
+      "ea": "0x451c0c",
+      "name": "@Scktcomp@TCustomWinSocket@Event$qqrp25Scktcomp@TCustomWinSocket21Scktcomp@TSocketEvent",
+      "size": 23
+    },
+    {
+      "ea": "0x451c24",
+      "name": "@Scktcomp@TCustomWinSocket@Error$qqrp25Scktcomp@TCustomWinSocket20Scktcomp@TErrorEventri",
+      "size": 33
+    },
+    {
+      "ea": "0x451cac",
+      "name": "@Scktcomp@TCustomWinSocket@SendStreamPiece$qqrv",
+      "size": 367
+    },
+    {
+      "ea": "0x451e20",
+      "name": "@Scktcomp@TCustomWinSocket@SendBuf$qqrpvi",
+      "size": 306
+    },
+    {
+      "ea": "0x451f8c",
+      "name": "@Scktcomp@TCustomWinSocket@Read$qqri",
+      "size": 28
+    },
+    {
+      "ea": "0x451fa8",
+      "name": "@Scktcomp@TCustomWinSocket@ReceiveBuf$qqrpvi",
+      "size": 346
+    },
+    {
+      "ea": "0x452120",
+      "name": "@Scktcomp@TCustomWinSocket@ReceiveText$qqrv",
+      "size": 57
+    },
+    {
+      "ea": "0x4521a8",
+      "name": "@Scktcomp@TCustomWinSocket@Write$qqri",
+      "size": 43
+    },
+    {
+      "ea": "0x4521d4",
+      "name": "@Scktcomp@TCustomWinSocket@CMLookupComplete$qqrr26Scktcomp@TCMLookupComplete",
+      "size": 276
+    },
+    {
+      "ea": "0x452314",
+      "name": "@Scktcomp@TClientWinSocket@SetClientType$qqr20Scktcomp@TClientType",
+      "size": 71
+    },
+    {
+      "ea": "0x452364",
+      "name": "@Scktcomp@TServerClientWinSocket@$bctr$qqrip25Scktcomp@TServerWinSocket",
+      "size": 165
+    },
+    {
+      "ea": "0x452410",
+      "name": "@Scktcomp@TServerClientWinSocket@$bdtr$qqrv",
+      "size": 51
+    },
+    {
+      "ea": "0x452444",
+      "name": "@Scktcomp@TServerWinSocket@$bctr$qqri",
+      "size": 112
+    },
+    {
+      "ea": "0x4524f8",
+      "name": "@Scktcomp@TServerWinSocket@AddClient$qqrp31Scktcomp@TServerClientWinSocket",
+      "size": 101
+    },
+    {
+      "ea": "0x452560",
+      "name": "@Scktcomp@TServerWinSocket@RemoveClient$qqrp31Scktcomp@TServerClientWinSocket",
+      "size": 84
+    },
+    {
+      "ea": "0x4525b4",
+      "name": "@Scktcomp@TServerWinSocket@AddThread$qqrp28Scktcomp@TServerClientThread",
+      "size": 122
+    },
+    {
+      "ea": "0x452630",
+      "name": "@Scktcomp@TServerWinSocket@RemoveThread$qqrp28Scktcomp@TServerClientThread",
+      "size": 84
+    },
+    {
+      "ea": "0x4527f8",
+      "name": "@Scktcomp@TServerWinSocket@Disconnect$qqri",
+      "size": 279
+    },
+    {
+      "ea": "0x452920",
+      "name": "@Scktcomp@TServerWinSocket@Listen$qqrr17System@AnsiStringt1t1usi",
+      "size": 75
+    },
+    {
+      "ea": "0x45296c",
+      "name": "@Scktcomp@TServerWinSocket@SetServerType$qqr20Scktcomp@TServerType",
+      "size": 71
+    },
+    {
+      "ea": "0x4529bc",
+      "name": "@Scktcomp@TServerWinSocket@SetThreadCacheSize$qqri",
+      "size": 153
+    },
+    {
+      "ea": "0x452a58",
+      "name": "@Scktcomp@TServerWinSocket@GetClientSocket$qqri",
+      "size": 61
+    },
+    {
+      "ea": "0x452ad8",
+      "name": "@Scktcomp@TServerWinSocket@GetServerThread$qqrp31Scktcomp@TServerClientWinSocket",
+      "size": 209
+    },
+    {
+      "ea": "0x452bac",
+      "name": "@Scktcomp@TServerWinSocket@ClientConnect$qqrp25Scktcomp@TCustomWinSocket",
+      "size": 31
+    },
+    {
+      "ea": "0x452bcc",
+      "name": "@Scktcomp@TServerWinSocket@ClientDisconnect$qqrp25Scktcomp@TCustomWinSocket",
+      "size": 48
+    },
+    {
+      "ea": "0x452bfc",
+      "name": "@Scktcomp@TServerWinSocket@ClientRead$qqrp25Scktcomp@TCustomWinSocket",
+      "size": 31
+    },
+    {
+      "ea": "0x452c1c",
+      "name": "@Scktcomp@TServerWinSocket@ClientWrite$qqrp25Scktcomp@TCustomWinSocket",
+      "size": 31
+    },
+    {
+      "ea": "0x452c3c",
+      "name": "@Scktcomp@TServerWinSocket@ClientErrorEvent$qqrp25Scktcomp@TCustomWinSocket20Scktcomp@TErrorEventri",
+      "size": 42
+    },
+    {
+      "ea": "0x452c68",
+      "name": "@Scktcomp@TServerAcceptThread@$bctr$qqrop25Scktcomp@TServerWinSocket",
+      "size": 65
+    },
+    {
+      "ea": "0x452cc8",
+      "name": "@Scktcomp@TServerClientThread@$bctr$qqrop31Scktcomp@TServerClientWinSocket",
+      "size": 117
+    },
+    {
+      "ea": "0x452d78",
+      "name": "@Scktcomp@TServerClientThread@ReActivate$qqrp31Scktcomp@TServerClientWinSocket",
+      "size": 60
+    },
+    {
+      "ea": "0x452e30",
+      "name": "@Scktcomp@TServerClientThread@HandleEvent$qqrp14System@TObjectp25Scktcomp@TCustomWinSocket21Scktcomp@TSocketEvent",
+      "size": 15
+    },
+    {
+      "ea": "0x452e40",
+      "name": "@Scktcomp@TServerClientThread@HandleError$qqrp14System@TObjectp25Scktcomp@TCustomWinSocket20Scktcomp@TErrorEventri",
+      "size": 20
+    },
+    {
+      "ea": "0x452e54",
+      "name": "@Scktcomp@TServerClientThread@Event$qqr21Scktcomp@TSocketEvent",
+      "size": 14
+    },
+    {
+      "ea": "0x4530a4",
+      "name": "@Scktcomp@TAbstractSocket@SetActive$qqro",
+      "size": 32
+    },
+    {
+      "ea": "0x4530c4",
+      "name": "@Scktcomp@TAbstractSocket@InitSocket$qqrp25Scktcomp@TCustomWinSocket",
+      "size": 21
+    },
+    {
+      "ea": "0x4530dc",
+      "name": "@Scktcomp@TAbstractSocket@Loaded$qqrv",
+      "size": 22
+    },
+    {
+      "ea": "0x4530f4",
+      "name": "@Scktcomp@TAbstractSocket@SetAddress$qqr17System@AnsiString",
+      "size": 126
+    },
+    {
+      "ea": "0x453174",
+      "name": "@Scktcomp@TAbstractSocket@SetHost$qqr17System@AnsiString",
+      "size": 126
+    },
+    {
+      "ea": "0x4531f4",
+      "name": "@Scktcomp@TAbstractSocket@SetPort$qqri",
+      "size": 44
+    },
+    {
+      "ea": "0x453220",
+      "name": "@Scktcomp@TAbstractSocket@SetService$qqr17System@AnsiString",
+      "size": 126
+    },
+    {
+      "ea": "0x4532a0",
+      "name": "@Scktcomp@TCustomSocket@Event$qqrp25Scktcomp@TCustomWinSocket21Scktcomp@TSocketEvent",
+      "size": 240
+    },
+    {
+      "ea": "0x453390",
+      "name": "@Scktcomp@TCustomSocket@Error$qqrp25Scktcomp@TCustomWinSocket20Scktcomp@TErrorEventri",
+      "size": 33
+    },
+    {
+      "ea": "0x4533b4",
+      "name": "@Scktcomp@TClientSocket@$bctr$qqrp18Classes@TComponent",
+      "size": 94
+    },
+    {
+      "ea": "0x453444",
+      "name": "@Scktcomp@TClientSocket@DoActivate$qqro",
+      "size": 77
+    },
+    {
+      "ea": "0x4534a0",
+      "name": "@Idudpserver@TIdUDPListenerThread@AfterRun$qqrv",
+      "size": 12
+    },
+    {
+      "ea": "0x4534dc",
+      "name": "@Scktcomp@TCustomServerSocket@DoActivate$qqro",
+      "size": 66
+    },
+    {
+      "ea": "0x45352c",
+      "name": "@Idudpserver@TIdUDPListenerThread@AfterRun$qqrv_0",
+      "size": 12
+    },
+    {
+      "ea": "0x453538",
+      "name": "@Scktcomp@TCustomServerSocket@GetGetThreadEvent$qqrv",
+      "size": 18
+    },
+    {
+      "ea": "0x45354c",
+      "name": "@Scktcomp@TCustomServerSocket@SetGetThreadEvent$qqrynpqqrp14System@TObjectp31Scktcomp@TServerClientWinSocketrp28Scktcomp@TServerClientThread$v",
+      "size": 25
+    },
+    {
+      "ea": "0x453568",
+      "name": "@Scktcomp@TCustomServerSocket@GetGetSocketEvent$qqrv",
+      "size": 18
+    },
+    {
+      "ea": "0x45357c",
+      "name": "@Scktcomp@TCustomServerSocket@SetGetSocketEvent$qqrynpqqrp14System@TObjectirp31Scktcomp@TServerClientWinSocket$v",
+      "size": 25
+    },
+    {
+      "ea": "0x453598",
+      "name": "@Scktcomp@TCustomServerSocket@GetThreadCacheSize$qqrv",
+      "size": 10
+    },
+    {
+      "ea": "0x4535a4",
+      "name": "@Idudpserver@TIdUDPListenerThread@AfterRun$qqrv_1",
+      "size": 12
+    },
+    {
+      "ea": "0x4535b0",
+      "name": "@Scktcomp@TCustomServerSocket@GetOnThreadStart$qqrv",
+      "size": 24
+    },
+    {
+      "ea": "0x4535c8",
+      "name": "@Scktcomp@TCustomServerSocket@GetOnThreadEnd$qqrv",
+      "size": 24
+    },
+    {
+      "ea": "0x4535e0",
+      "name": "@Scktcomp@TCustomServerSocket@SetOnThreadStart$qqrynpqqrp14System@TObjectp28Scktcomp@TServerClientThread$v",
+      "size": 31
+    },
+    {
+      "ea": "0x453600",
+      "name": "@Scktcomp@TCustomServerSocket@SetOnThreadEnd$qqrynpqqrp14System@TObjectp28Scktcomp@TServerClientThread$v",
+      "size": 31
+    },
+    {
+      "ea": "0x453620",
+      "name": "@Scktcomp@TCustomServerSocket@GetOnClientEvent$qqri",
+      "size": 118
+    },
+    {
+      "ea": "0x453698",
+      "name": "@Scktcomp@TCustomServerSocket@SetOnClientEvent$qqriynpqqrp14System@TObjectp25Scktcomp@TCustomWinSocket$v",
+      "size": 124
+    },
+    {
+      "ea": "0x453714",
+      "name": "@Scktcomp@TCustomServerSocket@GetOnClientError$qqrv",
+      "size": 24
+    },
+    {
+      "ea": "0x45372c",
+      "name": "@Scktcomp@TCustomServerSocket@SetOnClientError$qqrynpqqrp14System@TObjectp25Scktcomp@TCustomWinSocket20Scktcomp@TErrorEventri$v",
+      "size": 31
+    },
+    {
+      "ea": "0x45374c",
+      "name": "@Scktcomp@TServerSocket@$bctr$qqrp18Classes@TComponent",
+      "size": 110
+    },
+    {
+      "ea": "0x458f84",
+      "name": "@Buttons@TBitBtn@CNMeasureItem$qqrr23Messages@TWMMeasureItem",
+      "size": 16
+    },
+    {
+      "ea": "0x458f94",
+      "name": "@Buttons@TBitBtn@CNDrawItem$qqrr20Messages@TWMDrawItem",
+      "size": 9
+    },
+    {
+      "ea": "0x458fa0",
+      "name": "@Buttons@TBitBtn@DrawItem$qqrrx17tagDRAWITEMSTRUCT",
+      "size": 651
+    },
+    {
+      "ea": "0x463ea8",
+      "name": "@Db@TDefCollection@SetItemName$qqrp23Classes@TCollectionItem",
+      "size": 221
+    },
+    {
+      "ea": "0x463f88",
+      "name": "@Db@TDefCollection@Update$qqrp23Classes@TCollectionItem",
+      "size": 26
+    },
+    {
+      "ea": "0x464a10",
+      "name": "@Db@TFlatList@FindItem$qqrx17System@AnsiStringo",
+      "size": 166
+    },
+    {
+      "ea": "0x465ed4",
+      "name": "@Db@TField@Notification$qqrp18Classes@TComponent18Classes@TOperation",
+      "size": 39
+    },
+    {
+      "ea": "0x465f34",
+      "name": "@TMenuItem@ReadShortCutText$qqrp7TReader_0",
+      "size": 80
+    },
+    {
+      "ea": "0x46dc70",
+      "name": "@Miditems@TWebListInput@SetValues$qqrpx16Classes@TStrings",
+      "size": 13
+    },
+    {
+      "ea": "0x46e084",
+      "name": "@Sockets@TBaseSocket@MapSockType$qqr19Sockets@TSocketType",
+      "size": 12
+    },
+    {
+      "ea": "0x471ae0",
+      "name": "@Dbcommon@TFilterExpr@NewCompareNode$qqrp9Db@TField21Dbcommon@TCANOperatorrx14System@Variant",
+      "size": 169
+    },
+    {
+      "ea": "0x471b8c",
+      "name": "@Dbcommon@TFilterExpr@NewNode$qqr22Dbcommon@TExprNodeKind21Dbcommon@TCANOperatorrx14System@Variantp18Dbcommon@TExprNodet4",
+      "size": 243
+    },
+    {
+      "ea": "0x472204",
+      "name": "@Dbcommon@TFilterExpr@PutExprNode$qqrp18Dbcommon@TExprNode21Dbcommon@TCANOperator",
+      "size": 1627
+    },
+    {
+      "ea": "0x472954",
+      "name": "@Dbcommon@TFilterExpr@PutNode$qqr18Dbcommon@NODEClass21Dbcommon@TCANOperatori",
+      "size": 67
+    },
+    {
+      "ea": "0x476192",
+      "name": "DsProviderGetDataPacket",
+      "size": 6
+    },
+    {
+      "ea": "0x4761aa",
+      "name": "OsLdBufferUnicodeToNative",
+      "size": 6
+    },
+    {
+      "ea": "0x476ae6",
+      "name": "LsGetTimeStampEncode",
+      "size": 6
+    },
+    {
+      "ea": "0x476aec",
+      "name": "LsTimeStampEncode",
+      "size": 6
+    },
+    {
+      "ea": "0x476af2",
+      "name": "LsTimeStampDecode",
+      "size": 6
+    },
+    {
+      "ea": "0x476afe",
+      "name": "LsTimeDecode",
+      "size": 6
+    },
+    {
+      "ea": "0x476b04",
+      "name": "LsTimeEncode",
+      "size": 6
+    },
+    {
+      "ea": "0x476b10",
+      "name": "LsDateDecode",
+      "size": 6
+    },
+    {
+      "ea": "0x476b16",
+      "name": "LsDateEncode",
+      "size": 6
+    },
+    {
+      "ea": "0x476e34",
+      "name": "DbiTimeStampDecode",
+      "size": 6
+    },
+    {
+      "ea": "0x476e3a",
+      "name": "DbiTimeStampEncode",
+      "size": 6
+    },
+    {
+      "ea": "0x476e40",
+      "name": "DbiTimeDecode",
+      "size": 6
+    },
+    {
+      "ea": "0x476e46",
+      "name": "DbiTimeEncode",
+      "size": 6
+    },
+    {
+      "ea": "0x476ed0",
+      "name": "DbiDateDecode",
+      "size": 6
+    },
+    {
+      "ea": "0x476ed6",
+      "name": "DbiDateEncode",
+      "size": 6
+    },
+    {
+      "ea": "0x476f66",
+      "name": "DbiTruncateBlob",
+      "size": 6
+    },
+    {
+      "ea": "0x48d2d0",
+      "name": "_TFrmIDSoc_Timer1Timer",
+      "size": 62
+    },
+    {
+      "ea": "0x48d310",
+      "name": "_TFrmIDSoc_IDSocketConnect",
+      "size": 19
+    },
+    {
+      "ea": "0x48d324",
+      "name": "_TFrmIDSoc_IDSocketDisconnect",
+      "size": 19
+    },
+    {
+      "ea": "0x48d338",
+      "name": "_TFrmIDSoc_IDSocketError",
+      "size": 36
+    },
+    {
+      "ea": "0x48d35c",
+      "name": "_TFrmIDSoc_IDSocketRead",
+      "size": 155
+    },
+    {
+      "ea": "0x49ad14",
+      "name": "@Webadapt@TCustomAdapterGotoPageAction@ImplGetAdapterItemRequestParams$qqrr17System@AnsiString62System@%DelphiInterface$t34Sitecomp@IAdapterItemRequestParams%",
+      "size": 160
+    },
+    {
+      "ea": "0x4e4848",
+      "name": "_TFrmMain_StartTimerTimer",
+      "size": 1693
+    },
+    {
+      "ea": "0x4e5418",
+      "name": "_TFrmMain_Timer1Timer",
+      "size": 2307
+    },
+    {
+      "ea": "0x4e5e70",
+      "name": "_TFrmMain_SaveVariableTimerTimer",
+      "size": 24
+    },
+    {
+      "ea": "0x4e6450",
+      "name": "_TFrmMain_ConnectTimerTimer",
+      "size": 47
+    },
+    {
+      "ea": "0x4e6480",
+      "name": "_TFrmMain_RunTimerTimer",
+      "size": 176
+    },
+    {
+      "ea": "0x4e6530",
+      "name": "_TFrmMain_GateSocketClientConnect",
+      "size": 32
+    },
+    {
+      "ea": "0x4e6550",
+      "name": "_TFrmMain_GateSocketClientDisconnect",
+      "size": 32
+    },
+    {
+      "ea": "0x4e6570",
+      "name": "_TFrmMain_GateSocketClientError",
+      "size": 37
+    },
+    {
+      "ea": "0x4e6598",
+      "name": "_TFrmMain_GateSocketClientRead",
+      "size": 32
+    },
+    {
+      "ea": "0x4e65f0",
+      "name": "_TFrmMain_DBSocketConnect",
+      "size": 19
+    },
+    {
+      "ea": "0x4e6604",
+      "name": "_TFrmMain_DBSocketDisconnect",
+      "size": 19
+    },
+    {
+      "ea": "0x4e6618",
+      "name": "_TFrmMain_DBSocketError",
+      "size": 36
+    },
+    {
+      "ea": "0x4e663c",
+      "name": "_TFrmMain_DBSocketRead",
+      "size": 167
+    },
+    {
+      "ea": "0x4e676c",
+      "name": "_TFrmMain_TCloseTimerTimer",
+      "size": 52
+    }
+  ]
+}

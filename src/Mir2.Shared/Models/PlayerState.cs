@@ -105,6 +105,16 @@ public sealed class PlayerState
     public bool IsGrayName { get; set; }
     public long GrayNameExpireTick { get; set; }
 
+    // 官方 1.4/1.5 M2Server 物理真值字段 (IDA sub_4C1EF4 & sub_4D1E54)
+    public byte AttackMode { get; set; } = 0; // 0=全体, 1=和平, 2=组队, 3=行会, 4=善恶 (+0x2A1)
+    public byte Hit { get; set; } = 15; // 准确 Accuracy (+0x23C)
+    public byte Speed { get; set; } = 15; // 敏捷 Agility (+0x26C)
+    public byte AntiPoison { get; set; } = 0; // 抗毒抗麻 (+0x24A)
+    public bool BoAttackKill { get; set; } // 攻杀剑气蓄力 (+0x52C)
+    public bool BoFireHit { get; set; } // 烈火剑法火焰蓄力 (+0x52F)
+    public byte HitPlus { get; set; } = 5; // 攻杀附加伤害 (+0x23D)
+    public byte FireHitPlus { get; set; } = 14; // 烈火系数 (+0x23E)
+
     // 官方 9 大装备槽位数组
     public EquipItem?[] Equipment { get; } = new EquipItem?[9];
 

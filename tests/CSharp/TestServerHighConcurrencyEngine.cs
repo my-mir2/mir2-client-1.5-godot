@@ -299,6 +299,8 @@ public class TestServerHighConcurrencyEngine
             Assert.Contains("/200/200/", rollbackResp); // 坐标未被篡改，依然是 200, 200
 
             // 2. 战士 A 发起普通挥刀 CM_HIT (3014) 朝向 1
+            while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
+
             byte[] hitPkt = Encoding.UTF8.GetBytes("#3014/201/200/1!");
             await streamA.WriteAsync(hitPkt);
             await streamA.FlushAsync();
@@ -450,6 +452,75 @@ public class TestServerHighConcurrencyEngine
 
             // 合法可行走路径，移动成功
             // 实体自身在本地进行前推预测，同屏其他实体收到 SM_OBJECTWALK
+        }
+        finally
+        {
+            tickEngine.Stop();
+            gateway.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task TestE2E_OfficialM2_AttackMode_And_CombatTruth()
+    {
+        int testPort = 17007;
+        var mapManager = new Mir2.Server.Maps.MapManager();
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(mapManager);
+        var gateway = new TcpGateway(testPort);
+        gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.Start();
+
+        var tickEngine = new GameWorldTick(gateway);
+        tickEngine.Start();
+
+        try
+        {
+            using var clientA = new System.Net.Sockets.TcpClient();
+            await clientA.ConnectAsync("127.0.0.1", testPort);
+            var streamA = clientA.GetStream();
+            await streamA.WriteAsync(Encoding.UTF8.GetBytes("#103/战士A/200/200!"));
+            await streamA.FlushAsync();
+
+            using var clientB = new System.Net.Sockets.TcpClient();
+            await clientB.ConnectAsync("127.0.0.1", testPort);
+            var streamB = clientB.GetStream();
+            await streamB.WriteAsync(Encoding.UTF8.GetBytes("#103/平民B/201/200!"));
+            await streamB.FlushAsync();
+
+            await Task.Delay(200);
+
+            byte[] flushBuf = new byte[4096];
+            while (streamA.DataAvailable) _ = await streamA.ReadAsync(flushBuf, 0, flushBuf.Length);
+            while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
+
+            // 1. 发送 @AttackMode 切换指令 (从默认 0=全体 切换为 1=和平模式 [Mode: Peaceful])
+            byte[] modePkt = Encoding.UTF8.GetBytes("#3030/@AttackMode!");
+            await streamA.WriteAsync(modePkt);
+            await streamA.FlushAsync();
+
+            await Task.Delay(150);
+
+            Assert.True(streamA.DataAvailable, "切换攻击模式必须收到官方模式提示信息");
+            byte[] modeRespBuf = new byte[2048];
+            int modeRespLen = await streamA.ReadAsync(modeRespBuf, 0, modeRespBuf.Length);
+            string modeResp = Encoding.UTF8.GetString(modeRespBuf, 0, modeRespLen);
+            Assert.Contains("[Mode: Peaceful]", modeResp); // 1:1 对齐官方 IDA 0x4D1E54 字符串
+
+            // 2. 和平模式下物理攻击无辜白名平民 B -> 必须被拦截，平民 B 绝不能收到任何受击扣血包
+            byte[] hitPkt = Encoding.UTF8.GetBytes("#3014/201/200/1!");
+            await streamA.WriteAsync(hitPkt);
+            await streamA.FlushAsync();
+
+            await Task.Delay(150);
+
+            // 平民 B 收到挥刀动作 (SM_OBJECTHIT 242)，但坚决不能收到受击后仰 (SM_OBJECTSTRUCK 244)
+            if (streamB.DataAvailable)
+            {
+                byte[] hitRecvBuf = new byte[2048];
+                int hitRecvLen = await streamB.ReadAsync(hitRecvBuf, 0, hitRecvBuf.Length);
+                string hitRecvStr = Encoding.UTF8.GetString(hitRecvBuf, 0, hitRecvLen);
+                Assert.DoesNotContain($"#{ProtocolConsts.SM_OBJECTSTRUCK}/", hitRecvStr);
+            }
         }
         finally
         {

@@ -1,0 +1,111 @@
+# 官方 1.4/1.5 M2Server IDA Pro 9.4 物理真值总账本 (M2Server Ground Truth Table)
+
+> **基准二进制**：`D:\vbcoding\mir2\欧洲官方-14Server\korea\Mir200\M2Server.exe` (1,168,384 字节, Delphi 编译, 2004-04-28)  
+> **IDA 数据库**：`M2Server.exe.i64` (21.45 MB)  
+> **反编译源码**：`docs/ida_evidence/m2server/m2_combat_engine_decompiled.c` (874 KB, 27,443 行 Hex-Rays C 代码)  
+> **唯一准绳**：100% 依据官方二进制 Delphi 物理地址与结构体字段偏移，拒绝任何私服凭空假设与二手经验。
+
+---
+
+## 1. 核心生物对象 (`TCreature` / `TPlayObject`) 内存布局与字段偏移大账本
+
+通过 Hex-Rays 反编译 `sub_4C1EF4` (`TCreature._Attack`) 与 `sub_4D1E54` (`TPlayObject.Command`) 提取的绝对物理偏移：
+
+| 物理偏移 (Hex) | 物理偏移 (Dec) | 数据类型 | 变量名 / 含义 | 权威 IDA 实证与调用点 |
+| :--- | :--- | :--- | :--- | :--- |
+| `+0x034` | 52 | `byte` | `Level` (角色等级) | `sub_4C1EF4` @ L12744: 升级与技能修炼资格比对 |
+| `+0x198` | 408 | `struct` | `WAbility` (四维基础属性) | `sub_4C1EF4` @ L12616: 读取攻击、防御、魔御 |
+| `+0x19E` | 414 | `word` | `DC` (当前物攻上下限) | `sub_4C1EF4` @ L12618: 读取 DCMin/DCMax |
+| `+0x1A4` | 420 | `word` | `HP` (当前生命值) | `sub_4C1EF4` @ L12724: 受击扣血广播参数 |
+| `+0x1A8` | 424 | `word` | `MaxHP` (最大生命值) | `sub_4C1EF4` @ L12725: 血量百分比与同步 |
+| `+0x1DE` | 478 | `byte` | `HitPoint` (准确度修正) | `sub_4C1EF4` @ L12714: 伤害随机浮动减免 |
+| `+0x23A` | 570 | `byte` | `Race` (种族/职业) | `sub_4C1EF4` @ L12654: 0x32=怪物或特定职业判定 |
+| `+0x23C` | 572 | `byte` | `Hit` (攻击准确 Accuracy) | `sub_4C1EF4` @ L12704: `RandInt(Agility) >= Hit` 则 Miss |
+| `+0x23D` | 573 | `byte` | `HitPlus` (攻杀剑术附加伤害) | `sub_4C1EF4` @ L12624: 攻杀触发时 `v25 += HitPlus` |
+| `+0x23E` | 574 | `byte` | `FireHitPlus` (烈火爆发系数) | `sub_4C1EF4` @ L12631: 烈火触发时 `v17 = 10 * FireHitPlus` |
+| `+0x24A` | 586 | `byte` | `AntiPoison` (抗毒/抗麻痹点数) | `sub_4C1EF4` @ L12729: `RandInt(AntiPoison + 5) == 0` |
+| `+0x26C` | 620 | `byte` | `Speed` (防守方敏捷 Agility) | `sub_4C1EF4` @ L12704: `RandInt(Speed) >= Hit` 判定闪避 |
+| `+0x27E` | 638 | `byte` | `AllowGuildChat` (行会聊天开关) | `sub_4D1E54` @ L19153: 异或 1 翻转行会聊天接受状态 |
+| `+0x2A0` | 672 | `byte` | `boPetRest` (宠物休息开关) | `sub_4D1E54` @ L19197: 异或 1 切换宠物休息/战斗状态 |
+| `+0x2A1` | 673 | `byte` | `btAttackMode` (PK 模式) | `sub_4D1E54` @ L19167: 0=全体, 1=和平, 2=组队, 3=行会, 4=善恶 |
+| `+0x34C` | 844 | `byte` | `boParalysisRing` (麻痹戒指激活) | `sub_4C1EF4` @ L12729: 麻痹戒指麻痹判定触发标志 |
+| `+0x3A8` | 936 | `int` | `nLeechWeight` (虹魔吸血比率) | `sub_4C1EF4` @ L12731: 吸血比率与蓄力池计算 |
+| `+0x3B0` | 944 | `double`| `dLifestealAccum` (吸血浮点蓄力池) | `sub_4C1EF4` @ L12733: `Accum += dmg / 100.0 * Leech; Trunc()` |
+| `+0x524` | 1316 | `ptr` | `HalfMoonMagic` (半月弯刀法术指针)| `sub_4C1EF4` @ L12677: 半月剑气伤害计算与横扫 |
+| `+0x52C` | 1324 | `byte` | `boAttackKill` (攻杀剑术蓄力标志) | `sub_4C1EF4` @ L12621: 挥刀消耗攻杀剑气 |
+| `+0x52F` | 1327 | `byte` | `boFireHit` (烈火剑法蓄力标志) | `sub_4C1EF4` @ L12627: 挥刀消耗烈火火焰并造成巨额伤害 |
+
+---
+
+## 2. 核心战斗逻辑算法真值 (TCreature._Attack @ 0x4C1EF4)
+
+### 2.1 物理命中与闪避判定的物理实现
+```c
+// IDA 0x4C1EF4 @ L12704
+if ( RandInt(Defender->Speed) >= Attacker->Hit ) {
+    Damage = 0; // 攻击落空 (Miss)
+}
+```
+- **物理事实**：防守方敏捷作为 `RandInt` 的上限；若生成的随机值大于等于攻击方准确，判定为攻击未击中，伤害直接置为 0，不广播受击后仰动画！
+
+### 2.2 战士三大剑术附加结算
+- **攻杀剑术 (Skill ID = 3)**：
+  当 `boAttackKill (0x52C)` 为 1 时：
+  ```c
+  boAttackKill = 0;
+  Damage += HitPlus; // 附加 0x23D 偏移处的攻杀技能增伤
+  ```
+- **烈火剑法 (Skill ID = 7)**：
+  当 `boFireHit (0x52F)` 为 1 时：
+  ```c
+  boFireHit = 0;
+  int multiplier = 10 * FireHitPlus; // 例如 0级=14, 1级=18, 2级=22, 3级=26 -> 140%..260%
+  Damage += ROUND((double)Damage / 100.0 * (double)multiplier);
+  ```
+- **刺杀剑术第二格破防 (Skill ID = 4)**：
+  当打击第二格时，跳过第一格受击，按等级比率计算穿透直接伤害，**无视防守方防御与魔法盾**！
+
+### 2.3 特戒权威概率实证
+- **麻痹戒指**：
+  ```c
+  // 0x4C1EF4 @ L12729
+  if ( boParalysisRing && RandInt(Defender->AntiPoison + 5) == 0 ) {
+      ApplyParalysis(Defender); // 1 / (AntiPoison + 5) 绝对概率
+  }
+  ```
+- **虹魔吸血**：
+  ```c
+  // 0x4C1EF4 @ L12733
+  dLifestealAccum += (double)Damage / 100.0 * (double)nLeechWeight;
+  if ( dLifestealAccum >= 1.0 ) {
+      int heal = TRUNC(dLifestealAccum);
+      dLifestealAccum -= heal;
+      HealHp(Attacker, heal);
+  }
+  ```
+
+---
+
+## 3. PK 模式权威状态机 (TPlayObject.Command @ 0x4D1E54)
+
+| 模式编号 (`btAttackMode`) | 官方模式名称 | 逻辑判定规则 |
+| :---: | :--- | :--- |
+| `0` | `[Mode: Attack All]` (全体攻击) | 允许攻击视野内任意非安全区玩家与生物 |
+| `1` | `[Mode: Peaceful]` (和平模式) | 严禁主动物理/魔法锁定任何普通玩家 |
+| `2` | `[Mode: Group Attack]` (组队攻击) | 免疫同一队伍队友，可攻击其他玩家 |
+| `3` | `[Mode: Guild Attack]` (行会攻击) | 免疫同一行会与联盟行会成员，可攻击敌对行会 |
+| `4` | `[Mode: Red/White Name]` (善恶模式) | 允许攻击红名玩家（PK >= 200），保护白名无辜玩家 |
+
+---
+
+## 4. 关键函数物理地址对照表
+
+| 函数地址 (Hex) | 函数大小 | 官方模块 | 函数名 / 职责说明 |
+| :--- | :--- | :--- | :--- |
+| `0x4C1EF4` | 2202 字节 | `TCreature` | `TCreature._Attack` (物理攻击核心结算、命中判定、剑法附加、特戒触发) |
+| `0x4BDD20` | 324 字节 | `TCreature` | `TCreature.StruckDamage` (受击减伤抵扣、魔法盾吸收) |
+| `0x4D1E54` | 5178 字节 | `TPlayObject` | `TPlayObject.Command` (玩家指令解释器、PK模式切换、宠物控制) |
+| `0x4AE174` | 字符串 | `TUserEngine` | `TUserEngine.RegenMonsters` (全服怪物刷新心跳) |
+| `0x4B0A60` | 字符串 | `TUserEngine` | `TUserEngine.MakeNewHuman` (玩家登入实体实例化与属性装载) |
+| `0x4B87C4` | 890 字节 | `TUserEngine` | `TUserEngine.SendDefMessage` (官方封包封装与网络投递) |
+
