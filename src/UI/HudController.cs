@@ -183,6 +183,7 @@ public partial class HudController : CanvasLayer
     private readonly string[] _quickSlotItems = new string[6];
     private readonly int[] _quickSlotAmounts = new int[6];
     public event Action<int, string>? QuickItemUsed;
+    private long _lastEatTick = 0; // 盛大官方 1.5 IDA sub_48E33C / sub_48C188 吃药 200ms 全局防连点时钟
 
     // 官方 1.5 HUD 右下角弧形 4 按键 (底板已自带暗色按键，常态 TextureNormal 为空，按下或对应面板激活时显示高亮贴图)
     private TextureButton? _btnHudBag;
@@ -1301,6 +1302,10 @@ public partial class HudController : CanvasLayer
     {
         if (slot < 0 || slot >= 6) return;
         if (_quickSlotAmounts[slot] <= 0 || string.IsNullOrEmpty(_quickSlotItems[slot])) return;
+
+        long nowTick = System.Environment.TickCount64;
+        if (nowTick - _lastEatTick < 200) return; // 盛大官方 1.5 200ms 吃药冷却节流防连点 (IDA sub_48C188)
+        _lastEatTick = nowTick;
 
         if (IsDead)
         {
@@ -3475,6 +3480,10 @@ public partial class HudController : CanvasLayer
     public void ConsumeBagItem(int bagSlot, string itemName)
     {
         if (bagSlot < 0 || bagSlot >= 40) return;
+
+        long nowTick = System.Environment.TickCount64;
+        if (nowTick - _lastEatTick < 200) return; // 盛大官方 1.5 200ms 吃药冷却节流防连点 (IDA sub_48E33C)
+        _lastEatTick = nowTick;
 
         if (IsDead)
         {

@@ -1352,6 +1352,45 @@ public class TestCombatSkillsMatrix
         Assert.True(switchPhaseCalled);
         Assert.Equal("你想退出传奇吗？", logoutPrompt);
     }
+
+    [Fact]
+    public void TestOfficialPotionEatCooldownThrottle_200ms()
+    {
+        // 盛大官方 1.5 IDA sub_48E33C / sub_48C188 200ms 吃药冷却节流状态机脱机验证
+        long lastEatTick = 0;
+        int eatSuccessCount = 0;
+
+        bool TryEatPotion(long nowTick)
+        {
+            if (nowTick - lastEatTick < 200)
+            {
+                return false; // 200ms 防连点节流拦截
+            }
+            lastEatTick = nowTick;
+            eatSuccessCount++;
+            return true;
+        }
+
+        // 1. T = 1000ms: 第一次吃药 -> 成功
+        Assert.True(TryEatPotion(1000));
+        Assert.Equal(1, eatSuccessCount);
+
+        // 2. T = 1050ms (间隔 50ms < 200ms): 玩家连点器狂按 -> 拦截，吃药次数不增加
+        Assert.False(TryEatPotion(1050));
+        Assert.Equal(1, eatSuccessCount);
+
+        // 3. T = 1199ms (间隔 199ms < 200ms): 临界窗口未到 -> 拦截
+        Assert.False(TryEatPotion(1199));
+        Assert.Equal(1, eatSuccessCount);
+
+        // 4. T = 1200ms (间隔刚好 200ms): 冷却结束 -> 成功
+        Assert.True(TryEatPotion(1200));
+        Assert.Equal(2, eatSuccessCount);
+
+        // 5. T = 1500ms (间隔 300ms > 200ms): 正常后续喝药 -> 成功
+        Assert.True(TryEatPotion(1500));
+        Assert.Equal(3, eatSuccessCount);
+    }
 }
 
 

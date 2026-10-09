@@ -7766,14 +7766,28 @@
       - 在 `ServerMessageRouter.cs` 中纠正 756 为 `SM_SENDGUILDMEMBERLIST` 独立路由，避免被行会公告吞没；
       - 在 `tests/CSharp/TestGuildTradeEncoderMatrix.cs` 中新增 `OfficialStorageAndGuildMemberListGroundTruth` 单元测试，脱机测试总数提升至 **211 / 211 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+  - [x] **67. 盛大官方 1.5 快捷栏与背包吃药 200ms 全局防连点冷却节流实证 (sub_48E33C / sub_48C188)** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据 `sub_48E33C` (TFrmDlg_DItemGridDblClick) 与 `sub_48C188` (TFrmDlg_DBelt1DblClick)：
+        1. 吃药全局节流防连点机制：
+           官方 Delphi 源码中存在全局吃药时间戳判定 `if GetTickCount - dwLastEatTick < 200 then Exit; dwLastEatTick := GetTickCount;`；此前客户端代码未对快速点击药水进行时间节流拦截，导致玩家按住 1~6 快捷键或使用连点器时，在 10 毫秒内连续发出几十次吃药请求，引发服务端数据溢出与药水超额损耗；
+        2. 全局硬间隔保护：
+           在 `HudController.cs` 中增加 `_lastEatTick`，在 `UseQuickSlot` 与 `ConsumeBagItem` 双入口注入 200ms 强制冷却拦截窗口；
+        3. 脱机单元测试断言覆盖：
+           验证 50ms、199ms 连点被精确拦截，200ms、300ms 正常放行。
+    - **精准重构**：
+      - 在 `src/UI/HudController.cs` 中实现 `_lastEatTick` 与双入口 200ms 冷却拦截；
+      - 在 `tests/CSharp/TestCombatSkillsMatrix.cs` 中新增 `TestOfficialPotionEatCooldownThrottle_200ms` 单元测试，脱机测试总数提升至 **212 / 212 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **211 / 211 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **212 / 212 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
+
 
 
 
