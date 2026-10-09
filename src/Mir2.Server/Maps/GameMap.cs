@@ -228,6 +228,19 @@ public sealed class GameMap
         }
     }
 
+    public List<GroundItemEntity> GetGroundItemsAt(int x, int y)
+    {
+        long key = MakeCoordKey(x, y);
+        if (_groundItems.TryGetValue(key, out var list))
+        {
+            lock (list)
+            {
+                return new List<GroundItemEntity>(list);
+            }
+        }
+        return new List<GroundItemEntity>();
+    }
+
     public (bool success, GroundItemEntity? item, string errorMsg) TryPickGroundItem(int x, int y, int sessionId, long nowMs)
     {
         long key = MakeCoordKey(x, y);

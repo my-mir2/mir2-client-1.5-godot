@@ -410,5 +410,200 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         Assert.True(cleaned >= 4);
         Assert.Empty(map.GetFireWallsAt(52, 52));
     }
+
+    [Fact]
+    public void Test_Authoritative_TakeOffItem_And_Weight_Recalculate()
+    {
+        var (mapMgr, _, _, dispatcher, map) = CreateTestEnvironment();
+
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 100,
+            Y = 100,
+            CharacterName = "测试战士",
+            State = new PlayerState
+            {
+                Job = 0,
+                Level = 35,
+                Hp = 400,
+                MaxHp = 400
+            }
+        };
+        map.Aoi.Enter(player, 100, 100);
+
+        // 穿上一把裁决之杖在武器槽位 1
+        var weapon = new EquipItem { Uid = 555, Name = "裁决之杖", Weight = 30, Dc = 30, Shape = 1 };
+        player.State.Equipment[1] = weapon;
+        player.State.RecalculateAuthoritativeWeights();
+        player.State.RecalculateAttributes();
+
+        int initialDc = player.State.MaxDc;
+        int initialBagWeight = player.State.BagWeight;
+
+        // 发送脱下武器请求 (CM_TAKEOFFITEM = 1004 / 1005: 槽位 1)
+        dispatcher.Dispatch(player, "#1004/1/!");
+
+        // 1. 验证武器槽位已空
+        Assert.Null(player.State.Equipment[1]);
+
+        // 2. 验证武器进入背包，背包负重增加 30
+        Assert.Single(player.State.BagItems);
+        Assert.Equal("裁决之杖", player.State.BagItems[0].Name);
+        Assert.Equal(initialBagWeight + 30, player.State.BagWeight);
+
+        // 3. 验证攻击力扣除了武器的 30 点
+        Assert.Equal(initialDc - 30, player.State.MaxDc);
+
+        // 4. 验证下发了 SM_TAKEOFF_OK (619) 与 SM_ABILITY (648)
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_TAKEOFF_OK}/"));
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_ABILITY}/"));
+
+        // 5. 边界用例：将背包塞满 40 格，尝试卸下衣服，验证拒绝
+        for (int i = 0; i < 39; i++)
+        {
+            player.State.BagItems.Add(new EquipItem { Uid = 1000 + i, Name = "回城卷", Weight = 1 });
+        }
+        Assert.Equal(40, player.State.BagItems.Count); // 背包已满 40 格
+
+        player.State.Equipment[0] = new EquipItem { Uid = 888, Name = "重盔甲", Weight = 23, Ac = 5 };
+        dispatcher.Dispatch(player, "#1004/0/!");
+
+        // 依然穿在身上，卸下失败
+        Assert.NotNull(player.State.Equipment[0]);
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_TAKEOFF_FAIL}/"));
+    }
+
+    [Fact]
+    public void Test_Authoritative_DropItem_And_DropGold_To_Ground()
+    {
+        var (mapMgr, _, _, dispatcher, map) = CreateTestEnvironment();
+
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 120,
+            Y = 120,
+            CharacterName = "土豪玩家",
+            State = new PlayerState
+            {
+                Level = 30,
+                Gold = 10000
+            }
+        };
+        map.Aoi.Enter(player, 120, 120);
+
+        player.State.BagItems.Add(new EquipItem { Uid = 9999, Name = "天魔神甲", Weight = 23, Shape = 2 });
+        player.State.RecalculateAuthoritativeWeights(player.State.Gold);
+
+        // 1. 丢弃背包槽位 0 的天魔神甲 (CM_DROPITEM = 1000)
+        dispatcher.Dispatch(player, "#1000/0/!");
+
+        Assert.Empty(player.State.BagItems);
+        var groundDrops = map.GetGroundItemsAt(120, 120);
+        Assert.Single(groundDrops);
+        Assert.Equal("天魔神甲", groundDrops[0].Name);
+        Assert.Equal(0, groundDrops[0].OwnerSessionId); // 自由拾取
+
+        // 2. 丢弃 3000 金币 (CM_DROPGOLD = 1016)
+        dispatcher.Dispatch(player, "#1016/3000/!");
+
+        Assert.Equal(7000, player.State.Gold);
+        groundDrops = map.GetGroundItemsAt(120, 120);
+        Assert.Equal(2, groundDrops.Count);
+        Assert.Equal("金币", groundDrops[1].Name);
+    }
+
+    [Fact]
+    public void Test_Authoritative_AdjustBonus_Points()
+    {
+        var (mapMgr, _, _, dispatcher, map) = CreateTestEnvironment();
+
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 100,
+            Y = 100,
+            CharacterName = "加点勇士",
+            State = new PlayerState
+            {
+                Job = 0,
+                Level = 20,
+                BonusPoint = 3,
+                Dc = 10,
+            }
+        };
+        map.Aoi.Enter(player, 100, 100);
+        player.State.RecalculateAttributes();
+        int prevMaxDc = player.State.MaxDc;
+
+        // 分配 1 点到物理攻击 DC (CM_ADJUST_BONUS = 1043: bonusType = 0)
+        dispatcher.Dispatch(player, "#1043/0/!");
+
+        Assert.Equal(2, player.State.BonusPoint);
+        Assert.Equal(prevMaxDc + 1, player.State.MaxDc);
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_ABILITY}/"));
+    }
+
+    [Fact]
+    public void Test_Authoritative_KillMonster_GainExp_And_LevelUp()
+    {
+        var (mapMgr, regen, _, dispatcher, map) = CreateTestEnvironment();
+
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 200,
+            Y = 200,
+            CharacterName = "升级狂人",
+            State = new PlayerState
+            {
+                Job = 0,
+                Level = 1,
+                Exp = 0,
+                Hp = 19,
+                MaxHp = 19
+            }
+        };
+        map.Aoi.Enter(player, 200, 200);
+
+        // 刷新一只 100 血的钉耙猫在 (201, 200)，击杀将提供 200 经验
+        // 1 级升 2 级仅需 100 经验，将触发连级升级并重算属性
+        regen.AddRule(new MonsterSpawnRule
+        {
+            RuleId = 1,
+            MonsterName = "钉耙猫",
+            MapId = 0,
+            CenterX = 201,
+            CenterY = 200,
+            Radius = 0,
+            MaxCount = 1,
+            BaseHp = 100
+        });
+        regen.ProcessRegenTick(new OfficialClientRulesEngine.DelphiRandom(1));
+        var cat = regen.FindMonsterAt(0, 201, 200);
+        Assert.NotNull(cat);
+
+        // 战士一刀将其打残并秒杀 (模拟高额一击)
+        cat.Hp = 1;
+        // 战士向右挥刀 CM_HIT (3014): 朝向 2, targetX = 201, targetY = 200
+        dispatcher.Dispatch(player, "#3014/201/200/2/!");
+
+        // 验证怪物死亡
+        Assert.Null(regen.FindMonsterAt(0, 201, 200));
+
+        // 验证玩家获得经验并升到 2 级 (100经验升级，剩余 100 经验)
+        Assert.Equal(2, player.State.Level);
+        Assert.Equal(100, player.State.Exp);
+
+        // 验证升级后生命上限提升且满血
+        Assert.True(player.State.MaxHp > 19);
+        Assert.Equal(player.State.MaxHp, player.State.Hp);
+
+        // 验证下发了升级光效广播与经验通知
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_LEVELUP_DELPHI}/"));
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_EXPERIENCE}/"));
+    }
 }
+
 

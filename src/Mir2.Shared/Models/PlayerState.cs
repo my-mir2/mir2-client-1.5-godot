@@ -117,6 +117,27 @@ public sealed class PlayerState
     public byte HitPlus { get; set; } = 5; // 攻杀附加伤害 (+0x23D)
     public byte FireHitPlus { get; set; } = 14; // 烈火系数 (+0x23E)
 
+    // 角色当前总攻防属性 (基础成长 + 全量装备附加 + 试刀加成)
+    public int Dc { get; set; } = 5;
+    public int MaxDc { get; set; } = 10;
+    public int Mc { get; set; } = 0;
+    public int MaxMc { get; set; } = 0;
+    public int Sc { get; set; } = 0;
+    public int MaxSc { get; set; } = 0;
+    public int Ac { get; set; } = 0;
+    public int MaxAc { get; set; } = 0;
+    public int Mac { get; set; } = 0;
+    public int MaxMac { get; set; } = 0;
+
+    // 玩家自由分配的加点属性 (通过 CM_ADJUST_BONUS 1043 永久附加)
+    public int BonusDc { get; set; } = 0;
+    public int BonusMc { get; set; } = 0;
+    public int BonusSc { get; set; } = 0;
+    public int BonusAc { get; set; } = 0;
+    public int BonusMac { get; set; } = 0;
+    public int BonusHp { get; set; } = 0;
+    public int BonusMp { get; set; } = 0;
+
     // ==================== 官方 1.5 战法道权威物理判定引擎实例 ====================
     public WarriorCombatEngine.FireHitTracker FireHitTracker { get; } = new();
     public WarriorCombatEngine.StabbingTracker StabbingTracker { get; } = new();
@@ -299,6 +320,32 @@ public sealed class PlayerState
         // 8. 祈祷套装检测
         var ps = SpecialRings.CheckPrayerSet(Equipment);
         HasPrayerSet = ps.isFullSet;
+
+        // 9. 累加全量装备属性与职业基础成长
+        int sumAc = 0, sumMac = 0, sumDc = 0, sumMc = 0, sumSc = 0;
+        for (int i = 0; i < 9; i++)
+        {
+            var eq = Equipment[i];
+            if (eq == null || (eq.MaxDura > 0 && eq.Dura <= 0)) continue;
+            sumAc += eq.Ac;
+            sumMac += eq.Mac;
+            sumDc += eq.Dc;
+            sumMc += eq.Mc;
+            sumSc += eq.Sc;
+        }
+
+        int baseMinDc = Job == 0 ? 5 + Level / 3 : 2;
+        int baseMaxDc = Job == 0 ? 10 + Level : 4;
+        Dc = baseMinDc + sumDc + BonusDc;
+        MaxDc = baseMaxDc + sumDc + BonusDc;
+        Mc = (Job == 1 ? 2 + Level / 3 : 0) + sumMc + BonusMc;
+        MaxMc = (Job == 1 ? 5 + Level : 0) + sumMc + BonusMc;
+        Sc = (Job == 2 ? 2 + Level / 3 : 0) + sumSc + BonusSc;
+        MaxSc = (Job == 2 ? 5 + Level : 0) + sumSc + BonusSc;
+        Ac = sumAc + BonusAc;
+        MaxAc = sumAc + BonusAc;
+        Mac = sumMac + BonusMac;
+        MaxMac = sumMac + BonusMac;
     }
 
     /// <summary>
@@ -686,5 +733,63 @@ public sealed class PlayerState
     public bool CheckCanEquipAuthoritative(OfficialEquipSlot slot, int itemWeight, out string reason)
     {
         return WeightConstraintEngine.CheckCanEquip(Level, Job, (int)slot, itemWeight, WearWeight, out reason);
+    }
+
+    public long Exp { get; set; } = 0;
+    public long MaxExp => ExpTable.ExpForLevel(Level);
+    public int BonusPoint { get; set; } = 0;
+
+    /// <summary>
+    /// 盛大官方 1.5 权威生命与魔法基础上限成长计算 (按职业与等级)
+    /// </summary>
+    public void RecalculateBaseHpMp()
+    {
+        switch (Job)
+        {
+            case 0: // 战士
+                BaseMaxHp = 19 + (int)((Level - 1) * 4.5);
+                BaseMaxMp = 14 + (Level - 1) * 2;
+                break;
+            case 1: // 法师
+                BaseMaxHp = 14 + (int)((Level - 1) * 1.8);
+                BaseMaxMp = 19 + (int)((Level - 1) * 9.5);
+                break;
+            case 2: // 道士
+                BaseMaxHp = 17 + (int)((Level - 1) * 3.0);
+                BaseMaxMp = 17 + (int)((Level - 1) * 6.0);
+                break;
+            default:
+                BaseMaxHp = 20 + Level * 3;
+                BaseMaxMp = 20 + Level * 3;
+                break;
+        }
+
+        RecalculateAuthoritativeWeights(Gold);
+        RecalculateAttributes();
+    }
+
+    /// <summary>
+    /// 经验获取与连续升级权威判定
+    /// </summary>
+    public bool GainExp(long amount)
+    {
+        if (amount <= 0) return false;
+        Exp += amount;
+        bool leveledUp = false;
+        while (Level < ExpTable.NeedExp.Length - 1 && Exp >= ExpTable.ExpForLevel(Level))
+        {
+            Exp -= ExpTable.ExpForLevel(Level);
+            Level++;
+            BonusPoint += 3; // 每升一级给予 3 点自由属性点
+            leveledUp = true;
+        }
+
+        if (leveledUp)
+        {
+            RecalculateBaseHpMp();
+            Hp = MaxHp;
+            Mp = MaxMp;
+        }
+        return leveledUp;
     }
 }

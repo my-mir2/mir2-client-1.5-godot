@@ -23,6 +23,7 @@ public sealed class PacketDispatcher
     public TradeEngine? TradeEngine { get; set; }
     public GroupEngine GroupEngine { get; set; } = new();
     public GuildEngine GuildEngine { get; set; } = new();
+    private int _nextGroundItemUid = 10000;
 
     public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null, TradeEngine? tradeEngine = null, GroupEngine? groupEngine = null, GuildEngine? guildEngine = null)
     {
@@ -159,7 +160,6 @@ public sealed class PacketDispatcher
                 break;
 
             case ProtocolConsts.CM_USERSTORAGEWITHDRAW: // 1032 取回仓库物品
-            case 1016: // CM_TAKEOUTSTORAGE 官方 1.4/1.5
                 HandleStorageWithdraw(session, remaining);
                 break;
 
@@ -189,6 +189,23 @@ public sealed class PacketDispatcher
 
             case ProtocolConsts.CM_WEARITEM: // 1003 官方穿戴装备 (负重与腕力权威校验)
                 HandleWearItemPacket(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_TAKEOFFITEM: // 1004 / 1005 官方脱下装备 (背包容量与负重权威校验)
+            case 1005:
+                HandleTakeOffItemPacket(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_DROPITEM: // 1000 官方丢弃物品到地面
+                HandleDropItemPacket(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_DROPGOLD: // 1016 官方丢弃金币到地面
+                HandleDropGoldPacket(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_ADJUST_BONUS: // 1007 官方属性加点
+                HandleAdjustBonusPacket(session, remaining);
                 break;
 
             case ProtocolConsts.CM_GROUPMODE: // 1019 组队模式切换
@@ -436,6 +453,8 @@ public sealed class PacketDispatcher
         if (slash2 < 0) return;
         ReadOnlySpan<char> ySpan = rest[..slash2];
         ReadOnlySpan<char> dirSpan = rest[(slash2 + 1)..];
+        int slash3 = dirSpan.IndexOf('/');
+        if (slash3 >= 0) dirSpan = dirSpan[..slash3];
 
         if (int.TryParse(xSpan, out int targetX) &&
             int.TryParse(ySpan, out int targetY) &&
@@ -551,6 +570,7 @@ public sealed class PacketDispatcher
                             };
                             hitMap.AddGroundItem(loot);
                             BroadcastToNinePatch(session, ProtocolConsts.SM_GROUNDITEM, loot.Uid, monster.X, monster.Y, 0, loot.Name, includeSelf: true);
+                            OnMonsterKilledByPlayer(session, monster);
                         }
                     }
                 }
@@ -1936,6 +1956,7 @@ public sealed class PacketDispatcher
                         {
                             RegenEngine.OnMonsterDied(m.Uid);
                             BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, m.Uid, m.X, m.Y, 0, m.Name, includeSelf: true);
+                            OnMonsterKilledByPlayer(session, m);
                         }
                     }
                 }
@@ -1995,6 +2016,7 @@ public sealed class PacketDispatcher
                         {
                             RegenEngine.OnMonsterDied(m.Uid);
                             BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, m.Uid, m.X, m.Y, 0, m.Name, includeSelf: true);
+                            OnMonsterKilledByPlayer(session, m);
                         }
                     }
                 }
@@ -2135,6 +2157,7 @@ public sealed class PacketDispatcher
                 if (success)
                 {
                     session.EnqueuePacket(ProtocolConsts.SM_TAKEON_OK, session.SessionId, equipSlot, 0, 0);
+                    SendAbility(session);
                 }
                 else
                 {
@@ -2142,6 +2165,158 @@ public sealed class PacketDispatcher
                 }
             }
         }
+    }
+
+    private void HandleTakeOffItemPacket(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+        int slash = payload.IndexOf('/');
+        if (slash >= 0) payload = payload[..slash];
+        if (!byte.TryParse(payload, out byte slot) || slot >= 9) return;
+
+        var equip = session.State.Equipment[slot];
+        if (equip == null)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_TAKEOFF_FAIL, session.SessionId, slot, 0, 0);
+            return;
+        }
+
+        // 校验背包是否有空间 (40格上限)
+        if (session.State.BagItems.Count >= 40)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "背包已满，无法卸下装备");
+            session.EnqueuePacket(ProtocolConsts.SM_TAKEOFF_FAIL, session.SessionId, slot, 0, 0);
+            return;
+        }
+
+        // 校验背包负重 (卸下后放入背包)
+        if (session.State.BagWeight + equip.Weight > session.State.MaxBagWeight)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "背包负重不足，无法卸下装备");
+            session.EnqueuePacket(ProtocolConsts.SM_TAKEOFF_FAIL, session.SessionId, slot, 0, 0);
+            return;
+        }
+
+        session.State.Equipment[slot] = null;
+        session.State.BagItems.Add(equip);
+        session.State.RecalculateAuthoritativeWeights(session.State.Gold);
+        session.State.RecalculateAttributes();
+
+        session.EnqueuePacket(ProtocolConsts.SM_TAKEOFF_OK, session.SessionId, slot, 0, 0);
+        SendAbility(session);
+    }
+
+    private void HandleDropItemPacket(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+        // 格式: bagSlot 或 bagSlot/count
+        int slash = payload.IndexOf('/');
+        ReadOnlySpan<char> slotSpan = slash >= 0 ? payload[..slash] : payload;
+        if (!int.TryParse(slotSpan, out int bagSlot) || bagSlot < 0 || bagSlot >= session.State.BagItems.Count)
+        {
+            return;
+        }
+
+        var item = session.State.BagItems[bagSlot];
+        session.State.BagItems.RemoveAt(bagSlot);
+        session.State.RecalculateAuthoritativeWeights(session.State.Gold);
+        session.State.RecalculateAttributes();
+
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+        var groundItem = new GroundItemEntity
+        {
+            Uid = System.Threading.Interlocked.Increment(ref _nextGroundItemUid),
+            Name = item.Name,
+            X = session.X,
+            Y = session.Y,
+            OwnerSessionId = 0, // 玩家主动丢弃，无归属保护期
+            DropTickMs = Environment.TickCount64,
+            Weight = item.Weight
+        };
+        map.AddGroundItem(groundItem);
+
+        // 广播地面显示物品: SM_ITEMSHOW (625)
+        BroadcastToNinePatch(session, ProtocolConsts.SM_ITEMSHOW, groundItem.Uid, session.X, session.Y, item.Shape, item.Name, includeSelf: true);
+        SendAbility(session);
+    }
+
+    private void HandleDropGoldPacket(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+        int slash = payload.IndexOf('/');
+        if (slash >= 0) payload = payload[..slash];
+        if (!int.TryParse(payload, out int amount) || amount <= 0 || session.State.Gold < amount)
+        {
+            return;
+        }
+
+        session.State.Gold -= amount;
+        session.State.RecalculateAuthoritativeWeights(session.State.Gold);
+
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+        var goldEntity = new GroundItemEntity
+        {
+            Uid = System.Threading.Interlocked.Increment(ref _nextGroundItemUid),
+            Name = "金币",
+            X = session.X,
+            Y = session.Y,
+            OwnerSessionId = 0,
+            DropTickMs = Environment.TickCount64,
+            Weight = Math.Max(1, amount / 1000)
+        };
+        map.AddGroundItem(goldEntity);
+
+        BroadcastToNinePatch(session, ProtocolConsts.SM_ITEMSHOW, goldEntity.Uid, session.X, session.Y, 111, $"金币({amount})", includeSelf: true);
+        SendAbility(session);
+    }
+
+    private void HandleAdjustBonusPacket(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null || session.State.BonusPoint <= 0) return;
+        // 格式: bonusType (0=DC, 1=MC, 2=SC, 3=AC, 4=MAC, 5=HP, 6=MP)
+        int slash = payload.IndexOf('/');
+        if (slash >= 0) payload = payload[..slash];
+        if (int.TryParse(payload, out int bonusType))
+        {
+            session.State.BonusPoint--;
+            switch (bonusType)
+            {
+                case 0: session.State.BonusDc++; break;
+                case 1: session.State.BonusMc++; break;
+                case 2: session.State.BonusSc++; break;
+                case 3: session.State.BonusAc++; break;
+                case 4: session.State.BonusMac++; break;
+                case 5: session.State.BonusHp += 10; session.State.Hp += 10; break;
+                case 6: session.State.BonusMp += 10; session.State.Mp += 10; break;
+            }
+            session.State.RecalculateAttributes();
+            SendAbility(session);
+        }
+    }
+
+    public void SendAbility(ClientSession session)
+    {
+        if (session.State == null) return;
+        // SM_ABILITY: level, hp, maxhp, mp, maxmp, exp, maxexp, weight, maxweight, wearweight, maxwearweight, handweight, maxhandweight
+        session.EnqueuePacket(ProtocolConsts.SM_ABILITY, session.State.Level, session.State.Hp, session.State.MaxHp, session.State.Mp,
+            $"{session.State.MaxMp}/{session.State.Exp}/{session.State.MaxExp}/{session.State.BagWeight}/{session.State.MaxBagWeight}/{session.State.WearWeight}/{session.State.MaxWearWeight}/{session.State.HandWeight}/{session.State.MaxHandWeight}/{session.State.Gold}/{session.State.BonusPoint}");
+    }
+
+    private void OnMonsterKilledByPlayer(ClientSession killer, MonsterInstance monster)
+    {
+        if (killer.State == null) return;
+        int exp = Math.Max(10, monster.MaxHp * 2);
+        bool leveled = killer.State.GainExp(exp);
+
+        killer.EnqueuePacket(ProtocolConsts.SM_EXPERIENCE, (int)killer.State.Exp, (int)killer.State.MaxExp, 0, 0);
+        killer.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"获得经验值: {exp}");
+
+        if (leveled)
+        {
+            BroadcastToNinePatch(killer, ProtocolConsts.SM_LEVELUP_DELPHI, killer.SessionId, killer.X, killer.Y, killer.State.Level, killer.CharacterName, includeSelf: true);
+            killer.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"恭喜！你升到了 {killer.State.Level} 级！");
+        }
+        SendAbility(killer);
     }
 
     #endregion

@@ -108,7 +108,7 @@ public class TestOfficialM2_MonsterCombatMatrix
     [Fact]
     public async Task TestE2E_FullCycle_PlayerKillsMonster_SpawnsLoot_And_PicksUp()
     {
-        int testPort = 17010;
+        int testPort = 29010;
         var mapManager = new MapManager();
         var regen = new MonsterRegenEngine(mapManager);
 
