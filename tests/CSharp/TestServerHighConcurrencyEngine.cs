@@ -395,4 +395,66 @@ public class TestServerHighConcurrencyEngine
             gateway.Stop();
         }
     }
+
+    [Fact]
+    public async Task TestE2E_MapObstacle_CollisionAndRollback()
+    {
+        int testPort = 17006;
+        var mapManager = new Mir2.Server.Maps.MapManager();
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(mapManager);
+        var gateway = new TcpGateway(testPort);
+        gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.Start();
+
+        var tickEngine = new GameWorldTick(gateway);
+        tickEngine.Start();
+
+        try
+        {
+            // 客户端连入比奇省 (99, 100)，紧邻水面阻挡 (100, 100)
+            using var client = new System.Net.Sockets.TcpClient();
+            await client.ConnectAsync("127.0.0.1", testPort);
+            var stream = client.GetStream();
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("#103/探索者/99/100!"));
+            await stream.FlushAsync();
+
+            await Task.Delay(200);
+
+            byte[] flushBuf = new byte[4096];
+            while (stream.DataAvailable) _ = await stream.ReadAsync(flushBuf, 0, flushBuf.Length);
+
+            // 1. 尝试向右走向水面阻挡 (100, 100, 朝向 2)
+            byte[] walkIntoWaterPkt = Encoding.UTF8.GetBytes("#3011/100/100/2!");
+            await stream.WriteAsync(walkIntoWaterPkt);
+            await stream.FlushAsync();
+
+            await Task.Delay(150);
+
+            // 服务端物理阻挡必须生效，拉回原坐标 (99, 100)
+            Assert.True(stream.DataAvailable, "撞入阻挡格子必须被服务器立即拉回");
+            byte[] rollbackBuf = new byte[2048];
+            int rollbackLen = await stream.ReadAsync(rollbackBuf, 0, rollbackBuf.Length);
+            string rollbackResp = Encoding.UTF8.GetString(rollbackBuf, 0, rollbackLen);
+            Assert.Contains($"#{ProtocolConsts.SM_SENDUSERSTATE}/", rollbackResp);
+            Assert.Contains("/99/100/", rollbackResp); // 坐标未被篡改，依然是 99, 100
+
+            // 2. 尝试向下方无阻挡的自由区域移动 (99, 101, 朝向 4)
+            await Task.Delay(600); // 移动冷却
+            while (stream.DataAvailable) _ = await stream.ReadAsync(flushBuf, 0, flushBuf.Length);
+
+            byte[] validWalkPkt = Encoding.UTF8.GetBytes("#3011/99/101/4!");
+            await stream.WriteAsync(validWalkPkt);
+            await stream.FlushAsync();
+
+            await Task.Delay(150);
+
+            // 合法可行走路径，移动成功
+            // 实体自身在本地进行前推预测，同屏其他实体收到 SM_OBJECTWALK
+        }
+        finally
+        {
+            tickEngine.Stop();
+            gateway.Stop();
+        }
+    }
 }

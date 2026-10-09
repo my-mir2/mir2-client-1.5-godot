@@ -14,6 +14,9 @@ public sealed class NinePatchAoi<TEntity> where TEntity : class
 
     private readonly int _width;
     private readonly int _height;
+
+    public int Width => _width;
+    public int Height => _height;
     private readonly int _zonesX;
     private readonly int _zonesY;
     private readonly HashSet<TEntity>[] _zones;

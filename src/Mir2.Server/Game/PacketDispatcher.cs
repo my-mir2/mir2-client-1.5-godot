@@ -15,12 +15,18 @@ namespace Mir2.Server.Game;
 /// </summary>
 public sealed class PacketDispatcher
 {
-    private readonly NinePatchAoi<ClientSession> _mapAoi;
+    private readonly MapManager _mapManager;
     private readonly List<ClientSession> _ninePatchBuffer = new(64);
+
+    public PacketDispatcher(MapManager mapManager)
+    {
+        _mapManager = mapManager;
+    }
 
     public PacketDispatcher(NinePatchAoi<ClientSession> mapAoi)
     {
-        _mapAoi = mapAoi;
+        _mapManager = new MapManager();
+        _mapManager.RegisterMap(new GameMap(0, "比奇省", mapAoi.Width, mapAoi.Height));
     }
 
     /// <summary>
@@ -136,19 +142,22 @@ public sealed class PacketDispatcher
         }
 
         session.CharacterName = name;
+        session.CharacterName = name;
         session.CurrentMapId = 0; // 比奇省
         session.X = spawnX;
         session.Y = spawnY;
         session.State ??= new PlayerState();
 
-        // 1. 注册到比奇省 AOI 空间九宫格
-        _mapAoi.Enter(session, session.X, session.Y);
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+
+        // 1. 注册到当前地图 AOI 空间九宫格
+        map.Aoi.Enter(session, session.X, session.Y);
 
         // 2. 下发官方进入游戏核心响应: SM_LOGON_DELPHI (50)
         session.EnqueuePacket(ProtocolConsts.SM_LOGON_DELPHI, session.SessionId, session.X, session.Y, 0, session.CharacterName);
 
         // 3. 下发地图切换: SM_NEWMAP_DELPHI (521) / 比奇省 0, 坐标 (330, 270)
-        session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, 0, session.X, session.Y, 0, "比奇省");
+        session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, map.MapId, session.X, session.Y, 0, map.Name);
 
         // 4. 下发自身属性面板: SM_MYSTATUS (52)
         session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
@@ -183,11 +192,18 @@ public sealed class PacketDispatcher
             int.TryParse(ySpan, out int newY) &&
             int.TryParse(dirSpan, out int dir))
         {
-            // 1. 地图边界物理约束 (比奇省 400x400)
-            if (newX < 0 || newX >= 400 || newY < 0 || newY >= 400) return;
-
             int oldX = session.X;
             int oldY = session.Y;
+
+            var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+
+            // 1. 地图物理边界与碰撞阻挡判定 (IsWalkable 包含超界越境与水面/城墙障碍检测)
+            if (!map.IsWalkable(newX, newY))
+            {
+                // 撞墙或穿墙外挂，立即下发坐标拉回包
+                session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, oldX, oldY, dir, session.CharacterName);
+                return;
+            }
 
             // 2. 步长与防瞬移物理校验 (行走限 1 格，跑步限 2 格)
             int maxDist = isRun ? 2 : 1;
@@ -219,7 +235,7 @@ public sealed class PacketDispatcher
             session.Y = newY;
 
             // 更新九宫格 AOI 空间分区
-            _mapAoi.UpdatePosition(session, oldX, oldY, newX, newY, out _, out _);
+            map.Aoi.UpdatePosition(session, oldX, oldY, newX, newY, out _, out _);
 
             // 广播移动数据帧: 行走 SM_OBJECTWALK (241) / 跑步 SM_OBJECTRUN (240)
             short smCode = isRun ? ProtocolConsts.SM_OBJECTRUN : ProtocolConsts.SM_OBJECTWALK;
@@ -259,9 +275,10 @@ public sealed class PacketDispatcher
 
             // 3. 在九宫格同屏检索攻击目标 (坐标处于 targetX, targetY)
             ClientSession? defender = null;
+            var hitMap = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
             lock (_ninePatchBuffer)
             {
-                _mapAoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                hitMap.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
                 for (int i = 0; i < _ninePatchBuffer.Count; i++)
                 {
                     var ent = _ninePatchBuffer[i];
@@ -376,9 +393,10 @@ public sealed class PacketDispatcher
 
             // 伤害性法术 (雷电术=10, 火球术=1, 灵魂火符=13 等)
             ClientSession? defender = null;
+            var spellMap = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
             lock (_ninePatchBuffer)
             {
-                _mapAoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                spellMap.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
                 for (int i = 0; i < _ninePatchBuffer.Count; i++)
                 {
                     var ent = _ninePatchBuffer[i];
@@ -422,9 +440,10 @@ public sealed class PacketDispatcher
     /// </summary>
     private void BroadcastToNinePatch(ClientSession source, short ident, int recog, int param, int tag, int series, string extra, bool includeSelf)
     {
+        var map = _mapManager.GetMap(source.CurrentMapId) ?? _mapManager.DefaultMap;
         lock (_ninePatchBuffer)
         {
-            _mapAoi.GetEntitiesInNinePatch(source.X, source.Y, _ninePatchBuffer);
+            map.Aoi.GetEntitiesInNinePatch(source.X, source.Y, _ninePatchBuffer);
             for (int i = 0; i < _ninePatchBuffer.Count; i++)
             {
                 var target = _ninePatchBuffer[i];
