@@ -78,6 +78,10 @@ public sealed class PacketDispatcher
                 HandleHit(session, remaining);
                 break;
 
+            case ProtocolConsts.CM_SPELL: // 3017 技能施法
+                HandleSpell(session, remaining);
+                break;
+
             case ProtocolConsts.CM_SAY: // 3030 聊天通道
                 HandleSay(session, remaining);
                 break;
@@ -247,8 +251,162 @@ public sealed class PacketDispatcher
             }
             session.LastAttackTimeMs = nowMs;
 
-            // 向九宫格广播普通物理挥刀动作: SM_OBJECTHIT (242)
+            // 1. 向九宫格广播普通物理挥刀动作: SM_OBJECTHIT (242)
             BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTHIT, session.SessionId, session.X, session.Y, dir, session.CharacterName, includeSelf: false);
+
+            // 2. 武器开刀试刀判定
+            session.State?.TrialSlashEquippedWeapon();
+
+            // 3. 在九宫格同屏检索攻击目标 (坐标处于 targetX, targetY)
+            ClientSession? defender = null;
+            lock (_ninePatchBuffer)
+            {
+                _mapAoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                {
+                    var ent = _ninePatchBuffer[i];
+                    if (ent.SessionId != session.SessionId && ent.X == targetX && ent.Y == targetY)
+                    {
+                        defender = ent;
+                        break;
+                    }
+                }
+            }
+
+            if (defender != null && defender.State != null)
+            {
+                // 物理命中判定 (1:1 官方公式)
+                bool hit = OfficialClientRulesEngine.CombatMath.CheckPhysicalHit(20, 10, OfficialClientRulesEngine.DelphiRandom.Shared);
+                if (hit)
+                {
+                    // 物理伤害精算
+                    int rawDmg = OfficialClientRulesEngine.CombatMath.CalculatePhysicalDamage(15, 30, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
+
+                    // 虹魔吸血判定
+                    session.State?.ProcessAttackLifesteal(rawDmg);
+
+                    // 麻痹戒指判定
+                    if (session.State != null)
+                    {
+                        var (isParalyzed, _) = session.State.TryParalyzeTarget(0);
+                        if (isParalyzed)
+                        {
+                            defender.State.StatusBits[5] = true;
+                        }
+                    }
+
+                    // 伤害扣减 (含魔法盾、护身、复活戒指)
+                    var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = defender.State.TakeCombatDamageFull(rawDmg, nowMs);
+
+                    // 受击后仰广播: SM_OBJECTSTRUCK (244)
+                    BroadcastToNinePatch(defender, ProtocolConsts.SM_OBJECTSTRUCK, defender.SessionId, defender.X, defender.Y, rawDmg, defender.CharacterName, includeSelf: true);
+
+                    // 目标血量更新
+                    defender.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, defender.State.Hp, defender.State.MaxHp, defender.State.Mp, defender.State.MaxMp);
+
+                    // 死亡倒地动画广播: SM_DEATH_ACTION_DELPHI (28)
+                    if (died)
+                    {
+                        session.State?.AddPkMurder();
+                        BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
+                    }
+                }
+            }
+        }
+    }
+
+    private void HandleSpell(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null) return;
+
+        // 格式: targetUid/magicId/targetX/targetY (CM_SPELL 3017)
+        int slash1 = payload.IndexOf('/');
+        if (slash1 < 0) return;
+        ReadOnlySpan<char> uidSpan = payload[..slash1];
+        ReadOnlySpan<char> rest1 = payload[(slash1 + 1)..];
+
+        int slash2 = rest1.IndexOf('/');
+        if (slash2 < 0) return;
+        ReadOnlySpan<char> magicSpan = rest1[..slash2];
+        ReadOnlySpan<char> rest2 = rest1[(slash2 + 1)..];
+
+        int slash3 = rest2.IndexOf('/');
+        if (slash3 < 0) return;
+        ReadOnlySpan<char> xSpan = rest2[..slash3];
+        ReadOnlySpan<char> ySpan = rest2[(slash3 + 1)..];
+
+        if (int.TryParse(uidSpan, out int targetUid) &&
+            short.TryParse(magicSpan, out short magicId) &&
+            int.TryParse(xSpan, out int targetX) &&
+            int.TryParse(ySpan, out int targetY))
+        {
+            long nowMs = Environment.TickCount64;
+            // 施法公共CD校验 (500ms)
+            if (session.LastSpellTimeMs > 0 && (nowMs - session.LastSpellTimeMs < 500))
+            {
+                return;
+            }
+            session.LastSpellTimeMs = nowMs;
+
+            var skill = SkillFormulas.GetSkill(magicId);
+            int mpCost = skill?.MpCost ?? 10;
+            if (session.State.Mp < mpCost)
+            {
+                return; // 蓝量不足
+            }
+
+            session.State.Mp -= mpCost;
+            session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
+
+            // 向九宫格广播施法动作: SM_OBJECTSPELL (243)
+            BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSPELL, session.SessionId, session.X, session.Y, magicId, session.CharacterName, includeSelf: true);
+
+            // 特殊技能分支
+            if (magicId == 31) // 魔法盾
+            {
+                session.State.ActivateMagicShield(1, 30);
+                return;
+            }
+            if (magicId == 2 || magicId == 29) // 治愈术 / 群体治愈术
+            {
+                session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + 25);
+                session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
+                return;
+            }
+
+            // 伤害性法术 (雷电术=10, 火球术=1, 灵魂火符=13 等)
+            ClientSession? defender = null;
+            lock (_ninePatchBuffer)
+            {
+                _mapAoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                {
+                    var ent = _ninePatchBuffer[i];
+                    if (ent.SessionId != session.SessionId && (ent.SessionId == targetUid || (ent.X == targetX && ent.Y == targetY)))
+                    {
+                        defender = ent;
+                        break;
+                    }
+                }
+            }
+
+            if (defender != null && defender.State != null)
+            {
+                int magicDmg = OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(20, 35, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
+                var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = defender.State.TakeCombatDamageFull(magicDmg, nowMs);
+
+                // 受击后仰广播: SM_OBJECTSTRUCK (244)
+                BroadcastToNinePatch(defender, ProtocolConsts.SM_OBJECTSTRUCK, defender.SessionId, defender.X, defender.Y, magicDmg, defender.CharacterName, includeSelf: true);
+
+                // 同步目标血量
+                defender.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, defender.State.Hp, defender.State.MaxHp, defender.State.Mp, defender.State.MaxMp);
+
+                if (died)
+                {
+                    session.State.AddPkMurder();
+                    BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
+                }
+            }
         }
     }
 

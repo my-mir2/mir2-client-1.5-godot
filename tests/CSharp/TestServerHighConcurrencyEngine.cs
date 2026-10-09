@@ -319,4 +319,80 @@ public class TestServerHighConcurrencyEngine
             gateway.Stop();
         }
     }
+
+    [Fact]
+    public async Task TestE2E_Combat_MagicSpell_And_DamageSettlement()
+    {
+        int testPort = 17005;
+        var aoi = new NinePatchAoi<ClientSession>(400, 400);
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(aoi);
+        var gateway = new TcpGateway(testPort);
+        gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.Start();
+
+        var tickEngine = new GameWorldTick(gateway);
+        tickEngine.Start();
+
+        try
+        {
+            // 客户端 A: 法师 (300, 300)
+            using var clientA = new System.Net.Sockets.TcpClient();
+            await clientA.ConnectAsync("127.0.0.1", testPort);
+            var streamA = clientA.GetStream();
+            await streamA.WriteAsync(Encoding.UTF8.GetBytes("#103/法师A/300/300!"));
+            await streamA.FlushAsync();
+
+            // 客户端 B: 目标怪/玩家 (302, 300)
+            using var clientB = new System.Net.Sockets.TcpClient();
+            await clientB.ConnectAsync("127.0.0.1", testPort);
+            var streamB = clientB.GetStream();
+            await streamB.WriteAsync(Encoding.UTF8.GetBytes("#103/稻草人B/302/300!"));
+            await streamB.FlushAsync();
+
+            await Task.Delay(200);
+
+            byte[] flushBuf = new byte[4096];
+            while (streamA.DataAvailable) _ = await streamA.ReadAsync(flushBuf, 0, flushBuf.Length);
+            while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
+
+            // 1. 法师施展魔法盾 MagicId=31 (CM_SPELL 3017: targetUid/magicId/targetX/targetY)
+            byte[] shieldPkt = Encoding.UTF8.GetBytes("#3017/0/31/300/300!");
+            await streamA.WriteAsync(shieldPkt);
+            await streamA.FlushAsync();
+
+            await Task.Delay(150);
+
+            // 法师自身收到 MP 扣除与状态同步 SM_MYSTATUS (708)
+            Assert.True(streamA.DataAvailable, "施展魔法盾后必须同步法师自身血蓝");
+            byte[] shieldRespBuf = new byte[2048];
+            int shieldRespLen = await streamA.ReadAsync(shieldRespBuf, 0, shieldRespBuf.Length);
+            string shieldResp = Encoding.UTF8.GetString(shieldRespBuf, 0, shieldRespLen);
+            Assert.Contains($"#{ProtocolConsts.SM_OBJECTSPELL}/", shieldResp);
+            Assert.Contains($"#{ProtocolConsts.SM_MYSTATUS}/", shieldResp);
+
+            // 2. 等待公共 CD (550ms) 后，法师使用雷电术 MagicId=10 轰击稻草人B (302, 300)
+            await Task.Delay(550);
+            while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
+
+            byte[] thunderPkt = Encoding.UTF8.GetBytes("#3017/0/10/302/300!");
+            await streamA.WriteAsync(thunderPkt);
+            await streamA.FlushAsync();
+
+            await Task.Delay(150);
+
+            // 同屏稻草人 B 必须收到施法动作 SM_OBJECTSPELL (243) 与受击后仰 SM_OBJECTSTRUCK (244)
+            Assert.True(streamB.DataAvailable, "同屏稻草人 B 必须收到雷电轰击受击广播");
+            byte[] thunderBBuf = new byte[2048];
+            int thunderBLen = await streamB.ReadAsync(thunderBBuf, 0, thunderBBuf.Length);
+            string thunderBResp = Encoding.UTF8.GetString(thunderBBuf, 0, thunderBLen);
+            Assert.Contains($"#{ProtocolConsts.SM_OBJECTSPELL}/", thunderBResp);
+            Assert.Contains($"#{ProtocolConsts.SM_OBJECTSTRUCK}/", thunderBResp);
+            Assert.Contains($"#{ProtocolConsts.SM_MYSTATUS}/", thunderBResp); // 稻草人 B 扣血更新
+        }
+        finally
+        {
+            tickEngine.Stop();
+            gateway.Stop();
+        }
+    }
 }
