@@ -268,6 +268,7 @@ public static class ProtocolConsts
     public const short SM_MOVEFAIL                = 17;   // 移动失败
     public const short SM_OPENGUILDDLGFAIL        = 752;  // 打开行会面板失败
     public const short SM_OPENSTORAGEDLG          = 700;  // 打开仓库面板
+    public const short SM_USERSTORAGE_DLG         = 700;  // 仓库保管箱托管界面弹出 (对齐 SM_OPENSTORAGEDLG)
     public const short SM_OPENREPAIRDLG           = 668;  // 铁匠铺打开修理面板 (IDA open_shop_repair 0x46dae8)
     public const short SM_BUY_OK_DELPHI           = 648;  // 购买成功更新金币 (IDA sub_467920 0x469EDA)
     public const short SM_SELL_FAIL_DELPHI         = 649;  // 出售物品失败 (IDA sub_467920 0x469F04)

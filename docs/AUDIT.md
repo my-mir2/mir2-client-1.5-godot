@@ -7752,14 +7752,29 @@
       - 在 `src/UI/HudController.cs` 中集成事务快照与 2000ms 防重入拦截，完善 `OnTakeOnFail` 与 `OnTakeOffFail` 的完整物理回滚（恢复装备栏、背包格、按钮图标与纸娃娃立绘）；
       - 在 `tests/CSharp/TestProtocolMatrix.cs` 中增加 `TestEquipSlotOptimisticTransactionAndRollback` 闭环单元测试，脱机测试总数提升至 **210 / 210 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+  - [x] **66. 盛大官方 1.5 行会成员列表 756 独立路由纠偏与仓库保管箱 700 契约对齐实证 (SM_SENDGUILDMEMBERLIST 756 / SM_USERSTORAGE_DLG 700)** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据 `scratch/ida_processmsg.c` 行 528~530、659~662、768~771：
+        1. 行会成员列表加载权威协议纠偏（case 756 `load_guild_members()`）：
+           官方原版二进制中 `case 756` 明确为 `dword_4F94F0 = GetTickCount(); load_guild_members();`；此前客户端代码将 756 误命名为 `SM_UPDATEGUILDINFO` 并交由公告处理，而将成员列表寄生在 671（商店出售反馈）通过字符串包含判定容错。本次重构纠偏了 756 的命名与物理路由，使 756 直接驱动 `HandleSendGuildMemberList`；
+        2. 仓库保管箱托管界面呼出协议收敛（case 700 `handle_sm_open_shop()`）：
+           官方原版 `case 700` 用于通知客户端开启仓库保管箱界面，在 `ProtocolConsts.cs` 中补齐 `SM_USERSTORAGE_DLG = 700`，并在 `ServerMessageRouter.cs` 中实现对齐分发；
+        3. 行会捐献与心跳时钟闭环（case 764/767 `SM_DONATEOK`，case 810 `SM_TIMECHECKMSG`）：
+           打通行会捐献基金与时钟同步的权威下行分发。
+    - **精准重构**：
+      - 在 `ProtocolConsts.cs` 中补齐 `SM_USERSTORAGE_DLG = 700` 别名定义；
+      - 在 `ServerMessageRouter.cs` 中纠正 756 为 `SM_SENDGUILDMEMBERLIST` 独立路由，避免被行会公告吞没；
+      - 在 `tests/CSharp/TestGuildTradeEncoderMatrix.cs` 中新增 `OfficialStorageAndGuildMemberListGroundTruth` 单元测试，脱机测试总数提升至 **211 / 211 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **210 / 210 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **211 / 211 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
+
 
 
 

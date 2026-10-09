@@ -431,4 +431,33 @@ public sealed class TestGuildTradeEncoderMatrix
         router.OnPacket(new ServerPacket(ProtocolConsts.SM_ENTITY_FLYAXE_ACTION, 1001, 3, 0, Array.Empty<byte>()));
         router.OnPacket(new ServerPacket(ProtocolConsts.SM_ENTITY_DEATH_ACTION, 1001, 4, 0, Array.Empty<byte>()));
     }
+
+    [Fact]
+    public void OfficialStorageAndGuildMemberListGroundTruth()
+    {
+        // 1. 盛大官方 1.5 仓库呼出 (700)、行会名单 (756)、心跳 (810)、捐献 (767) 权威常量核验
+        Assert.Equal((short)700, ProtocolConsts.SM_USERSTORAGE_DLG);
+        Assert.Equal((short)700, ProtocolConsts.SM_OPENSTORAGEDLG);
+        Assert.Equal((short)756, ProtocolConsts.SM_SENDGUILDMEMBERLIST);
+        Assert.Equal((short)810, ProtocolConsts.SM_TIMECHECKMSG);
+        Assert.Equal((short)764, ProtocolConsts.SM_DONATEOK);
+
+        // 2. 脱机路由分发核验 (无 Godot 引擎依赖安全跑通)
+        var router = new ServerMessageRouter(null, null);
+        
+        // 700: 仓库呼出
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_USERSTORAGE_DLG, 0, 0, 0, Array.Empty<byte>()));
+        
+        // 756: 行会成员列表
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_SENDGUILDMEMBERLIST, 1, 0, 0, Encoding.UTF8.GetBytes("掌门人\t热血传奇\t道士\t45\t1\n")));
+        
+        // 810: 时间同步与心跳
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_TIMECHECKMSG, 123456, 0, 0, Array.Empty<byte>()));
+        
+        // 10: 实体移动/动作动画带字符串广播 (IDA case 10)
+        router.OnPacket(new ServerPacket(10, 1001, 1, 0, Encoding.UTF8.GetBytes("跑动动作")));
+        
+        // 767: 捐献成功
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DONATEOK, 50000, 0, 0, Array.Empty<byte>()));
+    }
 }

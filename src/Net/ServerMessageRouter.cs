@@ -74,7 +74,7 @@ public sealed class ServerMessageRouter
     public const short SM_USERSTORAGE_DLG        = 700;  // 仓库保管箱托管界面弹出
     public const short SM_SENDUSERSTATE_INSPECT  = 751;  // 观人/他人状态下发 (IDA 0x46A857)
     public const short SM_OPENGUILDDLG           = 753;  // 打开行会主页 (bridge SM_OPENGUILDDLG_DELPHI)
-    public const short SM_UPDATEGUILDINFO        = 756;  // 行会信息/公告更新 (bridge SM_UPDATEGUILDINFO_DELPHI，非名单！)
+    public const short SM_SENDGUILDMEMBERLIST    = 756;  // 行会成员列表批量下发 (IDA 0x467920 case 756 load_guild_members)
     public const short SM_GUILDMEMBERLIST_ALT    = 671;  // 行会成员列表 (bridge SM_GUILDMEMBERLIST，recog=人数)
     public const short SM_GUILDMAKEALLYOK        = 759;  // 行会结盟成功回显广播 (IDA 0x467920)
     public const short SM_GUILDBREAKALLYOK       = 761;  // 行会解除结盟广播 (IDA 0x467920)
@@ -354,8 +354,10 @@ public sealed class ServerMessageRouter
                     }
                 }
                 break;
-            case SM_UPDATEGUILDINFO:
-            case SM_GUILDNOTICE_RESULT:
+            case ProtocolConsts.SM_SENDGUILDMEMBERLIST: // 756: 盛大官方 1.5 行会成员列表批量下发 (IDA case 756 load_guild_members)
+                HandleSendGuildMemberList(packet);
+                break;
+            case SM_GUILDNOTICE_RESULT: // 767: 行会公告更新结果
                 HandleGuildMessage(packet);
                 break;
             case ProtocolConsts.SM_BUILDGUILDOK:
