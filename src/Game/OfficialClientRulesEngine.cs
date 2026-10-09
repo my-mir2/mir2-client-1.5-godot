@@ -15,6 +15,10 @@ public static class OfficialClientRulesEngine
     // ============================================================================
     public sealed class DelphiRandom
     {
+        public static DelphiRandom Shared { get; } = new();
+
+        public static int RandomRange(int minVal, int maxVal) => Shared.NextRange(minVal, maxVal);
+
         private uint _randSeed;
 
         public DelphiRandom(uint seed = 0)

@@ -448,5 +448,27 @@ namespace Mir2Client.Render
                 _ => baseOffset + dir * 4 + (_currentFrame % 4)
             };
         }
+
+        /// <summary>
+        /// 盛大官方 1.5 怪物倒地挖肉机制 (IDA sub_478148 / ButcherCorpse)
+        /// 仅当为鸡、鹿等可挖肉动物且处于尸体状态时允许割肉
+        /// </summary>
+        public bool TryHarvestMeat(out string meatName, out int meatQuality)
+        {
+            meatName = string.Empty;
+            meatQuality = 0;
+            if (!IsCorpse) return false;
+
+            var monDef = OfficialMonsterCompendium.GetByName(EntityName) ?? OfficialMonsterCompendium.GetByAppr(Appr);
+            if (monDef == null || !monDef.CanButcherMeat) return false;
+
+            // 依据官方 Delphi 伪随机数计算肉质品质 (8~18)
+            meatQuality = OfficialClientRulesEngine.DelphiRandom.RandomRange(8, 18);
+            meatName = $"{EntityName}肉";
+
+            // 播放挖肉割刀音效
+            AudioManager.Instance?.PlaySoundId(40);
+            return true;
+        }
     }
 }
