@@ -348,4 +348,11 @@ public static class PacketEncoder
         "堂主" => 3,
         _ => 0,
     };
+
+    /// <summary>
+    /// 盛大官方 1.5 死亡复活请求 (CM_REVIVE 1018, 对齐 bridge.rs:63 / IDA sub_481DD4 [0x481f05..0x481fb1])
+    /// reviveType: 0=回城安全区重新开始
+    /// </summary>
+    public static byte[] Revive(int reviveType = 0) =>
+        MakePacket(ProtocolConsts.CM_REVIVE, 0, (short)reviveType, 0, Array.Empty<byte>());
 }

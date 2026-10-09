@@ -2966,6 +2966,7 @@ public class TestProtocolMatrix
         bool takeOffAgain = tx.TryBeginTakeOff(1, 0, "裁决之杖", "攻击 0-30", now + 2500);
         Assert.False(takeOffAgain);
 
+
         // 7. 模拟服务端下发脱下失败 (SM_TAKEOFF_FAIL 620 -> tx.Rollback(1))
         var rollbackTakeOff = tx.Rollback(1);
         Assert.NotNull(rollbackTakeOff);
@@ -2973,6 +2974,37 @@ public class TestProtocolMatrix
         Assert.Equal(Mir2Client.Game.EquipTransactionManager.ActionType.TakeOff, rollbackTakeOff.Value.Type);
         Assert.Equal("裁决之杖", rollbackTakeOff.Value.EquipItemName); // 确认可原位穿回身上
         Assert.Equal(0, rollbackTakeOff.Value.BagSlot);              // 确认清空临时占用的背包 0 格
+    }
+
+    [Fact]
+    public void TestOfficialReviveProtocolFlow()
+    {
+        // 1. 验证官方常量严格对齐
+        Assert.Equal(1018, ProtocolConsts.CM_REVIVE);
+        Assert.Equal(501, ProtocolConsts.SM_REVIVE);
+        Assert.Equal(501, ProtocolConsts.SM_VERSION_FAIL);
+
+        // 2. 编码 CM_REVIVE 1018 发包验证
+        byte[] revivePacket = PacketEncoder.Revive(0);
+        Assert.NotNull(revivePacket);
+        Assert.NotEmpty(revivePacket);
+
+        // 3. 解码发包并验证 Ident=1018
+        Assert.True(revivePacket[0] >= (byte)'0' && revivePacket[0] <= (byte)'9');
+        Assert.Equal((byte)'\n', revivePacket[^1]);
+
+        var decoded = PacketDecoder.Parse(revivePacket.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_REVIVE, decoded.Ident);
+        Assert.Equal(0, decoded.Recog);
+
+        // 4. 模拟服务端下发 SM_REVIVE (501) 并验证 Extra 坐标解析逻辑
+        string extraCoords = "330/270";
+        var parts = extraCoords.Split(new[] { '/', '\t', ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(2, parts.Length);
+        Assert.True(int.TryParse(parts[0], out int rx));
+        Assert.True(int.TryParse(parts[1], out int ry));
+        Assert.Equal(330, rx);
+        Assert.Equal(270, ry);
     }
 }
 

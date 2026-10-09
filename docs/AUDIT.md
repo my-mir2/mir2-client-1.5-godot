@@ -7778,12 +7778,27 @@
     - **精准重构**：
       - 在 `src/UI/HudController.cs` 中实现 `_lastEatTick` 与双入口 200ms 冷却拦截；
       - 在 `tests/CSharp/TestCombatSkillsMatrix.cs` 中新增 `TestOfficialPotionEatCooldownThrottle_200ms` 单元测试，脱机测试总数提升至 **212 / 212 项 100% 全部通过**；
+  - [x] **68. 盛大官方 1.5 死亡重新开始安全区复活协议闭环 (CM_REVIVE 1018 / SM_REVIVE 501)** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据 `sub_481DD4 [0x481f05..0x481fb1]` 与 Rust 服务端 `mir2-my/bridge.rs`：
+        1. 死亡确认框确定点击物理行为：
+           官方原版二进制中，角色阵亡弹出 `Prguse_0360` 模态黑石浮雕框（452x179 @ 174, 210），确定按钮（361/363）文案为“你已经阵亡了，是否想要重新开始？”，点击确定后向服务端发送复活请求封包 `CM_REVIVE (1018)`；此前客户端在联机状态下错误调用了 `SoftClose`（小退 1009）并遗漏了 1018 发包；
+        2. 服务端复活应答 501 歧义消除与分流路由：
+           官方协议中 501 在登录阶段为版本不符弹窗 `SM_VERSION_FAIL`，在大世界主角死亡后为安全区复活下行广播 `SM_REVIVE`（携带目标传送坐标）；此前客户端将 501 恒定误判为版本错误弹窗；
+        3. 复活全链路状态自愈闭环：
+           在 `ServerMessageRouter.cs` 中增加大世界主角死亡状态与坐标解析，触发 `GameView.OnServerRevive(rx, ry)`，拉起角色模型（`ApplyRevive`）、恢复满血满蓝、重置坐标、消除死亡黑白灰屏遮罩与干瘪血球状态。
+    - **精准重构**：
+      - 在 `src/Net/ProtocolConsts.cs` 中增加 `CM_REVIVE = 1018` 与 `SM_REVIVE = 501`；
+      - 在 `src/Net/PacketEncoder.cs` 中实现 `PacketEncoder.Revive(0)`；
+      - 在 `src/UI/GameView.cs` 中实现 `OnServerRevive(int x, int y)`，重构 `PerformPlayerRevive()` 发送 1018 封包；
+      - 在 `src/Net/ServerMessageRouter.cs` 中打通 501 大世界复活路由分发；
+      - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialReviveProtocolFlow` 单元测试，脱机测试总数提升至 **213 / 213 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **212 / 212 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **213 / 213 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

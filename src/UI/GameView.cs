@@ -1831,7 +1831,29 @@ namespace Mir2Client.UI
         }
 
         /// <summary>
-        /// 盛大官方 1.5 主角复活全流程闭环 (单机沙盒恢复满血满蓝传送安全区，联机发送复活/小退)
+        /// 盛大官方 1.5 服务端复活应答落地 (SM_REVIVE 501: 恢复血蓝、重置坐标、解除灰屏)
+        /// </summary>
+        public void OnServerRevive(int x, int y)
+        {
+            if (PlayerInstance == null) return;
+            if (HudInstance?.DeathScreen != null)
+            {
+                HudInstance.DeathScreen.Visible = false;
+            }
+
+            PlayerStateInstance.Hp = PlayerStateInstance.MaxHp;
+            PlayerStateInstance.Mp = PlayerStateInstance.MaxMp;
+            HudInstance?.UpdateHp(PlayerStateInstance.Hp, PlayerStateInstance.MaxHp);
+            HudInstance?.UpdateMp(PlayerStateInstance.Mp, PlayerStateInstance.MaxMp);
+            PlayerInstance.ApplyRevive(PlayerStateInstance.MaxHp, PlayerStateInstance.MaxMp);
+            PlayerInstance.Direction = 0;
+            PlayerInstance.SetTilePos(x, y);
+            UpdateEnvironmentLighting();
+            HudInstance?.AddChat("复活", $"[复活] 你已在安全区 ({x}, {y}) 重获新生！", new Color(0.3f, 1f, 0.4f));
+        }
+
+        /// <summary>
+        /// 盛大官方 1.5 主角复活全流程闭环 (单机沙盒恢复满血满蓝传送安全区，联机发送复活发包 CM_REVIVE 1018)
         /// </summary>
         public void PerformPlayerRevive()
         {
@@ -1843,20 +1865,12 @@ namespace Mir2Client.UI
 
             if (_isSandbox)
             {
-                PlayerStateInstance.Hp = PlayerStateInstance.MaxHp;
-                PlayerStateInstance.Mp = PlayerStateInstance.MaxMp;
-                HudInstance?.UpdateHp(PlayerStateInstance.Hp, PlayerStateInstance.MaxHp);
-                HudInstance?.UpdateMp(PlayerStateInstance.Mp, PlayerStateInstance.MaxMp);
-                PlayerInstance.ApplyRevive(PlayerStateInstance.MaxHp, PlayerStateInstance.MaxMp);
-                PlayerInstance.Direction = 0;
-                // 复活回城：传送回比奇安全区 (330, 270)
-                PlayerInstance.SetTilePos(330, 270);
-                UpdateEnvironmentLighting();
-                HudInstance?.AddChat("复活", "[复活] 你已在安全区重获新生！", new Color(0.3f, 1f, 0.4f));
+                OnServerRevive(330, 270);
             }
             else
             {
-                _net?.SendPacket(PacketEncoder.SoftClose());
+                // 官方原版点击重新开始必须向服务端请求复活 CM_REVIVE (1018, 对齐 bridge.rs:63)
+                _net?.SendPacket(PacketEncoder.Revive(0));
             }
         }
     }

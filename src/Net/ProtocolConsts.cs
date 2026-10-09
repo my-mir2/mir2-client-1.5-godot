@@ -50,6 +50,8 @@ public static class ProtocolConsts
     public const short CM_HEARTBEAT              = 81;   // 客户端 10s 心跳保活
     public const short CM_QUERYUSERNAME_EXT      = 82;   // 双击Shift深度查名
     public const short CM_DROPGOLD               = 1016; // 丢弃金币到地面（bridge CM_DROPGOLD；旧 1002=OPENDOOR，扔金会开门）
+    public const short CM_REVIVE                 = 1018; // 官方死亡复活/重新开始发包 (IDA 0x481efc, bridge.rs:63)
+    public const short SM_REVIVE                 = 501;  // 官方角色复活应答 (bridge.rs:185)
     public const short CM_MERCHANTHOMEPAGE       = 1010; // NPC 对话主页请求
     public const short CM_USERBUYITEM            = 45;   // 商店购买物品主码 (bridge 45 | 1014)
     public const short CM_USERBUYITEM_ALT        = 1014; // 官方 1.5 扩展协议码

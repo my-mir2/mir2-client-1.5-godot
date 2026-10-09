@@ -704,8 +704,29 @@ public sealed class ServerMessageRouter
                 _hud?.ShowModalMessage("连接提示", "与服务器连接超时，连接已被切断。");
                 SafeLog($"[SM] 查询角色失败或连接超时 (SM_QUERYCHAR_FAIL=528)");
                 break;
-            case ProtocolConsts.SM_VERSION_FAIL: // 501: 补丁版本不符模态弹窗 (IDA 0x46B68C)
-                _hud?.ShowModalMessage("版本提示", "补丁版本不符，请更新客户端。");
+            case ProtocolConsts.SM_VERSION_FAIL: // 501: 补丁版本不符模态弹窗 (IDA 0x46B68C) 或 官方角色复活应答 (SM_REVIVE = 501)
+                if (_gameView?.PlayerInstance != null && (_gameView.PlayerInstance.Hp <= 0 || _gameView.HudInstance?.DeathScreen?.Visible == true))
+                {
+                    int rx = packet.Param > 0 ? packet.Param : 330;
+                    int ry = packet.Tag > 0 ? packet.Tag : 270;
+                    string extraText = !string.IsNullOrEmpty(packet.ExtraStr) ? packet.ExtraStr : DecodeExtraText(packet.Extra);
+                    if (!string.IsNullOrEmpty(extraText))
+                    {
+                        var parts = extraText.Split(new[] { '/', '\t', ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 2 && int.TryParse(parts[0], out int px) && int.TryParse(parts[1], out int py))
+                        {
+                            rx = px;
+                            ry = py;
+                        }
+                    }
+                    _gameView.OnServerRevive(rx, ry);
+                    SafeLog($"[SM] 角色复活安全区传送完成 (SM_REVIVE=501, x={rx}, y={ry})");
+                }
+                else
+                {
+                    _hud?.ShowModalMessage("版本提示", "补丁版本不符，请更新客户端。");
+                    SafeLog($"[SM] 补丁版本不符 (SM_VERSION_FAIL=501)");
+                }
                 break;
             case ProtocolConsts.SM_LOGINSUCCESS: // 530: 登录成功 (IDA case 530)
                 SafeLog($"[SM] 账号登录成功进入选服 (SM_LOGINSUCCESS=530)");
