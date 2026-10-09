@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace Mir2Client.Net;
+namespace Mir2.Shared.Protocols;
 
 /// <summary>
 /// 客户端上行 (CM) 与服务端下行 (SM) 基础数据包结构

@@ -456,7 +456,7 @@ public sealed class Official15ProtocolDispatcher
         Register(631, (id, rec, p, t, s, b) =>
         {
             // SM_MERCHANTDLG 弹出商店买卖货架界面
-            _hud?.ShowShop("商店老板", Array.Empty<ShopPanelView.ShopItemEntry>());
+            _hud?.ShowShop("商店老板", Array.Empty<ShopItemEntry>());
         });
 
         Register(644, (id, rec, p, t, s, b) =>

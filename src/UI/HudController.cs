@@ -2159,7 +2159,7 @@ public partial class HudController : CanvasLayer
         }
     }
 
-    public void OpenStorageList(IEnumerable<ShopPanelView.ShopItemEntry> items, int npcUid = 0)
+    public void OpenStorageList(IEnumerable<ShopItemEntry> items, int npcUid = 0)
     {
         if (_shopPanelView != null)
         {
@@ -2171,7 +2171,7 @@ public partial class HudController : CanvasLayer
     /// <summary>
     /// 官方 1.5 仓库数据驱动开启与列表刷新 (SM_USERSTORAGE_ITEMS 704)
     /// </summary>
-    public void OpenStorageList(IEnumerable<Mir2Client.Net.StorageItemInfo> items, int npcUid = 0)
+    public void OpenStorageList(IEnumerable<StorageItemInfo> items, int npcUid = 0)
     {
         if (_shopPanelView != null)
         {
@@ -2900,7 +2900,7 @@ public partial class HudController : CanvasLayer
     /// <summary>
     /// 打开并展示商店货架 (由 SM_MERCHANTDLG / SM_SENDGOODSLIST 驱动)
     /// </summary>
-    public void ShowShop(string npcName, System.Collections.Generic.IEnumerable<ShopPanelView.ShopItemEntry> items)
+    public void ShowShop(string npcName, System.Collections.Generic.IEnumerable<ShopItemEntry> items)
     {
         if (_shopPanelView != null)
         {

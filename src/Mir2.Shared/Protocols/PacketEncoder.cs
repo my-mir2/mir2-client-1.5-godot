@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace Mir2Client.Net;
+namespace Mir2.Shared.Protocols;
 
 /// <summary>
 /// 盛大官方 1.5 原版 CM 数据包序列化器 (IDA sub_458D3C + sub_45AF90 铁证)

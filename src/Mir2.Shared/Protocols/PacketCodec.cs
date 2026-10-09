@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace Mir2Client.Net;
+namespace Mir2.Shared.Protocols;
 
 /// <summary>
 /// 盛大官方 1.5 原版 Base64+60 快速指针与 Span 编解码器 (IDA sub_45AF90 & sub_45B030 铁证)

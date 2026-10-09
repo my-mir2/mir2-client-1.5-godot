@@ -490,7 +490,7 @@ public class TestOfficialUiGroundTruth
         Assert.True(eventFired);
 
         // 3. 官方 1.5 case 50 进入世界组队初始状态协议实证 (scratch/ida_processmsg.c 行 1425: byte_4F94F8 = (_BYTE)v64 == 1)
-        var pktLogon = new Mir2Client.Net.ServerPacket(
+        var pktLogon = new ServerPacket(
             ident: ProtocolConsts.SM_LOGON_DELPHI,
             recog: 8888,
             param: 100,

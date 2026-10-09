@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Mir2Client.Net;
+namespace Mir2.Shared.Protocols;
 
 /// <summary>
 /// 盛大官方 1.5 原版 TCP 数据包流分包与环形缓冲区 (IDA sub_458D3C 铁证)

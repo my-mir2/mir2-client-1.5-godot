@@ -3972,7 +3972,7 @@ public class TestProtocolMatrix
     public void TestOfficialDetails_Batch9_NetworkBoundary()
     {
         // 细节 131: TCP 粘包与半包在环形缓冲区中的定界自愈解析
-        var parser = new Mir2Client.Net.PacketProtocolEngine.RingBufferPacketParser();
+        var parser = new PacketProtocolEngine.RingBufferPacketParser();
         parser.Append(System.Text.Encoding.ASCII.GetBytes("garb#+A100!#+B20")); // 包含脏数据、一个完整包和一个半包
         var p1 = parser.ExtractPackets();
         Assert.Single(p1);
@@ -3983,124 +3983,124 @@ public class TestProtocolMatrix
         Assert.Equal("#+B200!", p2[0]);
 
         // 细节 132: 原生断线重连模态框
-        var recModal = Mir2Client.Net.PacketProtocolEngine.ReconnectModalEngine.Evaluate(isSocketConnected: false, retryCount: 2);
+        var recModal = PacketProtocolEngine.ReconnectModalEngine.Evaluate(isSocketConnected: false, retryCount: 2);
         Assert.True(recModal.showModal);
         Assert.True(recModal.canRetry);
 
         // 细节 133: 小退与大退 5 秒受击安全倒计时保护
-        var c1 = Mir2Client.Net.PacketProtocolEngine.LogoutProtectionEngine.UpdateCountdown(currentRemaining: 5.0f, delta: 1.0f, wasAttacked: false);
+        var c1 = PacketProtocolEngine.LogoutProtectionEngine.UpdateCountdown(currentRemaining: 5.0f, delta: 1.0f, wasAttacked: false);
         Assert.Equal(4.0f, c1.remainingSeconds);
-        var c2 = Mir2Client.Net.PacketProtocolEngine.LogoutProtectionEngine.UpdateCountdown(currentRemaining: 4.0f, delta: 0.5f, wasAttacked: true);
+        var c2 = PacketProtocolEngine.LogoutProtectionEngine.UpdateCountdown(currentRemaining: 4.0f, delta: 0.5f, wasAttacked: true);
         Assert.Equal(5.0f, c2.remainingSeconds); // 受击重置为 5 秒
         Assert.True(c2.interrupted);
 
         // 细节 134: 同格重叠多实体点击优先级 (玩家 > 怪物 > 掉落物)
-        var overlap = new List<Mir2Client.Net.PacketProtocolEngine.EntityOverlapPickEngine.TargetEntity>
+        var overlap = new List<PacketProtocolEngine.EntityOverlapPickEngine.TargetEntity>
         {
-            new(1, Mir2Client.Net.PacketProtocolEngine.EntityOverlapPickEngine.EntityKind.GroundItem, "金币"),
-            new(2, Mir2Client.Net.PacketProtocolEngine.EntityOverlapPickEngine.EntityKind.Monster, "半兽人"),
-            new(3, Mir2Client.Net.PacketProtocolEngine.EntityOverlapPickEngine.EntityKind.Player, "战士小明")
+            new(1, PacketProtocolEngine.EntityOverlapPickEngine.EntityKind.GroundItem, "金币"),
+            new(2, PacketProtocolEngine.EntityOverlapPickEngine.EntityKind.Monster, "半兽人"),
+            new(3, PacketProtocolEngine.EntityOverlapPickEngine.EntityKind.Player, "战士小明")
         };
-        var picked = Mir2Client.Net.PacketProtocolEngine.EntityOverlapPickEngine.PickPriorityTarget(overlap);
+        var picked = PacketProtocolEngine.EntityOverlapPickEngine.PickPriorityTarget(overlap);
         Assert.NotNull(picked);
         Assert.Equal("战士小明", picked.Name);
 
         // 细节 135: 地表掉落物空间网格剔除合并
-        var groundItems = new List<Mir2Client.Net.PacketProtocolEngine.GroundItemGridCullingEngine.GroundItem>
+        var groundItems = new List<PacketProtocolEngine.GroundItemGridCullingEngine.GroundItem>
         {
             new(1, 10, 10, "屠龙"),
             new(2, 500, 500, "木剑")
         };
-        var culled = Mir2Client.Net.PacketProtocolEngine.GroundItemGridCullingEngine.CullItemsInViewport(groundItems, 0, 0, 100, 100);
+        var culled = PacketProtocolEngine.GroundItemGridCullingEngine.CullItemsInViewport(groundItems, 0, 0, 100, 100);
         Assert.Single(culled);
         Assert.Equal("屠龙", culled[0].Name);
 
         // 细节 136: 安全区判定与攻击拦截
-        var safeAttack = Mir2Client.Net.PacketProtocolEngine.SafeZoneEngine.CheckAttackPermission(0, 320, 270);
+        var safeAttack = PacketProtocolEngine.SafeZoneEngine.CheckAttackPermission(0, 320, 270);
         Assert.False(safeAttack.allowAttack);
 
         // 细节 137: PK 状态切换与目标过滤
-        bool peaceAtk = Mir2Client.Net.PacketProtocolEngine.PkModeFilterEngine.CanAttackTarget(
-            Mir2Client.Net.PacketProtocolEngine.PkModeFilterEngine.PkMode.Peace, isMonster: false, isSameGuild: false, isSameGroup: false, isRedName: false);
+        bool peaceAtk = PacketProtocolEngine.PkModeFilterEngine.CanAttackTarget(
+            PacketProtocolEngine.PkModeFilterEngine.PkMode.Peace, isMonster: false, isSameGuild: false, isSameGroup: false, isRedName: false);
         Assert.False(peaceAtk);
-        bool redAtk = Mir2Client.Net.PacketProtocolEngine.PkModeFilterEngine.CanAttackTarget(
-            Mir2Client.Net.PacketProtocolEngine.PkModeFilterEngine.PkMode.RedOnly, isMonster: false, isSameGuild: false, isSameGroup: false, isRedName: true);
+        bool redAtk = PacketProtocolEngine.PkModeFilterEngine.CanAttackTarget(
+            PacketProtocolEngine.PkModeFilterEngine.PkMode.RedOnly, isMonster: false, isSameGuild: false, isSameGroup: false, isRedName: true);
         Assert.True(redAtk);
 
         // 细节 138: 玩家黑名单
-        Mir2Client.Net.PacketProtocolEngine.BlacklistEngine.Add("恶劣玩家");
-        Assert.True(Mir2Client.Net.PacketProtocolEngine.BlacklistEngine.IsBlocked("恶劣玩家"));
-        Mir2Client.Net.PacketProtocolEngine.BlacklistEngine.Remove("恶劣玩家");
-        Assert.False(Mir2Client.Net.PacketProtocolEngine.BlacklistEngine.IsBlocked("恶劣玩家"));
+        PacketProtocolEngine.BlacklistEngine.Add("恶劣玩家");
+        Assert.True(PacketProtocolEngine.BlacklistEngine.IsBlocked("恶劣玩家"));
+        PacketProtocolEngine.BlacklistEngine.Remove("恶劣玩家");
+        Assert.False(PacketProtocolEngine.BlacklistEngine.IsBlocked("恶劣玩家"));
 
         // 细节 139: 聊天多频道过滤
-        var msgs = new List<Mir2Client.Net.PacketProtocolEngine.ChatChannelFilterEngine.ChatMessage>
+        var msgs = new List<PacketProtocolEngine.ChatChannelFilterEngine.ChatMessage>
         {
-            new(Mir2Client.Net.PacketProtocolEngine.ChatChannelFilterEngine.Channel.Whisper, "小红", "在吗"),
-            new(Mir2Client.Net.PacketProtocolEngine.ChatChannelFilterEngine.Channel.Guild, "会长", "晚上攻城")
+            new(PacketProtocolEngine.ChatChannelFilterEngine.Channel.Whisper, "小红", "在吗"),
+            new(PacketProtocolEngine.ChatChannelFilterEngine.Channel.Guild, "会长", "晚上攻城")
         };
-        var whisperMsgs = Mir2Client.Net.PacketProtocolEngine.ChatChannelFilterEngine.FilterMessages(
-            msgs, Mir2Client.Net.PacketProtocolEngine.ChatChannelFilterEngine.Channel.Whisper);
+        var whisperMsgs = PacketProtocolEngine.ChatChannelFilterEngine.FilterMessages(
+            msgs, PacketProtocolEngine.ChatChannelFilterEngine.Channel.Whisper);
         Assert.Single(whisperMsgs);
 
         // 细节 140: 私聊自动补全
-        string autoC = Mir2Client.Net.PacketProtocolEngine.WhisperAutoCompleteEngine.AutoCompleteRecentWhisper("/", "小红");
+        string autoC = PacketProtocolEngine.WhisperAutoCompleteEngine.AutoCompleteRecentWhisper("/", "小红");
         Assert.Equal("/小红 ", autoC);
 
         // 细节 141: 背包物品自动整理
-        var rawInv = new List<Mir2Client.Net.PacketProtocolEngine.BagAutoSortEngine.InventoryItem>
+        var rawInv = new List<PacketProtocolEngine.BagAutoSortEngine.InventoryItem>
         {
             new(0, 10, 2, 10, 1, 1),
             new(1, 20, 1, 25, 1, 1)
         };
-        var sortedInv = Mir2Client.Net.PacketProtocolEngine.BagAutoSortEngine.SortInventory(rawInv);
+        var sortedInv = PacketProtocolEngine.BagAutoSortEngine.SortInventory(rawInv);
         Assert.Equal(1, sortedInv[0].Type); // Type 1 排前面
 
         // 细节 142: 商铺交易税率抽成
-        var (price, tax) = Mir2Client.Net.PacketProtocolEngine.ShopTaxEngine.CalculateTax(1000, 10.0f);
+        var (price, tax) = PacketProtocolEngine.ShopTaxEngine.CalculateTax(1000, 10.0f);
         Assert.Equal(1100, price);
         Assert.Equal(100, tax);
 
         // 细节 143: 武器升级开刀成败瞬间判定
-        var slashRes = Mir2Client.Net.PacketProtocolEngine.WeaponSlashInstantJudgeEngine.JudgeSlash(true);
+        var slashRes = PacketProtocolEngine.WeaponSlashInstantJudgeEngine.JudgeSlash(true);
         Assert.True(slashRes.isSuccess);
 
         // 细节 144: 怪物脱战回位与回血
-        var tether = Mir2Client.Net.PacketProtocolEngine.MonsterTetherEngine.CheckTether(100, 100, 80, 80);
+        var tether = PacketProtocolEngine.MonsterTetherEngine.CheckTether(100, 100, 80, 80);
         Assert.True(tether.shouldReset);
         Assert.True(tether.healFullHp);
 
         // 细节 145: 持续毒伤与黄毒降双防
-        var (dmg, rAc, rMac) = Mir2Client.Net.PacketProtocolEngine.PoisonDebuffEngine.ApplyPoison(100, 50, 40, isGreen: true, isYellow: true);
+        var (dmg, rAc, rMac) = PacketProtocolEngine.PoisonDebuffEngine.ApplyPoison(100, 50, 40, isGreen: true, isYellow: true);
         Assert.Equal(5, dmg);
         Assert.Equal(40, rAc);  // 50 - 20%
         Assert.Equal(32, rMac); // 40 - 20%
 
         // 细节 146: 沙巴克皇宫占领判定
-        var palaceOcc = new List<Mir2Client.Net.PacketProtocolEngine.PalaceCaptureEngine.Occupant>
+        var palaceOcc = new List<PacketProtocolEngine.PalaceCaptureEngine.Occupant>
         {
             new("义薄云天", true),
             new("义薄云天", true)
         };
-        var palResult = Mir2Client.Net.PacketProtocolEngine.PalaceCaptureEngine.EvaluatePalace(palaceOcc);
+        var palResult = PacketProtocolEngine.PalaceCaptureEngine.EvaluatePalace(palaceOcc);
         Assert.True(palResult.isCaptured);
         Assert.Equal("义薄云天", palResult.owningGuild);
 
         // 细节 147: 沙巴克城门损坏与倒塌废墟贴图替换
-        var gateStatus = Mir2Client.Net.PacketProtocolEngine.SabukDestructionEngine.CheckGateStatus(0);
+        var gateStatus = PacketProtocolEngine.SabukDestructionEngine.CheckGateStatus(0);
         Assert.True(gateStatus.isCollapsed);
         Assert.Equal(888, gateStatus.currentTextureId);
 
         // 细节 148: 客户端 60FPS 垂直同步锁帧
-        int sleepMs = Mir2Client.Net.PacketProtocolEngine.FrameLimiterEngine.CalculateSleepMs(5);
+        int sleepMs = PacketProtocolEngine.FrameLimiterEngine.CalculateSleepMs(5);
         Assert.Equal(11, sleepMs); // 16ms - 5ms = 11ms
 
         // 细节 149: 后台失去焦点静音/降音量
-        float vol = Mir2Client.Net.PacketProtocolEngine.BackgroundAudioEngine.CalculateVolume(1.0f, isWindowFocused: false, muteOnBlur: false);
+        float vol = PacketProtocolEngine.BackgroundAudioEngine.CalculateVolume(1.0f, isWindowFocused: false, muteOnBlur: false);
         Assert.Equal(0.2f, vol);
 
         // 细节 150: WIL 纹理 LRU 缓存驱逐
-        var lru = new Mir2Client.Net.PacketProtocolEngine.WilTextureLruCache(2);
+        var lru = new PacketProtocolEngine.WilTextureLruCache(2);
         lru.Put("tex1", 101);
         lru.Put("tex2", 102);
         lru.Put("tex3", 103); // 淘汰 tex1

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Mir2Client.Net;
+namespace Mir2.Shared.Protocols;
 
 /// <summary>
 /// 盛大官方 1.5 网络通信鲁棒性、同步与边界防御引擎 (细节 131 ~ 150)

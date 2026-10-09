@@ -1,6 +1,6 @@
 using System;
 
-namespace Mir2Client.Net;
+namespace Mir2.Shared.Protocols;
 
 /// <summary>
 /// 盛大官方 1.5 原版 SM 数据包反序列化器 (IDA sub_458D3C 逆推实证)
@@ -79,9 +79,9 @@ public static class PacketDecoder
     /// Extra 包含制表符、斜杠或换行符分隔的商品条目:
     /// 每行格式：名称 [\t 或 / 或 空格] 价格 [\t 或 / 或 空格] 重量或当前持久 [\t 或 / 或 空格] 最大持久
     /// </summary>
-    public static System.Collections.Generic.List<UI.ShopPanelView.ShopItemEntry> DecodeShopItems(string extraText)
+    public static System.Collections.Generic.List<ShopItemEntry> DecodeShopItems(string extraText)
     {
-        var list = new System.Collections.Generic.List<UI.ShopPanelView.ShopItemEntry>();
+        var list = new System.Collections.Generic.List<ShopItemEntry>();
         if (string.IsNullOrWhiteSpace(extraText))
             return list;
 
@@ -110,7 +110,7 @@ public static class PacketDecoder
             if (parts.Length > 3 && int.TryParse(parts[3].Trim(), out int md))
                 maxDura = md;
 
-            var entry = new UI.ShopPanelView.ShopItemEntry(name, weightOrDura, price);
+            var entry = new ShopItemEntry(name, weightOrDura, price);
             if (maxDura > 0)
             {
                 entry.Dura = weightOrDura;

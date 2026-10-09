@@ -1506,7 +1506,7 @@ public sealed class ServerMessageRouter
         }
 
         var lines = pkt.ExtraStr.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-        var items = new List<ShopPanelView.ShopItemEntry>();
+        var items = new List<ShopItemEntry>();
         string npcName = "商人";
 
         foreach (var line in lines)
@@ -1517,7 +1517,7 @@ public sealed class ServerMessageRouter
                 string name = parts[0];
                 int weight = int.TryParse(parts[1], out var w) ? w : 1;
                 int price = int.TryParse(parts[2], out var p) ? p : 100;
-                items.Add(new ShopPanelView.ShopItemEntry(name, weight, price));
+                items.Add(new ShopItemEntry(name, weight, price));
             }
             else if (parts.Length == 1 && line.StartsWith("#"))
             {
@@ -1537,19 +1537,19 @@ public sealed class ServerMessageRouter
             return;
         }
         var lines = pkt.ExtraStr.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-        var items = new List<ShopPanelView.ShopItemEntry>();
+        var items = new List<ShopItemEntry>();
         foreach (var line in lines)
         {
             var parts = line.Split(new[] { '\t', '/' }, StringSplitOptions.None);
             if (parts.Length >= 3)
             {
-                items.Add(new ShopPanelView.ShopItemEntry(parts[0],
+                items.Add(new ShopItemEntry(parts[0],
                     int.TryParse(parts[1], out var w) ? w : 1,
                     int.TryParse(parts[2], out var p) ? p : 0));
             }
             else if (parts.Length >= 1 && !string.IsNullOrWhiteSpace(parts[0]))
             {
-                items.Add(new ShopPanelView.ShopItemEntry(parts[0].Trim(), 1, 0));
+                items.Add(new ShopItemEntry(parts[0].Trim(), 1, 0));
             }
         }
         _hud?.OpenStorageList(items);
