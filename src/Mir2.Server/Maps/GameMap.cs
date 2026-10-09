@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Mir2.Server.Network;
 
 namespace Mir2.Server.Maps;
@@ -68,4 +69,69 @@ public sealed class GameMap
             }
         }
     }
+
+    // ==================== 官方 1.4/1.5 地面物品容器与 80 秒保护期 (IDA 0x4C5CB0) ====================
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, List<GroundItemEntity>> _groundItems = new();
+
+    public static long MakeCoordKey(int x, int y) => ((long)x << 32) | (uint)y;
+
+    public void AddGroundItem(GroundItemEntity item)
+    {
+        long key = MakeCoordKey(item.X, item.Y);
+        var list = _groundItems.GetOrAdd(key, _ => new List<GroundItemEntity>());
+        lock (list)
+        {
+            list.Add(item);
+        }
+    }
+
+    public (bool success, GroundItemEntity? item, string errorMsg) TryPickGroundItem(int x, int y, int sessionId, long nowMs)
+    {
+        long key = MakeCoordKey(x, y);
+        if (!_groundItems.TryGetValue(key, out var list))
+        {
+            return (false, null, "地上没有任何物品");
+        }
+
+        lock (list)
+        {
+            if (list.Count == 0)
+            {
+                return (false, null, "地上没有任何物品");
+            }
+
+            // 优先拾取列表顶部物品
+            var candidate = list[0];
+
+            // 官方保护期判定: 80,000 毫秒 = 80秒 (IDA 0x4C5CB0 @ 0x13880)
+            if (nowMs - candidate.DropTickMs <= 80000 && candidate.OwnerSessionId != 0 && candidate.OwnerSessionId != sessionId)
+            {
+                return (false, null, "物品受保护中，无法拾取");
+            }
+
+            list.RemoveAt(0);
+            if (list.Count == 0)
+            {
+                _groundItems.TryRemove(key, out _);
+            }
+            return (true, candidate, string.Empty);
+        }
+    }
 }
+
+/// <summary>
+/// 地面掉落物实体
+/// </summary>
+public sealed class GroundItemEntity
+{
+    public int Uid { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public int X { get; init; }
+    public int Y { get; init; }
+    public int Count { get; init; } = 1;
+    public bool IsGold { get; init; }
+    public int Weight { get; init; } = 1;
+    public int OwnerSessionId { get; set; }
+    public long DropTickMs { get; init; }
+}
+

@@ -92,6 +92,10 @@ public sealed class PacketDispatcher
                 HandleSay(session, remaining);
                 break;
 
+            case ProtocolConsts.CM_PICKUP: // 1001 拾取地表物品 (IDA 0x4C5CB0)
+                HandlePickUp(session);
+                break;
+
             default:
                 // 未知或扩展协议默认回显记录
                 break;
@@ -356,6 +360,16 @@ public sealed class PacketDispatcher
                         for (int d = 0; d < dropped.Count; d++)
                         {
                             var drop = dropped[d];
+                            hitMap.AddGroundItem(new GroundItemEntity
+                            {
+                                Uid = drop.ItemUid,
+                                Name = drop.ItemName,
+                                X = defender.X,
+                                Y = defender.Y,
+                                OwnerSessionId = session.SessionId, // 杀手独享 80 秒拾取保护权 (IDA 0x4C5CB0)
+                                DropTickMs = nowMs,
+                                Weight = 1
+                            });
                             BroadcastToNinePatch(defender, ProtocolConsts.SM_GROUNDITEM, drop.ItemUid, defender.X, defender.Y, 0, drop.ItemName, includeSelf: true);
                         }
                     }
@@ -461,6 +475,16 @@ public sealed class PacketDispatcher
                     for (int d = 0; d < dropped.Count; d++)
                     {
                         var drop = dropped[d];
+                        spellMap.AddGroundItem(new GroundItemEntity
+                        {
+                            Uid = drop.ItemUid,
+                            Name = drop.ItemName,
+                            X = defender.X,
+                            Y = defender.Y,
+                            OwnerSessionId = session.SessionId, // 杀手独享 80 秒拾取保护权 (IDA 0x4C5CB0)
+                            DropTickMs = nowMs,
+                            Weight = 1
+                        });
                         BroadcastToNinePatch(defender, ProtocolConsts.SM_GROUNDITEM, drop.ItemUid, defender.X, defender.Y, 0, drop.ItemName, includeSelf: true);
                     }
                 }
@@ -493,6 +517,75 @@ public sealed class PacketDispatcher
         // 2. 普通聊天广播到周围九宫格
         string msg = $"{session.CharacterName}: {payload}";
         BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSAY, session.SessionId, session.X, session.Y, 0, msg, includeSelf: true);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.4/1.5 拾取地表物品权威逻辑 (IDA 0x4C5CB0 TCreature.PickUp)
+    /// 包含死亡状态校验、80秒归属保护期、背包40格满仓检测、负重上限校验
+    /// </summary>
+    private void HandlePickUp(ClientSession session)
+    {
+        if (session.State == null || session.State.Hp <= 0) return; // 死亡不可拾取 (IDA 0x4C5CB0 @ L889)
+
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+        long nowMs = Environment.TickCount64;
+
+        // 尝试拾取玩家当前脚下 (session.X, session.Y) 的物品
+        var (success, groundItem, errorMsg) = map.TryPickGroundItem(session.X, session.Y, session.SessionId, nowMs);
+        if (!success || groundItem == null)
+        {
+            if (!string.IsNullOrEmpty(errorMsg))
+            {
+                // 发送官方系统提示消息
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, errorMsg);
+            }
+            return;
+        }
+
+        // 1. 金币拾取处理
+        if (groundItem.IsGold)
+        {
+            session.State.Gold += groundItem.Count;
+            // 广播地表物品消失: SM_DELGROUNDITEM (315)
+            BroadcastToNinePatch(session, ProtocolConsts.SM_DELGROUNDITEM, groundItem.Uid, groundItem.X, groundItem.Y, 0, groundItem.Name, includeSelf: true);
+            // 刷新金币
+            session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, 0, 0, 0);
+            return;
+        }
+
+        // 2. 普通装备/物品拾取处理
+        // 2.1 检查背包格子上限 (官方 40 格)
+        if (session.State.BagItems.Count >= 40)
+        {
+            // 背包已满，放回地面
+            map.AddGroundItem(groundItem);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "背包已满，无法拾取！");
+            return;
+        }
+
+        // 2.2 检查背包负重 (IDA 0x4C5CB0 @ L913)
+        if (session.State.BagWeight + groundItem.Weight > session.State.MaxBagWeight)
+        {
+            // 超过负重，放回地面
+            map.AddGroundItem(groundItem);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "负重不足，无法拾取！");
+            return;
+        }
+
+        // 2.3 入包结算
+        session.State.BagItems.Add(new EquipItem
+        {
+            Uid = groundItem.Uid,
+            Name = groundItem.Name,
+            Weight = groundItem.Weight
+        });
+        session.State.BagWeight += groundItem.Weight;
+
+        // 2.4 九宫格广播地表物品消失: SM_DELGROUNDITEM (315)
+        BroadcastToNinePatch(session, ProtocolConsts.SM_DELGROUNDITEM, groundItem.Uid, groundItem.X, groundItem.Y, 0, groundItem.Name, includeSelf: true);
+
+        // 2.5 下发物品入包通知: SM_ADDITEM (200)
+        session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, groundItem.Uid, groundItem.Weight, 0, 0, groundItem.Name);
     }
 
     /// <summary>

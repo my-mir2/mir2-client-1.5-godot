@@ -155,7 +155,45 @@ while ( remainingCount > 0 ) {
 
 ---
 
-## 6. 关键函数物理地址对照表
+## 6. 地表物品拾取与保护期机制 (TCreature.PickUp @ 0x4C5CB0)
+
+```c
+// IDA 0x4C5CB0 @ L889~L980
+if ( *(_BYTE *)(Creature + 791) == 0 ) { // 实体存活检测
+    GroundItem = FindGroundItem(Map, X, Y);
+    if ( GroundItem != null ) {
+        // 1. 掉落保护期 (0x13880 = 80,000 毫秒 = 80秒)
+        if ( GetTickCount() - GroundItem.DropTick > 80000 ) {
+            GroundItem.Owner = 0; // 超出 80 秒，保护解除，全员可拾取
+        }
+        
+        // 2. 所属权校验
+        if ( IsOwnerOrUnprotected(Creature, GroundItem) ) {
+            if ( GroundItem.IsGold ) {
+                AddGold(Creature, GroundItem.GoldCount);
+                DeleteGroundItem(Map, X, Y, GroundItem);
+            } else {
+                // 3. 背包格子与负重检测
+                if ( HasBagSpace(Creature) && CheckBagWeight(Creature, GroundItem.Weight) ) {
+                    AddToBag(Creature, GroundItem);
+                    DeleteGroundItem(Map, X, Y, GroundItem);
+                    BroadcastDeleteGroundItem(Map, X, Y, GroundItem); // SM_DELGROUNDITEM (315)
+                }
+            }
+        } else {
+            SysMsg(Creature, "Unable to pick up: Item is protected");
+        }
+    }
+}
+```
+- **物理事实**：
+  1. 官方保护期精准为 **80,000 毫秒** (`0x13880`)；
+  2. 保护期内只有杀手/拥有者有权捡起；超时后 `Owner = 0`，全员皆可拾取；
+  3. 拾取前严格校验存活、背包剩余格子及当前背包负重。
+
+---
+
+## 7. 关键函数物理地址对照表
 
 | 函数地址 (Hex) | 函数大小 | 官方模块 | 函数名 / 职责说明 |
 | :--- | :--- | :--- | :--- |
