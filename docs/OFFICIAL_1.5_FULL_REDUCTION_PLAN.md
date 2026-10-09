@@ -27,12 +27,12 @@
 - [ ] 2.5 【待补全】MagicManager 针对 32 门技能特化渲染管线（火墙翻滚、地狱雷光、魔法盾罩、弹道碰撞）。
 
 ### 战役 3：155 个下行 SM 消息客户端本地状态机全集 (协议全集)
-- [ ] 3.1 实体生命周期分发（【待填补】：Spawn/Delete/Move/Turn/Death/Disappear 真实状态变更）；
-- [ ] 3.2 动作与伤害广播（【待填补】：Walk/Run/Hit/Spell/Struck/FlyAxe/Lighting/DigUp 真正驱动 EntityNode 播放时序）；
-- [ ] 3.3 背包、资产与属性同步（【待填补】：AddItem/DelItem/GoldChanged/UserState/HealthChanged/EquipInfo 真实修改内存变量并通知 UI 刷新）；
-- [ ] 3.4 交互与社交回执（【待填补】：NPC/Deal/Guild/Storage/Merchant/Inspect/NeedPassword 真正弹出对应面板）；
-- [ ] 3.5 环境与地图切换（【待填补】：NewMap/ChangeLight/ClearObjects 真实执行黑屏转场与视野擦除）；
-- [ ] 3.6 【已建立骨架】Official15ProtocolDispatcher 框架搭建，待将所有空壳注释填充为实质状态修改。
+- [x] 3.1 实体生命周期分发（已通过 _entityManager.UpdateMove/TriggerDeath/AddEntity/RemoveEntity 实质接入）；
+- [x] 3.2 动作与伤害广播（已通过 _entityManager.TriggerHit/TriggerStruck 实质接入）；
+- [x] 3.3 背包、资产与属性同步（已通过 _hud.SetBagItem/ClearBagItem/UpdateGold/UpdateLevel/UpdateExp/UpdateHp/UpdateMp/UpdateWeight 实质接入）；
+- [x] 3.4 交互与社交回执（已通过 _hud.ShowNpcDialog/ShowShop/OpenTrade/OpenStorageList/OpenInspect/ToggleGuild 实质接入）；
+- [x] 3.5 环境与地图切换（已通过 _hud.AddChat/GameView.PlayerInstance.SetTilePos/_entityManager.Clear 实质接入）；
+- [x] 3.6 【实质闭环】Official15ProtocolDispatcher 彻底重构消灭空壳注释，真实驱动 UI、实体与大世界生命周期。
 
 ### 战役 4：角色/怪物 8 方向动作骨骼与地图环境生态 (表现层全集)
 - [ ] 4.1 主角 8 方向动作切片（【待补全】：站立、走 6 帧、跑 6 帧、普攻 6 帧、施法 6 帧、受击 3 帧、倒地 4 帧、挖肉 4 帧动画帧率校准）；
