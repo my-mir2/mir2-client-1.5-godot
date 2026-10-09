@@ -201,12 +201,23 @@ public sealed class PlayerState
     // 特戒赋予的技能列表 (如火焰戒指赋予火球术 1，防御戒指赋予治愈术 2)
     public List<int> GrantedRingSkills { get; } = new();
 
+    // 隐身术与麻痹石化状态 (IDA 0x49350C / 0x4B966C)
+    public long InvisibilityExpireMs { get; set; }
+    public bool IsInvisible => Environment.TickCount64 < InvisibilityExpireMs || HasInvisibleRing;
+
+    public long ParalyzeExpireMs { get; set; }
+    public bool IsParalyzed => Environment.TickCount64 < ParalyzeExpireMs;
+
     // 12 状态位掩码 (0: 绿毒, 1: 红毒, 5: 麻痹, 8: 隐身 等)
     public bool[] StatusBits { get; } = new bool[12];
     public uint BaseFlags { get; set; } = 0;
 
     public uint GetCurrentStatusMask()
     {
+        StatusBits[0] |= HasGreenPoison;
+        StatusBits[1] |= HasRedPoison;
+        StatusBits[5] |= IsParalyzed;
+        StatusBits[8] |= IsInvisible;
         return PlayerAuditEngine.AuditCalcStatusMask(StatusBits, BaseFlags);
     }
 

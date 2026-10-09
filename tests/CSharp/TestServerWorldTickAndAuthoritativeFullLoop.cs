@@ -562,7 +562,8 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
                 Level = 1,
                 Exp = 0,
                 Hp = 19,
-                MaxHp = 19
+                MaxHp = 19,
+                Hit = 100
             }
         };
         map.Aoi.Enter(player, 200, 200);

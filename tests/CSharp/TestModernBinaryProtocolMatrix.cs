@@ -302,7 +302,7 @@ public class TestModernBinaryProtocolMatrix
             X = 300,
             Y = 300,
             CurrentMapId = 0,
-            State = new Mir2.Shared.Models.PlayerState { Hp = 500, MaxHp = 500 }
+            State = new Mir2.Shared.Models.PlayerState { Hp = 500, MaxHp = 500, Hit = 100 }
         };
 
         var defender = new ClientSession(2, dummySocket)

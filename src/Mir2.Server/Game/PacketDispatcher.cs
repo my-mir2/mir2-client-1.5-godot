@@ -364,6 +364,14 @@ public sealed class PacketDispatcher
 
     private void HandleMove(ClientSession session, ReadOnlySpan<char> payload, bool isRun)
     {
+        // 官方麻痹石化状态检测: 麻痹期间封锁移动并拉回
+        if (session.State != null && session.State.IsParalyzed)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, session.X, session.Y, session.Direction, session.CharacterName);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【石化】你处于麻痹状态，无法移动！");
+            return;
+        }
+
         // 格式: 目标X/目标Y/朝向
         int slash1 = payload.IndexOf('/');
         if (slash1 < 0) return;
@@ -471,6 +479,12 @@ public sealed class PacketDispatcher
         int slash3 = dirSpan.IndexOf('/');
         if (slash3 >= 0) dirSpan = dirSpan[..slash3];
 
+        if (session.State != null && session.State.IsParalyzed)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【石化】你处于麻痹状态，无法攻击！");
+            return;
+        }
+
         if (int.TryParse(xSpan, out int targetX) &&
             int.TryParse(ySpan, out int targetY) &&
             int.TryParse(dirSpan, out int dir))
@@ -562,6 +576,10 @@ public sealed class PacketDispatcher
                     var (rawDmg, hit, isFireHit, died) = ResolveAuthoritativeMonsterPhysicalCombat(session, monster, dist, nowMs);
                     if (hit && rawDmg > 0)
                     {
+                        // 累加怪物仇恨大账本与破石苏醒 (IDA 0x4B966C)
+                        monster.ThreatTable.AddHate(session.SessionId, rawDmg, isTaunt: false);
+                        if (monster.IsStoneForm) monster.IsStoneForm = false;
+
                         // 广播怪物受击后仰: SM_OBJECTSTRUCK (244)
                         BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, monster.Uid, monster.X, monster.Y, rawDmg, monster.Name, includeSelf: true);
 
@@ -572,19 +590,25 @@ public sealed class PacketDispatcher
                             // 广播怪物死亡倒地: SM_DEATH_ACTION_DELPHI (28)
                             BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, monster.Uid, monster.X, monster.Y, 0, monster.Name, includeSelf: true);
 
-                            // 怪物死亡爆落战利品
-                            var loot = new GroundItemEntity
+                            // 盛大官方怪物掉落与周边空地散射 (80秒归属权保护)
+                            var dropRules = MonsterDropEngine.GetMonsterDropRules(monster.Name);
+                            var drops = MonsterDropEngine.RollMonsterDrops(monster.X, monster.Y, session.SessionId, nowMs, dropRules, OfficialClientRulesEngine.DelphiRandom.Shared, (tx, ty) => hitMap.IsWalkable(tx, ty));
+                            drops.Insert(0, new GroundItemEntity
                             {
                                 Uid = 50000 + monster.Uid % 10000,
                                 Name = $"{monster.Name}_战利品",
                                 X = monster.X,
                                 Y = monster.Y,
-                                OwnerSessionId = session.SessionId, // 击杀者 80 秒归属权
+                                OwnerSessionId = session.SessionId,
                                 DropTickMs = nowMs,
                                 Weight = 1
-                            };
-                            hitMap.AddGroundItem(loot);
-                            BroadcastToNinePatch(session, ProtocolConsts.SM_GROUNDITEM, loot.Uid, monster.X, monster.Y, 0, loot.Name, includeSelf: true);
+                            });
+
+                            foreach (var loot in drops)
+                            {
+                                hitMap.AddGroundItem(loot);
+                                BroadcastToNinePatch(session, ProtocolConsts.SM_GROUNDITEM, loot.Uid, loot.X, loot.Y, 0, loot.Name, includeSelf: true);
+                            }
                             OnMonsterKilledByPlayer(session, monster);
                         }
                     }
@@ -596,6 +620,11 @@ public sealed class PacketDispatcher
     private void HandleSpell(ClientSession session, ReadOnlySpan<char> payload)
     {
         if (session.State == null) return;
+        if (session.State.IsParalyzed)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【石化】你处于麻痹状态，无法施法！");
+            return;
+        }
 
         // 格式: targetUid/magicId/targetX/targetY (CM_SPELL 3017)
         int slash1 = payload.IndexOf('/');

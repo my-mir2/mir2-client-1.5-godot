@@ -26,6 +26,76 @@ public sealed class MonsterSpawnRule
 }
 
 /// <summary>
+/// 盛大官方 1.4/1.5 怪物仇恨权值大账本 (MonsterThreatTable)
+/// 严格 1:1 对齐官方 M2Server 物理反编译代码 (0x4B966C / TargetHate):
+/// - 伤害权值累积换仇
+/// - 道士召唤兽 (神兽/骷髅) 嘲讽高权值优先吸引怪物转火
+/// - 1.2 倍换仇门槛 (新目标必须超过当前第一仇恨 120% 才能换火，防止抽搐)
+/// - 目标隐身、死亡、距离脱出视野则脱仇
+/// </summary>
+public sealed class MonsterThreatTable
+{
+    private readonly Dictionary<int, int> _hateMap = new();
+    public int PrimaryTargetId { get; private set; }
+    public int MaxHate { get; private set; }
+
+    public void AddHate(int sessionId, int hateAmount, bool isTaunt = false)
+    {
+        if (sessionId <= 0 || hateAmount <= 0) return;
+        // 神兽与骷髅嘲讽加成: 伤害 * 2 + 50 额外嘲讽权值
+        int bonus = isTaunt ? (hateAmount * 2 + 50) : hateAmount;
+        if (_hateMap.TryGetValue(sessionId, out int current))
+        {
+            _hateMap[sessionId] = current + bonus;
+        }
+        else
+        {
+            _hateMap[sessionId] = bonus;
+        }
+
+        int newHate = _hateMap[sessionId];
+        if (PrimaryTargetId == 0 || PrimaryTargetId == sessionId)
+        {
+            PrimaryTargetId = sessionId;
+            MaxHate = newHate;
+        }
+        else if (isTaunt || newHate > (int)(MaxHate * 1.2f))
+        {
+            PrimaryTargetId = sessionId;
+            MaxHate = newHate;
+        }
+    }
+
+    public void RemoveTarget(int sessionId)
+    {
+        _hateMap.Remove(sessionId);
+        if (PrimaryTargetId == sessionId)
+        {
+            PrimaryTargetId = 0;
+            MaxHate = 0;
+            foreach (var kvp in _hateMap)
+            {
+                if (kvp.Value > MaxHate)
+                {
+                    MaxHate = kvp.Value;
+                    PrimaryTargetId = kvp.Key;
+                }
+            }
+        }
+    }
+
+    public void Clear()
+    {
+        _hateMap.Clear();
+        PrimaryTargetId = 0;
+        MaxHate = 0;
+    }
+
+    public bool HasTarget => PrimaryTargetId != 0;
+    public int GetHate(int sessionId) => _hateMap.TryGetValue(sessionId, out int h) ? h : 0;
+}
+
+/// <summary>
 /// 服务端怪物运行时实体
 /// </summary>
 public sealed class MonsterInstance
@@ -49,6 +119,15 @@ public sealed class MonsterInstance
     public int AttackDamageMax { get; set; } = 14;
     public long NextActionTimeMs { get; set; }
     public int TargetSessionId { get; set; }
+
+    // 盛大官方怪物特异 AI 状态属性
+    public MonsterThreatTable ThreatTable { get; } = new();
+    public bool CanMove { get; set; } = true; // 角蝇、赤月恶魔等固定不可移动
+    public bool IsStoneForm { get; set; } = false; // 祖玛雕像/祖玛卫士初始石化状态
+    public bool SeeInvisibility { get; set; } = false; // 赤月恶魔、各大教主破隐看穿隐身术
+    public long NextSpecialSkillTimeMs { get; set; } = 0; // 特殊技能冷却计时器
+    public int SpawnedSubMonsterCount { get; set; } = 0; // 角蝇当前繁殖存活的小怪数
+    public int ParentMonsterUid { get; set; } = 0; // 孵化出来的子怪记录母体 UID
 }
 
 /// <summary>
@@ -130,7 +209,11 @@ public sealed class MonsterRegenEngine
                             Direction = (byte)rng.Next(8),
                             Hp = rule.BaseHp,
                             MaxHp = rule.BaseHp,
-                            SpawnRuleId = rule.RuleId
+                            SpawnRuleId = rule.RuleId,
+                            // 官方怪物特异初始化规则
+                            IsStoneForm = rule.MonsterName.Contains("祖玛") && !rule.MonsterName.Contains("教主"),
+                            CanMove = !rule.MonsterName.Contains("角蝇") && !rule.MonsterName.Contains("赤月恶魔") && !rule.MonsterName.Contains("Demon"),
+                            SeeInvisibility = rule.MonsterName.Contains("赤月恶魔") || rule.MonsterName.Contains("教主") || rule.MonsterName.Contains("Demon")
                         };
 
                         _monsters[uid] = monster;
@@ -167,6 +250,13 @@ public sealed class MonsterRegenEngine
                     rule.ActiveCount--;
                 }
             }
+
+            // 回收母体子怪计数 (角蝇小蝙蝠死亡回收)
+            if (monster.ParentMonsterUid != 0 && _monsters.TryGetValue(monster.ParentMonsterUid, out var parent))
+            {
+                parent.SpawnedSubMonsterCount = Math.Max(0, parent.SpawnedSubMonsterCount - 1);
+            }
+
             // 官方默认保留 20 秒尸体 (CorpseRemainSec)
             monster.CorpseExpireTimeMs = Environment.TickCount64 + 20_000;
             _corpses[monsterUid] = monster;
@@ -275,17 +365,24 @@ public sealed class MonsterRegenEngine
     public readonly record struct MonsterAiActionResult(
         int MonsterUid,
         string MonsterName,
-        int ActionType, // 0=追击移动, 1=近战攻击, 2=闲置巡逻
+        int ActionType, // 0=追击移动, 1=近战攻击, 2=闲置巡逻, 3=远程喷毒, 4=全屏地刺, 5=孵化吐怪, 6=破石苏醒
         int X,
         int Y,
         byte Direction,
         int TargetSessionId,
-        int DamageDealt
+        int DamageDealt,
+        string Extra = ""
     );
 
     /// <summary>
     /// 执行全服怪物 AI 核心心跳 (IDA 0x4B1638 ProcessMonsters & 0x4B966C)
-    /// 包含视野索敌、追击移动、邻近攻击判定与 15ms 时间片硬熔断保护
+    /// 严格 1:1 闭环官方特异行为树:
+    /// - 仇恨大账本锁定、换仇 (1.2倍门槛) 与隐身/距离脱仇
+    /// - 祖玛雕像/祖玛卫士: 初始石化 (IsStoneForm), 玩家进入 3 格内或承伤时破石苏醒
+    /// - 毒蜘蛛: 2~4 格远程喷吐绿毒 (清空血池并持续扣血)
+    /// - 契蛾 / 蝙蝠 / 洞蛆: 15% 几率近战麻痹石化 (定身无法行动 3 秒)
+    /// - 角蝇: 固定原地不可移动, 每 2.5 秒吐出小蝙蝠 (最多维持 10 只)
+    /// - 赤月恶魔: 固定原地不可移动, 破隐全屏 15 格穿刺地刺群伤
     /// </summary>
     public (List<MonsterAiActionResult> actions, bool sliceTimeout) ProcessMonsterAiTick(
         Func<int, int, int, List<ClientSession>> getSessionsInNinePatch,
@@ -306,27 +403,201 @@ public sealed class MonsterRegenEngine
             var map = _mapManager.GetMap(monster.MapId);
             if (map == null) continue;
 
-            // 1. 视野索敌 (扫描周围九宫格内的玩家, 默认 5 格视野)
             var nearbyPlayers = getSessionsInNinePatch(monster.MapId, monster.X, monster.Y);
-            ClientSession? targetPlayer = null;
-            int closestDist = int.MaxValue;
 
-            for (int i = 0; i < nearbyPlayers.Count; i++)
+            // ==================== 1. 祖玛雕像/祖玛卫士 破石苏醒状态机 ====================
+            if (monster.IsStoneForm)
             {
-                var p = nearbyPlayers[i];
-                if (p.State == null || p.State.Hp <= 0) continue;
-
-                int dx = Math.Abs(p.X - monster.X);
-                int dy = Math.Abs(p.Y - monster.Y);
-                int chebyshevDist = Math.Max(dx, dy);
-
-                if (chebyshevDist <= monster.ViewRange && chebyshevDist < closestDist)
+                bool wakeUp = monster.ThreatTable.HasTarget; // 受到外界攻击立即苏醒
+                if (!wakeUp)
                 {
-                    closestDist = chebyshevDist;
-                    targetPlayer = p;
+                    for (int i = 0; i < nearbyPlayers.Count; i++)
+                    {
+                        var p = nearbyPlayers[i];
+                        if (p.State == null || p.State.Hp <= 0 || p.State.IsInvisible) continue;
+                        int dist = Math.Max(Math.Abs(p.X - monster.X), Math.Abs(p.Y - monster.Y));
+                        if (dist <= 3) // 官方 3 格接近唤醒距离
+                        {
+                            wakeUp = true;
+                            monster.ThreatTable.AddHate(p.SessionId, 1);
+                            break;
+                        }
+                    }
+                }
+
+                if (wakeUp)
+                {
+                    monster.IsStoneForm = false;
+                    monster.NextActionTimeMs = now + 800; // 苏醒硬直后摇
+                    actions.Add(new MonsterAiActionResult(
+                        monster.Uid, monster.Name, ActionType: 6,
+                        monster.X, monster.Y, monster.Direction,
+                        monster.ThreatTable.PrimaryTargetId, DamageDealt: 0,
+                        Extra: "破石苏醒"
+                    ));
+                }
+                continue; // 石化状态本帧不执行后续行动
+            }
+
+            // ==================== 2. 赤月恶魔 全屏地刺面伤 ====================
+            if (monster.Name.Contains("赤月恶魔") || monster.Name.Contains("Demon"))
+            {
+                monster.CanMove = false;
+                monster.SeeInvisibility = true;
+                if (now >= monster.NextSpecialSkillTimeMs)
+                {
+                    bool attacked = false;
+                    for (int i = 0; i < nearbyPlayers.Count; i++)
+                    {
+                        var p = nearbyPlayers[i];
+                        if (p.State == null || p.State.Hp <= 0) continue;
+                        int dist = Math.Max(Math.Abs(p.X - monster.X), Math.Abs(p.Y - monster.Y));
+                        if (dist <= 15) // 官方全屏 15 格地刺判定
+                        {
+                            int spikeDmg = rng.NextRange(monster.AttackDamageMin, monster.AttackDamageMax);
+                            p.State.Hp = Math.Max(0, p.State.Hp - spikeDmg);
+                            actions.Add(new MonsterAiActionResult(
+                                monster.Uid, monster.Name, ActionType: 4,
+                                monster.X, monster.Y, monster.Direction,
+                                p.SessionId, DamageDealt: spikeDmg,
+                                Extra: "全屏地刺"
+                            ));
+                            attacked = true;
+                        }
+                    }
+                    if (attacked)
+                    {
+                        monster.NextSpecialSkillTimeMs = now + 2000; // 地刺冷却 2.0 秒
+                        monster.NextActionTimeMs = now + 1200;
+                        continue;
+                    }
                 }
             }
 
+            // ==================== 3. 角蝇 吐出小蝙蝠特异行为 ====================
+            if ((monster.Name == "角蝇" || monster.Name == "HouseFly") && !monster.Name.Contains("蝙蝠"))
+            {
+                monster.CanMove = false;
+                if (now >= monster.NextSpecialSkillTimeMs && monster.SpawnedSubMonsterCount < 10)
+                {
+                    // 只要视野内有活人，每 2.5 秒吐出一只小蝙蝠
+                    bool hasActivePlayer = false;
+                    for (int i = 0; i < nearbyPlayers.Count; i++)
+                    {
+                        var player = nearbyPlayers[i];
+                        if (player?.State != null && player.State.Hp > 0)
+                        {
+                            hasActivePlayer = true;
+                            break;
+                        }
+                    }
+
+                    if (hasActivePlayer)
+                    {
+                        for (int d = 0; d < 8; d++)
+                        {
+                            var (offX, offY) = GetDirOffset((byte)d);
+                            int batX = monster.X + offX;
+                            int batY = monster.Y + offY;
+                            if (map.IsWalkable(batX, batY) && !IsTileOccupiedByOtherMonster(monster.MapId, batX, batY, monster.Uid))
+                            {
+                                int batUid = System.Threading.Interlocked.Increment(ref _nextMonsterUid);
+                                var bat = new MonsterInstance
+                                {
+                                    Uid = batUid,
+                                    Name = "角蝇小蝙蝠",
+                                    MapId = monster.MapId,
+                                    X = batX,
+                                    Y = batY,
+                                    Direction = (byte)d,
+                                    Hp = 15,
+                                    MaxHp = 15,
+                                    AttackDamageMin = 3,
+                                    AttackDamageMax = 8,
+                                    SpawnRuleId = 0,
+                                    ParentMonsterUid = monster.Uid,
+                                    NextActionTimeMs = now + 1000 // 刚孵化落地出生硬直 1 秒
+                                };
+                                _monsters[batUid] = bat;
+                                monster.SpawnedSubMonsterCount++;
+                                monster.NextSpecialSkillTimeMs = now + 2500;
+                                monster.NextActionTimeMs = now + 1000;
+                                actions.Add(new MonsterAiActionResult(
+                                    monster.Uid, monster.Name, ActionType: 5,
+                                    batX, batY, (byte)d,
+                                    0, DamageDealt: 0,
+                                    Extra: "吐出小蝙蝠"
+                                ));
+                                break;
+                            }
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            // ==================== 4. 仇恨列表第一目标检索与脱仇判定 ====================
+            ClientSession? targetPlayer = null;
+            if (monster.ThreatTable.HasTarget)
+            {
+                int primaryId = monster.ThreatTable.PrimaryTargetId;
+                for (int i = 0; i < nearbyPlayers.Count; i++)
+                {
+                    if (nearbyPlayers[i].SessionId == primaryId)
+                    {
+                        var candidate = nearbyPlayers[i];
+                        if (candidate.State != null && candidate.State.Hp > 0)
+                        {
+                            int dist = Math.Max(Math.Abs(candidate.X - monster.X), Math.Abs(candidate.Y - monster.Y));
+                            // 距离过远脱仇 (ViewRange + 4)
+                            if (dist > monster.ViewRange + 4)
+                            {
+                                monster.ThreatTable.RemoveTarget(primaryId);
+                            }
+                            // 隐身脱仇 (道士隐身术/隐身戒指生效且怪不破隐)
+                            else if (candidate.State.IsInvisible && !monster.SeeInvisibility)
+                            {
+                                monster.ThreatTable.RemoveTarget(primaryId);
+                            }
+                            else
+                            {
+                                targetPlayer = candidate;
+                            }
+                        }
+                        else
+                        {
+                            monster.ThreatTable.RemoveTarget(primaryId);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // ==================== 5. 视野自然索敌 (寻找最近未隐身玩家) ====================
+            if (targetPlayer == null)
+            {
+                int closestDist = int.MaxValue;
+                for (int i = 0; i < nearbyPlayers.Count; i++)
+                {
+                    var p = nearbyPlayers[i];
+                    if (p.State == null || p.State.Hp <= 0) continue;
+                    if (p.State.IsInvisible && !monster.SeeInvisibility) continue;
+
+                    int chebyshevDist = Math.Max(Math.Abs(p.X - monster.X), Math.Abs(p.Y - monster.Y));
+                    if (chebyshevDist <= monster.ViewRange && chebyshevDist < closestDist)
+                    {
+                        closestDist = chebyshevDist;
+                        targetPlayer = p;
+                    }
+                }
+
+                if (targetPlayer != null)
+                {
+                    monster.ThreatTable.AddHate(targetPlayer.SessionId, 1);
+                }
+            }
+
+            // ==================== 6. 目标执行行动 (远程喷毒 / 近战撕咬 / 追击寻路) ====================
             if (targetPlayer != null)
             {
                 monster.TargetSessionId = targetPlayer.SessionId;
@@ -334,25 +605,53 @@ public sealed class MonsterRegenEngine
                 int dy = targetPlayer.Y - monster.Y;
                 int dist = Math.Max(Math.Abs(dx), Math.Abs(dy));
 
-                if (dist == 1)
+                // 6.1 毒蜘蛛远程喷毒攻击 (距离 2~4 格且 CD 到达)
+                if (monster.Name.Contains("毒蜘蛛") && dist >= 2 && dist <= 4 && now >= monster.NextSpecialSkillTimeMs)
                 {
-                    // 2. 邻接物理近战攻击 (IDA 0x4B966C)
                     monster.Direction = GetDirection(dx, dy);
-                    int dmg = rng.Next(monster.AttackDamageMax - monster.AttackDamageMin + 1) + monster.AttackDamageMin;
+                    int poisonDmg = rng.NextRange(monster.AttackDamageMin, monster.AttackDamageMax);
+                    targetPlayer.State!.Hp = Math.Max(0, targetPlayer.State.Hp - poisonDmg);
 
-                    // 结算目标玩家受击扣血
+                    // 附加官方原版绿毒 (清空血池，每 2.5 秒扣血)
+                    targetPlayer.State.HasGreenPoison = true;
+                    targetPlayer.State.GreenPoisonExpireMs = now + 10_000;
+                    targetPlayer.State.GreenPoisonSc = 5;
+                    targetPlayer.State.IncHealth = 0;
+                    targetPlayer.State.StatusBits[0] = true;
+
+                    monster.NextSpecialSkillTimeMs = now + 2000;
+                    monster.NextActionTimeMs = now + 1200;
+                    actions.Add(new MonsterAiActionResult(
+                        monster.Uid, monster.Name, ActionType: 3,
+                        monster.X, monster.Y, monster.Direction,
+                        targetPlayer.SessionId, DamageDealt: poisonDmg,
+                        Extra: "毒液喷射"
+                    ));
+                }
+                // 6.2 邻接物理近战攻击
+                else if (dist == 1)
+                {
+                    monster.Direction = GetDirection(dx, dy);
+                    int dmg = rng.NextRange(monster.AttackDamageMin, monster.AttackDamageMax);
                     targetPlayer.State!.Hp = Math.Max(0, targetPlayer.State.Hp - dmg);
 
-                    monster.NextActionTimeMs = now + 1000; // 攻击后摇 1000ms
+                    // 契蛾 / 蝙蝠 / 洞蛆 15% 几率近战麻痹石化
+                    if ((monster.Name.Contains("契蛾") || monster.Name.Contains("洞蛆") || monster.Name.Contains("蝙蝠")) && rng.Next(100) < 15)
+                    {
+                        targetPlayer.State.ParalyzeExpireMs = now + 3000; // 麻痹 3 秒
+                        targetPlayer.State.StatusBits[5] = true;
+                    }
+
+                    monster.NextActionTimeMs = now + 1000;
                     actions.Add(new MonsterAiActionResult(
                         monster.Uid, monster.Name, ActionType: 1,
                         monster.X, monster.Y, monster.Direction,
                         targetPlayer.SessionId, DamageDealt: dmg
                     ));
                 }
-                else if (dist > 1)
+                // 6.3 追击移动寻路
+                else if (dist > 1 && monster.CanMove)
                 {
-                    // 3. 权威 A* 智能寻路追击 (避开物理障碍墙体与前方怪物实体防重叠)
                     var (nextX, nextY, nextDir, found) = ServerPathFinder.FindNextStep(
                         map,
                         monster.X,
@@ -368,7 +667,7 @@ public sealed class MonsterRegenEngine
                         monster.Direction = nextDir;
                         monster.X = nextX;
                         monster.Y = nextY;
-                        monster.NextActionTimeMs = now + 800; // 移动冷却 800ms
+                        monster.NextActionTimeMs = now + 800;
                         actions.Add(new MonsterAiActionResult(
                             monster.Uid, monster.Name, ActionType: 0,
                             monster.X, monster.Y, monster.Direction,
@@ -380,15 +679,14 @@ public sealed class MonsterRegenEngine
             else
             {
                 monster.TargetSessionId = 0;
-                // 4. 闲置巡逻 (20% 几率随机朝 8 方向漫步一格，避开障碍与其他怪物)
-                if (rng.Next(5) == 0)
+                // 7. 闲置漫步巡逻 (20% 几率随机朝 8 方向漫步一格)
+                if (monster.CanMove && rng.Next(5) == 0)
                 {
                     int randDir = rng.Next(8);
                     var (offX, offY) = GetDirOffset((byte)randDir);
                     int roamX = monster.X + offX;
                     int roamY = monster.Y + offY;
 
-                    // 保证漫步不超过刷新半径
                     var rule = _rules.Find(r => r.RuleId == monster.SpawnRuleId);
                     bool withinRadius = rule == null || (Math.Abs(roamX - rule.CenterX) <= rule.Radius && Math.Abs(roamY - rule.CenterY) <= rule.Radius);
 
