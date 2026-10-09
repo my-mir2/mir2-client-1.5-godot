@@ -1021,6 +1021,81 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         dispatcher.Dispatch(mage, $"#{ProtocolConsts.CM_SPELL}/0/10/106/100/!");
         Assert.True(mage.HasBufferedPacket($"#{ProtocolConsts.SM_SYSMSG_DELPHI}/")); // 收到障碍阻挡提示
     }
+
+    [Fact]
+    public void TestOfficialTaoistHighTierSpellsFullLoop()
+    {
+        var (mapMgr, regen, _, dispatcher, map) = CreateTestEnvironment();
+
+        var taoist = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 200,
+            Y = 200,
+            Direction = 4, // 朝南
+            CharacterName = "逍遥散人",
+            State = new PlayerState { Uid = 1001, Name = "逍遥散人", Level = 35, Hp = 200, MaxHp = 200, Mp = 400, MaxMp = 400 }
+        };
+        // 佩戴护身符 (OfficialEquipSlot.Lighting = 2)
+        var amulet = new EquipItem { Uid = 301, Name = "道士护身符", Weight = 1, Dura = 100, MaxDura = 100 };
+        taoist.State.Equipment[(int)OfficialEquipSlot.Lighting] = amulet;
+        map.Aoi.Enter(taoist, 200, 200);
+
+        // 1. 测试神圣战甲术 (MagicId = 15) 与 幽灵盾 (MagicId = 14)
+        int prevBonusAc = taoist.State.BonusAc;
+        int prevBonusMac = taoist.State.BonusMac;
+        taoist.ClearBufferedPackets();
+        taoist.LastSpellTimeMs = 0;
+        dispatcher.Dispatch(taoist, $"#{ProtocolConsts.CM_SPELL}/0/15/200/200/!");
+        Assert.Equal(prevBonusAc + TaoistCombatEngine.AuraBuffs.BonusAc, taoist.State.BonusAc);
+
+        taoist.ClearBufferedPackets();
+        taoist.LastSpellTimeMs = 0;
+        dispatcher.Dispatch(taoist, $"#{ProtocolConsts.CM_SPELL}/0/14/200/200/!");
+        Assert.Equal(prevBonusMac + TaoistCombatEngine.AuraBuffs.BonusMac, taoist.State.BonusMac);
+
+        // 2. 测试召唤骷髅 (MagicId = 17) 与 召唤神兽 (MagicId = 30)
+        int prevAmuletDura = amulet.Dura;
+        taoist.ClearBufferedPackets();
+        taoist.LastSpellTimeMs = 0;
+        dispatcher.Dispatch(taoist, $"#{ProtocolConsts.CM_SPELL}/0/17/200/200/!");
+        Assert.Equal(prevAmuletDura - 1, amulet.Dura); // 扣除护身符耐久
+        var skeleton = regen.FindMonsterAt(0, 201, 200);
+        Assert.NotNull(skeleton);
+        Assert.Equal("变异骷髅", skeleton.Name);
+
+        taoist.ClearBufferedPackets();
+        taoist.LastSpellTimeMs = 0;
+        dispatcher.Dispatch(taoist, $"#{ProtocolConsts.CM_SPELL}/0/30/200/200/!");
+        Assert.Equal(prevAmuletDura - 2, amulet.Dura); // 再次扣除护身符耐久
+        var shinsu = regen.FindMonsterAt(0, 200, 201);
+        Assert.NotNull(shinsu);
+        Assert.Equal("神兽", shinsu.Name);
+
+        // 3. 测试心灵启示 (MagicId = 28)
+        taoist.ClearBufferedPackets();
+        taoist.LastSpellTimeMs = 0;
+        dispatcher.Dispatch(taoist, $"#{ProtocolConsts.CM_SPELL}/{shinsu.Uid}/28/201/200/!");
+        Assert.True(taoist.HasBufferedPacket($"#{ProtocolConsts.SM_SYSMSG_DELPHI}/"));
+
+        // 4. 测试困魔咒 (MagicId = 16)
+        regen.AddRule(new MonsterSpawnRule { RuleId = 99, MonsterName = "僵尸测试", MapId = 0, CenterX = 205, CenterY = 205, Radius = 0, MaxCount = 1, BaseHp = 100 });
+        regen.ProcessRegenTick(new OfficialClientRulesEngine.DelphiRandom(1));
+        var zombie = regen.FindMonsterAt(0, 205, 205);
+        Assert.NotNull(zombie);
+
+        taoist.ClearBufferedPackets();
+        taoist.LastSpellTimeMs = 0;
+        dispatcher.Dispatch(taoist, $"#{ProtocolConsts.CM_SPELL}/0/16/205/205/!");
+        Assert.True(zombie.NextActionTimeMs > Environment.TickCount64 + 10_000); // 验证被禁锢 15 秒
+
+        // 5. 测试隐身术 (MagicId = 18) 脱离怪物仇恨
+        zombie.TargetSessionId = taoist.SessionId; // 僵尸锁定道士为仇恨目标
+        taoist.ClearBufferedPackets();
+        taoist.LastSpellTimeMs = 0;
+        dispatcher.Dispatch(taoist, $"#{ProtocolConsts.CM_SPELL}/0/18/200/200/!");
+        Assert.Equal(0, zombie.TargetSessionId); // 隐身后脱离仇恨
+    }
 }
 
 

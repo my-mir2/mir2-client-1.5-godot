@@ -1991,12 +1991,190 @@ public sealed class PacketDispatcher
             return;
         }
 
-        // 7. 治愈术 (MagicId = 2 / 29)
+        // 7. 治愈术 (MagicId = 2) 与 群体治愈术 (MagicId = 29)
         if (magicId == 2 || magicId == 29)
         {
             int heal = TaoistCombatEngine.MassHeal.CalculateHealAmount(sc: 25, skillLevel: 3);
-            session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + heal);
-            session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
+            if (magicId == 29)
+            {
+                // 3x3 范围群体治愈
+                lock (_ninePatchBuffer)
+                {
+                    map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                    for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                    {
+                        var p = _ninePatchBuffer[i];
+                        if (p.State != null && Math.Abs(p.X - session.X) <= 1 && Math.Abs(p.Y - session.Y) <= 1)
+                        {
+                            p.State.Hp = Math.Min(p.State.MaxHp, p.State.Hp + heal);
+                            p.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, p.State.Hp, p.State.MaxHp, p.State.Mp, p.State.MaxMp);
+                            BroadcastToNinePatch(p, ProtocolConsts.SM_SPELLEFFECT_DELPHI, p.SessionId, p.X, p.Y, 29, "群疗", includeSelf: true);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + heal);
+                session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
+                BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 2, "治愈术", includeSelf: true);
+            }
+            return;
+        }
+
+        // 7.1 幽灵盾 (MagicId = 14) 3x3 范围内队友与自身增加 MAC +3 光环
+        if (magicId == 14)
+        {
+            lock (_ninePatchBuffer)
+            {
+                map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                {
+                    var p = _ninePatchBuffer[i];
+                    if (p.State != null && Math.Abs(p.X - session.X) <= 1 && Math.Abs(p.Y - session.Y) <= 1)
+                    {
+                        p.State.BonusMac += TaoistCombatEngine.AuraBuffs.BonusMac;
+                        p.State.RecalculateAttributes();
+                        p.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【幽灵盾】获得神圣魔法防御提升光环！");
+                        BroadcastToNinePatch(p, ProtocolConsts.SM_SPELLEFFECT_DELPHI, p.SessionId, p.X, p.Y, 14, "幽灵盾", includeSelf: true);
+                    }
+                }
+            }
+            return;
+        }
+
+        // 7.2 神圣战甲术 (MagicId = 15) 3x3 范围内队友与自身增加 AC +3 光环
+        if (magicId == 15)
+        {
+            lock (_ninePatchBuffer)
+            {
+                map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                {
+                    var p = _ninePatchBuffer[i];
+                    if (p.State != null && Math.Abs(p.X - session.X) <= 1 && Math.Abs(p.Y - session.Y) <= 1)
+                    {
+                        p.State.BonusAc += TaoistCombatEngine.AuraBuffs.BonusAc;
+                        p.State.RecalculateAttributes();
+                        p.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【神圣战甲术】获得物理神圣装甲提升光环！");
+                        BroadcastToNinePatch(p, ProtocolConsts.SM_SPELLEFFECT_DELPHI, p.SessionId, p.X, p.Y, 15, "神圣战甲术", includeSelf: true);
+                    }
+                }
+            }
+            return;
+        }
+
+        // 7.3 隐身术 (MagicId = 18) 与 集体隐身术 (MagicId = 19)
+        if (magicId == 18 || magicId == 19)
+        {
+            if (RegenEngine != null)
+            {
+                var monsters = RegenEngine.GetMonstersInArea(session.CurrentMapId, session.X - 5, session.Y - 5, session.X + 5, session.Y + 5);
+                for (int i = 0; i < monsters.Count; i++)
+                {
+                    if (monsters[i].TargetSessionId == session.SessionId)
+                    {
+                        monsters[i].TargetSessionId = 0; // 脱离怪物仇恨目标
+                    }
+                }
+            }
+            BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, magicId, "隐身术", includeSelf: true);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【隐身术】已进入隐身匿踪状态！");
+            return;
+        }
+
+        // 7.4 召唤骷髅 (MagicId = 17) 与 召唤神兽 (MagicId = 30)
+        if (magicId == 17 || magicId == 30)
+        {
+            if (RegenEngine != null)
+            {
+                string petName = magicId == 30 ? "神兽" : "变异骷髅";
+                int baseHp = magicId == 30 ? 300 : 150;
+                int petX = session.X + 1;
+                int petY = session.Y;
+                if (!map.IsWalkable(petX, petY) || RegenEngine.FindMonsterAt(session.CurrentMapId, petX, petY) != null)
+                {
+                    petX = session.X; petY = session.Y + 1;
+                }
+                if (!map.IsWalkable(petX, petY) || RegenEngine.FindMonsterAt(session.CurrentMapId, petX, petY) != null)
+                {
+                    petX = session.X - 1; petY = session.Y;
+                }
+
+                RegenEngine.AddRule(new MonsterSpawnRule
+                {
+                    RuleId = 88000 + session.SessionId % 1000 + (magicId == 30 ? 10000 : 0),
+                    MonsterName = petName,
+                    MapId = session.CurrentMapId,
+                    CenterX = petX,
+                    CenterY = petY,
+                    Radius = 0,
+                    MaxCount = 1,
+                    BaseHp = baseHp
+                });
+                RegenEngine.ProcessRegenTick(OfficialClientRulesEngine.DelphiRandom.Shared);
+                var pet = RegenEngine.FindMonsterAt(session.CurrentMapId, petX, petY);
+                if (pet != null)
+                {
+                    pet.TargetSessionId = 0;
+                }
+                BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, petX, petY, magicId, petName, includeSelf: true);
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【道法召唤】成功召唤出【{petName}】！");
+            }
+            return;
+        }
+
+        // 7.5 心灵启示 (MagicId = 28)
+        if (magicId == 28)
+        {
+            ClientSession? targetPlayer = null;
+            lock (_ninePatchBuffer)
+            {
+                map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                {
+                    var p = _ninePatchBuffer[i];
+                    if (p.SessionId == targetUid || (p.X == targetX && p.Y == targetY))
+                    {
+                        targetPlayer = p;
+                        break;
+                    }
+                }
+            }
+            if (targetPlayer?.State != null)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【心灵启示】{targetPlayer.CharacterName} 当前生命: {targetPlayer.State.Hp} / {targetPlayer.State.MaxHp}");
+                return;
+            }
+            if (RegenEngine != null)
+            {
+                var m = RegenEngine.FindMonsterByUid(targetUid) ?? RegenEngine.FindMonsterAt(session.CurrentMapId, targetX, targetY);
+                if (m != null)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【心灵启示】{m.Name} 当前生命: {m.Hp} / {m.MaxHp}");
+                    return;
+                }
+            }
+            return;
+        }
+
+        // 7.6 困魔咒 (MagicId = 16)
+        if (magicId == 16)
+        {
+            if (RegenEngine != null)
+            {
+                var monsters = RegenEngine.GetMonstersInArea(session.CurrentMapId, targetX - 1, targetY - 1, targetX + 1, targetY + 1);
+                for (int i = 0; i < monsters.Count; i++)
+                {
+                    var m = monsters[i];
+                    if (!m.IsDead && (m.Name.Contains("尸") || m.Name.Contains("骷髅") || m.Name.Contains("骨")))
+                    {
+                        m.NextActionTimeMs = nowMs + 15_000;
+                    }
+                }
+            }
+            BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, targetX, targetY, 16, "困魔咒", includeSelf: true);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【困魔咒】金光符文阵禁锢了范围内的亡灵生物！");
             return;
         }
 
@@ -2694,8 +2872,8 @@ public sealed class PacketDispatcher
         }
 
         // 2. 需消耗护身符的道士法术:
-        // 灵魂火符 (13), 召唤骷髅 (17), 召唤神兽 (30), 幽灵盾 (14), 神圣战甲术 (15), 隐身术 (18), 集体隐身术 (19), 困魔咒 (24)
-        if (magicId is 13 or 17 or 30 or 14 or 15 or 18 or 19 or 24)
+        // 灵魂火符 (13), 召唤骷髅 (17), 召唤神兽 (30), 幽灵盾 (14), 神圣战甲术 (15), 隐身术 (18), 集体隐身术 (19), 困魔咒 (16)
+        if (magicId is 13 or 17 or 30 or 14 or 15 or 18 or 19 or 16)
         {
             // 优先检查装备栏照明/护符槽位 (官方 OfficialEquipSlot.Lighting = 2)
             var eqAmulet = session.State.Equipment[(int)OfficialEquipSlot.Lighting];
