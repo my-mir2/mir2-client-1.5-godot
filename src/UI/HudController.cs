@@ -302,17 +302,23 @@ public partial class HudController : CanvasLayer
         EmitSignal(SignalName.ChangeAttackModeRequested, nextMode);
     }
 
-    /// <summary>官方 1.5 小退/换人 (IDA TFrmDlg_DBotLogoutClick 0x491474, 发包 CM_SOFTCLOSE 1009)</summary>
+    /// <summary>官方 1.5 小退/换人 (IDA TFrmDlg_DBotLogoutClick 0x491474 / sub_486DF0 模态确认防误触)</summary>
     public void RequestSoftClose()
     {
-        AddChat("系统", "[系统] 正在注销当前角色并返回选角神龛...", new Color(1f, 0.8f, 0.4f));
-        EmitSignal(SignalName.SoftCloseRequested);
+        ShowModalMessage("小退提示", "你真的想要重新选择角色吗？", hasCancel: true, onConfirm: () =>
+        {
+            AddChat("系统", "[系统] 正在注销当前角色并返回选角神龛...", new Color(1f, 0.8f, 0.4f));
+            EmitSignal(SignalName.SoftCloseRequested);
+        });
     }
 
-    /// <summary>官方 1.5 退出游戏 (IDA TFrmDlg_DBotExitClick 0x491520)</summary>
+    /// <summary>官方 1.5 退出游戏 (IDA TFrmDlg_DBotExitClick 0x491520 / sub_486DF0 模态确认防误触)</summary>
     public void RequestExitGame()
     {
-        EmitSignal(SignalName.ExitGameRequested);
+        ShowModalMessage("退出提示", "你真的想要退出游戏吗？", hasCancel: true, onConfirm: () =>
+        {
+            EmitSignal(SignalName.ExitGameRequested);
+        });
     }
 
     /// <summary>官方 1.5 丢弃金币 (IDA TFrmDlg_DGoldClick 0x48e564, 发包 CM_DROPGOLD 1016)</summary>

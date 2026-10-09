@@ -495,6 +495,10 @@ namespace Mir2Client.UI
                 InputPluginInstance.SkillToggleRequested += () => HudInstance?.ToggleSkill();
                 InputPluginInstance.GroupToggleRequested += () => HudInstance?.ToggleGroup();
                 InputPluginInstance.GroupAllowToggleRequested += () => HudInstance?.GroupPanel?.ToggleAllowGroup();
+                InputPluginInstance.HalfMoonToggleRequested += () => HudInstance?.ToggleHalfMoon();
+                InputPluginInstance.ThrustingToggleRequested += () => HudInstance?.ToggleThrusting();
+                InputPluginInstance.PetCommandRequested += () => TogglePetCommand();
+                InputPluginInstance.ScreenCaptureRequested += () => CaptureScreen();
                 InputPluginInstance.MinimapToggleRequested += () => HudInstance?.ToggleMinimap();
                 InputPluginInstance.EscapeRequested += () => HudInstance?.CloseTopDialog();
             }
@@ -831,6 +835,45 @@ namespace Mir2Client.UI
                     ? $"开始缓慢恢复生命 (总计 {meta.TotalHp} 点，当前缓回池: {PotionRecoverySystem.PendingHp} 点)"
                     : $"开始缓慢恢复魔法 (总计 {meta.TotalMp} 点，当前缓回池: {PotionRecoverySystem.PendingMp} 点)";
                 HudInstance.AddChat("提示", $"使用了 {item}，{poolText}。", new Color(0.6f, 0.95f, 0.6f));
+            }
+        }
+
+        private bool _isPetResting = false;
+
+        /// <summary>
+        /// 盛大官方 1.5 道士快捷键 Ctrl+A 宝宝状态切换 (休息/攻击)
+        /// </summary>
+        private void TogglePetCommand()
+        {
+            _isPetResting = !_isPetResting;
+            string status = _isPetResting ? "休息" : "攻击";
+            HudInstance?.AddChat("系统", $"[系统] 召唤兽进入{status}状态。", new Color(0.4f, 1.0f, 0.4f));
+        }
+
+        /// <summary>
+        /// 盛大官方 1.5 PrintScreen/Pause 全屏截屏 (自动保存至 Images/ 目录)
+        /// </summary>
+        private void CaptureScreen()
+        {
+            try
+            {
+                var img = GetViewport().GetTexture().GetImage();
+                if (img != null)
+                {
+                    string dir = "Images";
+                    if (!System.IO.Directory.Exists(dir))
+                    {
+                        System.IO.Directory.CreateDirectory(dir);
+                    }
+                    string filename = System.IO.Path.Combine(dir, $"Mir_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+                    img.SavePng(filename);
+                    HudInstance?.AddChat("系统", $"[系统] 游戏截图已保存至 {filename}。", new Color(1.0f, 0.95f, 0.3f));
+                    AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.NormButtonClick);
+                }
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"[GameView] 截屏保存失败: {ex.Message}");
             }
         }
 

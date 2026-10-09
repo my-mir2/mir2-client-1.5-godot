@@ -35,6 +35,9 @@ namespace Mir2Client.Game
         [Signal] public delegate void GroupToggleRequestedEventHandler();
         [Signal] public delegate void GroupAllowToggleRequestedEventHandler();
         [Signal] public delegate void NavigateRequestedEventHandler(Vector2I targetTile);
+        [Signal] public delegate void HalfMoonToggleRequestedEventHandler();
+        [Signal] public delegate void ThrustingToggleRequestedEventHandler();
+        [Signal] public delegate void ScreenCaptureRequestedEventHandler();
 
         public const int DirUp = 0;
         public const int DirUpRight = 1;
@@ -177,13 +180,17 @@ namespace Mir2Client.Game
                             case Key.A: EmitSignal(SignalName.PetCommandRequested); break;
                             case Key.H: EmitSignal(SignalName.PkModeToggleRequested); break;
                             case Key.E: EmitSignal(SignalName.GroupAllowToggleRequested); break;
-                            case Key.B: EmitSignal(SignalName.BagToggleRequested); break;
+                            case Key.B: EmitSignal(SignalName.HalfMoonToggleRequested); break;
+                            case Key.F: EmitSignal(SignalName.ThrustingToggleRequested); break;
                         }
                     }
                     else
                     {
                         switch (key.Keycode)
                         {
+                            case Key.Print: case Key.Pause:
+                                EmitSignal(SignalName.ScreenCaptureRequested);
+                                break;
                             case Key.Key1: case Key.Key2: case Key.Key3:
                             case Key.Key4: case Key.Key5: case Key.Key6:
                                 EmitSignal(SignalName.QuickItemKeyPressed, (int)key.Keycode - (int)Key.Key1);
