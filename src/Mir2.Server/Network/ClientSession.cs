@@ -170,6 +170,17 @@ public sealed class ClientSession : IDisposable
         return GetBufferedPacketsString().Contains(subPacket);
     }
 
+    /// <summary>
+    /// 清空当前发送缓冲区（测试与断言专用）
+    /// </summary>
+    public void ClearBufferedPackets()
+    {
+        lock (_sendLock)
+        {
+            _sendBufferOffset = 0;
+        }
+    }
+
     public void Dispose()
     {
         lock (_sendLock)

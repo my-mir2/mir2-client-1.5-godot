@@ -604,6 +604,165 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_LEVELUP_DELPHI}/"));
         Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_EXPERIENCE}/"));
     }
+
+    [Fact]
+    public void TestOfficialButcherCorpseMatrix_QualityAndDepletion()
+    {
+        var (mapMgr, regen, _, dispatcher, map) = CreateTestEnvironment();
+
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 200,
+            Y = 200,
+            CharacterName = "屠夫学徒",
+            State = new PlayerState { Uid = 1001, Name = "屠夫学徒", Level = 10, Hp = 100, MaxHp = 100, BagWeight = 0, MaxBagWeight = 100 }
+        };
+        map.Aoi.Enter(player, 200, 200);
+
+        // 1. 刷新一只鹿并击杀生成尸体
+        regen.AddRule(new MonsterSpawnRule
+        {
+            RuleId = 10,
+            MonsterName = "鹿",
+            MapId = 0,
+            CenterX = 201,
+            CenterY = 200,
+            Radius = 0,
+            MaxCount = 1,
+            BaseHp = 50
+        });
+        regen.ProcessRegenTick(new OfficialClientRulesEngine.DelphiRandom(1));
+        var deer = regen.FindMonsterAt(0, 201, 200);
+        Assert.NotNull(deer);
+
+        // 击杀该鹿转入尸体池
+        deer.Hp = 0;
+        regen.OnMonsterDied(deer.Uid);
+        var corpse = regen.FindCorpse(deer.Uid);
+        Assert.NotNull(corpse);
+        Assert.True(corpse.IsDead);
+        Assert.False(corpse.IsButchered);
+
+        // 2. 玩家在相邻位置 (200, 200) 对 (201, 200) 的鹿尸体发起割肉发包 CM_BUTCHITEM (1007)
+        player.ClearBufferedPackets();
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_BUTCHITEM}/{deer.Uid}/201/200/!");
+
+        // 3. 验证割肉成功
+        Assert.True(corpse.IsButchered);
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_BUTCH}/"));
+        var meat = player.State.BagItems.Find(i => i.Name == "鹿肉");
+        Assert.NotNull(meat);
+        Assert.True(meat.Dura >= 10000); // 鹿肉品质在 10~20 之间
+        Assert.Equal(1, player.State.BagWeight);
+
+        // 4. 重复对同一具尸体割肉，必须被权威拦截并提示已割空
+        player.ClearBufferedPackets();
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_BUTCHITEM}/{deer.Uid}/201/200/!");
+        Assert.Single(player.State.BagItems); // 背包物品没有增加
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_SYSMSG_DELPHI}/"));
+    }
+
+    [Fact]
+    public void TestOfficialAntidoteAndInstantPotionLifecycle()
+    {
+        var (mapMgr, _, _, dispatcher, map) = CreateTestEnvironment();
+
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 200,
+            Y = 200,
+            CharacterName = "试药法师",
+            State = new PlayerState { Uid = 1001, Name = "试药法师", Level = 25, Hp = 20, MaxHp = 120, Mp = 10, MaxMp = 200, BagWeight = 0, MaxBagWeight = 200 }
+        };
+        map.Aoi.Enter(player, 200, 200);
+
+        // 1. 玩家染上绿毒与红毒
+        long now = Environment.TickCount64;
+        player.State.ApplyPoison(TaoistCombatEngine.PoisonType.Green, 30, sc: 20, now);
+        player.State.ApplyPoison(TaoistCombatEngine.PoisonType.Red, 30, sc: 20, now);
+        Assert.True(player.State.HasGreenPoison);
+        Assert.True(player.State.HasRedPoison);
+
+        // 2. 背包放入太阳水与解毒药水
+        player.State.BagItems.Add(new EquipItem { Uid = 101, Name = "太阳水", Weight = 1 });
+        player.State.BagItems.Add(new EquipItem { Uid = 102, Name = "解毒药水", Weight = 1 });
+        player.State.BagWeight = 2;
+
+        // 3. 喝太阳水: 瞬回 +30 HP, +40 MP
+        player.ClearBufferedPackets();
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_EATITEM}/0/太阳水/!");
+        Assert.Equal(50, player.State.Hp); // 20 + 30
+        Assert.Equal(50, player.State.Mp); // 10 + 40
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_EAT_OK}/"));
+
+        // 4. 使用解毒药水: 清除全部中毒状态
+        player.ClearBufferedPackets();
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_EATITEM}/0/解毒药水/!");
+        Assert.False(player.State.HasGreenPoison);
+        Assert.False(player.State.HasRedPoison);
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_SYSMSG_DELPHI}/"));
+    }
+
+    [Fact]
+    public void TestOfficialTaoistSpellReagentsConsumption()
+    {
+        var (mapMgr, _, _, dispatcher, map) = CreateTestEnvironment();
+
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 200,
+            Y = 200,
+            CharacterName = "清风道长",
+            State = new PlayerState { Uid = 1001, Name = "清风道长", Level = 35, Hp = 200, MaxHp = 200, Mp = 300, MaxMp = 300, BagWeight = 0, MaxBagWeight = 300 }
+        };
+        map.Aoi.Enter(player, 200, 200);
+
+        var enemy = new ClientSession(1002, null!)
+        {
+            CurrentMapId = 0,
+            X = 201,
+            Y = 200,
+            CharacterName = "敌对武士",
+            State = new PlayerState { Uid = 1002, Name = "敌对武士", Level = 30, Hp = 300, MaxHp = 300, Mp = 50, MaxMp = 50, BagWeight = 0, MaxBagWeight = 300 }
+        };
+        map.Aoi.Enter(enemy, 201, 200);
+
+        // 1. 无药粉施放施毒术 (MagicId = 6) -> 拦截失败，MP 不扣除
+        player.ClearBufferedPackets();
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_SPELL}/1002/6/201/200/!");
+        Assert.Equal(300, player.State.Mp); // 蓝量未消耗
+        Assert.False(enemy.State.HasGreenPoison);
+        Assert.False(enemy.State.HasRedPoison);
+
+        // 2. 背包放入黄色药粉 (Dura = 2)，再次施毒 -> 成功扣减药粉耐久，目标中红毒
+        var powder = new EquipItem { Uid = 201, Name = "黄色药粉(中)", Weight = 2, Dura = 2, MaxDura = 200 };
+        player.State.BagItems.Add(powder);
+        player.State.BagWeight += 2;
+        player.ClearBufferedPackets();
+        player.LastSpellTimeMs = 0; // 重置施法CD
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_SPELL}/1002/6/201/200/!");
+        Assert.True(enemy.State.HasRedPoison || enemy.State.HasGreenPoison);
+        Assert.Equal(1, powder.Dura); // 药粉耐久扣减 1
+
+        // 3. 灵魂火符 (MagicId = 13) 无护身符施放 -> 拦截失败
+        player.ClearBufferedPackets();
+        player.LastSpellTimeMs = 0;
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_SPELL}/1002/13/201/200/!");
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_SYSMSG_DELPHI}/"));
+
+        // 4. 装备栏佩戴护身符 (OfficialEquipSlot.Lighting = 2) 后施放 -> 扣减护身符耐久并命中
+        var amulet = new EquipItem { Uid = 202, Name = "护身符", Weight = 1, Dura = 5, MaxDura = 100 };
+        player.State.Equipment[(int)OfficialEquipSlot.Lighting] = amulet;
+        player.ClearBufferedPackets();
+        player.LastSpellTimeMs = 0;
+        int enemyOldHp = enemy.State.Hp;
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_SPELL}/1002/13/201/200/!");
+        Assert.Equal(4, amulet.Dura); // 护身符耐久扣减 1
+        Assert.True(enemy.State.Hp < enemyOldHp); // 造成法术伤害
+    }
 }
 
 

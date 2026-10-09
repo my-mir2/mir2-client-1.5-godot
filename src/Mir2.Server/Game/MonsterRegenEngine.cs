@@ -40,6 +40,8 @@ public sealed class MonsterInstance
     public int MaxHp { get; set; }
     public int SpawnRuleId { get; init; }
     public bool IsDead => Hp <= 0;
+    public bool IsButchered { get; set; } // 盛大官方 1.5 尸体割肉标记 (已被割空则不可再次割肉)
+    public long CorpseExpireTimeMs { get; set; } // 尸体腐烂时间戳 (官方默认 20 秒)
 
     // 官方怪物 AI 属性 (IDA 0x4B966C)
     public int ViewRange { get; set; } = 5; // 官方默认视野 5 格 (0x4B966C @ +484)
@@ -63,10 +65,12 @@ public sealed class MonsterRegenEngine
     private readonly MapManager _mapManager;
     private readonly List<MonsterSpawnRule> _rules = new();
     private readonly ConcurrentDictionary<int, MonsterInstance> _monsters = new();
+    private readonly ConcurrentDictionary<int, MonsterInstance> _corpses = new();
     private int _nextMonsterUid = 100_000;
 
     public IReadOnlyList<MonsterSpawnRule> Rules => _rules;
     public int TotalActiveMonsters => _monsters.Count;
+    public int TotalActiveCorpses => _corpses.Count;
 
     public MonsterRegenEngine(MapManager mapManager)
     {
@@ -149,7 +153,7 @@ public sealed class MonsterRegenEngine
     }
 
     /// <summary>
-    /// 处理怪物死亡下线并释放刷新配额
+    /// 处理怪物死亡下线并释放刷新配额，转入尸体列表保留 20 秒 (供挖肉与倒地表现)
     /// </summary>
     public MonsterInstance? OnMonsterDied(int monsterUid)
     {
@@ -163,6 +167,9 @@ public sealed class MonsterRegenEngine
                     rule.ActiveCount--;
                 }
             }
+            // 官方默认保留 20 秒尸体 (CorpseRemainSec)
+            monster.CorpseExpireTimeMs = Environment.TickCount64 + 20_000;
+            _corpses[monsterUid] = monster;
             return monster;
         }
         return null;
@@ -172,6 +179,51 @@ public sealed class MonsterRegenEngine
     {
         _monsters.TryGetValue(monsterUid, out var m);
         return m;
+    }
+
+    public MonsterInstance? FindMonsterByUid(int monsterUid)
+    {
+        if (_monsters.TryGetValue(monsterUid, out var m)) return m;
+        if (_corpses.TryGetValue(monsterUid, out var c)) return c;
+        return null;
+    }
+
+    public MonsterInstance? FindCorpse(int monsterUid)
+    {
+        if (_corpses.TryGetValue(monsterUid, out var c)) return c;
+        return null;
+    }
+
+    /// <summary>
+    /// 检索指定地图与坐标的有效尸体 (未完全腐烂)
+    /// </summary>
+    public MonsterInstance? FindCorpseAt(int mapId, int x, int y)
+    {
+        long now = Environment.TickCount64;
+        foreach (var kvp in _corpses)
+        {
+            var c = kvp.Value;
+            if (c.MapId == mapId && c.X == x && c.Y == y && now <= c.CorpseExpireTimeMs)
+            {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 清理已超时的腐烂尸体
+    /// </summary>
+    public void CleanExpiredCorpses()
+    {
+        long now = Environment.TickCount64;
+        foreach (var kvp in _corpses)
+        {
+            if (now > kvp.Value.CorpseExpireTimeMs)
+            {
+                _corpses.TryRemove(kvp.Key, out _);
+            }
+        }
     }
 
     /// <summary>

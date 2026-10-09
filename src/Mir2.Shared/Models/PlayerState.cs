@@ -632,6 +632,19 @@ public sealed class PlayerState
     }
 
     /// <summary>
+    /// 盛大官方 1.5 解毒剂清除体内红绿毒状态机 (恢复自然回血)
+    /// </summary>
+    public void ClearPoison()
+    {
+        HasGreenPoison = false;
+        GreenPoisonExpireMs = 0;
+        NextGreenPoisonTickMs = 0;
+        GreenPoisonSc = 0;
+        HasRedPoison = false;
+        RedPoisonExpireMs = 0;
+    }
+
+    /// <summary>
     /// 服务端权威绿毒 Tick 结算 (每 2.5 秒触发一次掉血并清空回血池)
     /// </summary>
     public (bool tookDamage, int damage, bool greenExpired, bool redExpired) ProcessPoisonTick(long nowMs)

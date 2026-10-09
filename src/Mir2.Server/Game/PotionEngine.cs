@@ -33,7 +33,8 @@ public static class PotionEngine
         int InstantHp,
         int InstantMp,
         int ContinuousHp,
-        int ContinuousMp
+        int ContinuousMp,
+        bool ClearPoison = false
     );
 
     /// <summary>
@@ -89,6 +90,12 @@ public static class PotionEngine
         if (name.Contains("魔法药"))
         {
             return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 0, ContinuousMp: 30);
+        }
+
+        // 4. 特殊解毒药剂与神水 (IDA 0x4B7100 / sub_4C7720)
+        if (name.Contains("解毒") || name.Contains("神水") || name.Contains("鹿茸"))
+        {
+            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 0, ContinuousMp: 0, ClearPoison: true);
         }
 
         return null;
@@ -149,6 +156,12 @@ public static class PotionEngine
         if (effect.ContinuousMp > 0)
         {
             player.IncSpell += effect.ContinuousMp;
+        }
+
+        // 3. 解毒剂应用：彻底解除红绿毒状态机 (IDA sub_4C7720)
+        if (effect.ClearPoison)
+        {
+            player.ClearPoison();
         }
 
         return (PotionResult.Success, effect);

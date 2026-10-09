@@ -204,8 +204,12 @@ public sealed class PacketDispatcher
                 HandleDropGoldPacket(session, remaining);
                 break;
 
-            case ProtocolConsts.CM_ADJUST_BONUS: // 1007 官方属性加点
+            case ProtocolConsts.CM_ADJUST_BONUS: // 1043 官方属性加点
                 HandleAdjustBonusPacket(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_BUTCHITEM: // 1007 官方生物尸体割肉 (Alt+点击)
+                HandleButchItemPacket(session, remaining);
                 break;
 
             case ProtocolConsts.CM_GROUPMODE: // 1019 组队模式切换
@@ -621,6 +625,12 @@ public sealed class PacketDispatcher
             if (session.State.Mp < mpCost)
             {
                 return; // 蓝量不足
+            }
+
+            // 施法耗材权威检验 (道士药粉与护身符)
+            if (!CheckAndConsumeSpellReagent(session, magicId))
+            {
+                return;
             }
 
             session.State.Mp -= mpCost;
@@ -1197,6 +1207,12 @@ public sealed class PacketDispatcher
             session.EnqueuePacket(ProtocolConsts.SM_EAT_OK, 0, 0, 0, 0);
             session.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, session.State.Hp, session.State.Mp, session.State.MaxHp, session.State.MaxMp);
             session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+
+            if (effect.ClearPoison)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "体内的毒素已被化解，恢复了健康。");
+                SendAbility(session);
+            }
         }
     }
 
@@ -2083,6 +2099,22 @@ public sealed class PacketDispatcher
                 BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
             }
         }
+        else if (RegenEngine != null)
+        {
+            var monster = RegenEngine.FindMonsterByUid(targetUid) ?? RegenEngine.FindMonsterAt(session.CurrentMapId, targetX, targetY);
+            if (monster != null && !monster.IsDead)
+            {
+                int magicDmg = OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(20, 35, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
+                monster.Hp = Math.Max(0, monster.Hp - magicDmg);
+                BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, monster.Uid, monster.X, monster.Y, magicDmg, monster.Name, includeSelf: true);
+                if (monster.IsDead)
+                {
+                    RegenEngine.OnMonsterDied(monster.Uid);
+                    BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, monster.Uid, monster.X, monster.Y, 0, monster.Name, includeSelf: true);
+                    OnMonsterKilledByPlayer(session, monster);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -2317,6 +2349,184 @@ public sealed class PacketDispatcher
             killer.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"恭喜！你升到了 {killer.State.Level} 级！");
         }
         SendAbility(killer);
+    }
+
+    private void HandleButchItemPacket(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null || session.State.Hp <= 0) return;
+        // 格式: targetUid/tx/ty/ 或 targetUid (CM_BUTCHITEM 1007)
+        int targetUid = 0;
+        int tx = session.X;
+        int ty = session.Y;
+
+        int slash1 = payload.IndexOf('/');
+        if (slash1 > 0)
+        {
+            int.TryParse(payload[..slash1], out targetUid);
+            var rest = payload[(slash1 + 1)..];
+            int slash2 = rest.IndexOf('/');
+            if (slash2 > 0)
+            {
+                int.TryParse(rest[..slash2], out tx);
+                var rest2 = rest[(slash2 + 1)..];
+                int slash3 = rest2.IndexOf('/');
+                if (slash3 > 0) int.TryParse(rest2[..slash3], out ty);
+                else int.TryParse(rest2, out ty);
+            }
+            else
+            {
+                int.TryParse(rest, out tx);
+            }
+        }
+        else
+        {
+            int.TryParse(payload, out targetUid);
+        }
+
+        // 距离校验: 必须在相邻 2 格内 (官方 IDA 割肉范围)
+        if (Math.Abs(session.X - tx) > 2 || Math.Abs(session.Y - ty) > 2)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "距离太远，无法割肉！");
+            return;
+        }
+
+        // 查找尸体
+        var corpse = RegenEngine?.FindCorpse(targetUid) ?? RegenEngine?.FindCorpseAt(session.CurrentMapId, tx, ty);
+        if (corpse == null || !corpse.IsDead)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "目标不存在或尚未死亡！");
+            return;
+        }
+
+        var monDef = OfficialMonsterCompendium.GetByName(corpse.Name);
+        if (monDef == null || !monDef.CanButcherMeat)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "这具尸体上没有可以割取的肉。");
+            return;
+        }
+
+        if (corpse.IsButchered)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "这具尸体已经被割空了。");
+            return;
+        }
+
+        // 权威割肉
+        corpse.IsButchered = true;
+        int quality = corpse.Name.Contains("鹿") ? Random.Shared.Next(10, 21) : Random.Shared.Next(5, 16);
+        string meatName = $"{corpse.Name}肉";
+
+        // 背包容量与负重校验
+        if (session.State.BagItems.Count < 40 && session.State.BagWeight + 1 <= session.State.MaxBagWeight)
+        {
+            var meatItem = new EquipItem
+            {
+                Uid = (int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1_000_000_000) + Random.Shared.Next(1, 999),
+                Name = meatName,
+                Weight = 1,
+                Dura = quality * 1000,
+                MaxDura = 20000
+            };
+            session.State.BagItems.Add(meatItem);
+            session.State.BagWeight += 1;
+            session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+        }
+        else
+        {
+            // 掉落在地表
+            var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+            var groundMeat = new GroundItemEntity
+            {
+                Uid = 80000 + Random.Shared.Next(1, 9999),
+                Name = meatName,
+                X = session.X,
+                Y = session.Y,
+                Weight = 1,
+                DropTickMs = Environment.TickCount64
+            };
+            map.AddGroundItem(groundMeat);
+            BroadcastToNinePatch(session, ProtocolConsts.SM_ITEMSHOW, groundMeat.Uid, groundMeat.X, groundMeat.Y, 0, groundMeat.Name, includeSelf: true);
+        }
+
+        // 回复客户端割肉成功与广播 (SM_BUTCH 665, Recog = corpse.Uid, 负载 = 肉品品质描述)
+        session.EnqueuePacket(ProtocolConsts.SM_BUTCH, corpse.Uid, 0, 0, 0, $"品质 {quality} 的{meatName}");
+        BroadcastToNinePatch(session, ProtocolConsts.SM_SITDOWN, session.SessionId, session.X, session.Y, session.Direction, session.CharacterName, includeSelf: false);
+    }
+
+    private bool CheckAndConsumeSpellReagent(ClientSession session, short magicId)
+    {
+        if (session.State == null) return false;
+
+        // 1. 施毒术 (MagicId = 6): 必须消耗灰色药粉 (绿毒) 或黄色药粉 (红毒)
+        if (magicId == 6)
+        {
+            var powder = session.State.BagItems.Find(i => i.Name.Contains("药粉") || i.Name.Contains("毒药"));
+            if (powder == null)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "缺少施毒药粉，施法失败！");
+                return false;
+            }
+
+            if (powder.Dura > 1)
+            {
+                powder.Dura -= 1;
+            }
+            else
+            {
+                session.State.BagItems.Remove(powder);
+                session.State.BagWeight = Math.Max(0, session.State.BagWeight - powder.Weight);
+                session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{powder.Name}已用尽！");
+            }
+            return true;
+        }
+
+        // 2. 需消耗护身符的道士法术:
+        // 灵魂火符 (13), 召唤骷髅 (17), 召唤神兽 (30), 幽灵盾 (14), 神圣战甲术 (15), 隐身术 (18), 集体隐身术 (19), 困魔咒 (24)
+        if (magicId is 13 or 17 or 30 or 14 or 15 or 18 or 19 or 24)
+        {
+            // 优先检查装备栏照明/护符槽位 (官方 OfficialEquipSlot.Lighting = 2)
+            var eqAmulet = session.State.Equipment[(int)OfficialEquipSlot.Lighting];
+            if (eqAmulet != null && eqAmulet.Name.Contains("符"))
+            {
+                if (eqAmulet.Dura > 1)
+                {
+                    eqAmulet.Dura -= 1;
+                }
+                else
+                {
+                    session.State.Equipment[(int)OfficialEquipSlot.Lighting] = null;
+                    session.State.WearWeight = Math.Max(0, session.State.WearWeight - eqAmulet.Weight);
+                    session.State.RecalculateAttributes();
+                    session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "护身符已耗尽！");
+                }
+                return true;
+            }
+
+            // 装备栏未佩戴，检查背包中的护身符
+            var bagAmulet = session.State.BagItems.Find(i => i.Name.Contains("护身符") || i.Name.Contains("符"));
+            if (bagAmulet != null)
+            {
+                if (bagAmulet.Dura > 1)
+                {
+                    bagAmulet.Dura -= 1;
+                }
+                else
+                {
+                    session.State.BagItems.Remove(bagAmulet);
+                    session.State.BagWeight = Math.Max(0, session.State.BagWeight - bagAmulet.Weight);
+                    session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{bagAmulet.Name}已耗尽！");
+                }
+                return true;
+            }
+
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "缺少护身符，施法失败！");
+            return false;
+        }
+
+        return true;
     }
 
     #endregion
