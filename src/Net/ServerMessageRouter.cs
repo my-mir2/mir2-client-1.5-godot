@@ -731,6 +731,63 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_LOGINSUCCESS: // 530: 登录成功 (IDA case 530)
                 SafeLog($"[SM] 账号登录成功进入选服 (SM_LOGINSUCCESS=530)");
                 break;
+            case ProtocolConsts.SM_OBJECTSAY: // 301: 官方实体/玩家视野说话广播 (bridge.rs:120)
+                {
+                    string rawText = DecodeExtraText(packet.Extra);
+                    if (string.IsNullOrEmpty(rawText)) rawText = packet.ExtraStr;
+                    if (!string.IsNullOrEmpty(rawText))
+                    {
+                        var parts = rawText.Split('\t', 2);
+                        if (parts.Length == 2)
+                        {
+                            _hud?.AddChat("附近", $"{parts[0]}: {parts[1]}", Colors.White);
+                        }
+                        else
+                        {
+                            _hud?.AddChat("附近", rawText, Colors.White);
+                        }
+                    }
+                    SafeLog($"[SM] 实体说话 (SM_OBJECTSAY=301, uid={packet.Recog})");
+                }
+                break;
+            case ProtocolConsts.SM_WHISPER: // 303: 官方私聊/密语下行通知 (bridge.rs:132)
+                {
+                    string rawText = DecodeExtraText(packet.Extra);
+                    if (string.IsNullOrEmpty(rawText)) rawText = packet.ExtraStr;
+                    if (!string.IsNullOrEmpty(rawText))
+                    {
+                        var parts = rawText.Split('\t', 2);
+                        if (parts.Length == 2)
+                        {
+                            _hud?.AddChat("私聊", $"[{parts[0]}] 悄悄对你说: {parts[1]}", new Color(0.4f, 1.0f, 1.0f));
+                        }
+                        else
+                        {
+                            _hud?.AddChat("私聊", rawText, new Color(0.4f, 1.0f, 1.0f));
+                        }
+                    }
+                    SafeLog($"[SM] 私聊下行 (SM_WHISPER=303)");
+                }
+                break;
+            case ProtocolConsts.SM_MONSTERSAY: // 1501: 官方怪物战吼/说话广播 (bridge.rs:349)
+                {
+                    string rawText = DecodeExtraText(packet.Extra);
+                    if (string.IsNullOrEmpty(rawText)) rawText = packet.ExtraStr;
+                    if (!string.IsNullOrEmpty(rawText))
+                    {
+                        var parts = rawText.Split('\t', 2);
+                        if (parts.Length == 2)
+                        {
+                            _hud?.AddChat("怪物", $"【{parts[0]}】: {parts[1]}", new Color(1f, 0.6f, 0.2f));
+                        }
+                        else
+                        {
+                            _hud?.AddChat("怪物", rawText, new Color(1f, 0.6f, 0.2f));
+                        }
+                    }
+                    SafeLog($"[SM] 怪物战吼 (SM_MONSTERSAY=1501)");
+                }
+                break;
             case ProtocolConsts.SM_LOGON_DELPHI: // 50: 主角色进入世界并绑定 (IDA case 50)
                 if (_entityManager != null && packet.Recog > 0)
                 {

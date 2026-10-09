@@ -999,10 +999,28 @@ namespace Mir2Client.UI
                 return;
             }
 
-            // 8. 普通聊天内容
+            // 8. 聊天发包处理 (普通说话 CM_SAY 3030 与 私聊 CM_WHISPER 3030 分流)
             if (_net != null && _net.IsConnectedToServer)
             {
-                _net.SendPacket(PacketEncoder.Say(trimmed));
+                if (trimmed.StartsWith("/"))
+                {
+                    string content = trimmed[1..].TrimStart();
+                    int spaceIdx = content.IndexOf(' ');
+                    if (spaceIdx > 0)
+                    {
+                        string target = content[..spaceIdx].Trim();
+                        string whisperMsg = content[(spaceIdx + 1)..].Trim();
+                        _net.SendPacket(PacketEncoder.Whisper(target, whisperMsg));
+                    }
+                    else
+                    {
+                        _net.SendPacket(PacketEncoder.Say(trimmed));
+                    }
+                }
+                else
+                {
+                    _net.SendPacket(PacketEncoder.Say(trimmed));
+                }
             }
         }
 

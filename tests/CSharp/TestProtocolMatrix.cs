@@ -3006,6 +3006,41 @@ public class TestProtocolMatrix
         Assert.Equal(330, rx);
         Assert.Equal(270, ry);
     }
+
+    [Fact]
+    public void TestOfficialWhisperAndChatProtocolFlow()
+    {
+        // 1. 验证聊天与私聊协议号常量对齐
+        Assert.Equal(3030, ProtocolConsts.CM_SAY);
+        Assert.Equal(3030, ProtocolConsts.CM_WHISPER);
+        Assert.Equal(301, ProtocolConsts.SM_OBJECTSAY);
+        Assert.Equal(303, ProtocolConsts.SM_WHISPER);
+        Assert.Equal(1501, ProtocolConsts.SM_MONSTERSAY);
+
+        // 2. 编码 CM_WHISPER 发包并校验序列化格式 (目标\t正文)
+        byte[] whisperPacket = PacketEncoder.Whisper("战神无双", "组队打沃玛教主来不来？");
+        Assert.NotNull(whisperPacket);
+        Assert.True(whisperPacket[0] >= (byte)'0' && whisperPacket[0] <= (byte)'9');
+        Assert.Equal((byte)'\n', whisperPacket[^1]);
+
+        var decoded = PacketDecoder.Parse(whisperPacket.AsSpan(1))!.Value;
+        Assert.Equal(ProtocolConsts.CM_WHISPER, decoded.Ident);
+        Assert.Equal(0, decoded.Recog);
+        Assert.Equal("战神无双\t组队打沃玛教主来不来？", decoded.ExtraStr);
+
+        // 3. 模拟 SM_WHISPER (303) 下行解构验证
+        var whisperParts = decoded.ExtraStr.Split('\t', 2);
+        Assert.Equal(2, whisperParts.Length);
+        Assert.Equal("战神无双", whisperParts[0]);
+        Assert.Equal("组队打沃玛教主来不来？", whisperParts[1]);
+
+        // 4. 模拟 SM_MONSTERSAY (1501) 战吼解析
+        string monsterPayload = "沃玛教主\t入侵者必将葬身火海！";
+        var monsterParts = monsterPayload.Split('\t', 2);
+        Assert.Equal(2, monsterParts.Length);
+        Assert.Equal("沃玛教主", monsterParts[0]);
+        Assert.Equal("入侵者必将葬身火海！", monsterParts[1]);
+    }
 }
 
 

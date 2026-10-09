@@ -7794,11 +7794,26 @@
       - 在 `src/Net/ServerMessageRouter.cs` 中打通 501 大世界复活路由分发；
       - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialReviveProtocolFlow` 单元测试，脱机测试总数提升至 **213 / 213 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+  - [x] **69. 盛大官方 1.5 聊天视野广播/密语私聊/怪物战吼协议双向闭环 (CM_WHISPER 3030 / SM_OBJECTSAY 301 / SM_WHISPER 303 / SM_MONSTERSAY 1501)** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据 `sub_467920` (case 6/7/11) 与 Rust 服务端 `mir2-my/bridge.rs` (行 120/132/349/858/1590/1603/2540)：
+        1. 聊天输入与私聊发包上行分流：
+           官方客户端中输入 `/玩家名 消息` 属于密语私聊通道，在发包上行层面虽然与普通聊天同属 3030，但在 Extra 负载中需采用制表符规范格式 `目标\t正文`；此前客户端在 `GameView.cs` 中未对以 `/` 开头的发言进行参数切分，导致直接将整句发送给服务端；
+        2. 下行协议下发盲区与断链消除：
+           服务端网关转发实体视野说话广播 (`SM_OBJECTSAY 301`)、玩家密语私聊 (`SM_WHISPER 303`) 与怪物战吼说话 (`SM_MONSTERSAY 1501`) 时，此前客户端 `ProtocolConsts.cs` 与 `ServerMessageRouter.cs` 中完全遗漏了这三条下行协议路由，导致收到包后进入 default 分支，HUD 聊天框无法呈现他人说话、私聊密语及怪物战吼；
+        3. 多频道视觉与格式闭环：
+           在 `ServerMessageRouter.cs` 中补齐 301（白字实体说话）、303（淡青色私聊 `[玩家名] 悄悄对你说: 消息`）与 1501（橙黄色怪物战吼 `【怪物名】: 消息`），完成双向网络与 UI 呈现闭环。
+    - **精准重构**：
+      - 在 `src/Net/ProtocolConsts.cs` 中增加 `SM_OBJECTSAY = 301`、`SM_WHISPER = 303` 与 `SM_MONSTERSAY = 1501`；
+      - 在 `src/UI/GameView.cs` 中实现 `OnChatSent` 识别 `/` 前缀自动解析目标与正文并分流 `PacketEncoder.Whisper`；
+      - 在 `src/Net/ServerMessageRouter.cs` 中实现 301、303、1501 的独立路由与 Tab 分割解析；
+      - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialWhisperAndChatProtocolFlow` 单元测试，脱机测试总数提升至 **214 / 214 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **213 / 213 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **214 / 214 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
