@@ -989,27 +989,51 @@ public sealed class PacketDispatcher
     private void HandleNpcHomePage(ClientSession session, ReadOnlySpan<char> payload)
     {
         // 格式: npcUid (CM_MERCHANTHOMEPAGE 1010)
-        if (NpcEngine == null) return;
         if (int.TryParse(payload, out int npcUid))
         {
-            string script = NpcEngine.GetNpcHomePage(npcUid);
-            // 下发官方 NPC 脚本对话框: SM_NPCDIALOG (54)
-            session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
+            if (ModernNpcEngine.HasPlugin(npcUid))
+            {
+                var (handled, script, closed) = ModernNpcEngine.DispatchDialog(session, npcUid, "@main");
+                if (handled)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
+                    return;
+                }
+            }
+
+            if (NpcEngine != null)
+            {
+                string script = NpcEngine.GetNpcHomePage(npcUid);
+                session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
+            }
         }
     }
 
     private void HandleNpcSelect(ClientSession session, ReadOnlySpan<char> payload)
     {
         // 格式: npcUid/label (CM_NPCSELECT 1011)
-        if (NpcEngine == null) return;
         int slash = payload.IndexOf('/');
         if (slash < 0) return;
 
         if (int.TryParse(payload[..slash], out int npcUid))
         {
             string label = payload[(slash + 1)..].ToString();
-            string script = NpcEngine.SelectScriptOption(npcUid, label);
-            session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
+
+            if (ModernNpcEngine.HasPlugin(npcUid))
+            {
+                var (handled, script, closed) = ModernNpcEngine.DispatchDialog(session, npcUid, label);
+                if (handled)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
+                    return;
+                }
+            }
+
+            if (NpcEngine != null)
+            {
+                string script = NpcEngine.SelectScriptOption(npcUid, label);
+                session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
+            }
         }
     }
 

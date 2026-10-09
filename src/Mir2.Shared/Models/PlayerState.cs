@@ -169,6 +169,12 @@ public sealed class PlayerState
     public string StoragePassword { get; set; } = string.Empty;
     public bool IsStorageUnlocked { get; set; } = false;
 
+    // 行会职位 (0: 平民/无行会, 1: 一号正掌门人, 2: 副掌门)
+    public byte GuildRank { get; set; } = 0;
+
+    // 武器升级与开刀试刀状态计数
+    public int TrialSlashCount { get; set; } = 0;
+
     // 官方 1.4/1.5 药水持续血池与蓝池递增 (IDA sub_4B7100 TCreature.Eat: nIncHealth / nIncSpell)
     public int IncHealth { get; set; } = 0;
     public int IncSpell { get; set; } = 0;

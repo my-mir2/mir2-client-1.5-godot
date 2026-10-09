@@ -267,13 +267,25 @@
 ## 模块十三：现代强类型插件化脚本引擎 (Modern Script Engine & Plugin Sandbox)
 
 - [x] **13.1 淘汰旧 TXT 脚本，全面升级为强类型 C# 行为树接口 (`INpcBehavior`)**：
-  - [x] 定义规范化接口：`NpcDialogContext`, `ExecuteAction`, `GetDialogText`；
+  - [x] 定义规范化接口：`NpcDialogContext`, `INpcBehavior`, `AddLink`, `BuildFinalDialogPayload`；
   - [x] 本地开发机具备 100% 编译期静态检查与类型安全，杜绝动态字符串手滑拼错；
-- [x] **13.2 插件化热加载沙箱 (`PluginHotReloadEngine`)**：
-  - [x] 支持在线热更新替换 NPC 脚本与世界事件插件，无需重启 exe 进程；
+- [x] **13.2 插件化内存字节码热加载沙箱 (`LoadPluginsFromAssemblyBytes`)**：
+  - [x] 开发者在本地 IDE 编译排错后，直接将程序集字节流热传输至服务端内存装载，不锁定磁盘文件，实现原子热替换与回滚；
   - [x] 100% 兼容 .NET 10 Native AOT 纯机器码发布与静态编译内置回退；
-- [x] **13.3 官方全量核心 NPC 脚本现代化重写升级**：
-  - [x] 老兵传送、盟重药店、沙巴克皇宫管家、封魔谷月老、铁匠铺全量升级为强类型插件。
+- [x] **13.3 官方 13 大核心全生态 NPC 脚本现代化重写升级**：
+  - [x] 比奇老兵 (`VeteranNpcBehavior`, ID 101)：盟重/毒蛇传送与金币校验；
+  - [x] 沙巴克皇宫管家 (`SabukStewardNpcBehavior`, ID 102)：城主金库公款支取与城堡修缮；
+  - [x] 封魔谷月老 (`YuelaoNpcBehavior`, ID 103)：结婚与离婚协议；
+  - [x] 盟重药店老板 (`MengzhongPharmacyNpcBehavior`, ID 104)：药水买卖与 20% 沙巴克税收上缴；
+  - [x] 比奇铁匠铺老板 (`BlacksmithNpcBehavior`, ID 105)：武器特修与持久保全；
+  - [x] 仓库保管员 (`StorageKeeperNpcBehavior`, ID 106)：二级密码安全防线与金币寄存；
+  - [x] 沙巴克武器升级大师 (`WeaponUpgradeMasterNpcBehavior`, ID 107)：黑铁矿纯度、首饰加权、淬火等待与试刀状态机；
+  - [x] 比奇武馆教头 (`MasterApprenticeRegistrarNpcBehavior`, ID 108)：28 级以下拜师、35 级以上收徒与声望流转；
+  - [x] 沙巴克攻城管理员 (`SabukSiegeRegistrarNpcBehavior`, ID 109)：沃玛号角行会掌门提交祖玛头像与 100 万军费申请 3 天后决战沙城；
+  - [x] 命运之刃任务老头 (`FateSwordQuestNpcBehavior`, ID 110)：35 级战士金矿纯度、五局三胜剪刀石头布猜拳与神器铸造；
+  - [x] 神秘老人未知暗殿引路人 (`DarkHallTeleporterNpcBehavior`, ID 111)：神水检定与传送至未知暗殿 (Map 9000)；
+  - [x] 盟重技能书合成大师 (`SkillBookSynthesizerNpcBehavior`, ID 112)：白日门书页合成 35 级三职业终极秘籍（烈火/冰咆哮/狗书）；
+  - [x] 银杏村新手指导员 (`NewbieGuideNpcBehavior`, ID 113)：新手赠送木剑布衣与 Alt 割肉换第一桶金指引。
 
 ---
 
@@ -309,9 +321,9 @@
 
 ## 质量验证准绳与自动化测试闭环
 
-- [x] **已完成基线测试**：**341 / 341** 项测试全部通过（100% 通过率）；
+- [x] **已完成基线测试**：**344 / 344** 项测试全部通过（100% 通过率）；
 - [x] **新增计划测试要求**：
-  - [x] 每一批次完成必须新增覆盖测试（已覆盖现代强类型插件、沙巴克税收金库、祈祷大叛变、记忆天地合一、暗殿反差萌与守卫A*回岗）；
+  - [x] 每一批次完成必须新增覆盖测试（已覆盖现代强类型插件、程序集内存热加载、沙巴克税收金库、祈祷大叛变、记忆天地合一、暗殿反差萌与守卫A*回岗）；
   - [x] 严禁任何断言松绑；
   - [x] 每次代码变更必须通过 `dotnet test` 与 `dotnet publish -c Release Native AOT` 双重真机编译验收。
 
