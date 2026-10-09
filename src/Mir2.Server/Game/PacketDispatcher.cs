@@ -25,6 +25,12 @@ public sealed class PacketDispatcher
     public GuildEngine GuildEngine { get; set; } = new();
     public SabukSiegeEngine SabukEngine { get; set; } = new();
     public EconomyAntiDupeEngine EcoEngine { get; set; } = new();
+    public NpcScriptEngine ScriptEngine { get; set; } = new();
+    public SafeZoneAndGuardEngine SafeZoneEngine { get; set; } = new();
+    public EnvironmentLightingEngine LightingEngine { get; set; } = new();
+    public CombatPersistenceAndAntiHackEngine AntiHackEngine { get; set; } = new();
+    public SocialRelationsEngine SocialEngine { get; set; } = new();
+    public StorageSecurityEngine StorageSecEngine { get; set; } = new();
     private int _nextGroundItemUid = 10000;
 
     public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null, TradeEngine? tradeEngine = null, GroupEngine? groupEngine = null, GuildEngine? guildEngine = null, SabukSiegeEngine? sabukEngine = null, EconomyAntiDupeEngine? ecoEngine = null)
@@ -545,6 +551,13 @@ public sealed class PacketDispatcher
                         break;
                     }
                 }
+            }
+
+            // 安全区禁武规则: 攻击者或目标处于安全区内一律禁止动武
+            if (SafeZoneEngine.IsAttackForbiddenBySafeZone(session.CurrentMapId, session.X, session.Y, targetX, targetY))
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "安全区内禁止动武！");
+                return;
             }
 
             if (defender != null && defender.State != null && session.State != null)
