@@ -17,10 +17,12 @@ public sealed class PacketDispatcher
 {
     private readonly MapManager _mapManager;
     private readonly List<ClientSession> _ninePatchBuffer = new(64);
+    public MonsterRegenEngine? RegenEngine { get; set; }
 
-    public PacketDispatcher(MapManager mapManager)
+    public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null)
     {
         _mapManager = mapManager;
+        RegenEngine = regenEngine;
     }
 
     public PacketDispatcher(NinePatchAoi<ClientSession> mapAoi)
@@ -375,6 +377,58 @@ public sealed class PacketDispatcher
                     }
                 }
             }
+            else if (RegenEngine != null && session.State != null)
+            {
+                // 4. 检索目标位置的怪物并进行物理攻击与掉落结算
+                var monster = RegenEngine.FindMonsterAt(session.CurrentMapId, targetX, targetY);
+                if (monster != null && !monster.IsDead)
+                {
+                    // 物理命中判定 (1:1 官方 Delphi M2 sub_4C1EF4 @ L12704)
+                    int rollSpeed = OfficialClientRulesEngine.DelphiRandom.Shared.Next(16);
+                    if (rollSpeed < session.State.Hit)
+                    {
+                        int rawDmg = OfficialClientRulesEngine.CombatMath.CalculatePhysicalDamage(15, 30, 0, 5, OfficialClientRulesEngine.DelphiRandom.Shared);
+                        if (session.State.BoAttackKill)
+                        {
+                            session.State.BoAttackKill = false;
+                            rawDmg += session.State.HitPlus;
+                        }
+                        if (session.State.BoFireHit)
+                        {
+                            session.State.BoFireHit = false;
+                            int multiplier = 10 * session.State.FireHitPlus;
+                            rawDmg += (int)Math.Round((double)rawDmg / 100.0 * multiplier);
+                        }
+
+                        monster.Hp = Math.Max(0, monster.Hp - rawDmg);
+
+                        // 广播怪物受击后仰: SM_OBJECTSTRUCK (244)
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, monster.Uid, monster.X, monster.Y, rawDmg, monster.Name, includeSelf: true);
+
+                        if (monster.IsDead)
+                        {
+                            RegenEngine.OnMonsterDied(monster.Uid);
+
+                            // 广播怪物死亡倒地: SM_DEATH_ACTION_DELPHI (28)
+                            BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, monster.Uid, monster.X, monster.Y, 0, monster.Name, includeSelf: true);
+
+                            // 怪物死亡爆落战利品
+                            var loot = new GroundItemEntity
+                            {
+                                Uid = 50000 + monster.Uid % 10000,
+                                Name = $"{monster.Name}_战利品",
+                                X = monster.X,
+                                Y = monster.Y,
+                                OwnerSessionId = session.SessionId, // 击杀者 80 秒归属权
+                                DropTickMs = nowMs,
+                                Weight = 1
+                            };
+                            hitMap.AddGroundItem(loot);
+                            BroadcastToNinePatch(session, ProtocolConsts.SM_GROUNDITEM, loot.Uid, monster.X, monster.Y, 0, loot.Name, includeSelf: true);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -602,6 +656,57 @@ public sealed class PacketDispatcher
                 var target = _ninePatchBuffer[i];
                 if (!includeSelf && target.SessionId == source.SessionId) continue;
                 target.EnqueuePacket(ident, recog, param, tag, series, extra);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 驱动一次怪物 AI 行为并在九宫格内向玩家广播其动作 (移动/近战/巡逻)
+    /// </summary>
+    public int ProcessMonsterAiCycle(OfficialClientRulesEngine.DelphiRandom rng)
+    {
+        if (RegenEngine == null) return 0;
+
+        var (actions, _) = RegenEngine.ProcessMonsterAiTick((mapId, x, y) =>
+        {
+            var map = _mapManager.GetMap(mapId) ?? _mapManager.DefaultMap;
+            var list = new List<ClientSession>();
+            map.Aoi.GetEntitiesInNinePatch(x, y, list);
+            return list;
+        }, rng);
+
+        for (int i = 0; i < actions.Count; i++)
+        {
+            var act = actions[i];
+            var map = _mapManager.GetMap(0);
+            if (map == null) continue;
+
+            if (act.ActionType == 0 || act.ActionType == 2)
+            {
+                // 怪物移动广播: SM_OBJECTWALK (241)
+                BroadcastToCoords(map, act.X, act.Y, ProtocolConsts.SM_OBJECTWALK, act.MonsterUid, act.X, act.Y, act.Direction, act.MonsterName);
+            }
+            else if (act.ActionType == 1)
+            {
+                // 怪物近战攻击动作: SM_OBJECTHIT (242)
+                BroadcastToCoords(map, act.X, act.Y, ProtocolConsts.SM_OBJECTHIT, act.MonsterUid, act.X, act.Y, act.Direction, act.MonsterName);
+
+                // 目标玩家受击后仰: SM_OBJECTSTRUCK (244)
+                BroadcastToCoords(map, act.X, act.Y, ProtocolConsts.SM_OBJECTSTRUCK, act.TargetSessionId, act.X, act.Y, act.DamageDealt, act.MonsterName);
+            }
+        }
+
+        return actions.Count;
+    }
+
+    private void BroadcastToCoords(GameMap map, int x, int y, short ident, int recog, int param, int tag, int series, string extra)
+    {
+        lock (_ninePatchBuffer)
+        {
+            map.Aoi.GetEntitiesInNinePatch(x, y, _ninePatchBuffer);
+            for (int i = 0; i < _ninePatchBuffer.Count; i++)
+            {
+                _ninePatchBuffer[i].EnqueuePacket(ident, recog, param, tag, series, extra);
             }
         }
     }

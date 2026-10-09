@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Mir2.Server.Maps;
+using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Rules;
 
@@ -39,6 +40,13 @@ public sealed class MonsterInstance
     public int MaxHp { get; set; }
     public int SpawnRuleId { get; init; }
     public bool IsDead => Hp <= 0;
+
+    // 官方怪物 AI 属性 (IDA 0x4B966C)
+    public int ViewRange { get; set; } = 5; // 官方默认视野 5 格 (0x4B966C @ +484)
+    public int AttackDamageMin { get; set; } = 6;
+    public int AttackDamageMax { get; set; } = 14;
+    public long NextActionTimeMs { get; set; }
+    public int TargetSessionId { get; set; }
 }
 
 /// <summary>
@@ -165,4 +173,193 @@ public sealed class MonsterRegenEngine
         _monsters.TryGetValue(monsterUid, out var m);
         return m;
     }
+
+    /// <summary>
+    /// 根据地图与坐标检索处于该位置的存活怪物
+    /// </summary>
+    public MonsterInstance? FindMonsterAt(int mapId, int x, int y)
+    {
+        foreach (var kvp in _monsters)
+        {
+            var m = kvp.Value;
+            if (!m.IsDead && m.MapId == mapId && m.X == x && m.Y == y)
+            {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    public readonly record struct MonsterAiActionResult(
+        int MonsterUid,
+        string MonsterName,
+        int ActionType, // 0=追击移动, 1=近战攻击, 2=闲置巡逻
+        int X,
+        int Y,
+        byte Direction,
+        int TargetSessionId,
+        int DamageDealt
+    );
+
+    /// <summary>
+    /// 执行全服怪物 AI 核心心跳 (IDA 0x4B1638 ProcessMonsters & 0x4B966C)
+    /// 包含视野索敌、追击移动、邻近攻击判定与 15ms 时间片硬熔断保护
+    /// </summary>
+    public (List<MonsterAiActionResult> actions, bool sliceTimeout) ProcessMonsterAiTick(
+        Func<int, int, int, List<ClientSession>> getSessionsInNinePatch,
+        OfficialClientRulesEngine.DelphiRandom rng)
+    {
+        long startTick = Environment.TickCount64;
+        var actions = new List<MonsterAiActionResult>();
+        bool sliceTimeout = false;
+
+        foreach (var kvp in _monsters)
+        {
+            var monster = kvp.Value;
+            if (monster.IsDead) continue;
+
+            long now = Environment.TickCount64;
+            if (now < monster.NextActionTimeMs) continue;
+
+            var map = _mapManager.GetMap(monster.MapId);
+            if (map == null) continue;
+
+            // 1. 视野索敌 (扫描周围九宫格内的玩家, 默认 5 格视野)
+            var nearbyPlayers = getSessionsInNinePatch(monster.MapId, monster.X, monster.Y);
+            ClientSession? targetPlayer = null;
+            int closestDist = int.MaxValue;
+
+            for (int i = 0; i < nearbyPlayers.Count; i++)
+            {
+                var p = nearbyPlayers[i];
+                if (p.State == null || p.State.Hp <= 0) continue;
+
+                int dx = Math.Abs(p.X - monster.X);
+                int dy = Math.Abs(p.Y - monster.Y);
+                int chebyshevDist = Math.Max(dx, dy);
+
+                if (chebyshevDist <= monster.ViewRange && chebyshevDist < closestDist)
+                {
+                    closestDist = chebyshevDist;
+                    targetPlayer = p;
+                }
+            }
+
+            if (targetPlayer != null)
+            {
+                monster.TargetSessionId = targetPlayer.SessionId;
+                int dx = targetPlayer.X - monster.X;
+                int dy = targetPlayer.Y - monster.Y;
+                int dist = Math.Max(Math.Abs(dx), Math.Abs(dy));
+
+                if (dist == 1)
+                {
+                    // 2. 邻接物理近战攻击 (IDA 0x4B966C)
+                    monster.Direction = GetDirection(dx, dy);
+                    int dmg = rng.Next(monster.AttackDamageMax - monster.AttackDamageMin + 1) + monster.AttackDamageMin;
+
+                    // 结算目标玩家受击扣血
+                    targetPlayer.State!.Hp = Math.Max(0, targetPlayer.State.Hp - dmg);
+
+                    monster.NextActionTimeMs = now + 1000; // 攻击后摇 1000ms
+                    actions.Add(new MonsterAiActionResult(
+                        monster.Uid, monster.Name, ActionType: 1,
+                        monster.X, monster.Y, monster.Direction,
+                        targetPlayer.SessionId, DamageDealt: dmg
+                    ));
+                }
+                else if (dist > 1)
+                {
+                    // 3. 追击步进 (朝目标方向移动 1 格)
+                    int stepX = monster.X + Math.Sign(dx);
+                    int stepY = monster.Y + Math.Sign(dy);
+
+                    if (map.IsWalkable(stepX, stepY))
+                    {
+                        monster.Direction = GetDirection(Math.Sign(dx), Math.Sign(dy));
+                        monster.X = stepX;
+                        monster.Y = stepY;
+                        monster.NextActionTimeMs = now + 800; // 移动冷却 800ms
+                        actions.Add(new MonsterAiActionResult(
+                            monster.Uid, monster.Name, ActionType: 0,
+                            monster.X, monster.Y, monster.Direction,
+                            targetPlayer.SessionId, DamageDealt: 0
+                        ));
+                    }
+                }
+            }
+            else
+            {
+                monster.TargetSessionId = 0;
+                // 4. 闲置巡逻 (20% 几率随机朝 8 方向漫步一格)
+                if (rng.Next(5) == 0)
+                {
+                    int randDir = rng.Next(8);
+                    var (offX, offY) = GetDirOffset((byte)randDir);
+                    int roamX = monster.X + offX;
+                    int roamY = monster.Y + offY;
+
+                    // 保证漫步不超过刷新半径
+                    var rule = _rules.Find(r => r.RuleId == monster.SpawnRuleId);
+                    bool withinRadius = rule == null || (Math.Abs(roamX - rule.CenterX) <= rule.Radius && Math.Abs(roamY - rule.CenterY) <= rule.Radius);
+
+                    if (withinRadius && map.IsWalkable(roamX, roamY))
+                    {
+                        monster.X = roamX;
+                        monster.Y = roamY;
+                        monster.Direction = (byte)randDir;
+                        monster.NextActionTimeMs = now + 1200;
+                        actions.Add(new MonsterAiActionResult(
+                            monster.Uid, monster.Name, ActionType: 2,
+                            monster.X, monster.Y, monster.Direction,
+                            TargetSessionId: 0, DamageDealt: 0
+                        ));
+                    }
+                }
+            }
+
+            // 时间片熔断检测 (IDA 0x4B1638)
+            if (Environment.TickCount64 - startTick > MaxRegenTimeSliceMs)
+            {
+                sliceTimeout = true;
+                break;
+            }
+        }
+
+        return (actions, sliceTimeout);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 8方向计算函数 (0=上, 1=右上, 2=右, 3=右下, 4=下, 5=左下, 6=左, 7=左上)
+    /// </summary>
+    public static byte GetDirection(int dx, int dy)
+    {
+        int sx = Math.Sign(dx);
+        int sy = Math.Sign(dy);
+        return (sx, sy) switch
+        {
+            (0, -1) => 0,
+            (1, -1) => 1,
+            (1, 0) => 2,
+            (1, 1) => 3,
+            (0, 1) => 4,
+            (-1, 1) => 5,
+            (-1, 0) => 6,
+            (-1, -1) => 7,
+            _ => 0
+        };
+    }
+
+    public static (int dx, int dy) GetDirOffset(byte dir) => dir switch
+    {
+        0 => (0, -1),
+        1 => (1, -1),
+        2 => (1, 0),
+        3 => (1, 1),
+        4 => (0, 1),
+        5 => (-1, 1),
+        6 => (-1, 0),
+        7 => (-1, -1),
+        _ => (0, 0)
+    };
 }

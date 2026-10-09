@@ -193,7 +193,50 @@ if ( *(_BYTE *)(Creature + 791) == 0 ) { // 实体存活检测
 
 ---
 
-## 7. 关键函数物理地址对照表
+## 7. 怪物 AI 巡逻、索敌与追击攻击机制 (0x4B1638 & 0x4B966C)
+
+```c
+// IDA 0x4B966C @ L9239~L9355
+minX = Monster.X - Monster.ViewRange;
+maxX = Monster.X + Monster.ViewRange;
+minY = Monster.Y - Monster.ViewRange;
+maxY = Monster.Y + Monster.ViewRange;
+
+// 1. 扫描视野范围内的活动生物
+for (x = minX; x <= maxX; x++) {
+    for (y = minY; y <= maxY; y++) {
+        Creature = FindCreatureAt(Map, x, y);
+        if ( Creature != null && Creature.IsAlive && !Creature.IsHidden ) {
+            AddTarget(Monster, Creature); // 0x4B939C
+        }
+    }
+}
+
+// 2. 追击与近身攻击决策
+if ( Monster.Target != null ) {
+    int dist = ChebyshevDistance(Monster.X, Monster.Y, Target.X, Target.Y);
+    if ( dist == 1 ) {
+        // 紧邻目标: 面向目标执行物理挥击攻击 (SM_OBJECTHIT 242)
+        Monster.Direction = CalcDirection(Target.X - Monster.X, Target.Y - Monster.Y);
+        Attack(Monster, Target); // 扣减伤害并广播受击动作 SM_OBJECTSTRUCK (244)
+    } else if ( dist > 1 && dist <= Monster.ViewRange ) {
+        // 逼近目标: 朝目标方向步进一格并校验阻挡 (SM_OBJECTWALK 241)
+        StepTowards(Monster, Target.X, Target.Y);
+    }
+} else {
+    // 3. 闲置巡逻 (Idle Roam): 保持在刷新半径内随机走动
+    RandomWalk(Monster);
+}
+```
+- **物理事实**：
+  1. 怪物视野半径 `ViewRange` 官方默认为 **5 格**（`*(v43 + 484)`）；
+  2. 邻接判定采用切比雪夫距离 `max(|dx|, |dy|) == 1`；
+  3. 怪物挥刀动作向九宫格广播 `SM_OBJECTHIT (242)`，受击后仰广播 `SM_OBJECTSTRUCK (244)`，移动广播 `SM_OBJECTWALK (241)`；
+  4. 采用 15ms 时间片熔断硬保护，保证怪物数量庞大时心跳平滑。
+
+---
+
+## 8. 关键函数物理地址对照表
 
 | 函数地址 (Hex) | 函数大小 | 官方模块 | 函数名 / 职责说明 |
 | :--- | :--- | :--- | :--- |
