@@ -156,12 +156,12 @@ public static class OfficialClientRulesEngine
             "强效金创药" => new PotionEffect { InstantHp = 0, HotHpTotal = 90, HotDurationSec = 6 },
             "中量金创药" => new PotionEffect { InstantHp = 0, HotHpTotal = 50, HotDurationSec = 5 },
             "金创药(小量)" => new PotionEffect { InstantHp = 0, HotHpTotal = 25, HotDurationSec = 4 },
-            "强效魔法药" => new PotionEffect { InstantMp = 0, HotMpTotal = 120, HotDurationSec = 6 },
-            "中量魔法药" => new PotionEffect { InstantMp = 0, HotMpTotal = 70, HotDurationSec = 5 },
+            "强效魔法药" => new PotionEffect { InstantMp = 0, HotMpTotal = 150, HotDurationSec = 6 },
+            "中量魔法药" => new PotionEffect { InstantMp = 0, HotMpTotal = 80, HotDurationSec = 5 },
             "魔法药(小量)" => new PotionEffect { InstantMp = 0, HotMpTotal = 35, HotDurationSec = 4 },
             "太阳水" => new PotionEffect { InstantHp = 30, InstantMp = 40 },
             "强效太阳水" => new PotionEffect { InstantHp = 50, InstantMp = 80 },
-            "万年雪霜" => new PotionEffect { InstantHp = 120, InstantMp = 150 },
+            "万年雪霜" => new PotionEffect { InstantHp = 120, InstantMp = 120 },
             "疗伤药" => new PotionEffect { InstantHp = 250, InstantMp = 250 },
             _ => new PotionEffect()
         };
