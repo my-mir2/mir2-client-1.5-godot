@@ -183,8 +183,11 @@ public sealed class PacketDispatcher
                 break;
 
             case ProtocolConsts.CM_EATITEM: // 1006 使用物品/吃药
-            case 1002: // CM_EAT 官方 1.4/1.5
                 HandleEatItem(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_OPENDOOR: // 1002 官方打开石门
+                HandleOpenDoorPacket(session, remaining);
                 break;
 
             case ProtocolConsts.CM_WEARITEM: // 1003 官方穿戴装备 (负重与腕力权威校验)
@@ -442,6 +445,14 @@ public sealed class PacketDispatcher
                 {
                     BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, session.SessionId, newX, newY, 0, session.CharacterName, includeSelf: true);
                 }
+            }
+
+            // 4. 盛大官方跳点传送权威检测 (Transfer Passage)
+            var passage = _mapManager.FindPassage(session.CurrentMapId, newX, newY);
+            if (passage != null)
+            {
+                TriggerMapPassage(session, passage);
+                return;
             }
         }
     }
@@ -2527,6 +2538,107 @@ public sealed class PacketDispatcher
         }
 
         return true;
+    }
+
+    public void HandleOpenDoorPacket(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        if (session.State == null || session.State.Hp <= 0) return;
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+
+        // 格式: doorX/doorY/ 或缺省取正前方 1 格 (CM_OPENDOOR 1002)
+        int doorX = session.X;
+        int doorY = session.Y;
+        int slash = payload.IndexOf('/');
+        if (slash > 0)
+        {
+            int.TryParse(payload[..slash], out doorX);
+            var rest = payload[(slash + 1)..];
+            int slash2 = rest.IndexOf('/');
+            if (slash2 >= 0) rest = rest[..slash2];
+            int.TryParse(rest, out doorY);
+        }
+        else
+        {
+            var (fx, fy) = GetFrontCoord(session.X, session.Y, session.Direction);
+            doorX = fx;
+            doorY = fy;
+        }
+
+        // 权威距离检定: 玩家与门必须相邻 (<= 1 格)
+        if (Math.Abs(session.X - doorX) > 1 || Math.Abs(session.Y - doorY) > 1) return;
+
+        long nowMs = Environment.TickCount64;
+        bool opened = map.OpenDoor(doorX, doorY, nowMs);
+        if (opened)
+        {
+            // 向九宫格广播开门成功动画 (SM_OPENDOOR 612)
+            BroadcastToNinePatch(session, ProtocolConsts.SM_OPENDOOR, doorX, doorY, 1, 0, "石门开启", includeSelf: true);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "石门已被推开。");
+        }
+    }
+
+    public void TickWorldDoors(long nowMs)
+    {
+        foreach (var map in _mapManager.AllMaps)
+        {
+            var closed = map.ProcessDoorTick(nowMs);
+            for (int i = 0; i < closed.Count; i++)
+            {
+                var d = closed[i];
+                // 广播关门协议 SM_CLOSEDOOR (614) 并恢复阻挡
+                lock (_ninePatchBuffer)
+                {
+                    map.Aoi.GetEntitiesInNinePatch(d.X, d.Y, _ninePatchBuffer);
+                    for (int j = 0; j < _ninePatchBuffer.Count; j++)
+                    {
+                        _ninePatchBuffer[j].EnqueuePacket(ProtocolConsts.SM_CLOSEDOOR, d.X, d.Y, 0, 0, "石门关闭");
+                    }
+                }
+            }
+        }
+    }
+
+    public void TriggerMapPassage(ClientSession session, MapPassage passage)
+    {
+        var oldMap = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+        var newMap = _mapManager.GetMap(passage.ToMapId) ?? _mapManager.DefaultMap;
+
+        int oldX = session.X;
+        int oldY = session.Y;
+
+        // 1. 从原地图离开并广播实体消失
+        oldMap.Aoi.Leave(session, oldX, oldY);
+        BroadcastToNinePatch(session, ProtocolConsts.SM_ENTITYDISAPPEAR, session.SessionId, oldX, oldY, 0, session.CharacterName, includeSelf: false);
+
+        // 2. 变更会话地图与物理坐标
+        session.CurrentMapId = newMap.MapId;
+        session.X = passage.ToX;
+        session.Y = passage.ToY;
+
+        // 3. 下发客户端地图切换与黑屏转场协议 (SM_NEWMAP_DELPHI 521)
+        session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, newMap.MapId, passage.ToX, passage.ToY, 0, newMap.Name);
+        session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, passage.ToX, passage.ToY, session.Direction, session.CharacterName);
+        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"进入【{newMap.Name}】");
+
+        // 4. 进入新地图 AOI 空间分区并广播登场
+        newMap.Aoi.Enter(session, passage.ToX, passage.ToY);
+        BroadcastToNinePatch(session, ProtocolConsts.SM_ENTITYAPPEAR, session.SessionId, passage.ToX, passage.ToY, session.Direction, session.CharacterName, includeSelf: false);
+    }
+
+    public static (int x, int y) GetFrontCoord(int x, int y, int dir)
+    {
+        return dir switch
+        {
+            0 => (x, y - 1),     // 北
+            1 => (x + 1, y - 1), // 东北
+            2 => (x + 1, y),     // 东
+            3 => (x + 1, y + 1), // 东南
+            4 => (x, y + 1),     // 南
+            5 => (x - 1, y + 1), // 西南
+            6 => (x - 1, y),     // 西
+            7 => (x - 1, y - 1), // 西北
+            _ => (x, y)
+        };
     }
 
     #endregion

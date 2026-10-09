@@ -189,6 +189,12 @@ public static class Program
             var map = _mapManager.GetMap(0);
             map?.CleanExpiredFireWalls(nowMs);
         }
+
+        // 6. 地图门状态机自动关门流转 (每 10 个 Tick 检查一次 5 秒自动关门并恢复物理阻挡)
+        if (tick % 10 == 0 && _dispatcher != null)
+        {
+            _dispatcher.TickWorldDoors(nowMs);
+        }
     }
 
     private static bool IsNativeAot()

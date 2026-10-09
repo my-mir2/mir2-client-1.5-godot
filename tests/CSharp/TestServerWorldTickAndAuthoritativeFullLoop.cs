@@ -763,6 +763,96 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         Assert.Equal(4, amulet.Dura); // 护身符耐久扣减 1
         Assert.True(enemy.State.Hp < enemyOldHp); // 造成法术伤害
     }
+
+    [Fact]
+    public void TestOfficialDoorStateMachine_OpenAndAutoClose()
+    {
+        var (mapMgr, _, _, dispatcher, map) = CreateTestEnvironment();
+
+        // 1. 在地图 (100, 100) 处安装一扇石门，初始状态为关闭，设置阻挡
+        var door = new DoorEntity { DoorId = 1, X = 100, Y = 100, IsOpen = false };
+        map.AddDoor(door);
+        Assert.False(map.IsWalkable(100, 100)); // 关门状态下物理阻挡不可通行
+
+        // 2. 玩家位于门前 (100, 101)，朝向北 (0)
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 100,
+            Y = 101,
+            Direction = 0,
+            CharacterName = "开门勇士",
+            State = new PlayerState { Uid = 1001, Name = "开门勇士", Level = 10, Hp = 100, MaxHp = 100 }
+        };
+        map.Aoi.Enter(player, 100, 101);
+
+        // 3. 玩家发送 CM_OPENDOOR (1002) 推门
+        player.ClearBufferedPackets();
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_OPENDOOR}/100/100/!");
+
+        // 4. 验证门状态与阻挡更新
+        Assert.True(door.IsOpen);
+        Assert.True(map.IsWalkable(100, 100)); // 开门后阻挡解除，允许穿行
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_OPENDOOR}/")); // 收到开门广播
+
+        // 5. 模拟 5 秒后自动关门
+        door.AutoCloseTickMs = Environment.TickCount64 - 1000; // 让开门时间已过期
+        player.ClearBufferedPackets();
+        dispatcher.TickWorldDoors(Environment.TickCount64);
+
+        // 6. 验证门已自动关闭并恢复阻挡
+        Assert.False(door.IsOpen);
+        Assert.False(map.IsWalkable(100, 100)); // 关门后阻挡重新生效
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_CLOSEDOOR}/")); // 收到关门广播
+    }
+
+    [Fact]
+    public void TestOfficialMapPassage_AuthoritativeTransfer()
+    {
+        // 构造具备比奇与毒蛇跳点的原生地图环境
+        var mapMgr = new MapManager();
+        var biqi = mapMgr.GetMap(0)!;
+        var snakeValley = mapMgr.GetMap(2)!;
+        var regenEng = new MonsterRegenEngine(mapMgr);
+        var npcEng = new NpcMerchantEngine();
+        var tradeEng = new TradeEngine();
+        var groupEng = new GroupEngine();
+        var guildEng = new GuildEngine();
+        var dispatcher = new PacketDispatcher(mapMgr, regenEng, npcEng, tradeEng, groupEng, guildEng);
+
+        // 1. 玩家站在比奇省 (649, 460)，距离毒蛇山谷跳点 (650, 460) 仅一步之遥
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 649,
+            Y = 460,
+            Direction = 2, // 朝东
+            CharacterName = "过图法师",
+            State = new PlayerState { Uid = 1001, Name = "过图法师", Level = 15, Hp = 80, MaxHp = 80 }
+        };
+        biqi.Aoi.Enter(player, 649, 460);
+
+        // 2. 玩家往东走一步进入跳点 (650, 460)
+        player.ClearBufferedPackets();
+        dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_WALK}/650/460/2/!");
+
+        // 3. 验证权威跳点传送：
+        // 玩家地图切换到 2 (毒蛇山谷)，坐标传送到 (50, 500)
+        Assert.Equal(2, player.CurrentMapId);
+        Assert.Equal(50, player.X);
+        Assert.Equal(500, player.Y);
+
+        // 4. 验证 AOI 迁移与 SM_NEWMAP_DELPHI 下发
+        var biqiEntities = new List<ClientSession>();
+        biqi.Aoi.GetEntitiesInNinePatch(650, 460, biqiEntities);
+        Assert.DoesNotContain(player, biqiEntities);
+
+        var snakeEntities = new List<ClientSession>();
+        snakeValley.Aoi.GetEntitiesInNinePatch(50, 500, snakeEntities);
+        Assert.Contains(player, snakeEntities);
+
+        Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_NEWMAP_DELPHI}/"));
+    }
 }
 
 

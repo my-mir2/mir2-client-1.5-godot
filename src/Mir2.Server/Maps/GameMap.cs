@@ -213,6 +213,55 @@ public sealed class GameMap
         return cleaned;
     }
 
+    // ==================== 官方 1.4/1.5 地图门状态机与 5 秒自动关门 (IDA sub_49F2FC/sub_49F420) ====================
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, DoorEntity> _doors = new();
+
+    public void AddDoor(DoorEntity door)
+    {
+        long key = MakeCoordKey(door.X, door.Y);
+        _doors[key] = door;
+        if (!door.IsOpen)
+        {
+            SetWalkable(door.X, door.Y, false); // 默认关门阻挡
+        }
+    }
+
+    public DoorEntity? GetDoor(int x, int y)
+    {
+        long key = MakeCoordKey(x, y);
+        _doors.TryGetValue(key, out var door);
+        return door;
+    }
+
+    public bool OpenDoor(int x, int y, long nowMs)
+    {
+        long key = MakeCoordKey(x, y);
+        if (_doors.TryGetValue(key, out var door) && !door.IsOpen)
+        {
+            door.IsOpen = true;
+            door.AutoCloseTickMs = nowMs + 5000; // 官方 5 秒自动关门
+            SetWalkable(x, y, true); // 移除阻挡允许通行
+            return true;
+        }
+        return false;
+    }
+
+    public List<DoorEntity> ProcessDoorTick(long nowMs)
+    {
+        var closedDoors = new List<DoorEntity>();
+        foreach (var kvp in _doors)
+        {
+            var d = kvp.Value;
+            if (d.IsOpen && nowMs >= d.AutoCloseTickMs)
+            {
+                d.IsOpen = false;
+                SetWalkable(d.X, d.Y, false); // 恢复关门物理阻挡
+                closedDoors.Add(d);
+            }
+        }
+        return closedDoors;
+    }
+
     // ==================== 官方 1.4/1.5 地面物品容器与 80 秒保护期 (IDA 0x4C5CB0) ====================
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, List<GroundItemEntity>> _groundItems = new();
 
@@ -330,5 +379,32 @@ public sealed class FireWallEntity
     public int CasterSessionId { get; init; }
     public int Damage { get; init; }
     public long ExpireTimeMs { get; init; }
+}
+
+/// <summary>
+/// 盛大官方 1.5 地图门实体 (Door)
+/// 包含开关阻挡动态切换与 5 秒自动关门状态机 (IDA sub_49F2FC/sub_49F420)
+/// </summary>
+public sealed class DoorEntity
+{
+    public int DoorId { get; init; }
+    public int X { get; init; }
+    public int Y { get; init; }
+    public bool IsOpen { get; set; }
+    public long AutoCloseTickMs { get; set; }
+}
+
+/// <summary>
+/// 盛大官方 1.5 地图跳点传送通道 (Transfer Passage)
+/// </summary>
+public sealed class MapPassage
+{
+    public int FromMapId { get; init; }
+    public int FromX { get; init; }
+    public int FromY { get; init; }
+    public int ToMapId { get; init; }
+    public int ToX { get; init; }
+    public int ToY { get; init; }
+    public string Description { get; init; } = string.Empty;
 }
 
