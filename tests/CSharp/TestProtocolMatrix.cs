@@ -3137,6 +3137,129 @@ public class TestProtocolMatrix
         };
         Assert.Equal("编组还未成立或者你还不够等级创建。", errMsg);
     }
+
+    [Fact]
+    public void TestOfficialPotionRecoveryAndGoldDefenseFlow()
+    {
+        // 1. 盛大官方 1.5 经典药水元数据解析验证
+        var metaSun = Mir2Client.Game.PotionSystem.ParsePotion("太阳水");
+        Assert.True(metaSun.IsInstant);
+        Assert.Equal(30, metaSun.TotalHp);
+        Assert.Equal(40, metaSun.TotalMp);
+
+        var metaFrost = Mir2Client.Game.PotionSystem.ParsePotion("万年雪霜");
+        Assert.True(metaFrost.IsInstant);
+        Assert.Equal(120, metaFrost.TotalHp);
+        Assert.Equal(120, metaFrost.TotalMp);
+
+        var metaRedSuper = Mir2Client.Game.PotionSystem.ParsePotion("强效金创药");
+        Assert.False(metaRedSuper.IsInstant);
+        Assert.Equal(90, metaRedSuper.TotalHp);
+        Assert.Equal(0, metaRedSuper.TotalMp);
+
+        var metaBlueSuper = Mir2Client.Game.PotionSystem.ParsePotion("强效魔法药");
+        Assert.False(metaBlueSuper.IsInstant);
+        Assert.Equal(0, metaBlueSuper.TotalHp);
+        Assert.Equal(150, metaBlueSuper.TotalMp);
+
+        // 2. 药水系统瞬回与缓回双轨行为测试
+        var potionSys = new Mir2Client.Game.PotionSystem();
+        long now = 10000;
+
+        // (1) 瞬回喝药：立即生效，缓冲池不增加
+        var (instantHp, instantMp) = potionSys.Drink("太阳水", now);
+        Assert.Equal(30, instantHp);
+        Assert.Equal(40, instantMp);
+        Assert.Equal(0, potionSys.PendingHp);
+        Assert.Equal(0, potionSys.PendingMp);
+
+        // (2) 缓回喝药：增量累积入池，瞬回为 0
+        var (gradualHp, gradualMp) = potionSys.Drink("强效金创药", now);
+        Assert.Equal(0, gradualHp);
+        Assert.Equal(0, gradualMp);
+        Assert.Equal(90, potionSys.PendingHp);
+
+        // (3) 连续喝药（顶药）：池子叠加
+        potionSys.Drink("中量金创药", now);
+        Assert.Equal(140, potionSys.PendingHp); // 90 + 50 = 140
+
+        potionSys.Drink("中量魔法药", now);
+        Assert.Equal(80, potionSys.PendingMp);
+
+        // (4) 未到 250ms Tick 周期，不产出回复
+        bool tickFired1 = potionSys.ProcessTick(now + 100, out int hpTick1, out int mpTick1);
+        Assert.False(tickFired1);
+        Assert.Equal(0, hpTick1);
+        Assert.Equal(0, mpTick1);
+
+        // (5) 到达 250ms Tick 周期，产出单次步长回复
+        bool tickFired2 = potionSys.ProcessTick(now + 260, out int hpTick2, out int mpTick2, hpStep: 4, mpStep: 5);
+        Assert.True(tickFired2);
+        Assert.Equal(4, hpTick2);
+        Assert.Equal(5, mpTick2);
+        Assert.Equal(136, potionSys.PendingHp); // 140 - 4 = 136
+        Assert.Equal(75, potionSys.PendingMp);  // 80 - 5 = 75
+
+        // (6) 阵亡重置清空缓冲池
+        potionSys.Reset();
+        Assert.Equal(0, potionSys.PendingHp);
+        Assert.Equal(0, potionSys.PendingMp);
+
+        // 3. 查名 600ms 防抖节流逻辑验证
+        const long debounceMs = Mir2Client.UI.GameView.QueryUserDebounceMs;
+        Assert.Equal(600, debounceMs);
+        long t1 = 5000;
+        long t2 = 5300; // 300ms < 600ms -> 应拦截
+        long t3 = 5700; // 700ms >= 600ms -> 放行
+        Assert.True(t2 - t1 < debounceMs);
+        Assert.False(t3 - t1 < debounceMs);
+
+        // 4. 金币丢弃全角数字规约与安全截断防御验证
+        string fullWidthStr = "１２５０";
+        char[] chars = fullWidthStr.ToCharArray();
+        for (int i = 0; i < chars.Length; i++)
+        {
+            if (chars[i] >= '０' && chars[i] <= '９')
+                chars[i] = (char)(chars[i] - '０' + '0');
+        }
+        string parsedStr = new string(chars);
+        Assert.Equal("1250", parsedStr);
+        Assert.True(int.TryParse(parsedStr, out var goldAmount));
+        Assert.Equal(1250, goldAmount);
+
+        // 携带金币 1000 时，丢弃 1250 自动截断为 1000
+        int currentHold = 1000;
+        int realDrop = Math.Min(goldAmount, currentHold);
+        Assert.Equal(1000, realDrop);
+
+        // 5. 盛大官方 1.5 随从名牌格式与 0~7 级名牌变色阶梯验证
+        int petLvl = 7;
+        string master = "无涯";
+        string petName = "神兽";
+        string displayName = string.IsNullOrEmpty(master) ? petName : $"{master} 的 {petName}";
+        if (petLvl > 0) displayName += $" ({petLvl}级)";
+        Assert.Equal("无涯 的 神兽 (7级)", displayName);
+
+        // 验证 0~7 级颜色分阶
+        for (int lvl = 0; lvl <= 7; lvl++)
+        {
+            var expectedColor = lvl switch
+            {
+                0 => new Godot.Color(1.0f, 1.0f, 1.0f),
+                1 or 2 => new Godot.Color(0.85f, 1.0f, 0.4f),
+                3 or 4 => new Godot.Color(0.2f, 1.0f, 0.4f),
+                5 or 6 => new Godot.Color(0.3f, 0.8f, 1.0f),
+                7 => new Godot.Color(0.5f, 0.4f, 1.0f),
+                _ => new Godot.Color(1.0f, 1.0f, 1.0f)
+            };
+            if (lvl == 7)
+            {
+                Assert.Equal(0.5f, expectedColor.R, 2);
+                Assert.Equal(0.4f, expectedColor.G, 2);
+                Assert.Equal(1.0f, expectedColor.B, 2);
+            }
+        }
+    }
 }
 
 

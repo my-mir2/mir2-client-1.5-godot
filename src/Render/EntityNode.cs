@@ -24,6 +24,8 @@ namespace Mir2Client.Render
         public int MaxHp { get; set; } = 100;
         public bool IsDead { get; set; } = false;
         public bool IsCorpse { get; set; } = false;
+        public int PetLevel { get; set; } = 0;
+        public string MasterName { get; set; } = string.Empty;
 
         private Sprite2D? _sprite;
         private Label? _nameLabel;
@@ -88,9 +90,29 @@ namespace Mir2Client.Render
             UpdateNameColor();
         }
 
+        public void SetPetInfo(int level, string masterName)
+        {
+            PetLevel = Math.Clamp(level, 0, 7);
+            MasterName = masterName ?? string.Empty;
+            UpdateNameColor();
+        }
+
         private void UpdateNameColor()
         {
             if (_nameLabel == null) return;
+
+            // 盛大官方 1.5 随从名字格式: [主人名 的] 随从名 [(X级)]
+            string displayName = EntityName;
+            if (!string.IsNullOrEmpty(MasterName))
+            {
+                displayName = $"{MasterName} 的 {EntityName}";
+            }
+            if (PetLevel > 0)
+            {
+                displayName += $" ({PetLevel}级)";
+            }
+            _nameLabel.Text = displayName;
+
             if (IsDead)
             {
                 _nameLabel.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f));
@@ -116,6 +138,19 @@ namespace Mir2Client.Render
             else if (_pkPoint >= 100) // 官方黄名警告
             {
                 _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.2f)); // 亮黄色
+            }
+            else if (PetLevel > 0 || !string.IsNullOrEmpty(MasterName)) // 盛大官方 1.5 随从名牌变色阶梯 (0~7级)
+            {
+                Color petColor = PetLevel switch
+                {
+                    0 => new Color(1.0f, 1.0f, 1.0f),       // 0级: 纯白
+                    1 or 2 => new Color(0.85f, 1.0f, 0.4f),  // 1~2级: 黄绿
+                    3 or 4 => new Color(0.2f, 1.0f, 0.4f),   // 3~4级: 翠绿
+                    5 or 6 => new Color(0.3f, 0.8f, 1.0f),   // 5~6级: 天蓝
+                    7 => new Color(0.5f, 0.4f, 1.0f),        // 7级: 官方招牌深蓝紫
+                    _ => new Color(1.0f, 1.0f, 1.0f)
+                };
+                _nameLabel.AddThemeColorOverride("font_color", petColor);
             }
             else
             {

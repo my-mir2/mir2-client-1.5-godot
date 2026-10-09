@@ -71,6 +71,13 @@ namespace Mir2Client.UI
         public GroundItemManager GroundItemManagerInstance { get; } = new();
         private readonly Dictionary<int, GroundItemNode> _itemNodes = new();
 
+        // 盛大官方 1.5 药水双轨回复系统 (瞬回与持续缓回池)
+        public PotionSystem PotionRecoverySystem { get; } = new();
+
+        // 盛大官方 1.5 玩家查名频控节流缓存 (CM_QUERYUSERNAME 80 / CM_QUERYUSERNAME_EXT 82 防抖拦截)
+        private readonly Dictionary<int, long> _queryUserThrottle = new();
+        public const long QueryUserDebounceMs = 600;
+
         private ulong _lastSpellTick = 0;
         public const ulong SpellCooldownMs = 600;
 
@@ -235,6 +242,10 @@ namespace Mir2Client.UI
             {
                 if (_entityNodes.ContainsKey(data.Uid)) return;
 
+                string masterName = data.MasterUid > 0 && EntityManagerInstance.GetEntity(data.MasterUid) is { } master
+                    ? master.Name
+                    : string.Empty;
+
                 var node = new EntityNode
                 {
                     Name = $"Entity_{data.Uid}",
@@ -246,7 +257,9 @@ namespace Mir2Client.UI
                     TileY = data.TileY,
                     Direction = data.Direction,
                     Hp = data.Hp,
-                    MaxHp = data.MaxHp
+                    MaxHp = data.MaxHp,
+                    PetLevel = data.PetLevel,
+                    MasterName = masterName
                 };
 
                 WilLoader? loader = data.Type == EntityManager.EntityType.Npc
@@ -257,6 +270,7 @@ namespace Mir2Client.UI
                 if (MapRendererInstance != null) node.SetMapRenderer(MapRendererInstance);
                 if (data.PkPoint != 0) node.UpdatePk(data.PkPoint);
                 if (data.PoisonMask != 0) node.UpdatePoison(data.PoisonMask);
+                if (data.PetLevel > 0 || !string.IsNullOrEmpty(masterName)) node.SetPetInfo(data.PetLevel, masterName);
 
                 EntityContainer.AddChild(node);
                 _entityNodes[data.Uid] = node;
@@ -777,80 +791,45 @@ namespace Mir2Client.UI
         }
 
         /// <summary>
-        /// 盛大官方 1.5 药水平滑回复与单机沙盒数值对齐 (战法道全量药水):
-        /// 1. 金创药: 普通 20 HP, 中量 50 HP, 强效 90 HP;
-        /// 2. 魔法药: 普通 30 MP, 中量 80 MP, 强效 150 MP;
-        /// 3. 太阳水族: 普通 30 HP/40 MP, 强效 50 HP/50 MP, 疗伤药 80 HP/80 MP, 万年雪霜 120 HP/120 MP。
+        /// 盛大官方 1.5 药水双轨回复与单机沙盒数值对齐 (战法道全量药水):
+        /// 1. 金创药族 / 魔法药族: 持续缓回机制 (注入 PotionSystem 缓冲池，每 250ms tick 定频注入，经典顶药);
+        /// 2. 太阳水族 (太阳水/强效太阳水/疗伤药/万年雪霜): 瞬时即刻加血加魔 (Instant Heal)，并调用 HudInstance.ApplyHeal。
         /// </summary>
         private void ApplyPotionRecovery(string item)
         {
             if (PlayerInstance == null || HudInstance == null || string.IsNullOrEmpty(item)) return;
 
-            int hpGain = 0;
-            int mpGain = 0;
+            long nowMs = (long)Time.GetTicksMsec();
+            var meta = PotionSystem.ParsePotion(item);
+            if (meta.Kind == PotionSystem.PotionKind.None) return;
 
-            if (item.Contains("万年雪霜"))
-            {
-                hpGain = 120;
-                mpGain = 120;
-            }
-            else if (item.Contains("疗伤药"))
-            {
-                hpGain = 80;
-                mpGain = 80;
-            }
-            else if (item.Contains("强效太阳水"))
-            {
-                hpGain = 50;
-                mpGain = 50;
-            }
-            else if (item.Contains("太阳水"))
-            {
-                hpGain = 30;
-                mpGain = 40;
-            }
-            else if (item.Contains("强效金创药") || item.Contains("超强金创药") || item.Contains("大红"))
-            {
-                hpGain = 90;
-            }
-            else if (item.Contains("中量金创药") || item.Contains("中红"))
-            {
-                hpGain = 50;
-            }
-            else if (item.Contains("金创药") || item.Contains("红"))
-            {
-                hpGain = 20;
-            }
-            else if (item.Contains("强效魔法药") || item.Contains("超强魔法药") || item.Contains("大蓝"))
-            {
-                mpGain = 150;
-            }
-            else if (item.Contains("中量魔法药") || item.Contains("中蓝"))
-            {
-                mpGain = 80;
-            }
-            else if (item.Contains("魔法药") || item.Contains("蓝"))
-            {
-                mpGain = 30;
-            }
+            var (instantHp, instantMp) = PotionRecoverySystem.Drink(item, nowMs);
 
-            if (hpGain > 0 || mpGain > 0)
+            if (meta.IsInstant)
             {
-                if (hpGain > 0)
+                if (instantHp > 0)
                 {
-                    PlayerInstance.Hp = Math.Min(PlayerInstance.MaxHp, PlayerInstance.Hp + hpGain);
-                    HudInstance.UpdateHp(PlayerInstance.Hp, PlayerInstance.MaxHp);
+                    PlayerInstance.Hp = Math.Min(PlayerInstance.MaxHp, PlayerInstance.Hp + instantHp);
+                    HudInstance.ApplyHeal(instantHp);
                 }
-                if (mpGain > 0)
+                if (instantMp > 0)
                 {
-                    PlayerInstance.Mp = Math.Min(PlayerInstance.MaxMp, PlayerInstance.Mp + mpGain);
+                    PlayerInstance.Mp = Math.Min(PlayerInstance.MaxMp, PlayerInstance.Mp + instantMp);
                     HudInstance.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
                 }
 
-                string gainText = hpGain > 0 && mpGain > 0
-                    ? $"生命恢复 {hpGain} 点，魔法恢复 {mpGain} 点"
-                    : (hpGain > 0 ? $"生命值恢复 {hpGain} 点" : $"魔法值恢复 {mpGain} 点");
+                string gainText = instantHp > 0 && instantMp > 0
+                    ? $"生命瞬间恢复 {instantHp} 点，魔法瞬间恢复 {instantMp} 点"
+                    : (instantHp > 0 ? $"生命瞬间恢复 {instantHp} 点" : $"魔法瞬间恢复 {instantMp} 点");
                 HudInstance.AddChat("提示", $"使用了 {item}，{gainText}。", new Color(0.6f, 1f, 0.6f));
+            }
+            else
+            {
+                // 缓回药水入池
+                string poolText = meta.TotalHp > 0
+                    ? $"开始缓慢恢复生命 (总计 {meta.TotalHp} 点，当前缓回池: {PotionRecoverySystem.PendingHp} 点)"
+                    : $"开始缓慢恢复魔法 (总计 {meta.TotalMp} 点，当前缓回池: {PotionRecoverySystem.PendingMp} 点)";
+                HudInstance.AddChat("提示", $"使用了 {item}，{poolText}。", new Color(0.6f, 0.95f, 0.6f));
             }
         }
 
@@ -1794,6 +1773,24 @@ namespace Mir2Client.UI
             {
                 HudInstance?.OnPlayerPositionChanged(PlayerInstance.TileX, PlayerInstance.TileY);
             }
+
+            // 驱动盛大官方 1.5 药水缓回 Tick 灌注 (每 250ms 注入一次生命/魔法)
+            if (PlayerInstance != null && !PlayerInstance.IsDead && HudInstance != null)
+            {
+                if (PotionRecoverySystem.ProcessTick(nowTick, out int hpTick, out int mpTick))
+                {
+                    if (hpTick > 0 && PlayerInstance.Hp < PlayerInstance.MaxHp)
+                    {
+                        PlayerInstance.Hp = Math.Min(PlayerInstance.MaxHp, PlayerInstance.Hp + hpTick);
+                        HudInstance.UpdateHp(PlayerInstance.Hp, PlayerInstance.MaxHp);
+                    }
+                    if (mpTick > 0 && PlayerInstance.Mp < PlayerInstance.MaxMp)
+                    {
+                        PlayerInstance.Mp = Math.Min(PlayerInstance.MaxMp, PlayerInstance.Mp + mpTick);
+                        HudInstance.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
+                    }
+                }
+            }
         }
 
         public void SetNet(NetManager net, int sId, string uname, int ulevel = 35)
@@ -1834,6 +1831,14 @@ namespace Mir2Client.UI
             // 2. 玩家交互：查询玩家名与他人装备 (官方实证 0x463649: Shift+双击 CM 82; 普通点击 CM 80)
             else if (type == EntityManager.EntityType.Player)
             {
+                long now = (long)Time.GetTicksMsec();
+                if (_queryUserThrottle.TryGetValue(targetUid, out long lastTick) && now - lastTick < QueryUserDebounceMs)
+                {
+                    GD.Print($"[GameView] 查名节流防抖拦截: Uid {targetUid} (距上次发包 {now - lastTick}ms < {QueryUserDebounceMs}ms)");
+                    return;
+                }
+                _queryUserThrottle[targetUid] = now;
+
                 if (_net != null && _net.IsConnectedToServer)
                 {
                     byte[] pkt = isShift
@@ -1861,6 +1866,7 @@ namespace Mir2Client.UI
         {
             if (PlayerInstance == null || PlayerInstance.IsDead) return;
 
+            PotionRecoverySystem.Reset();
             PlayerInstance.ApplyDie();
             PlayerStateInstance.Hp = 0;
             HudInstance?.UpdateHp(0, PlayerStateInstance.MaxHp);

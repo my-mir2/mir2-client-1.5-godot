@@ -7841,12 +7841,30 @@
       - 在 `src/UI/GameView.cs` 的 `PerformButcher` 中检索目标地块上的死者尸体 UID 并传给发包器；
       - 在 `src/Net/ServerMessageRouter.cs` 中实现 `HandleLeaveGroupFailOrButch` 消除 665 歧义；
       - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialButcherProtocolFlow` 单元测试，脱机测试总数提升至 **216 / 216 项 100% 全部通过**；
-      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+  - [x] **72. 盛大官方 1.5 药水双轨回复系统 (瞬回与持续缓回池)、查名频控节流防抖与随从 0~7 级名牌变色阶梯闭环 (`PotionSystem.cs`, `EntityNode.cs`, `GameView.cs`, `HudController.cs`, `TestProtocolMatrix.cs`)** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据盛大官方 1.5 原版二进制与经典客户端规范：
+        1. 药水回复机制双轨物理真值对齐：
+           此前客户端吃药直接瞬间加满 HP/MP，完全遗漏了盛大官方 1.5 的药水缓回机制。官方 1.5 药水分为两类：太阳水族（太阳水/强效太阳水/万年雪霜/疗伤药）为即时生效瞬回 (Instant Heal)；而金创药族（小红/中红/大红/强效金创药）与魔法药族（小蓝/中蓝/大蓝/强效魔法药）为持续缓回池累加（Gradual Tick），每 250ms 定频灌注固定步长，真实还原传奇老玩家狂按金创药“顶药”时血量逐点爬升手感；
+        2. 查名协议 (CM_QUERYUSERNAME 80 / CM_QUERYUSERNAME_EXT 82) 频控防抖拦截：
+           在玩家群密集的场景下，鼠标滑动或连击易频繁向服务端网关发送查名请求。在 `GameView.cs` 中增加 600ms 本地字典频控节流缓存，在有效时间内对同一目标 UID 拦截防抖，避免网络拥堵与服务端泛洪限流断开；
+        3. 背包金币丢弃 (CM_DROPGOLD 1016) 边界防御：
+           在 `HudController.cs` 的金币丢弃弹窗输入回调中增加全角数字归一化、负数与零拦截、非纯数字防御、以及超过当前携带金币自动截断保护；
+        4. 随从实体 0~7 级名牌变色阶梯与称号渲染：
+           依据官方 Delphi 客户端 `ClMain.pas` / `Actor.pas`，在 `EntityNode.cs` 中实现道士/法师随从称号格式（`主人名 的 随从名 (X级)`），并实现官方权威 0~7 级名牌变色阶梯（0 级纯白、1~2 级黄绿、3~4 级翠绿、5~6 级天蓝、7 级深蓝紫）；
+        5. 即时治愈血球与魔球平滑插值：
+           在 `HudController.cs` 中建立 `_displayHpRatio` 逐像素插值平滑爬升动画，告别单帧突变。
+    - **精准重构**：
+      - 新增 `src/Game/PotionSystem.cs`，实现药水瞬回与缓回双轨解析、定频 Tick 结算、顶药池叠加与阵亡重置；
+      - 在 `src/UI/GameView.cs` 中接入 `PotionRecoverySystem`、`_Process` 缓回 Tick 驱动与 `_queryUserThrottle` 600ms 查名节流；
+      - 在 `src/UI/HudController.cs` 中增加丢弃金币全角转半角防御与血球平滑爬升插值；
+      - 在 `src/Render/EntityNode.cs` 中增加随从名牌格式与 0~7 级名牌变色阶梯；
+      - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialPotionRecoveryAndGoldDefenseFlow` 单元测试，脱机测试总数提升至 **217 / 217 项 100% 全部通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **216 / 216 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **217 / 217 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。

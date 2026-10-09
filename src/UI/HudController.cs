@@ -111,6 +111,10 @@ public partial class HudController : CanvasLayer
     private ItemTooltipView? _itemTooltipView;
     private int _currentHp = 100;
     private int _maxHp = 100;
+    private float _displayHpRatio = 1.0f;
+    private float _targetHpRatio = 1.0f;
+    private float _displayMpRatio = 1.0f;
+    private float _targetMpRatio = 1.0f;
     private bool _isStunned = false;
     private bool _isFrozen = false;
 
@@ -355,6 +359,25 @@ public partial class HudController : CanvasLayer
     private ColorRect? _darknessFogMask;
     private ShaderMaterial? _fogShaderMat;
     public Mir2Client.Game.DarknessFogManager FogManager => _fogManager;
+
+    public override void _Process(double delta)
+    {
+        base._Process(delta);
+
+        if (_orbShaderMat != null)
+        {
+            if (Math.Abs(_displayHpRatio - _targetHpRatio) > 0.001f)
+            {
+                _displayHpRatio = Mathf.MoveToward(_displayHpRatio, _targetHpRatio, (float)delta * 2.5f);
+                _orbShaderMat.SetShaderParameter("hp_ratio", _displayHpRatio);
+            }
+            if (Math.Abs(_displayMpRatio - _targetMpRatio) > 0.001f)
+            {
+                _displayMpRatio = Mathf.MoveToward(_displayMpRatio, _targetMpRatio, (float)delta * 2.5f);
+                _orbShaderMat.SetShaderParameter("mp_ratio", _displayMpRatio);
+            }
+        }
+    }
 
     public override void _Ready()
     {
@@ -621,10 +644,31 @@ public partial class HudController : CanvasLayer
                     {
                         _messageBoxDialog.ShowInput($"请输入要丢弃的金币数量 (最多 {_currentGold:N0})：", "100", (input) =>
                         {
-                            if (int.TryParse(input.Trim(), out var dropAmount) && dropAmount > 0)
+                            string raw = (input ?? string.Empty).Trim();
+                            if (string.IsNullOrEmpty(raw)) return;
+
+                            // 全角数字字符规约为半角数字
+                            char[] chars = raw.ToCharArray();
+                            for (int i = 0; i < chars.Length; i++)
                             {
+                                if (chars[i] >= '０' && chars[i] <= '９')
+                                    chars[i] = (char)(chars[i] - '０' + '0');
+                            }
+                            string normalized = new string(chars);
+
+                            if (int.TryParse(normalized, out var dropAmount))
+                            {
+                                if (dropAmount <= 0)
+                                {
+                                    AddChat("系统", "[系统] 丢弃金币数量必须大于 0。", new Color(1f, 0.4f, 0.4f));
+                                    return;
+                                }
                                 int realDrop = Math.Min(dropAmount, _currentGold);
                                 RequestDropGold(realDrop);
+                            }
+                            else
+                            {
+                                AddChat("系统", "[系统] 请输入合法的金币数量。", new Color(1f, 0.4f, 0.4f));
                             }
                         });
                     }
@@ -1368,10 +1412,16 @@ public partial class HudController : CanvasLayer
         _currentHp = hp;
         _maxHp = maxHp;
         if (_lblHp != null) _lblHp.Text = $"{hp}/{maxHp}";
-        if (_orbShaderMat != null)
+        _targetHpRatio = maxHp > 0 ? Mathf.Clamp((float)hp / maxHp, 0f, 1f) : 0f;
+        // 若血量瞬间清零或初始化，立即对齐显示比率，无需缓动爬升
+        if (hp <= 0 || maxHp <= 0 || _displayHpRatio < 0)
         {
-            float ratio = maxHp > 0 ? Mathf.Clamp((float)hp / maxHp, 0f, 1f) : 0f;
-            _orbShaderMat.SetShaderParameter("hp_ratio", ratio);
+            _displayHpRatio = _targetHpRatio;
+            _orbShaderMat?.SetShaderParameter("hp_ratio", _displayHpRatio);
+        }
+        else if (_orbShaderMat == null)
+        {
+            _displayHpRatio = _targetHpRatio;
         }
     }
 
@@ -1388,10 +1438,15 @@ public partial class HudController : CanvasLayer
     public void UpdateMp(int mp, int maxMp)
     {
         if (_lblMp != null) _lblMp.Text = $"{mp}/{maxMp}";
-        if (_orbShaderMat != null)
+        _targetMpRatio = maxMp > 0 ? Mathf.Clamp((float)mp / maxMp, 0f, 1f) : 0f;
+        if (mp <= 0 || maxMp <= 0 || _displayMpRatio < 0)
         {
-            float ratio = maxMp > 0 ? Mathf.Clamp((float)mp / maxMp, 0f, 1f) : 0f;
-            _orbShaderMat.SetShaderParameter("mp_ratio", ratio);
+            _displayMpRatio = _targetMpRatio;
+            _orbShaderMat?.SetShaderParameter("mp_ratio", _displayMpRatio);
+        }
+        else if (_orbShaderMat == null)
+        {
+            _displayMpRatio = _targetMpRatio;
         }
     }
 
