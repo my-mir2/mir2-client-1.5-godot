@@ -157,10 +157,14 @@ public static class ProtocolConsts
     public const short SM_SPELLACTION_DELPHI     = 34;   // 盛大官方 1.5 实体施法动作 (IDA sub_467920 case '"')
     public const short SM_CHARLIST_DELPHI        = 211;  // 盛大官方 1.5 角色列表下发 (IDA ProcessServerMessage case 0xD3u @ 0x469AE0 handle_sm_char_list)
     public const short SM_DELCHAR_DELPHI         = 212;  // 盛大官方 1.5 角色删除确认 (IDA ProcessServerMessage case 0xD4u @ 0x469B00 handle_sm_char_list_del)
+    public const short SM_OBJECTRUN              = 240;  // 实体奔跑位移广播 (bridge.rs:116)
+    public const short SM_OBJECTWALK             = 241;  // 实体行走位移广播 (bridge.rs:117)
+    public const short SM_OBJECTHIT              = 242;  // 实体普通物理攻击出刀广播 (bridge.rs:129)
     public const short SM_OBJECTSPELL            = 243;  // 实体施法动作 (bridge.rs 权威实证)
     public const short SM_OBJECTSTRUCK           = 244;  // 实体受击后仰 (bridge.rs 权威实证)
     public const short SM_OBJECTSTRUCK_DELPHI    = 637;  // 实体受击伤害结算 (Delphi 变体)
     public const short SM_MAGIC_FIRE             = 638;  // 施法特效下发广播 (bridge.rs 权威实证)
+    public const short SM_SENDUSERSTATE_ALT      = 251;  // 服务端 251 角色四维属性广播 (bridge.rs:121)
     public const short SM_DIGUP                  = 36;   // 地下破土
     public const short SM_DIGDOWN                = 37;   // 潜入地下
     public const short SM_ACTORSOUND_DELPHI      = 40;   // 盛大官方 1.5 实体音效触发播放 (IDA sub_467920 case '(')
@@ -173,7 +177,7 @@ public static class ProtocolConsts
     public const short SM_EXPERIENCE             = 45;   // 经验增长
     public const short SM_CHANGELIGHT            = 46;   // 昼夜光照范围
     public const short SM_LOGON_DELPHI           = 50;   // 主角进入世界绑定
-    public const short SM_SENDUSERSTATE          = 52;   // 玩家基础四维属性
+    public const short SM_SENDUSERSTATE          = 52;   // 玩家基础四维属性 (IDA case 52)
     public const short SM_HEALTHSPELLCHANGED     = 53;   // HP/MP 血量魔法值变动
     public const short SM_NPCDIALOG              = 54;   // NPC 对话脚本页面
     public const short SM_SYSMSG_DELPHI          = 100;  // 系统提示消息

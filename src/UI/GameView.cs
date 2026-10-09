@@ -311,6 +311,14 @@ namespace Mir2Client.UI
                 }
             };
 
+            EntityManagerInstance.EntityHitTriggered += (uid, dir) =>
+            {
+                if (_entityNodes.TryGetValue(uid, out var node))
+                {
+                    node.PlayAction(ActionType.Hit, dir, 0.4f);
+                }
+            };
+
             EntityManagerInstance.EntityDied += (uid) =>
             {
                 if (_entityNodes.TryGetValue(uid, out var node))

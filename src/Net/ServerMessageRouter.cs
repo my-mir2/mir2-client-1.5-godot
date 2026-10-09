@@ -330,6 +330,7 @@ public sealed class ServerMessageRouter
                 _hud?.OnNeedPassword();
                 break;
             case SM_SENDUSERSTATE:
+            case ProtocolConsts.SM_SENDUSERSTATE_ALT: // 251: 服务端 251 角色四维属性广播 (bridge.rs:121)
             case SM_SENDUSERSTATE_INSPECT:
                 HandleSendUserState(packet);
                 break;
@@ -492,7 +493,14 @@ public sealed class ServerMessageRouter
                 HandleSystemMessage(packet);
                 break;
             case ProtocolConsts.SM_HIT_DELPHI: // 12: 实体挥砍物理攻击广播
+            case ProtocolConsts.SM_OBJECTHIT:  // 242: 官方实体出刀/攻击广播 (bridge.rs:129/1615)
                 HandleHit(packet);
+                break;
+            case ProtocolConsts.SM_OBJECTWALK: // 241: 官方实体行走位移广播 (bridge.rs:117/1529)
+                HandleEntityWalk(packet);
+                break;
+            case ProtocolConsts.SM_OBJECTRUN:  // 240: 官方实体奔跑位移广播 (bridge.rs:116)
+                HandleEntityRun(packet);
                 break;
             case ProtocolConsts.SM_SITDOWN: // 27: 蹲下/割肉姿态切换
                 HandleSitDown(packet);
@@ -2043,16 +2051,86 @@ public sealed class ServerMessageRouter
         }
     }
 
-    // 官方 1.5 实体挥砍物理攻击广播 (IDA ProcessServerMessage case 12)
+    // 官方 1.5 实体挥砍物理攻击广播 (IDA ProcessServerMessage case 12 / bridge.rs 242 SM_OBJECTHIT)
     private void HandleHit(ServerPacket pkt)
     {
         int attackerId = pkt.Recog;
         int dir = pkt.Param;
         _entityManager?.UpdateTurn(attackerId, (byte)dir);
-        if (_gameView?.PlayerInstance != null && (attackerId == 0 || attackerId == _gameView.SessionId))
+        if (_gameView?.PlayerInstance != null && (attackerId == 0 || attackerId == _gameView.SessionId || attackerId == _gameView.PlayerInstance.Uid))
         {
             _gameView.PlayerInstance.Direction = dir;
             _gameView.PlayerInstance.Anim?.SetAction(ActionType.Hit, dir);
+        }
+        else
+        {
+            _entityManager?.TriggerHit(attackerId, (byte)dir);
+        }
+    }
+
+    // 官方 1.5 实体行走位移广播 (SM_OBJECTWALK 241, bridge.rs:117/1529)
+    private void HandleEntityWalk(ServerPacket pkt)
+    {
+        if (_entityManager == null) return;
+        int uid = pkt.Recog;
+        int x = 0, y = 0;
+        byte dir = (byte)(pkt.Param & 7);
+        string text = !string.IsNullOrEmpty(pkt.ExtraStr) ? pkt.ExtraStr : DecodeExtraText(pkt.Extra);
+        if (!string.IsNullOrEmpty(text))
+        {
+            var parts = text.Split(new[] { '\t', '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2 && int.TryParse(parts[0], out var px) && int.TryParse(parts[1], out var py))
+            {
+                x = px;
+                y = py;
+            }
+            if (parts.Length >= 3 && byte.TryParse(parts[2], out var pd))
+            {
+                dir = (byte)(pd & 7);
+            }
+        }
+        else
+        {
+            x = pkt.Recog & 0xFFFF;
+            y = (pkt.Recog >> 16) & 0xFFFF;
+        }
+
+        if (x > 0 && y > 0)
+        {
+            _entityManager.UpdateStepMove(uid, x, y, dir, false);
+        }
+    }
+
+    // 官方 1.5 实体奔跑位移广播 (SM_OBJECTRUN 240, bridge.rs:116)
+    private void HandleEntityRun(ServerPacket pkt)
+    {
+        if (_entityManager == null) return;
+        int uid = pkt.Recog;
+        int x = 0, y = 0;
+        byte dir = (byte)(pkt.Param & 7);
+        string text = !string.IsNullOrEmpty(pkt.ExtraStr) ? pkt.ExtraStr : DecodeExtraText(pkt.Extra);
+        if (!string.IsNullOrEmpty(text))
+        {
+            var parts = text.Split(new[] { '\t', '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2 && int.TryParse(parts[0], out var px) && int.TryParse(parts[1], out var py))
+            {
+                x = px;
+                y = py;
+            }
+            if (parts.Length >= 3 && byte.TryParse(parts[2], out var pd))
+            {
+                dir = (byte)(pd & 7);
+            }
+        }
+        else
+        {
+            x = pkt.Recog & 0xFFFF;
+            y = (pkt.Recog >> 16) & 0xFFFF;
+        }
+
+        if (x > 0 && y > 0)
+        {
+            _entityManager.UpdateStepMove(uid, x, y, dir, true);
         }
     }
 

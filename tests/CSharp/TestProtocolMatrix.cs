@@ -3041,6 +3041,64 @@ public class TestProtocolMatrix
         Assert.Equal("沃玛教主", monsterParts[0]);
         Assert.Equal("入侵者必将葬身火海！", monsterParts[1]);
     }
+
+    [Fact]
+    public void TestOfficialEntityActionAndMoveProtocolFlow()
+    {
+        // 1. 验证实体动作与移动协议常量物理对齐
+        Assert.Equal(240, ProtocolConsts.SM_OBJECTRUN);
+        Assert.Equal(241, ProtocolConsts.SM_OBJECTWALK);
+        Assert.Equal(242, ProtocolConsts.SM_OBJECTHIT);
+        Assert.Equal(251, ProtocolConsts.SM_SENDUSERSTATE_ALT);
+
+        // 2. 验证 EntityManager 实体攻击广播触发
+        var em = new Mir2Client.Game.EntityManager();
+        em.AddEntity(1001, "稻草人", Mir2Client.Game.EntityManager.EntityType.Monster, 330, 270, 2, 0);
+
+        int hitUid = 0;
+        byte hitDir = 0;
+        em.EntityHitTriggered += (uid, dir) =>
+        {
+            hitUid = uid;
+            hitDir = dir;
+        };
+
+        em.TriggerHit(1001, 3);
+        Assert.Equal(1001, hitUid);
+        Assert.Equal(3, hitDir);
+        Assert.Equal(3, em.GetEntity(1001)!.Direction);
+
+        // 3. 验证 EntityManager 实体行走与奔跑平滑位移事件触发
+        int moveUid = 0;
+        int moveX = 0, moveY = 0;
+        byte moveDir = 0;
+        bool moveIsRun = false;
+
+        em.EntityStepMoved += (uid, x, y, dir, isRun) =>
+        {
+            moveUid = uid;
+            moveX = x;
+            moveY = y;
+            moveDir = dir;
+            moveIsRun = isRun;
+        };
+
+        // 行走 (isRun = false)
+        em.UpdateStepMove(1001, 331, 270, 2, false);
+        Assert.Equal(1001, moveUid);
+        Assert.Equal(331, moveX);
+        Assert.Equal(270, moveY);
+        Assert.Equal(2, moveDir);
+        Assert.False(moveIsRun);
+
+        // 奔跑 (isRun = true)
+        em.UpdateStepMove(1001, 333, 270, 2, true);
+        Assert.Equal(1001, moveUid);
+        Assert.Equal(333, moveX);
+        Assert.Equal(270, moveY);
+        Assert.Equal(2, moveDir);
+        Assert.True(moveIsRun);
+    }
 }
 
 

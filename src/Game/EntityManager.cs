@@ -72,6 +72,7 @@ public class EntityManager
     public event Action<int, bool>? EntityHealthBarToggled;       // uid, visible (1105)
     public event Action<int, int, int, int>? EntityHealthBarColorChanged; // uid, hp, maxHp, color (1104)
     public event Action<int, bool>? EntityDigUpChanged;           // uid, digUpFinished (SM_DIGUP_ACTION_DELPHI 15)
+    public event Action<int, byte>? EntityHitTriggered;           // uid, dir (SM_HIT_DELPHI 12 / SM_OBJECTHIT 242)
 
     private readonly Dictionary<int, EntityData> _entities = new();
 
@@ -208,6 +209,18 @@ public class EntityManager
             ent.TileY = y;
             ent.Direction = dir;
             EntityReconciled?.Invoke(uid, x, y, dir);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 实体物理攻击出刀广播 (SM_HIT_DELPHI 12 / SM_OBJECTHIT 242)
+    /// </summary>
+    public void TriggerHit(int uid, byte dir)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            ent.Direction = dir;
+            EntityHitTriggered?.Invoke(uid, dir);
         }
     }
 

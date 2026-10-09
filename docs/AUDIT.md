@@ -7809,11 +7809,29 @@
       - 在 `src/Net/ServerMessageRouter.cs` 中实现 301、303、1501 的独立路由与 Tab 分割解析；
       - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialWhisperAndChatProtocolFlow` 单元测试，脱机测试总数提升至 **214 / 214 项 100% 全部通过**；
       - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
+  - [x] **70. 盛大官方 1.5 实体动作出刀/行走奔跑位移与属性广播闭环 (SM_OBJECTHIT 242 / SM_OBJECTWALK 241 / SM_OBJECTRUN 240 / SM_SENDUSERSTATE_ALT 251)** (完成时间: 2026-10-09)
+    - **审计背景与物理证据**：
+      - 依据官方原版二进制 (`MIR_final_v3_p.exe`) IDA 反编译证据 `sub_467920` (case 10/11/12/52) 与 Rust 服务端 `mir2-my/bridge.rs` (行 116/117/121/129/1390/1529/1615/2086)：
+        1. 实体普通物理攻击出刀广播盲区消除：
+           服务端网关下发实体出刀/攻击广播 `SM_OBJECTHIT (242)` 时，此前客户端仅定义并监听了 12 (`SM_HIT_DELPHI`)，遗漏了 242，且在 `HandleHit` 中仅驱动了主角本地动画，未触发同屏怪物或外部玩家的出刀动画；
+        2. 实体平滑行走与奔跑位移广播补齐：
+           服务端网关下发非主角实体位移时发送 `SM_OBJECTWALK (241)` 与 `SM_OBJECTRUN (240)` 携带坐标制表符文本 `x\ty\tdir`；此前客户端缺失这两个协议路由分支，导致同屏实体位移被丢弃；
+        3. 服务端角色四维属性广播协议号补全：
+           服务端网关下发角色四维属性广播 `SM_SENDUSERSTATE (251)`（携带 level 与属性文本），此前客户端仅定义了 52，导致 251 进入 default 分支；
+        4. 全链路动画驱动闭环：
+           在 `EntityManager.cs` 中增加 `EntityHitTriggered` 事件与 `TriggerHit` 方法，并在 `GameView.cs` 中建立对实体节点 `node.PlayAction(ActionType.Hit, dir, 0.4f)` 的动画绑定，同屏实体普通攻击出刀、平滑行走、跑步位移全面打通。
+    - **精准重构**：
+      - 在 `src/Net/ProtocolConsts.cs` 中增加 `SM_OBJECTRUN = 240`、`SM_OBJECTWALK = 241`、`SM_OBJECTHIT = 242` 与 `SM_SENDUSERSTATE_ALT = 251`；
+      - 在 `src/Game/EntityManager.cs` 中实现 `EntityHitTriggered` 事件与 `TriggerHit` 方法；
+      - 在 `src/UI/GameView.cs` 中订阅 `EntityHitTriggered` 并驱动对应实体节点播放出刀动画；
+      - 在 `src/Net/ServerMessageRouter.cs` 中实现 240、241、242 与 251 的完整路由分发与坐标解析；
+      - 在 `tests/CSharp/TestProtocolMatrix.cs` 中新增 `TestOfficialEntityActionAndMoveProtocolFlow` 单元测试，脱机测试总数提升至 **215 / 215 项 100% 全部通过**；
+      - Godot 无头自动化演练保持 **127 / 127 阶段全生命周期 0 缺陷通过**。
 
 ### 2. 终局指标与质量守门线核销
 - **官方 1.5 二进制 IDA 真值表 SM 全集**：`docs/ida_evidence/SM_truth_table.md` 与 `scratch/ida_processmsg.c` 记录的权威下行协议达到 **100.0% 闭环，0 缺口 (官方 1.5 二进制原版 155 个 switch case 100% 封闭覆盖)**；
 - **官方 1.5 原生窗体与控件事件全集**：`docs/ida_evidence/dialog_truth_table.md` 165 个原生 UI事件 100% 建档核销，0 悬空断链；
-- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **214 / 214 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
+- **单元测试通过率**：`dotnet test tests/CSharp/Mir2Client.Tests.csproj` 达到 **215 / 215 项 100% 全部通过 (0 失败，0 告警，耗时 4 秒)**；
 - **Godot 实机端对端演练**：`Godot_console.exe --headless --autotest` 达 **127 / 127 阶段全生命周期 0 缺陷通过**；
 - **运行时日志零容忍扫描**：引擎控制台审查日志中 `ERROR:` 与 `SCRIPT ERROR:` 始终保持为 **0**。
 - **脱机架构解耦**：所有纯算法与音频解析均实现与 Godot C++ 导出运行时的物理隔离，保证持续集成（CI）毫秒级跑通。
