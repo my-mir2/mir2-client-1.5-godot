@@ -702,5 +702,211 @@ public class TestOfficialM2_ModernArchitectureAndUltimateMatrix
         Assert.True(gotBlackIron, "持续开采必须能够挖出关键黑铁矿石");
         Assert.Contains(miner.BagItems, i => i.Name == "黑铁矿石");
     }
+
+    // ==================== 16. 模块二十七: 行会宣战、同盟与战争击杀豁免测试 ====================
+
+    [Fact]
+    public void Test_GuildWarAndAllianceEngine_DeclareWar_Alliance_And_PkExemption()
+    {
+        var warEngine = new GuildWarAndAllianceEngine();
+        long now = 1000_000;
+
+        // 1. 发起宣战 (3 小时)
+        var (warOk, warMsg) = warEngine.DeclareWar("邪恶之眼", "布拉格", now);
+        Assert.True(warOk);
+        Assert.Contains("战火燃起", warMsg);
+        Assert.True(warEngine.AreGuildsAtWar("邪恶之眼", "布拉格", now));
+        Assert.True(warEngine.AreGuildsAtWar("布拉格", "邪恶之眼", now)); // 双向战争关系
+
+        // 2. 战争期间击杀绝对免除 PK 点数
+        Assert.True(warEngine.IsKillExemptFromPkPenalty("邪恶之眼", "布拉格", now));
+        Assert.False(warEngine.IsKillExemptFromPkPenalty("邪恶之眼", "散人联盟", now)); // 非交战行会正常判红名
+
+        // 3. 3 小时后战争自动平息
+        long afterWar = now + (3 * 3600 * 1000) + 1000;
+        Assert.False(warEngine.AreGuildsAtWar("邪恶之眼", "布拉格", afterWar));
+        Assert.False(warEngine.IsKillExemptFromPkPenalty("邪恶之眼", "布拉格", afterWar));
+
+        // 4. 行会结盟
+        var (allyOk, allyMsg) = warEngine.FormAlliance("邪恶之眼", "兄弟情深");
+        Assert.True(allyOk);
+        Assert.Contains("金兰结义", allyMsg);
+        Assert.True(warEngine.AreGuildsAllied("邪恶之眼", "兄弟情深"));
+        Assert.True(warEngine.AreGuildsAllied("兄弟情深", "邪恶之眼"));
+    }
+
+    // ==================== 17. 模块二十八: 沙巴克城门开关、击毁与城主修缮测试 ====================
+
+    [Fact]
+    public void Test_SabukCastleGateEngine_OpenClose_DamageBroken_And_Repair()
+    {
+        var gate = new SabukCastleGateEngine();
+        var lord = new PlayerState { Name = "霸气城主", Gold = 100000 };
+
+        // 1. 非城主禁止操控开关门
+        var (fakeToggle, _) = gate.ToggleGate(open: true, isLord: false);
+        Assert.False(fakeToggle);
+
+        // 2. 城主开启与关闭城门
+        var (openOk, openMsg) = gate.ToggleGate(open: true, isLord: true);
+        Assert.True(openOk);
+        Assert.Equal(SabukCastleGateEngine.GateState.Opened, gate.State);
+
+        var (closeOk, _) = gate.ToggleGate(open: false, isLord: true);
+        Assert.True(closeOk);
+        Assert.Equal(SabukCastleGateEngine.GateState.Closed, gate.State);
+
+        // 3. 攻城期间承受巨额伤害直至击毁
+        var (dmg1, broken1, _) = gate.DamageGate(1000);
+        Assert.True(dmg1);
+        Assert.False(broken1);
+        Assert.Equal(1000, gate.Hp);
+
+        var (dmg2, broken2, brokenMsg) = gate.DamageGate(1000);
+        Assert.True(dmg2);
+        Assert.True(broken2);
+        Assert.Equal(0, gate.Hp);
+        Assert.Equal(SabukCastleGateEngine.GateState.Broken, gate.State);
+        Assert.Contains("击溃粉碎", brokenMsg);
+
+        // 4. 倒塌状态无法直接开关，必须先修缮
+        var (openFail, _) = gate.ToggleGate(open: true, isLord: true);
+        Assert.False(openFail);
+
+        // 5. 城主消耗 50000 金币修缮城门
+        var (repairOk, repairMsg) = gate.RepairGate(lord);
+        Assert.True(repairOk);
+        Assert.Equal(50000, lord.Gold); // 100000 - 50000 = 50000
+        Assert.Equal(SabukCastleGateEngine.MaxGateHp, gate.Hp);
+        Assert.Equal(SabukCastleGateEngine.GateState.Closed, gate.State);
+    }
+
+    // ==================== 18. 模块二十九: 隐身术、怪物仇恨与真视反隐测试 ====================
+
+    [Fact]
+    public void Test_StealthAndTrueSightEngine_StealthDuration_TrueSight_And_BreakAction()
+    {
+        // 1. 隐身持续时间精算
+        long duration = StealthAndTrueSightEngine.CalculateStealthDurationMs(sc: 20, skillLevel: 3);
+        Assert.Equal(40000L, duration); // 15 + 15 + 10 = 40 秒
+
+        // 2. 普通怪物无法侦测隐身目标
+        bool seeZombie = StealthAndTrueSightEngine.CanMonsterDetectTarget("僵尸", targetIsStealthed: true);
+        Assert.False(seeZombie);
+
+        bool seePig = StealthAndTrueSightEngine.CanMonsterDetectTarget("红野猪", targetIsStealthed: true);
+        Assert.False(seePig);
+
+        // 3. 官方真视怪物 (楔蛾/月魔蜘蛛/暗之系列) 能够识破隐身
+        bool seeMoth = StealthAndTrueSightEngine.CanMonsterDetectTarget("楔蛾", targetIsStealthed: true);
+        Assert.True(seeMoth);
+
+        bool seeMoonSpider = StealthAndTrueSightEngine.CanMonsterDetectTarget("月魔蜘蛛", targetIsStealthed: true);
+        Assert.True(seeMoonSpider);
+
+        // 4. 动作破隐
+        bool isStealthed = true;
+        bool broke = StealthAndTrueSightEngine.BreakStealthOnAction(ref isStealthed);
+        Assert.True(broke);
+        Assert.False(isStealthed);
+    }
+
+    // ==================== 19. 模块三十: 道士心灵启示精准显血透视测试 ====================
+
+    [Fact]
+    public void Test_RevelationSkillEngine_MonsterAndPlayerHpDetection()
+    {
+        var taoist = new PlayerState { Name = "清风道人", Mp = 100, Sc = 15 };
+        var boss = new MonsterInstance { Uid = 888, Name = "沃玛教主", Hp = 2200, MaxHp = 2200 };
+        long now = 10000;
+
+        // 1. 对沃玛教主施展心灵启示
+        var (castOk, info, msg) = RevelationSkillEngine.CastRevelationOnMonster(taoist, boss, skillLevel: 2, now);
+        Assert.True(castOk);
+        Assert.NotNull(info);
+        Assert.Equal(2200, info.CurrentHp);
+        Assert.Equal(2200, info.MaxHp);
+        Assert.Equal(90, taoist.Mp); // 100 - 10 = 90
+        Assert.Contains("沃玛教主", msg);
+        Assert.False(info.IsExpired(now + 10000));
+
+        // 2. 蓝量不足施法失败
+        taoist.Mp = 5;
+        var (castFail, _, failMsg) = RevelationSkillEngine.CastRevelationOnMonster(taoist, boss, skillLevel: 2, now);
+        Assert.False(castFail);
+        Assert.Contains("魔法值不足", failMsg);
+    }
+
+    // ==================== 20. 模块三十一: 传统道士制毒配方合成测试 ====================
+
+    [Fact]
+    public void Test_PoisonCraftingEngine_GreenAndRedPoisonRecipes()
+    {
+        var player = new PlayerState { Name = "毒仙" };
+
+        // 1. 材料不足合成失败
+        var (failOk, _, failMsg) = PoisonCraftingEngine.CraftPoison(player, PoisonCraftingEngine.PoisonType.GreenPoisonGrayPowder);
+        Assert.False(failOk);
+        Assert.Contains("材料不足", failMsg);
+
+        // 2. 准备绿毒材料 (食人树叶 4, 果实 1, 牙齿 2)
+        for (int i = 0; i < 4; i++) player.BagItems.Add(new EquipItem { Uid = 10 + i, Name = "食人树叶" });
+        player.BagItems.Add(new EquipItem { Uid = 20, Name = "食人树果实" });
+        for (int i = 0; i < 2; i++) player.BagItems.Add(new EquipItem { Uid = 30 + i, Name = "毒蜘蛛牙齿" });
+
+        var (greenOk, grayPowder, greenMsg) = PoisonCraftingEngine.CraftPoison(player, PoisonCraftingEngine.PoisonType.GreenPoisonGrayPowder);
+        Assert.True(greenOk);
+        Assert.NotNull(grayPowder);
+        Assert.Equal("灰色药粉(中)", grayPowder.Name);
+        Assert.Equal(50, grayPowder.Dura);
+        Assert.Contains("灰色药粉", greenMsg);
+
+        // 3. 准备红毒材料 (食人树叶 4, 蝎子尾巴 1, 蛆卵 4)
+        for (int i = 0; i < 4; i++) player.BagItems.Add(new EquipItem { Uid = 40 + i, Name = "食人树叶" });
+        player.BagItems.Add(new EquipItem { Uid = 50, Name = "蝎子尾巴" });
+        for (int i = 0; i < 4; i++) player.BagItems.Add(new EquipItem { Uid = 60 + i, Name = "蛆卵" });
+
+        var (redOk, yellowPowder, redMsg) = PoisonCraftingEngine.CraftPoison(player, PoisonCraftingEngine.PoisonType.RedPoisonYellowPowder);
+        Assert.True(redOk);
+        Assert.NotNull(yellowPowder);
+        Assert.Equal("黄色药粉(中)", yellowPowder.Name);
+        Assert.Equal(50, yellowPowder.Dura);
+        Assert.Contains("黄色药粉", redMsg);
+    }
+
+    // ==================== 21. 模块三十二: 千里传音全服喇叭与频控测试 ====================
+
+    [Fact]
+    public void Test_WorldBroadcastEngine_Cooldown_ItemConsumption_And_Delivery()
+    {
+        var engine = new WorldBroadcastEngine();
+        var sender = CreateMockSession(6001, "霸天龙皇");
+        var receiver = CreateMockSession(6002, "吃瓜群众");
+        var allSessions = new List<ClientSession> { sender, receiver };
+        long now = 1000_000;
+
+        // 1. 无道具禁止传音
+        var (failNoItem, _, noItemMsg) = engine.BroadcastMessage(sender, "沙巴克今晚攻城！", allSessions, now);
+        Assert.False(failNoItem);
+        Assert.Contains("没有【千里传音】", noItemMsg);
+
+        // 2. 携带道具成功发送
+        sender.State!.BagItems.Add(new EquipItem { Uid = 777, Name = "千里传音" });
+        var (succOk, text, _) = engine.BroadcastMessage(sender, "沙巴克今晚决战！", allSessions, now);
+        Assert.True(succOk);
+        Assert.Contains("[千里传音] 霸天龙皇: 沙巴克今晚决战！", text);
+        Assert.DoesNotContain(sender.State.BagItems, i => i.Uid == 777); // 道具已消耗
+
+        // 3. 5 秒频控拦截刷屏
+        sender.State.BagItems.Add(new EquipItem { Uid = 778, Name = "千里传音" });
+        var (cdFail, _, cdMsg) = engine.BroadcastMessage(sender, "第二遍喇叭！", allSessions, now + 2000); // 仅过 2 秒
+        Assert.False(cdFail);
+        Assert.Contains("冷却中", cdMsg);
+
+        // 4. 5 秒后恢复发送
+        var (succAfterCd, _, _) = engine.BroadcastMessage(sender, "第二遍喇叭！", allSessions, now + 5001);
+        Assert.True(succAfterCd);
+    }
 }
+
 
