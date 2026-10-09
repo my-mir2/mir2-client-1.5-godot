@@ -282,4 +282,25 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
         Visible = false;
         EmitSignal(SignalName.StatSubmitted, 1);
     }
+
+    /// <summary>
+    /// 重置所有分配的属性点并返还到剩余点数池
+    /// </summary>
+    public void ResetAllocations()
+    {
+        for (int i = 0; i < 9; i++)
+        {
+            if (_statAllocations[i] > 0)
+            {
+                _remainingPoints += _statAllocations[i];
+                _statAllocations[i] = 0;
+                if (_lblStatAllocations[i] != null)
+                {
+                    _lblStatAllocations[i].Text = "0";
+                    _lblStatAllocations[i].AddThemeColorOverride("font_color", new Color(0.95f, 0.95f, 0.8f));
+                }
+            }
+        }
+        if (_lblRemain != null) _lblRemain.Text = _remainingPoints.ToString();
+    }
 }

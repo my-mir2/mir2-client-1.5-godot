@@ -262,6 +262,60 @@ public partial class GroupPanelView : Control, IManagedWindow
         }
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 组队成员血量百分比渲染 (对齐队伍血条与低血量变红警告机制)
+    /// </summary>
+    public void SetMembersWithHp(string leader, int leaderHpPercent, IList<(string Name, int HpPercent)>? members = null)
+    {
+        CurrentLeader = leader ?? string.Empty;
+        CurrentMembers.Clear();
+        if (members != null)
+        {
+            foreach (var m in members) CurrentMembers.Add(m.Name);
+        }
+
+        if (_membersContainer == null) return;
+        foreach (Node child in _membersContainer.GetChildren())
+        {
+            child.QueueFree();
+        }
+
+        if (string.IsNullOrEmpty(leader)) return;
+
+        var colorGray = new Color(0.753f, 0.753f, 0.753f); // 0xC0C0C0
+
+        // 队长名字与血量百分比
+        var lblLeader = new Label
+        {
+            Name = "LblLeader",
+            Position = new Vector2(28, 80),
+            Text = $"{leader} [队长] {Math.Clamp(leaderHpPercent, 0, 100)}%"
+        };
+        lblLeader.AddThemeFontSizeOverride("font_size", 12);
+        lblLeader.AddThemeColorOverride("font_color", new Color(1.0f, 0.85f, 0.2f));
+        _membersContainer.AddChild(lblLeader);
+
+        if (members == null) return;
+
+        // 队员名字与血量百分比双列绘制
+        for (int i = 0; i < members.Count && i < 10; i++)
+        {
+            int col = i % 2;
+            int row = i / 2;
+            var m = members[i];
+            int hp = Math.Clamp(m.HpPercent, 0, 100);
+            var lblMember = new Label
+            {
+                Name = $"LblMember_{i}",
+                Position = new Vector2(28 + col * 100, 96 + row * 16),
+                Text = $"{m.Name} {hp}%"
+            };
+            lblMember.AddThemeFontSizeOverride("font_size", 12);
+            lblMember.AddThemeColorOverride("font_color", hp < 30 ? new Color(1f, 0.3f, 0.3f) : colorGray);
+            _membersContainer.AddChild(lblMember);
+        }
+    }
+
     public void SetAllowGroup(bool enabled)
     {
         _groupModeEnabled = enabled;

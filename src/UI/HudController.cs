@@ -2348,22 +2348,29 @@ public partial class HudController : CanvasLayer
 
     public void ShowSlotTooltip(string title, string desc, Vector2 globalPos, bool showFloating = true)
     {
+        // 盛大官方 1.5 规则：当装备持久力为 0 时，显示鲜红警示字 (IDA sub_488AF4 / DrawItemHint)
+        string warningDesc = desc;
+        if (warningDesc.Contains("持久力 0/"))
+        {
+            warningDesc = warningDesc.Replace("持久力 0/", "[color=#ff3333]持久力 0/[/color]");
+        }
+
         // 1. 如果背包面板处于打开状态，同步更新背包底部的官方原生物品属性内胆
         if (_bagPanel != null && _bagPanel.Visible && _lblBagItemDesc != null)
         {
-            _lblBagItemDesc.Text = $"[color=#ffff40]{title}[/color]\n{desc}";
+            _lblBagItemDesc.Text = $"[color=#ffff40]{title}[/color]\n{warningDesc}";
         }
 
         // 2. 如果装备面板处于打开状态，同步更新装备面板底部的官方原生物品属性内胆
         if (_equipPanel != null && _equipPanel.Visible && _lblEquipItemDesc != null)
         {
-            _lblEquipItemDesc.Text = $"[color=#ffff40]{title}[/color]\n{desc}";
+            _lblEquipItemDesc.Text = $"[color=#ffff40]{title}[/color]\n{warningDesc}";
         }
 
         // 3. 浮动 Tooltip
         if (showFloating)
         {
-            _itemTooltipView?.ShowTooltip(title, desc, globalPos);
+            _itemTooltipView?.ShowTooltip(title, warningDesc, globalPos);
         }
         else
         {
