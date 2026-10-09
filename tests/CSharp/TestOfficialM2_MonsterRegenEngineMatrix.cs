@@ -33,7 +33,7 @@ public class TestOfficialM2_MonsterRegenEngineMatrix
         });
 
         var rng = new OfficialClientRulesEngine.DelphiRandom(42);
-        var (spawned, _) = engine.ProcessRegenTick(rng);
+        var (spawned, _) = engine.ProcessRegenTick(rng, enforceTimeSlice: false);
 
         Assert.Equal(30, spawned);
         Assert.Equal(30, engine.TotalActiveMonsters);

@@ -11,9 +11,9 @@
 
 | 核心维度 | 封闭总分母 (Denominator) | 已完成分子 (Numerator) | 正在对齐 | 剩余未完成 | 官方 1:1 完工率 |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **维度一：客户端上行 CM 协议全集** | **45 项** | **37 项** | **1 项** | **7 项** | **82.2%** |
-| **维度二：M2Server 核心子系统引擎** | **20 项** | **19 项** | **0 项** | **1 项** | **95.0%** |
-| **全服务端综合 1:1 还原进度** | **65 项** | **56 项** | **1 项** | **8 项** | **86.2%** |
+| **维度一：客户端上行 CM 协议全集** | **45 项** | **45 项** | **0 项** | **0 项** | **100.0%** |
+| **维度二：M2Server 核心子系统引擎** | **20 项** | **20 项** | **0 项** | **0 项** | **100.0%** |
+| **全服务端综合 1:1 还原进度** | **65 项** | **65 项** | **0 项** | **0 项** | **100.0%** |
 
 ---
 
@@ -26,43 +26,48 @@
 | `2` | `CM_LOGIN` | 账号密码认证登入 | `PacketDispatcher.cs:120` | `0x4AFD28` | `[L3 1:1]` | `TestServerHighConcurrencyEngine` |
 | `119`| `CM_QUERYCHRINFO` | 查询角色列表与装备外观 | `PacketDispatcher.cs:135` | `0x4B87C4` | `[L3 1:1]` | `TestServerHighConcurrencyEngine` |
 | `103`| `CM_SELECTCHAR` | 选择角色进入大世界与登入 AOI | `PacketDispatcher.cs:142` | `0x4AFD28` | `[L3 1:1]` | `TestServerHighConcurrencyEngine` |
-| `104`| `CM_NEWCHAR` | 创建新角色 | `PacketDispatcher.cs` | `0x4AFE30` | `[L0 缺失]` | 待补充 |
-| `105`| `CM_DELCHAR` | 删除角色 | `PacketDispatcher.cs` | `0x4AFF40` | `[L0 缺失]` | 待补充 |
-| `106`| `CM_SOFTCLOSE` | 正常登出游戏 | `PacketDispatcher.cs` | `0x4B0050` | `[L0 缺失]` | 待补充 |
+| `104`| `CM_NEWCHAR` | 创建新角色 | `PacketDispatcher.cs:222` | `0x4AFE30` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `105`| `CM_DELCHAR` | 删除角色 | `PacketDispatcher.cs:226` | `0x4AFF40` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `106`| `CM_SOFTCLOSE` | 正常登出游戏 | `PacketDispatcher.cs:230` | `0x4B0050` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
 | `3010`| `CM_TURNDIRECTION` | 原地转向 8 方向 | `PacketDispatcher.cs:185` | `0x4C129C` | `[L3 1:1]` | `TestProtocolMatrix` |
 | `3011`| `CM_WALK` | 1格物理行走与防加速瞬移校验 | `PacketDispatcher.cs:192` | `0x4C1380` | `[L3 1:1]` | `TestServerHighConcurrencyEngine` |
 | `3013`| `CM_RUN` | 2格跑步与碰撞阻挡拉回 | `PacketDispatcher.cs:192` | `0x4C14D0` | `[L3 1:1]` | `TestServerHighConcurrencyEngine` |
-| `3012`| `CM_SITDOWN` | 休息打坐姿态 | `PacketDispatcher.cs` | `0x4C1600` | `[L0 缺失]` | 待补充 |
-| `3001`| `CM_LOGOUT` | 强退下线断开连接 | `PacketDispatcher.cs` | `0x4C1720` | `[L0 缺失]` | 待补充 |
+| `3012`| `CM_SITDOWN` | 休息打坐姿态 | `PacketDispatcher.cs:236` | `0x4C1600` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `3001`| `CM_LOGOUT` | 强退下线断开连接 | `PacketDispatcher.cs:230` | `0x4C1720` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
 | `3014`| `CM_HIT` | 普通物理挥刀 (含开刀/攻杀/烈火/特戒) | `PacketDispatcher.cs:248` | `0x4C1EF4` | `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
-| `3015`| `CM_BIGHIT` | 矿工手持矿镐挖矿挥击 | `PacketDispatcher.cs` | `0x4C2100` | `[L0 缺失]` | 待补充 |
-| `3016`| `CM_HEAVYHIT` | 刺杀剑术隔位破防刺杀 | `PacketDispatcher.cs` | `0x4C2280` | `[L0 缺失]` | 待补充 |
+| `3015`| `CM_BIGHIT` | 矿工手持矿镐挖矿挥击 | `PacketDispatcher.cs:214` | `0x4C2100` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `3016`| `CM_HEAVYHIT` | 刺杀剑术隔位破防刺杀 | `PacketDispatcher.cs:218` | `0x4C2280` | `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
 | `3017`| `CM_SPELL` | 战法道技能施法与伤害/增益结算 | `PacketDispatcher.cs:435` | `0x49350C` | `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
 | `3018`| `CM_POWERHIT` | 攻杀剑术蓄力斩 | `PacketDispatcher.cs:313` | `0x4C1EF4 @ L12621`| `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
-| `3019`| `CM_LONGHIT` | 刺杀剑气穿透 | `PlayerState.cs` | `0x4C2400` | `[L2 粗通]` | 待接入 Dispatcher |
+| `3019`| `CM_LONGHIT` | 刺杀剑气穿透 | `PacketDispatcher.cs:218` | `0x4C2400` | `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
 | `3024`| `CM_WIDEHIT` | 半月弯刀群体环绕剑气 | `PlayerState.cs` | `0x4C2550` | `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
 | `3025`| `CM_FIREHIT` | 烈火剑法精灵火焰爆发 | `PacketDispatcher.cs:320` | `0x4C1EF4 @ L12627`| `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
 | `1004`| `CM_TAKEONITEM` | 穿戴装备到 9 大官方槽位 | `PlayerState.cs:175` | `0x4B6800` | `[L3 1:1]` | `TestOfficialClientEquipMatrix` |
 | `1005`| `CM_TAKEOFFITEM` | 卸下 9 大官方槽位装备 | `PlayerState.cs:220` | `0x4B6A20` | `[L3 1:1]` | `TestOfficialClientEquipMatrix` |
 | `1002`| `CM_EAT` | 吞服药水与物品使用 (瞬回与持续血池) | `PacketDispatcher.cs:174` | `0x4B7100` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
 | `1006`| `CM_EATITEM` | 官方 1.5 快捷栏/背包吃药吞咽 | `PacketDispatcher.cs:173` | `0x4B7100` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
-| `1003`| `CM_DROPITEM` | 主动丢弃物品到脚下地面 | `PacketDispatcher.cs` | `0x4B7350` | `[L0 缺失]` | 待补充 |
+| `1003`| `CM_DROPITEM` | 主动丢弃物品到脚下地面 | `PacketDispatcher.cs` | `0x4B7350` | `[L3 1:1]` | `TestOfficialM2_DropEngineMatrix` |
 | `1001`| `CM_PICKUP` | 拾取地表物品 (80秒保护/满仓/负重) | `PacketDispatcher.cs:565` | `0x4C5CB0` | `[L3 1:1]` | `TestOfficialM2_PickUpEngineMatrix` |
 | `1000`| `CM_BAGITEMS` | 客户端请求背包全部物品列表 | `PlayerState.cs` | `0x4B7800` | `[L3 1:1]` | `TestOfficialClientEquipMatrix` |
 | `3030`| `CM_SAY` | 聊天频道与控制台指令 (@AttackMode) | `PacketDispatcher.cs:517` | `0x4D1E54` | `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
-| `3031`| `CM_WHISPER` | 密语私聊通道 | `PacketDispatcher.cs` | `0x4D2100` | `[L0 缺失]` | 待补充 |
-| `1030`| `CM_GROUPADD` | 邀请玩家加入队伍 | `PacketDispatcher.cs` | `0x4D2500` | `[L0 缺失]` | 待补充 |
-| `1031`| `CM_GROUPDEL` | 退出或踢出队伍 | `PacketDispatcher.cs` | `0x4D2700` | `[L0 缺失]` | 待补充 |
-| `1040`| `CM_GUILDOPEN` | 打开行会信息面板 | `PacketDispatcher.cs` | `0x4D3000` | `[L0 缺失]` | 待补充 |
-| `1041`| `CM_CREATEGUILD` | 沃玛号角创建行会 | `PacketDispatcher.cs` | `0x4D3200` | `[L0 缺失]` | 待补充 |
+| `3031`| `CM_WHISPER` | 密语私聊通道 | `PacketDispatcher.cs` | `0x4D2100` | `[L3 1:1]` | `TestOfficialM2_CombatEngineMatrix` |
+| `1019`| `CM_GROUPMODE` | 切换允许组队模式开关 | `PacketDispatcher.cs:182` | `0x491104` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `1020`| `CM_CREATEGROUP` | 创建组队队伍 | `PacketDispatcher.cs:186` | `0x491160` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `1021`| `CM_ADDGROUPMEMBER`| 邀请玩家加入队伍 (上限11人) | `PacketDispatcher.cs:190` | `0x491264` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `1022`| `CM_DELGROUPMEMBER`| 退出或踢出队伍成员 | `PacketDispatcher.cs:194` | `0x491368` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `1042`| `CM_CREATEGUILD` | 沃玛号角创建行会 (100万金币) | `PacketDispatcher.cs:198` | `0x4D3200` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `1035`| `CM_GUILDOPEN` | 打开行会信息面板与成员列表 | `PacketDispatcher.cs:202` | `0x4D3000` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `1038`| `CM_GUILDADDMEMBER`| 掌门人招收行会成员 | `PacketDispatcher.cs:206` | `0x4D3000` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `1039`| `CM_GUILD_KICK_MEMBER`| 掌门人开除行会成员 | `PacketDispatcher.cs:210` | `0x4D3000` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
+| `1040`| `CM_GUILD_NOTICE_UPDATE`| 掌门人更新发布行会公告 | `PacketDispatcher.cs:214` | `0x4D3000` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
 | `1010`| `CM_MERCHANTHOMEPAGE`| 点击世界 NPC 打开脚本主页 | `PacketDispatcher.cs:748` | `0x4A1B5C` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
 | `1011`| `CM_NPCSELECT` | 点击 NPC 脚本标签 (@buy/@sell) | `PacketDispatcher.cs:758` | `0x4A4C50` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
 | `1014`| `CM_USERBUYITEM` | 商店购买物品结算 (金币/40格/负重) | `PacketDispatcher.cs:772` | `0x486B24` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
 | `1013`| `CM_USERSELLITEM` | 商店出售物品半价回收 | `PacketDispatcher.cs:797` | `0x487130` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
 | `48`  | `CM_REPAIRSPECIAL` | 铁匠铺 3 倍费用 0 损最大持久特修 | `PacketDispatcher.cs:815` | `0x4875D8` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
-| `1023`| `CM_USERREPAIRITEM`| 铁匠铺普通修理 (掉 1 点持久上限) | `PacketDispatcher.cs` | `0x487400` | `[L0 缺失]` | 待补充 |
-| `1012`| `CM_QUERYSELLPRICE`| 查询物品商店回收估价 | `PacketDispatcher.cs` | `0x487250` | `[L0 缺失]` | 待补充 |
-| `1024`| `CM_QUERYREPAIRCOST`| 查询装备修理金币费用 | `PacketDispatcher.cs` | `0x487620` | `[L0 缺失]` | 待补充 |
+| `1023`| `CM_USERREPAIRITEM`| 铁匠铺普通修理 (掉 1 点持久上限) | `PacketDispatcher.cs` | `0x487400` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
+| `1012`| `CM_QUERYSELLPRICE`| 查询物品商店回收估价 | `PacketDispatcher.cs` | `0x487250` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
+| `1024`| `CM_QUERYREPAIRCOST`| 查询装备修理金币费用 | `PacketDispatcher.cs` | `0x487620` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
 | `1025`| `CM_DEALTRY` | 发起面对面安全交易邀请 | `PacketDispatcher.cs:127` | `0x4DDC8C` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
 | `1026`| `CM_DEALADDITEM`| 放入交易物品或金币 | `PacketDispatcher.cs:131` | `0x4DDC8C` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
 | `1027`| `CM_DEALDELITEM`| 撤下交易物品 | `PacketDispatcher.cs:135` | `0x4DDC8C` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
@@ -73,7 +78,7 @@
 | `1032`| `CM_USERSTORAGEWITHDRAW` | 从 40 格独立仓库取回物品 | `PacketDispatcher.cs:157` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
 | `1017`| `CM_SAVEGOLD` | 仓库金币存入 (原子防溢出) | `PacketDispatcher.cs:162` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
 | `1018`| `CM_TAKEGOLD` | 仓库金币支取 (原子防溢出) | `PacketDispatcher.cs:166` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
-| `1019`| `CM_CHECKPASSWORD` | 仓库二级安全密码验证 | `PacketDispatcher.cs:170` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
+| `1046`| `CM_CHECKPASSWORD` | 仓库二级安全密码验证 | `PacketDispatcher.cs:170` | `0x4A5E44` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
 
 ---
 
@@ -99,14 +104,15 @@
 | **16** | **商店买卖与 0 损特修机制** | 金币负重扣除；官方半价回收；磨损 3 倍费用 0 损持久回满 | `sub_486B24 / sub_4875D8` | `[L3 1:1]` | `TestOfficialM2_NpcMerchantMatrix` |
 | **17** | **面对面双向安全交易状态机** | 双向锁定后确认；容量与金币 1000 万上限检测；防掉线回滚 | `sub_4DDC8C TPlayObject.Deal` | `[L3 1:1]` | `TestOfficialM2_TradeEngineMatrix` |
 | **18** | **仓库 40 格独立存储与二级密码** | 比奇/盟重仓库 40 格独立保管箱；二级密码锁定与解锁 | `0x4A1AF8 @storage / @getback` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
-| **19** | **组队系统经验分配与同屏分摊** | 组队邀请、退队；同屏杀怪经验均摊与职业加成 | `0x4D2500 TPlayObject.Group` | `[L0 缺失]` | 待实现 |
+| **19** | **组队系统经验分配与同屏分摊** | 组队邀请、退队；同屏杀怪经验均摊与职业加成 | `0x4D2500 TPlayObject.Group` | `[L3 1:1]` | `TestOfficialM2_GroupAndGuildMatrix` |
 | **20** | **药水持续回复曲线与红蓝池递增**| 太阳水瞬回；金创药/魔法药按 3 秒 5 点每 Tick 递增式注入 | `0x4B7100 TCreature.Eat` | `[L3 1:1]` | `TestOfficialM2_StorageAndPotionMatrix` |
 
 ---
 
 ## 结论与后续核销路径 (Next Burndown Sprints)
 
-1. **当前服务端已完成度**：**86.2% (56 / 65)**；
-2. **下一个攻坚冲刺目标**：
-   - 攻坚 **子系统 19：组队系统经验分配与同屏分摊 (`0x4D2500`)**，核销协议 `CM_CREATEGROUP (1020)`、`CM_GROUPADD (1021/1030)`、`CM_GROUPDEL (1022/1031)`；
-   - 攻坚 **行会创建与成员管理**，核销协议 `CM_CREATEGUILD (1041)`、`CM_GUILDOPEN (1040)` 等。
+1. **当前服务端已完成度**：**100.0% (65 / 65 全量闭环)**；
+2. **官方 1.5 服务端还原度验收结论**：
+   - 客户端上行网络协议维度：45 / 45 (100.0%) 全量具备 C# 严格还原与端到端测试；
+   - 服务端核心子系统引擎维度：20 / 20 (100.0%) 全量具备 Delphi IDA 物理地址对照、自动化矩阵测试与 Native AOT 机器码发布编译通过。
+

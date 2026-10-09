@@ -90,6 +90,10 @@ public static class ProtocolConsts
     public const short CM_GUILD_BREAK_ALLY       = 1045; // 解除行会结盟关系
     public const short CM_GUILD_KICK_MEMBER      = 1039; // 开除行会成员
     public const short CM_GUILD_UPDATE_RANK      = 1041; // 调整行会职位封号
+    public const short CM_CREATEGUILD            = 1042; // 官方创建行会发包 (沃玛号角+100万金币)
+    public const short CM_GUILDOPEN              = 1035; // 打开行会面板别名 (对齐 CM_GUILD_OPEN_PAGE)
+    public const short CM_CHECKPASSWORD          = 1046; // 官方仓库二级密码校验
+    public const short CM_LOGOUT                 = 3001; // 强退下线断开连接
     public const short CM_CHANGEATTACKMODE       = 1019; // 历史私服误用别名 (盛大官方 1.5 原版 1019 为 CM_GROUPMODE 允许编组/退组，攻击模式在双端权威走 @AttackMode 文本指令)
 
     // ============ 官方 1.5 权威 SM 协议号 (下行) ============

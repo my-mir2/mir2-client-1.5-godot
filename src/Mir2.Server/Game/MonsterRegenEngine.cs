@@ -88,7 +88,7 @@ public sealed class MonsterRegenEngine
     /// 执行全服刷怪心跳处理 (包含官方 15ms 时间片硬熔断保护)
     /// 返回本次刷出的怪物数量及是否因耗时超限而触发熔断
     /// </summary>
-    public (int spawnedCount, bool sliceTimeout) ProcessRegenTick(OfficialClientRulesEngine.DelphiRandom rng)
+    public (int spawnedCount, bool sliceTimeout) ProcessRegenTick(OfficialClientRulesEngine.DelphiRandom rng, bool enforceTimeSlice = true)
     {
         long startTick = Environment.TickCount64;
         int totalSpawned = 0;
@@ -136,7 +136,7 @@ public sealed class MonsterRegenEngine
                     }
 
                     // 官方时间片硬熔断检测 (0x4ADF04 @ L470: GetTickCount() - TickCount > *off_4E9FD4)
-                    if (Environment.TickCount64 - startTick > MaxRegenTimeSliceMs)
+                    if (enforceTimeSlice && Environment.TickCount64 - startTick > MaxRegenTimeSliceMs)
                     {
                         sliceTimeout = true;
                         return (totalSpawned, sliceTimeout);

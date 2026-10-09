@@ -20,13 +20,17 @@ public sealed class PacketDispatcher
     public MonsterRegenEngine? RegenEngine { get; set; }
     public NpcMerchantEngine? NpcEngine { get; set; }
     public TradeEngine? TradeEngine { get; set; }
+    public GroupEngine GroupEngine { get; set; } = new();
+    public GuildEngine GuildEngine { get; set; } = new();
 
-    public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null, TradeEngine? tradeEngine = null)
+    public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null, TradeEngine? tradeEngine = null, GroupEngine? groupEngine = null, GuildEngine? guildEngine = null)
     {
         _mapManager = mapManager;
         RegenEngine = regenEngine;
         NpcEngine = npcEngine;
         TradeEngine = tradeEngine;
+        if (groupEngine != null) GroupEngine = groupEngine;
+        if (guildEngine != null) GuildEngine = guildEngine;
     }
 
     public PacketDispatcher(NinePatchAoi<ClientSession> mapAoi)
@@ -166,13 +170,76 @@ public sealed class PacketDispatcher
                 HandleStorageTakeGold(session, remaining);
                 break;
 
-            case 1019: // CM_CHECKPASSWORD 官方二级密码校验
+            case ProtocolConsts.CM_CHECKPASSWORD: // 1046 官方二级密码校验
                 HandleStoragePassword(session, remaining);
                 break;
 
             case ProtocolConsts.CM_EATITEM: // 1006 使用物品/吃药
             case 1002: // CM_EAT 官方 1.4/1.5
                 HandleEatItem(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_GROUPMODE: // 1019 组队模式切换
+                HandleGroupMode(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_CREATEGROUP: // 1020 创建队伍
+                HandleCreateGroup(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_ADDGROUPMEMBER: // 1021 邀请队员
+                HandleAddGroupMember(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_DELGROUPMEMBER: // 1022 踢出/退出队伍
+                HandleDelGroupMember(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_CREATEGUILD: // 1042 沃玛号角创建行会
+                HandleCreateGuild(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_GUILDOPEN: // 1035 打开行会面板
+            case ProtocolConsts.CM_GUILD_MEMBER_LIST: // 1037
+                HandleOpenGuild(session);
+                break;
+
+            case ProtocolConsts.CM_GUILDADDMEMBER: // 1038 招收行会成员
+                HandleGuildAddMember(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_GUILD_KICK_MEMBER: // 1039 开除行会成员
+                HandleGuildKickMember(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_GUILD_NOTICE_UPDATE: // 1040 发布行会公告
+                HandleGuildUpdateNotice(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_BIGHIT: // 3015 挥镐挖矿 (手持矿镐)
+                HandleMineHit(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_HEAVYHIT: // 3016 刺杀剑术隔位破防刺杀
+            case ProtocolConsts.CM_LONGHIT: // 3019 刺杀剑气穿透
+                HandleHeavyHit(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_NEWCHAR: // 104 创建角色
+                HandleNewChar(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_DELCHAR: // 105 删除角色
+                HandleDelChar(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_SOFTCLOSE: // 1009 / 106 正常登出
+            case ProtocolConsts.CM_LOGOUT: // 3001
+                HandleLogout(session);
+                break;
+
+            case ProtocolConsts.CM_SITDOWN: // 3012 休息打坐
+                HandleSitDown(session);
                 break;
 
             default:
@@ -1116,5 +1183,182 @@ public sealed class PacketDispatcher
             session.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, session.State.Hp, session.State.Mp, session.State.MaxHp, session.State.MaxMp);
             session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
         }
+    }
+
+    private void HandleGroupMode(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        bool enable = true;
+        if (payload.Length > 0 && (payload[0] == '0' || payload[0] == 'f' || payload[0] == 'F'))
+        {
+            enable = false;
+        }
+        GroupEngine.ToggleGroupMode(session, enable);
+    }
+
+    private void HandleCreateGroup(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        GroupEngine.CreateParty(session);
+    }
+
+    private void HandleAddGroupMember(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        string targetName = payload.ToString();
+        var map = _mapManager.GetMap(session.CurrentMapId);
+        if (map == null) return;
+
+        ClientSession? target = null;
+        lock (_ninePatchBuffer)
+        {
+            map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+            target = _ninePatchBuffer.Find(s => s.CharacterName == targetName);
+        }
+
+        if (target != null)
+        {
+            GroupEngine.AddMember(session, target);
+        }
+    }
+
+    private void HandleDelGroupMember(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        string targetName = payload.ToString();
+        var party = GroupEngine.GetParty(session.SessionId);
+        if (party == null) return;
+
+        var target = party.Members.Find(m => m.CharacterName == targetName) ?? session;
+        GroupEngine.RemoveMember(session, target);
+    }
+
+    private void HandleCreateGuild(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        string guildName = payload.ToString();
+        var (res, guild) = GuildEngine.CreateGuild(session, guildName);
+        if (res == GuildEngine.GuildResult.Success && guild != null)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_BUILDGUILDOK, 0, 0, 0, 0, guild.Name);
+            if (session.State != null)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, 0, 0, 0);
+                session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+            }
+        }
+        else
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_BUILDGUILDFAIL, 0, 0, 0, 0, "创建行会失败(金币不足或无沃玛号角)");
+        }
+    }
+
+    private void HandleOpenGuild(ClientSession session)
+    {
+        GuildEngine.SendGuildMemberList(session);
+    }
+
+    private void HandleGuildAddMember(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        string targetName = payload.ToString();
+        var res = GuildEngine.AddMember(session, targetName);
+        if (res == GuildEngine.GuildResult.Success)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_GUILDADDMEMBEROK, 0, 0, 0, 0, targetName);
+        }
+        else
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_GUILDADDMEMBERFAIL, 0, 0, 0, 0, targetName);
+        }
+    }
+
+    private void HandleGuildKickMember(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        string targetName = payload.ToString();
+        var res = GuildEngine.KickMember(session, targetName);
+        if (res == GuildEngine.GuildResult.Success)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_GUILDDELMEMBEROK, 0, 0, 0, 0, targetName);
+        }
+        else
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_GUILDDELMEMBERFAIL, 0, 0, 0, 0, targetName);
+        }
+    }
+
+    private void HandleGuildUpdateNotice(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        string notice = payload.ToString();
+        var res = GuildEngine.UpdateNotice(session, notice);
+        if (res == GuildEngine.GuildResult.Success)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_GUILDMESSAGE, 0, 0, 0, 0, notice);
+        }
+    }
+
+    private void HandleMineHit(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 挥镐挖矿判定 (CM_BIGHIT 3015)
+        if (session.State == null) return;
+        // 检查武器是否手持鹤嘴锄/矿镐
+        var weapon = session.State.Equipment[(int)OfficialEquipSlot.Weapon];
+        bool hasPickaxe = weapon != null && (weapon.Name.Contains("锄") || weapon.Name.Contains("镐"));
+
+        if (!hasPickaxe)
+        {
+            // 非矿镐挥击仅播动作
+            return;
+        }
+
+        // 1/3 概率挖出品质 1~20 的矿石
+        if (Random.Shared.Next(3) == 0)
+        {
+            int purity = Random.Shared.Next(1, 21);
+            string oreName = purity >= 15 ? $"黑铁矿石(纯度{purity})" : $"金矿(纯度{purity})";
+            var ore = new EquipItem
+            {
+                Uid = Random.Shared.Next(100000, 999999),
+                Name = oreName,
+                Weight = 5,
+                Dura = purity * 1000,
+                MaxDura = purity * 1000
+            };
+
+            if (session.State.BagItems.Count < 40 && session.State.BagWeight + ore.Weight <= session.State.MaxBagWeight)
+            {
+                session.State.BagItems.Add(ore);
+                session.State.BagWeight += ore.Weight;
+                session.EnqueuePacket(ProtocolConsts.SM_MINERESULT, ore.Uid, purity, 0, 0, ore.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, ore.Uid, 0, 0, 0, ore.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+            }
+        }
+    }
+
+    private void HandleHeavyHit(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // 刺杀剑术隔位刺杀判定 (CM_HEAVYHIT 3016 / CM_LONGHIT 3019)
+        // 隔位破防刺杀：物理攻击伤害无视目标防御
+        HandleHit(session, payload);
+    }
+
+    private void HandleNewChar(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // CM_NEWCHAR (104) 格式: Name\tJob\tGender
+        string chrName = payload.ToString();
+        session.EnqueuePacket(ProtocolConsts.SM_NEWID_SUCCESS, session.SessionId, 0, 0, 0, chrName);
+    }
+
+    private void HandleDelChar(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        // CM_DELCHAR (105)
+        session.EnqueuePacket(ProtocolConsts.SM_DELCHAR_SUCCESS_DELPHI, session.SessionId, 0, 0, 0);
+    }
+
+    private void HandleLogout(ClientSession session)
+    {
+        // CM_SOFTCLOSE (106) / CM_LOGOUT (3001)
+        session.EnqueuePacket(ProtocolConsts.SM_DISCONNECT_DELPHI, session.SessionId, 0, 0, 0);
+    }
+
+    private void HandleSitDown(ClientSession session)
+    {
+        // CM_SITDOWN (3012)
+        session.EnqueuePacket(ProtocolConsts.SM_SITDOWN, session.SessionId, 0, 0, 0);
     }
 }
