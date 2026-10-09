@@ -242,6 +242,22 @@ public sealed class MonsterRegenEngine
         return null;
     }
 
+    /// <summary>
+    /// 判定目标格子是否被其他存活怪物实体占据 (防止怪物重叠)
+    /// </summary>
+    public bool IsTileOccupiedByOtherMonster(int mapId, int x, int y, int selfUid)
+    {
+        foreach (var kvp in _monsters)
+        {
+            var m = kvp.Value;
+            if (!m.IsDead && m.Uid != selfUid && m.MapId == mapId && m.X == x && m.Y == y)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public List<MonsterInstance> GetMonstersInArea(int mapId, int minX, int minY, int maxX, int maxY)
     {
         var list = new List<MonsterInstance>();
@@ -336,15 +352,22 @@ public sealed class MonsterRegenEngine
                 }
                 else if (dist > 1)
                 {
-                    // 3. 追击步进 (朝目标方向移动 1 格)
-                    int stepX = monster.X + Math.Sign(dx);
-                    int stepY = monster.Y + Math.Sign(dy);
+                    // 3. 权威 A* 智能寻路追击 (避开物理障碍墙体与前方怪物实体防重叠)
+                    var (nextX, nextY, nextDir, found) = ServerPathFinder.FindNextStep(
+                        map,
+                        monster.X,
+                        monster.Y,
+                        targetPlayer.X,
+                        targetPlayer.Y,
+                        (checkX, checkY) => IsTileOccupiedByOtherMonster(monster.MapId, checkX, checkY, monster.Uid),
+                        maxDepth: monster.ViewRange + 2
+                    );
 
-                    if (map.IsWalkable(stepX, stepY))
+                    if (found && (nextX != monster.X || nextY != monster.Y))
                     {
-                        monster.Direction = GetDirection(Math.Sign(dx), Math.Sign(dy));
-                        monster.X = stepX;
-                        monster.Y = stepY;
+                        monster.Direction = nextDir;
+                        monster.X = nextX;
+                        monster.Y = nextY;
                         monster.NextActionTimeMs = now + 800; // 移动冷却 800ms
                         actions.Add(new MonsterAiActionResult(
                             monster.Uid, monster.Name, ActionType: 0,
@@ -357,7 +380,7 @@ public sealed class MonsterRegenEngine
             else
             {
                 monster.TargetSessionId = 0;
-                // 4. 闲置巡逻 (20% 几率随机朝 8 方向漫步一格)
+                // 4. 闲置巡逻 (20% 几率随机朝 8 方向漫步一格，避开障碍与其他怪物)
                 if (rng.Next(5) == 0)
                 {
                     int randDir = rng.Next(8);
@@ -369,7 +392,7 @@ public sealed class MonsterRegenEngine
                     var rule = _rules.Find(r => r.RuleId == monster.SpawnRuleId);
                     bool withinRadius = rule == null || (Math.Abs(roamX - rule.CenterX) <= rule.Radius && Math.Abs(roamY - rule.CenterY) <= rule.Radius);
 
-                    if (withinRadius && map.IsWalkable(roamX, roamY))
+                    if (withinRadius && map.IsWalkable(roamX, roamY) && !IsTileOccupiedByOtherMonster(monster.MapId, roamX, roamY, monster.Uid))
                     {
                         monster.X = roamX;
                         monster.Y = roamY;

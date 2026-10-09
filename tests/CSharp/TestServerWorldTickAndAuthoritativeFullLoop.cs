@@ -853,6 +853,91 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
 
         Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_NEWMAP_DELPHI}/"));
     }
+
+    [Fact]
+    public void TestServerPathFinder_ObstacleAvoidanceAndNoCornerCutting()
+    {
+        // 1. 创建 50x50 测试地图并在 (10, 10) 到 (12, 10) 设置横向墙体阻挡
+        var map = new GameMap(99, "迷宫地图", 50, 50);
+        map.SetWalkable(10, 10, false);
+        map.SetWalkable(11, 10, false);
+        map.SetWalkable(12, 10, false);
+
+        // 2. 从墙南侧 (11, 11) 寻路到北侧 (11, 9)
+        var (nextX, nextY, dir, found) = ServerPathFinder.FindNextStep(
+            map,
+            startX: 11, startY: 11,
+            targetX: 11, targetY: 9
+        );
+
+        // 3. 验证算法成功找到绕行步进 (不能直走撞墙到 11, 10，而是向左或向右绕行)
+        Assert.True(found);
+        Assert.True(map.IsWalkable(nextX, nextY));
+        Assert.NotEqual((11, 10), (nextX, nextY)); // 不能进入墙体
+        Assert.Contains((nextX, nextY), new[] { (10, 11), (12, 11), (9, 11), (13, 11) });
+    }
+
+    [Fact]
+    public void TestMonsterAi_AStarPursuitAndAntiOverlap()
+    {
+        var (mapMgr, regen, _, dispatcher, map) = CreateTestEnvironment();
+
+        // 1. 玩家位于 (100, 100)
+        var player = new ClientSession(1001, null!)
+        {
+            CurrentMapId = 0,
+            X = 100,
+            Y = 100,
+            Direction = 0,
+            CharacterName = "诱饵战士",
+            State = new PlayerState { Uid = 1001, Name = "诱饵战士", Level = 20, Hp = 200, MaxHp = 200 }
+        };
+        map.Aoi.Enter(player, 100, 100);
+
+        // 2. 在玩家正南方 (100, 101) 刷出怪物 B (挡在直线通道上)
+        regen.AddRule(new MonsterSpawnRule
+        {
+            RuleId = 101,
+            MonsterName = "阻挡半兽人",
+            MapId = 0,
+            CenterX = 100,
+            CenterY = 101,
+            Radius = 0,
+            MaxCount = 1,
+            BaseHp = 100
+        });
+        regen.ProcessRegenTick(new OfficialClientRulesEngine.DelphiRandom(1));
+        var blocker = regen.FindMonsterAt(0, 100, 101);
+        Assert.NotNull(blocker);
+
+        // 3. 在 (100, 102) 刷出怪物 A (要追击玩家，但直线上被怪物 B 阻挡)
+        regen.AddRule(new MonsterSpawnRule
+        {
+            RuleId = 102,
+            MonsterName = "追击骷髅",
+            MapId = 0,
+            CenterX = 100,
+            CenterY = 102,
+            Radius = 0,
+            MaxCount = 1,
+            BaseHp = 100
+        });
+        regen.ProcessRegenTick(new OfficialClientRulesEngine.DelphiRandom(1));
+        var chaser = regen.FindMonsterAt(0, 100, 102);
+        Assert.NotNull(chaser);
+
+        // 重置两者冷却，允许立即行动
+        blocker.NextActionTimeMs = Environment.TickCount64 + 5000; // blocker 保持不动
+        chaser.NextActionTimeMs = 0;
+
+        // 4. 驱动怪物 AI 心跳
+        var (actions, _) = regen.ProcessMonsterAiTick((mapId, x, y) => new List<ClientSession> { player }, new OfficialClientRulesEngine.DelphiRandom(1));
+
+        // 5. 验证怪物 A 成功避开怪物 B，计算出侧面绕行，没有与怪物 B 重叠在 (100, 101)
+        Assert.NotEqual((100, 101), (chaser.X, chaser.Y)); // 绝对严禁与 blocker 发生重叠！
+        Assert.True(chaser.X != 100 || chaser.Y != 102);    // 成功发生了移动
+        Assert.Contains(chaser.X, new[] { 99, 101 });       // 向左或向右进行了侧向绕行
+    }
 }
 
 
