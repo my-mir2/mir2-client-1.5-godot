@@ -58,31 +58,46 @@ public class PotionSystem
 
         string trimmed = itemName.Trim();
 
-        // 1. 太阳水族 (瞬回)
-        if (trimmed.Contains("万年雪霜"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.InstantHpMp, TotalHp = 120, TotalMp = 120 };
-        if (trimmed.Contains("疗伤药"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.InstantHpMp, TotalHp = 80, TotalMp = 80 };
-        if (trimmed.Contains("强效太阳水"))
+        // 优先使用盛大官方 1.5 权威药水代谢引擎解析
+        var profile = OfficialClientRulesEngine.PotionMetabolism.GetPotionProfile(trimmed);
+        if (profile.InstantHp > 0 || profile.InstantMp > 0)
+        {
+            return new PotionMeta
+            {
+                Name = trimmed,
+                Kind = PotionKind.InstantHpMp,
+                TotalHp = profile.InstantHp,
+                TotalMp = profile.InstantMp
+            };
+        }
+        if (profile.HotHpTotal > 0)
+        {
+            return new PotionMeta
+            {
+                Name = trimmed,
+                Kind = PotionKind.GradualHp,
+                TotalHp = profile.HotHpTotal,
+                TotalMp = 0
+            };
+        }
+        if (profile.HotMpTotal > 0)
+        {
+            return new PotionMeta
+            {
+                Name = trimmed,
+                Kind = PotionKind.GradualMp,
+                TotalHp = 0,
+                TotalMp = profile.HotMpTotal
+            };
+        }
+
+        // 兜底模糊匹配
+        if (trimmed.Contains("太阳水") || trimmed.Contains("疗伤药") || trimmed.Contains("万年雪霜"))
             return new PotionMeta { Name = trimmed, Kind = PotionKind.InstantHpMp, TotalHp = 50, TotalMp = 50 };
-        if (trimmed.Contains("太阳水"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.InstantHpMp, TotalHp = 30, TotalMp = 40 };
-
-        // 2. 金创药族 (持续缓回)
-        if (trimmed.Contains("强效金创药") || trimmed.Contains("超强金创药") || trimmed.Contains("大红"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualHp, TotalHp = 90, TotalMp = 0 };
-        if (trimmed.Contains("中量金创药") || trimmed.Contains("中红"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualHp, TotalHp = 50, TotalMp = 0 };
         if (trimmed.Contains("金创药") || trimmed.Contains("红"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualHp, TotalHp = 20, TotalMp = 0 };
-
-        // 3. 魔法药族 (持续缓回)
-        if (trimmed.Contains("强效魔法药") || trimmed.Contains("超强魔法药") || trimmed.Contains("大蓝"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualMp, TotalHp = 0, TotalMp = 150 };
-        if (trimmed.Contains("中量魔法药") || trimmed.Contains("中蓝"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualMp, TotalHp = 0, TotalMp = 80 };
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualHp, TotalHp = 50, TotalMp = 0 };
         if (trimmed.Contains("魔法药") || trimmed.Contains("蓝"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualMp, TotalHp = 0, TotalMp = 30 };
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualMp, TotalHp = 0, TotalMp = 80 };
 
         return new PotionMeta { Name = trimmed, Kind = PotionKind.None };
     }
