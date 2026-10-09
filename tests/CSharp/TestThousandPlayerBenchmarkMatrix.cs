@@ -145,11 +145,11 @@ public class TestThousandPlayerBenchmarkMatrix
         var map = mapManager.GetMap(0)!;
 
         using var dummySocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        var attacker = new ClientSession(1, dummySocket) { UseModernProtocol = true, X = 330, Y = 270, CurrentMapId = 0, State = new PlayerState { Hp = 500, MaxHp = 500 } };
-        var victim = new ClientSession(2, dummySocket) { UseModernProtocol = true, X = 331, Y = 270, CurrentMapId = 0, State = new PlayerState { Hp = 500, MaxHp = 500 } };
+        var attacker = new ClientSession(1, dummySocket) { UseModernProtocol = true, X = 100, Y = 100, CurrentMapId = 0, State = new PlayerState { Hp = 500, MaxHp = 500, Hit = 100 } };
+        var victim = new ClientSession(2, dummySocket) { UseModernProtocol = true, X = 101, Y = 100, CurrentMapId = 0, State = new PlayerState { Hp = 500, MaxHp = 500, Speed = 0 } };
 
-        map.Aoi.Enter(attacker, 330, 270);
-        map.Aoi.Enter(victim, 331, 270);
+        map.Aoi.Enter(attacker, 100, 100);
+        map.Aoi.Enter(victim, 101, 100);
 
         Span<byte> attackPayload = stackalloc byte[6];
         new BinaryProtocol.AttackIntentPayload { TargetUid = 2, Direction = 2, SkillType = 0 }.Write(attackPayload);

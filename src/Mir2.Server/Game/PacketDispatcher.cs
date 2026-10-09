@@ -31,6 +31,9 @@ public sealed class PacketDispatcher
     public CombatPersistenceAndAntiHackEngine AntiHackEngine { get; set; } = new();
     public SocialRelationsEngine SocialEngine { get; set; } = new();
     public StorageSecurityEngine StorageSecEngine { get; set; } = new();
+    public ModernNpcPluginEngine ModernNpcEngine { get; set; } = new();
+    public SabukTreasuryEngine TreasuryEngine { get; set; } = new();
+    public GuardPatrolAndReturnEngine GuardPatrolEngine { get; set; } = new();
     private int _nextGroundItemUid = 10000;
 
     public PacketDispatcher(MapManager mapManager, MonsterRegenEngine? regenEngine = null, NpcMerchantEngine? npcEngine = null, TradeEngine? tradeEngine = null, GroupEngine? groupEngine = null, GuildEngine? guildEngine = null, SabukSiegeEngine? sabukEngine = null, EconomyAntiDupeEngine? ecoEngine = null)

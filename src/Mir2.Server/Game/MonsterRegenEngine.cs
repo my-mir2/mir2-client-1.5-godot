@@ -101,13 +101,16 @@ public sealed class MonsterThreatTable
 public sealed class MonsterInstance
 {
     public int Uid { get; init; }
-    public string Name { get; init; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
     public int MapId { get; set; }
     public int X { get; set; }
     public int Y { get; set; }
     public byte Direction { get; set; }
     public int Hp { get; set; }
     public int MaxHp { get; set; }
+    public int Exp { get; set; } = 100;
+    public int MasterSessionId { get; set; } = 0; // 所属主人 SessionId (道士神兽/法师宝宝)
+    public bool IsMad { get; set; } = false;      // 祈祷大叛变发狂标志
     public int SpawnRuleId { get; init; }
     public bool IsDead => Hp <= 0;
     public bool IsButchered { get; set; } // 盛大官方 1.5 尸体割肉标记 (已被割空则不可再次割肉)
