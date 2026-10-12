@@ -338,7 +338,7 @@ public class TestUiSceneBindingArchitecture
     /// <summary>
     /// 步骤 5: 盛大官方 1.5 角色 9 大装备槽位坐标与尺寸固定实证测试
     /// IDA sub_481dd4 [0x483eb0..0x484180] 实锤：
-    /// 0:衣服, 1:武器, 2:勋章, 3:项链, 4:头盔, 5:右手镯, 6:左手镯, 7:右戒指, 8:左戒指
+    /// 0:衣服, 1:武器, 2:照明/右持物(火把/蜡烛/护符/毒药/药粉), 3:项链, 4:头盔, 5:右手镯, 6:左手镯, 7:右戒指, 8:左戒指
     /// </summary>
     [Fact]
     public void TestEquipPanel_FixedSlots_GroundTruth()
@@ -349,7 +349,7 @@ public class TestUiSceneBindingArchitecture
             [0] = (96, 122, 53, 112),  // 衣服
             [4] = (115, 93, 18, 18),   // 头盔
             [3] = (168, 87, 34, 31),   // 项链
-            [2] = (168, 125, 34, 31),  // 勋章
+            [2] = (168, 125, 34, 31),  // 照明/右持物 (火把/蜡烛/护符/毒药/药粉)
             [6] = (42, 176, 34, 31),   // 左手镯
             [5] = (168, 176, 34, 31),  // 右手镯
             [8] = (42, 215, 34, 31),   // 左戒指
@@ -683,11 +683,12 @@ public class TestUiSceneBindingArchitecture
         Assert.False(HudController.IsItemCompatibleWithEquipSlot("重盔甲(男)", 1));
         Assert.False(HudController.IsItemCompatibleWithEquipSlot("珊瑚戒指", 1));
 
-        // 槽位 2: 勋章/饰品
-        Assert.True(HudController.IsItemCompatibleWithEquipSlot("荣誉勋章", 2));
+        // 槽位 2: 官方 1.5 照明/右持物 (火把/蜡烛/护符/毒药/药粉)，严格屏蔽 1.70 勋章
         Assert.True(HudController.IsItemCompatibleWithEquipSlot("火把", 2));
         Assert.True(HudController.IsItemCompatibleWithEquipSlot("黄色药粉", 2));
+        Assert.False(HudController.IsItemCompatibleWithEquipSlot("荣誉勋章", 2)); // 官方 1.5 严格屏蔽 1.70 勋章
         Assert.False(HudController.IsItemCompatibleWithEquipSlot("木剑", 2));
+
 
         // 槽位 3: 项链
         Assert.True(HudController.IsItemCompatibleWithEquipSlot("幽灵项链", 3));

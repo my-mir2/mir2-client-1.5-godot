@@ -26,7 +26,11 @@ namespace Mir2Client.UI
         public const string MapDir = "res://resources/maps/Map/";
 
         private NetManager? _net;
+#if MIR2_SANDBOX_DEV
         private bool _isSandbox = false;
+#else
+        private const bool _isSandbox = false;
+#endif
         private bool _isAllowDeal = true;
         public int SessionId { get; set; } = 0;
         public string Username { get; set; } = string.Empty;
@@ -103,6 +107,9 @@ namespace Mir2Client.UI
                 InputPluginInstance = PlayerInstance.GetNodeOrNull<InputPlugin>("InputPlugin");
             }
             HudInstance = GetNodeOrNull<HudController>("HUD");
+#if MIR2_SANDBOX_DEV
+            if (HudInstance != null) HudInstance.IsSandboxMode = _isSandbox;
+#endif
 
             MagicManagerInstance = new MagicManager();
             AddChild(MagicManagerInstance);
@@ -129,6 +136,19 @@ namespace Mir2Client.UI
             }
 
             SetupRetroDitherOverlay();
+
+            // 官方 1.5 默认大世界出生地图预载 (比奇省 0.map, 出生坐标 (330, 270))，消除异步包赛跑导致灰屏
+            string defaultMapPath = ResPath.Resolve("resources/maps/Map/0.map");
+            if (System.IO.File.Exists(defaultMapPath) && MapRendererInstance != null)
+            {
+                MapRendererInstance.LoadMap(defaultMapPath);
+                if (PlayerInstance != null)
+                {
+                    PlayerInstance.SetTilePos(330, 270);
+                    PlayerInstance.BodyDressType = 2; // 默认重盔甲男
+                    PlayerInstance.WeaponType = 2;     // 默认修罗
+                }
+            }
 
             Callable.From(CheckAutoSandbox).CallDeferred();
         }
@@ -313,7 +333,12 @@ namespace Mir2Client.UI
 
             EntityManagerInstance.EntityReconciled += (uid, x, y, dir) =>
             {
-                if (_entityNodes.TryGetValue(uid, out var node))
+                if (uid == EntityManagerInstance.LocalPlayerUid && PlayerInstance != null)
+                {
+                    // 服务端权威碰撞拉回强制校准，直接覆写客户端预测
+                    PlayerInstance.ReconcilePosition(x, y, dir);
+                }
+                else if (_entityNodes.TryGetValue(uid, out var node))
                 {
                     node.ReconcilePosition(x, y, dir);
                 }
@@ -340,10 +365,12 @@ namespace Mir2Client.UI
                 if (_entityNodes.TryGetValue(uid, out var node))
                 {
                     node.TriggerDeath();
+#if MIR2_SANDBOX_DEV
                     if (_isSandbox)
                     {
                         SpawnMonsterLoot(node.EntityName, node.TileX, node.TileY);
                     }
+#endif
                 }
             };
 
@@ -379,26 +406,32 @@ namespace Mir2Client.UI
 
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        if (_net.UseModernBinaryProtocol)
+                        Span<byte> movePayload = stackalloc byte[6];
+                        new BinaryProtocol.MoveIntentPayload
                         {
-                            Span<byte> movePayload = stackalloc byte[6];
-                            new BinaryProtocol.MoveIntentPayload
-                            {
-                                TargetX = (short)tx,
-                                TargetY = (short)ty,
-                                Direction = (byte)(dir & 7),
-                                IsRun = (byte)(isRun ? 1 : 0)
-                            }.Write(movePayload);
-                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentMove, movePayload);
-                        }
-                        else
-                        {
-                            byte[] pkt = isRun
-                                ? PacketEncoder.Run((short)tx, (short)ty, (short)dir)
-                                : PacketEncoder.Walk((short)tx, (short)ty, (short)dir);
-                            _net.SendPacket(pkt);
-                        }
+                            TargetX = (short)tx,
+                            TargetY = (short)ty,
+                            Direction = (byte)(dir & 7),
+                            IsRun = (byte)(isRun ? 1 : 0)
+                        }.Write(movePayload);
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentMove, movePayload);
                     }
+                };
+
+                PlayerInstance.Turned += (dir) =>
+                {
+                    if (_net != null && _net.IsConnectedToServer)
+                    {
+                        Span<byte> turnPayload = stackalloc byte[1];
+                        turnPayload[0] = (byte)(dir & 7);
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentTurn, turnPayload);
+                    }
+                };
+
+                InputPluginInstance.TurnRequested += (dir) =>
+                {
+                    if (PlayerInstance.IsDead || PlayerInstance.IsMoving) return;
+                    PlayerInstance.TurnTo(dir);
                 };
 
                 InputPluginInstance.WalkRequested += (dir) =>
@@ -407,7 +440,15 @@ namespace Mir2Client.UI
                     var offset = PlayerAuditEngine.DirOffsets[dir & 7];
                     int tx = PlayerInstance.TileX + offset.X;
                     int ty = PlayerInstance.TileY + offset.Y;
-                    if (MapRendererInstance != null && !MapRendererInstance.IsPassable(tx, ty)) return;
+
+                    // 盛大官方 1.5 规则：若目标瓦片为不可通行障碍物/墙体，角色原地转向而不迈步
+                    bool passable = MapRendererInstance?.IsPassable(tx, ty) ?? true;
+                    if (!passable)
+                    {
+                        PlayerInstance.TurnTo(dir);
+                        return;
+                    }
+
                     PlayerInstance.StartStepMovement(tx, ty, 1, ActionType.Walk, dir);
                 };
 
@@ -415,19 +456,30 @@ namespace Mir2Client.UI
                 {
                     if (PlayerInstance.IsDead || PlayerInstance.IsMoving) return;
                     var offset = PlayerAuditEngine.DirOffsets[dir & 7];
-                    int tx = PlayerInstance.TileX + offset.X * 2;
-                    int ty = PlayerInstance.TileY + offset.Y * 2;
                     int midX = PlayerInstance.TileX + offset.X;
                     int midY = PlayerInstance.TileY + offset.Y;
-                    if (MapRendererInstance != null && (!MapRendererInstance.IsPassable(midX, midY) || !MapRendererInstance.IsPassable(tx, ty)))
+                    int runX = PlayerInstance.TileX + offset.X * 2;
+                    int runY = PlayerInstance.TileY + offset.Y * 2;
+
+                    // 盛大官方 1.5 双格奔跑阻挡判定：
+                    // 1. 中间格不可走：不能跑也不能走，原地转向
+                    bool midPassable = MapRendererInstance?.IsPassable(midX, midY) ?? true;
+                    if (!midPassable)
                     {
-                        if (MapRendererInstance != null && MapRendererInstance.IsPassable(midX, midY))
-                        {
-                            PlayerInstance.StartStepMovement(midX, midY, 1, ActionType.Walk, dir);
-                        }
+                        PlayerInstance.TurnTo(dir);
                         return;
                     }
-                    PlayerInstance.StartStepMovement(tx, ty, 2, ActionType.Run, dir);
+
+                    // 2. 目标格不可走：平滑降级为走动 1 格
+                    bool runPassable = MapRendererInstance?.IsPassable(runX, runY) ?? true;
+                    if (!runPassable)
+                    {
+                        PlayerInstance.StartStepMovement(midX, midY, 1, ActionType.Walk, dir);
+                        return;
+                    }
+
+                    // 3. 两格均可走：执行奔跑 2 格
+                    PlayerInstance.StartStepMovement(runX, runY, 2, ActionType.Run, dir);
                 };
 
                 InputPluginInstance.NavigateRequested += (targetTile) =>
@@ -437,8 +489,14 @@ namespace Mir2Client.UI
                     var path = FastPathFinder.FindPath(startTile, targetTile, (x, y) => MapRendererInstance?.IsPassable(x, y) ?? true);
                     if (path != null && path.Count > 0)
                     {
-                        PlayerInstance.SetPath(path, run: true);
+                        PlayerInstance.SetPath(path, run: false);
                     }
+                };
+
+                PlayerInstance.StepCompleted += () =>
+                {
+                    if (PlayerInstance.IsDead) return;
+                    InputPluginInstance?.PollContinuousMovement();
                 };
 
                 InputPluginInstance.HitRequested += (dir) =>
@@ -453,26 +511,20 @@ namespace Mir2Client.UI
                         short targetX = (short)(PlayerInstance.TileX + offset.X);
                         short targetY = (short)(PlayerInstance.TileY + offset.Y);
 
-                        if (_net.UseModernBinaryProtocol)
+                        var p = new BinaryProtocol.AttackIntentPayload
                         {
-                            Span<byte> attackPayload = stackalloc byte[6];
-                            new BinaryProtocol.AttackIntentPayload
-                            {
-                                TargetUid = _selectedTargetUid,
-                                Direction = (byte)(dir & 7),
-                                SkillType = 0
-                            }.Write(attackPayload);
-                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentAttack, attackPayload);
-                        }
-                        else
-                        {
-                            _net.SendPacket(PacketEncoder.Hit((short)(dir & 7), targetX, targetY));
-                        }
+                            TargetUid = _selectedTargetUid,
+                            Direction = (byte)(dir & 7),
+                            SkillType = 0
+                        };
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentAttack, in p);
                     }
+#if MIR2_SANDBOX_DEV
                     else if (_isSandbox)
                     {
                         CheckSandboxMeleeHit(dir, 15);
                     }
+#endif
                 };
 
                 InputPluginInstance.PickupRequested += () =>
@@ -542,134 +594,153 @@ namespace Mir2Client.UI
                     // 盛大官方 1.5 快捷栏使用物品发包 CM_EATITEM (1006)
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        if (_net.UseModernBinaryProtocol)
-                        {
-                            Span<byte> itemPayload = stackalloc byte[4];
-                            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(itemPayload, slot);
-                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentUseItem, itemPayload);
-                        }
-                        else
-                        {
-                            _net.SendPacket(PacketEncoder.EatItem(slot, item));
-                        }
+                        var p = new BinaryProtocol.UseItemIntentPayload { ItemUid = 0, BagSlot = slot };
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentUseItem, in p);
                     }
+#if MIR2_SANDBOX_DEV
                     else if (_isSandbox)
                     {
                         ApplyPotionRecovery(item);
                     }
+#endif
                 };
 
                 HudInstance.ChatSent += OnChatSent;
                 HudInstance.ItemDropToGroundRequested += OnItemDropToGroundRequested;
+                HudInstance.SplitItemRequested += (slot, splitCount) =>
+                {
+                    var p = new BinaryProtocol.SplitItemIntentPayload { BagSlot = slot, SplitCount = splitCount };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSplitItem, in p);
+                };
 
-                // 官方面对面安全交易网络发包打通 (CM_ADDDEALITEM / CM_DELDEALITEM / CM_DEALCHGGOLD / CM_DEALEND / CM_TRADECANCEL)
+                // 官方面对面安全交易 Direct-Blit 发包
                 HudInstance.TradeAddItemRequested += (slot, name) =>
                 {
-                    _net?.SendPacket(PacketEncoder.DealAddItem((short)slot, name));
+                    var p = new BinaryProtocol.TradeIntentPayload { Action = 1, ItemUid = slot };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentTrade, in p);
                 };
                 HudInstance.TradeDelItemRequested += (slot) =>
                 {
-                    _net?.SendPacket(PacketEncoder.DealDelItem((short)slot));
+                    var p = new BinaryProtocol.TradeIntentPayload { Action = 2, ItemUid = slot };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentTrade, in p);
                 };
                 HudInstance.TradeChangeGoldRequested += (gold) =>
                 {
-                    _net?.SendPacket(PacketEncoder.DealChangeGold(gold));
+                    var p = new BinaryProtocol.TradeIntentPayload { Action = 3, Gold = gold };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentTrade, in p);
                 };
                 HudInstance.TradeConfirmRequested += () =>
                 {
-                    _net?.SendPacket(PacketEncoder.DealConfirm());
+                    var p = new BinaryProtocol.TradeIntentPayload { Action = 4 };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentTrade, in p);
                 };
                 HudInstance.TradeCancelRequested += () =>
                 {
-                    _net?.SendPacket(PacketEncoder.DealCancel());
+                    var p = new BinaryProtocol.TradeIntentPayload { Action = 5 };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentTrade, in p);
                 };
 
-                // 官方 1.5 仓库保管箱存取发包 (CM_USERSTORAGEDEPOSIT 1031 / CM_USERSTORAGEWITHDRAW 1032)
+                // 官方 1.5 仓库保管箱存取 Direct-Blit 发包
                 HudInstance.StorageDepositRequested += (bagSlot, itemName) =>
                 {
-                    _net?.SendPacket(PacketEncoder.DepositStorage(bagSlot, itemName));
+                    var p = new BinaryProtocol.StorageDepositIntentPayload { BagSlot = bagSlot, ItemUid = 0 };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentStorageDeposit, in p);
                 };
                 HudInstance.StorageWithdrawRequested += (storageSlot) =>
                 {
-                    _net?.SendPacket(PacketEncoder.WithdrawStorage(storageSlot));
+                    var p = new BinaryProtocol.StorageWithdrawIntentPayload { StorageSlot = storageSlot };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentStorageWithdraw, in p);
+                };
+                HudInstance.StorageDepositGoldRequested += (amount) =>
+                {
+                    var p = new BinaryProtocol.StorageDepositGoldIntentPayload { GoldAmount = amount };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentStorageDepositGold, in p);
+                };
+                HudInstance.StorageWithdrawGoldRequested += (amount) =>
+                {
+                    var p = new BinaryProtocol.StorageWithdrawGoldIntentPayload { GoldAmount = amount };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentStorageWithdrawGold, in p);
                 };
 
-                // 官方攻击模式变更发包 (官方原版发送 @AttackMode 聊天指令，避免 1019 破坏 CM_GROUPMODE 组队状态)
+                // 官方攻击模式变更 Direct-Blit 发包
                 HudInstance.ChangeAttackModeRequested += (mode) =>
                 {
-                    _net?.SendPacket(PacketEncoder.Say("@AttackMode"));
+                    var p = new BinaryProtocol.AttackModeIntentPayload { Mode = (byte)mode };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentAttackMode, in p);
                 };
 
-                // 官方 NPC 对话选项点击发包 (CM_NPCSELECT 1011)
+                // 官方 NPC 对话选项点击 Direct-Blit 发包
                 HudInstance.NpcActionSelected += (actionTag) =>
                 {
                     int npcUid = HudInstance.NpcDialog?.CurrentNpcUid ?? 0;
-                    _net?.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_NPCSELECT, npcUid, 0, 0, System.Text.Encoding.UTF8.GetBytes(actionTag)));
+                    Span<byte> buf = stackalloc byte[8 + System.Text.Encoding.UTF8.GetByteCount(actionTag ?? string.Empty)];
+                    BinaryProtocol.NpcSelectIntentPayload.Write(buf, npcUid, actionTag ?? string.Empty);
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentNpcSelect, buf);
                 };
                 HudInstance.NpcOptionSelected += (index) =>
                 {
                     int npcUid = HudInstance.NpcDialog?.CurrentNpcUid ?? 0;
-                    string npcName = EntityManagerInstance.GetEntity(npcUid)?.Name ?? string.Empty;
-                    _net?.SendPacket(PacketEncoder.NpcSelect(npcUid, npcName, index));
+                    Span<byte> buf = stackalloc byte[8 + 16];
+                    BinaryProtocol.NpcSelectIntentPayload.Write(buf, npcUid, $"@{index}");
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentNpcSelect, buf);
                 };
 
-                // 现代二进制意图吃药与官方兼容发包
+                // 吃药使用物品 Direct-Blit 发包
                 HudInstance.UseItemRequested += (slot, item) =>
                 {
                     if (PlayerInstance?.IsDead == true) return;
-                    if (_net != null && _net.IsConnectedToServer && _net.UseModernBinaryProtocol)
+                    if (_net != null && _net.IsConnectedToServer)
                     {
-                        Span<byte> itemPayload = stackalloc byte[4];
-                        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(itemPayload, slot);
-                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentUseItem, itemPayload);
+                        var p = new BinaryProtocol.UseItemIntentPayload { ItemUid = 0, BagSlot = slot };
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentUseItem, in p);
                     }
-                    else
+#if MIR2_SANDBOX_DEV
+                    else if (_isSandbox)
                     {
-                        if (_net != null && _net.IsConnectedToServer)
-                        {
-                            _net.SendPacket(PacketEncoder.EatItem(slot, item));
-                        }
-                        else if (_isSandbox)
-                        {
-                            ApplyPotionRecovery(item);
-                        }
+                        ApplyPotionRecovery(item);
                     }
+#endif
                 };
                 HudInstance.WearItemRequested += (bagSlot, equipSlot) =>
                 {
                     if (PlayerInstance?.IsDead == true) return;
-                    _net?.SendPacket(PacketEncoder.WearItem((short)bagSlot, (short)equipSlot));
+                    var p = new BinaryProtocol.EquipItemIntentPayload { ItemUid = bagSlot, TargetSlot = (byte)equipSlot };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentEquipItem, in p);
                 };
                 HudInstance.TakeoffItemRequested += (equipSlot) =>
                 {
                     if (PlayerInstance?.IsDead == true) return;
-                    _net?.SendPacket(PacketEncoder.TakeOffItem((short)equipSlot));
+                    var p = new BinaryProtocol.TakeoffItemIntentPayload { TargetSlot = (byte)equipSlot };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentTakeoffItem, in p);
                 };
 
-                // 官方战士核心技能开关网络发包 (CM_THRUSTINGONOFF 3026 / CM_HALFMOONONOFF 3027)
+                // 官方战士核心技能开关 Direct-Blit 发包 (刺杀 / 半月)
                 HudInstance.ToggleThrustingRequested += (enabled) =>
                 {
-                    _net?.SendPacket(PacketEncoder.ThrustingOnOff(enabled));
+                    var p = new BinaryProtocol.ToggleSkillIntentPayload { SkillType = 0, Enabled = (byte)(enabled ? 1 : 0) };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentToggleSkill, in p);
                 };
                 HudInstance.ToggleHalfMoonRequested += (enabled) =>
                 {
-                    _net?.SendPacket(PacketEncoder.HalfMoonOnOff(enabled));
+                    var p = new BinaryProtocol.ToggleSkillIntentPayload { SkillType = 1, Enabled = (byte)(enabled ? 1 : 0) };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentToggleSkill, in p);
                 };
 
-                // 官方 1.5 背包金币丢弃发包 (CM_DROPGOLD 1016, 对齐 IDA TFrmDlg_DGoldClick 0x48e564)
+                // 官方 1.5 背包金币丢弃 Direct-Blit 发包
                 HudInstance.DropGoldRequested += (amount) =>
                 {
-                    _net?.SendPacket(PacketEncoder.DropGold(amount));
+                    var p = new BinaryProtocol.DropGoldIntentPayload { Gold = amount };
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentDropGold, in p);
                 };
 
-                // 官方 1.5 角色小退换人模态确认与发包 (对齐 IDA TFrmDlg_DBotLogoutClick 0x491474 / sub_461DEC 0x461338)
+                // 官方 1.5 角色小退换人模态确认与发包
                 HudInstance.SoftCloseRequested += () =>
                 {
                     if (HudInstance.MessageBox != null)
                     {
                         HudInstance.MessageBox.ShowMessage("你想退出传奇吗？", true, () =>
                         {
-                            _net?.SendPacket(PacketEncoder.SoftClose());
+                            _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSoftClose, ReadOnlySpan<byte>.Empty);
                             HudInstance.AddChat("系统", "[系统] 正在注销当前角色并返回选角神龛...", new Color(1f, 0.8f, 0.4f));
                             var main = GetTree().Root.GetNodeOrNull<Main>("Main");
                             main?.SwitchPhase(Main.Phase.SelectChar);
@@ -677,83 +748,92 @@ namespace Mir2Client.UI
                     }
                     else
                     {
-                        _net?.SendPacket(PacketEncoder.SoftClose());
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSoftClose, ReadOnlySpan<byte>.Empty);
                     }
                 };
 
-                // 官方 1.5 退出游戏模态确认与发包 (对齐 IDA TFrmDlg_DBotExitClick 0x491520 / sub_461DEC 0x461244)
+                // 官方 1.5 退出游戏模态确认与发包
                 HudInstance.ExitGameRequested += () =>
                 {
                     if (HudInstance.MessageBox != null)
                     {
                         HudInstance.MessageBox.ShowMessage("你想退出吗 ?", true, () =>
                         {
-                            _net?.SendPacket(PacketEncoder.SoftClose());
+                            _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSoftClose, ReadOnlySpan<byte>.Empty);
                             GetTree().Quit();
                         });
                     }
                     else
                     {
-                        _net?.SendPacket(PacketEncoder.SoftClose());
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSoftClose, ReadOnlySpan<byte>.Empty);
                         GetTree().Quit();
                     }
                 };
 
-                // 官方 1.5 组队面板交互发包 (CM_CREATEGROUP 1020 / CM_ADDGROUPMEMBER 1021 / CM_DELGROUPMEMBER 1022 / CM_GROUPMODE 1019)
+                // 官方 1.5 组队面板交互 Direct-Blit 发包
                 if (HudInstance.GroupPanel != null)
                 {
                     HudInstance.GroupPanel.CreateGroupRequested += (targetName) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GroupCreate());
+                        Span<byte> buf = stackalloc byte[1 + System.Text.Encoding.UTF8.GetByteCount(targetName ?? string.Empty)];
+                        BinaryProtocol.GroupActionIntentPayload.Write(buf, 0, targetName ?? string.Empty);
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGroupAction, buf);
                     };
                     HudInstance.GroupPanel.AddMemberRequested += (targetName) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GroupAddMember(targetName));
+                        Span<byte> buf = stackalloc byte[1 + System.Text.Encoding.UTF8.GetByteCount(targetName ?? string.Empty)];
+                        BinaryProtocol.GroupActionIntentPayload.Write(buf, 1, targetName ?? string.Empty);
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGroupAction, buf);
                     };
                     HudInstance.GroupPanel.DelMemberRequested += (targetName) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GroupDelMember(targetName));
+                        Span<byte> buf = stackalloc byte[1 + System.Text.Encoding.UTF8.GetByteCount(targetName ?? string.Empty)];
+                        BinaryProtocol.GroupActionIntentPayload.Write(buf, 2, targetName ?? string.Empty);
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGroupAction, buf);
                     };
                     HudInstance.GroupPanel.GroupModeToggled += (enabled) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GroupModeToggle(enabled));
+                        Span<byte> buf = stackalloc byte[1 + 8];
+                        BinaryProtocol.GroupActionIntentPayload.Write(buf, 3, enabled ? "1" : "0");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGroupAction, buf);
                     };
                 }
 
-                // 官方 1.5 商店面板交互发包 (CM_USERBUYITEM 45 / CM_USERSTORAGEWITHDRAW 1032 / CM_USERGETDETAILITEM 1013)
+                // 官方 1.5 商店面板交互 Direct-Blit 发包
                 if (HudInstance.ShopPanel != null)
                 {
                     HudInstance.ShopPanel.BuyRequested += (npcUid, itemIdx, count) =>
                     {
-                        _net?.SendPacket(PacketEncoder.BuyFromShop(npcUid, (short)count, (short)itemIdx));
+                        var p = new BinaryProtocol.ShopBuyIntentPayload { NpcUid = npcUid, GoodsIndex = itemIdx, Count = count };
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentShopBuy, in p);
                     };
                     HudInstance.ShopPanel.TakeBackRequested += (storageSlot, itemName) =>
                     {
-                        _net?.SendPacket(PacketEncoder.WithdrawStorage(storageSlot));
+                        var p = new BinaryProtocol.StorageWithdrawIntentPayload { StorageSlot = storageSlot };
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentStorageWithdraw, in p);
+                    };
+                    HudInstance.ShopPanel.SellRequested += (npcUid, itemUid) =>
+                    {
+                        var p = new BinaryProtocol.ShopSellIntentPayload { NpcUid = npcUid, ItemUid = itemUid };
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentShopSell, in p);
                     };
                     HudInstance.ShopPanel.ItemSelectedForDetail += (itemName) =>
                     {
-                        _net?.SendPacket(PacketEncoder.UserGetDetailItem(itemName));
                     };
                 }
 
-                // 官方 1.5 铁匠铺修理与仓库保管交互发包 (CM_USERREPAIRITEM 1023 / CM_REPAIRSPECIAL 48 / CM_USERSTORAGEDEPOSIT 1031)
+                // 官方 1.5 铁匠铺修理与仓库保管交互 Direct-Blit 发包
                 if (HudInstance.RepairPanel != null)
                 {
                     HudInstance.RepairPanel.RepairConfirmed += (itemUid, isSpecial) =>
                     {
-                        if (isSpecial)
-                        {
-                            _net?.SendPacket(PacketEncoder.RepairSpecial(0, itemUid));
-                        }
-                        else
-                        {
-                            _net?.SendPacket(PacketEncoder.RepairItem(0, itemUid));
-                        }
+                        var p = new BinaryProtocol.RepairIntentPayload { NpcUid = 0, ItemUid = itemUid, IsSpecial = (byte)(isSpecial ? 1 : 0) };
+                        _net?.SendBinaryIntent(isSpecial ? (ushort)BinaryProtocol.MsgType.IntentSpecialRepair : (ushort)BinaryProtocol.MsgType.IntentRepair, in p);
                     };
                     HudInstance.RepairPanel.StorageDepositConfirmed += (bagSlot, itemName) =>
                     {
-                        _net?.SendPacket(PacketEncoder.DepositStorage(bagSlot, itemName));
+                        var p = new BinaryProtocol.StorageDepositIntentPayload { BagSlot = bagSlot, ItemUid = 0 };
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentStorageDeposit, in p);
                     };
                 }
 
@@ -761,43 +841,63 @@ namespace Mir2Client.UI
                 {
                     HudInstance.GuildPanel.HomeRequested += () =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildOpenPage(0));
+                        Span<byte> buf = stackalloc byte[3];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 0, "", "");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                     HudInstance.GuildPanel.MemberListRequested += () =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildMemberList(0));
+                        Span<byte> buf = stackalloc byte[3];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 1, "", "");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                     HudInstance.GuildPanel.AddMemberRequested += (targetName) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildAddMember(targetName));
+                        Span<byte> buf = stackalloc byte[3 + System.Text.Encoding.UTF8.GetByteCount(targetName ?? string.Empty)];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 2, targetName ?? string.Empty, "");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                     HudInstance.GuildPanel.DelMemberRequested += (targetName) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildKickMember(targetName));
+                        Span<byte> buf = stackalloc byte[3 + System.Text.Encoding.UTF8.GetByteCount(targetName ?? string.Empty)];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 3, targetName ?? string.Empty, "");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                     HudInstance.GuildPanel.AllyRequested += (targetGuild) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildAllyRequest(targetGuild));
+                        Span<byte> buf = stackalloc byte[3 + System.Text.Encoding.UTF8.GetByteCount(targetGuild ?? string.Empty)];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 4, targetGuild ?? string.Empty, "");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                     HudInstance.GuildPanel.CancelAllyRequested += (targetGuild) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildBreakAlly(targetGuild));
+                        Span<byte> buf = stackalloc byte[3 + System.Text.Encoding.UTF8.GetByteCount(targetGuild ?? string.Empty)];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 5, targetGuild ?? string.Empty, "");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                     HudInstance.GuildPanel.NoticeUpdated += (newNotice) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildNoticeUpdate(newNotice));
+                        Span<byte> buf = stackalloc byte[3 + System.Text.Encoding.UTF8.GetByteCount(newNotice ?? string.Empty)];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 6, newNotice ?? string.Empty, "");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                     HudInstance.GuildPanel.RankUpdated += (memberName, newRank) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildUpdateRank(memberName, newRank));
+                        Span<byte> buf = stackalloc byte[3 + System.Text.Encoding.UTF8.GetByteCount(memberName ?? string.Empty) + System.Text.Encoding.UTF8.GetByteCount(newRank ?? string.Empty)];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 7, memberName ?? string.Empty, newRank ?? string.Empty);
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                     HudInstance.GuildPanel.WarRequested += (targetGuild) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildApplyWar(targetGuild));
+                        Span<byte> buf = stackalloc byte[3 + System.Text.Encoding.UTF8.GetByteCount(targetGuild ?? string.Empty)];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 8, targetGuild ?? string.Empty, "");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                     HudInstance.GuildPanel.CancelWarRequested += (targetGuild) =>
                     {
-                        _net?.SendPacket(PacketEncoder.GuildCancelWar(targetGuild));
+                        Span<byte> buf = stackalloc byte[3 + System.Text.Encoding.UTF8.GetByteCount(targetGuild ?? string.Empty)];
+                        BinaryProtocol.GuildActionIntentPayload.Write(buf, 9, targetGuild ?? string.Empty, "");
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentGuildAction, buf);
                     };
                 }
 
@@ -805,7 +905,8 @@ namespace Mir2Client.UI
                 {
                     HudInstance.AdjustAbilPanel.StatSubmitted += (bonusType) =>
                     {
-                        _net?.SendPacket(PacketEncoder.AdjustBonus((short)bonusType));
+                        var p = new BinaryProtocol.AdjustBonusIntentPayload { BonusType = (byte)bonusType };
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentAdjustBonus, in p);
                     };
                 }
 
@@ -813,13 +914,14 @@ namespace Mir2Client.UI
                 {
                     HudInstance.KeySelectDialog.KeyBindingConfirmed += (magicId, keyNum) =>
                     {
-                        _net?.SendPacket(PacketEncoder.MagicKeyChange(magicId, (byte)keyNum));
+                        var p = new BinaryProtocol.MagicKeyIntentPayload { MagicId = (short)magicId, KeyNum = (byte)keyNum };
+                        _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentMagicKey, in p);
                     };
                 }
 
                 HudInstance.MinimapToggled += () =>
                 {
-                    _net?.SendPacket(PacketEncoder.WantMinimap());
+                    _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentWantMinimap, ReadOnlySpan<byte>.Empty);
                 };
 
                 if (HudInstance.Minimap != null)
@@ -857,6 +959,7 @@ namespace Mir2Client.UI
             }
         }
 
+#if MIR2_SANDBOX_DEV
         /// <summary>
         /// 盛大官方 1.5 药水双轨回复与单机沙盒数值对齐 (战法道全量药水):
         /// 1. 金创药族 / 魔法药族: 持续缓回机制 (注入 PotionSystem 缓冲池，每 250ms tick 定频注入，经典顶药);
@@ -899,6 +1002,7 @@ namespace Mir2Client.UI
                 HudInstance.AddChat("提示", $"使用了 {item}，{poolText}。", new Color(0.6f, 0.95f, 0.6f));
             }
         }
+#endif
 
         private bool _isPetResting = false;
 
@@ -910,6 +1014,7 @@ namespace Mir2Client.UI
             _isPetResting = !_isPetResting;
             string status = _isPetResting ? "休息" : "攻击";
             HudInstance?.AddChat("系统", $"[系统] 召唤兽进入{status}状态。", new Color(0.4f, 1.0f, 0.4f));
+            _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSay, System.Text.Encoding.UTF8.GetBytes("@Rest"));
         }
 
         /// <summary>
@@ -943,20 +1048,26 @@ namespace Mir2Client.UI
         {
             if (PlayerInstance == null) return;
 
-            // 1. 计算地表瓦片坐标 (默认在主角当前脚下)
-            int dropTileX = PlayerInstance.TileX;
-            int dropTileY = PlayerInstance.TileY;
+#if MIR2_SANDBOX_DEV
+            if (_isSandbox)
+            {
+                // 1. 计算地表瓦片坐标 (默认在主角当前脚下)
+                int dropTileX = PlayerInstance.TileX;
+                int dropTileY = PlayerInstance.TileY;
 
-            // 2. 生成地表战利品掉落物
-            int look = itemName.Contains("金币") ? 1 : (itemName.Contains("药") ? 2 : 13);
-            GroundItemManagerInstance.AddItem(_dropItemIdSeed++, itemName, dropTileX, dropTileY, look, 1);
+                // 2. 生成地表战利品掉落物
+                int look = itemName.Contains("金币") ? 1 : (itemName.Contains("药") ? 2 : 13);
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, itemName, dropTileX, dropTileY, look, 1);
+            }
+#endif
 
             // 3. 播放官方经典物品落地声效 (金币为 401，装备道具为 2)
             int sfxId = itemName.Contains("金币") ? 401 : 2;
             AudioManager.Instance?.PlaySoundId(sfxId);
 
-            // 4. 发送网络协议包 CM_DROPITEM (1000)
-            _net?.SendPacket(PacketEncoder.DropItem(bagSlot, 1));
+            // 4. 发送 Direct-Blit 意图丢弃物品
+            var p = new BinaryProtocol.DropItemIntentPayload { ItemUid = 0, BagSlot = bagSlot };
+            _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentDropItem, in p);
         }
 
         private void OnChatSent(string msg)
@@ -969,20 +1080,31 @@ namespace Mir2Client.UI
                 trimmed.StartsWith("@飞", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.StartsWith("@瞬移", StringComparison.OrdinalIgnoreCase))
             {
-                var res = PlayerStateInstance.TryExecuteTeleport(
-                    trimmed,
-                    isTileBlocked: (x, y) => !(MapRendererInstance?.IsPassable(x, y) ?? true),
-                    nowTick: (long)Time.GetTicksMsec());
+#if MIR2_SANDBOX_DEV
+                if (_isSandbox)
+                {
+                    var res = PlayerStateInstance.TryExecuteTeleport(
+                        trimmed,
+                        isTileBlocked: (x, y) => !(MapRendererInstance?.IsPassable(x, y) ?? true),
+                        nowTick: (long)Time.GetTicksMsec());
 
-                if (res.success)
-                {
-                    PlayerInstance?.SetTilePos(res.targetX, res.targetY);
-                    HudInstance?.AddChat("提示", res.message, new Color(0.2f, 1f, 0.4f));
-                    AudioManager.Instance?.PlaySoundId(2);
+                    if (res.success)
+                    {
+                        PlayerInstance?.SetTilePos(res.targetX, res.targetY);
+                        HudInstance?.AddChat("提示", res.message, new Color(0.2f, 1f, 0.4f));
+                        AudioManager.Instance?.PlaySoundId(2);
+                    }
+                    else
+                    {
+                        HudInstance?.AddChat("系统", res.message, new Color(1f, 0.3f, 0.3f));
+                    }
+                    return;
                 }
-                else
+#endif
+                // 正式发布模式：严格上报服务端权威裁决与全屏广播，客户端绝不在本地越权位移
+                if (_net != null && _net.IsConnectedToServer)
                 {
-                    HudInstance?.AddChat("系统", res.message, new Color(1f, 0.3f, 0.3f));
+                    _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSay, System.Text.Encoding.UTF8.GetBytes(trimmed));
                 }
                 return;
             }
@@ -991,27 +1113,38 @@ namespace Mir2Client.UI
             if (trimmed.Equals("@天地合一", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.Equals("@grouprecall", StringComparison.OrdinalIgnoreCase))
             {
-                var teammates = new List<(int uid, string name, int x, int y)>();
-                foreach (var tm in TeamManagerInstance.Members)
+#if MIR2_SANDBOX_DEV
+                if (_isSandbox)
                 {
-                    teammates.Add((tm.Uid, tm.Name, 0, 0));
-                }
+                    var teammates = new List<(int uid, string name, int x, int y)>();
+                    foreach (var tm in TeamManagerInstance.Members)
+                    {
+                        teammates.Add((tm.Uid, tm.Name, 0, 0));
+                    }
 
-                var res = PlayerStateInstance.TryExecuteRecall(
-                    trimmed,
-                    isLeader: true,
-                    teammates,
-                    isTileBlocked: (x, y) => !(MapRendererInstance?.IsPassable(x, y) ?? true),
-                    nowTick: (long)Time.GetTicksMsec());
+                    var res = PlayerStateInstance.TryExecuteRecall(
+                        trimmed,
+                        isLeader: true,
+                        teammates,
+                        isTileBlocked: (x, y) => !(MapRendererInstance?.IsPassable(x, y) ?? true),
+                        nowTick: (long)Time.GetTicksMsec());
 
-                if (res.success)
-                {
-                    HudInstance?.AddChat("行会/组队", res.message, new Color(1f, 0.9f, 0.2f));
-                    AudioManager.Instance?.PlaySoundId(2);
+                    if (res.success)
+                    {
+                        HudInstance?.AddChat("行会/组队", res.message, new Color(1f, 0.9f, 0.2f));
+                        AudioManager.Instance?.PlaySoundId(2);
+                    }
+                    else
+                    {
+                        HudInstance?.AddChat("系统", res.message, new Color(1f, 0.3f, 0.3f));
+                    }
+                    return;
                 }
-                else
+#endif
+                // 正式发布模式：严格上报服务端执行组队队员全量校验与同屏拉拽
+                if (_net != null && _net.IsConnectedToServer)
                 {
-                    HudInstance?.AddChat("系统", res.message, new Color(1f, 0.3f, 0.3f));
+                    _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSay, System.Text.Encoding.UTF8.GetBytes(trimmed));
                 }
                 return;
             }
@@ -1041,7 +1174,7 @@ namespace Mir2Client.UI
                 HudInstance?.AddChat("系统", statusMsg, new Color(1f, 0.95f, 0.3f));
                 if (_net != null && _net.IsConnectedToServer)
                 {
-                    _net.SendPacket(PacketEncoder.Say("@AllowDeal"));
+                    _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSay, System.Text.Encoding.UTF8.GetBytes("@AllowDeal"));
                 }
                 return;
             }
@@ -1058,7 +1191,7 @@ namespace Mir2Client.UI
                     HudInstance?.AddChat("提示", $"【探测项链】正在探查目标玩家 [{targetName}] 当前坐标方位...", new Color(0.4f, 1f, 0.5f));
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.Say($"@Searching {targetName}"));
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSay, System.Text.Encoding.UTF8.GetBytes($"@Searching {targetName}"));
                     }
                 }
                 else
@@ -1092,7 +1225,7 @@ namespace Mir2Client.UI
                 return;
             }
 
-            // 8. 聊天发包处理 (普通说话 CM_SAY 3030 与 私聊 CM_WHISPER 3030 分流)
+            // 8. 聊天发包处理 (普通说话 IntentSay 与 私聊 IntentWhisper 分流)
             if (_net != null && _net.IsConnectedToServer)
             {
                 if (trimmed.StartsWith("/"))
@@ -1103,16 +1236,18 @@ namespace Mir2Client.UI
                     {
                         string target = content[..spaceIdx].Trim();
                         string whisperMsg = content[(spaceIdx + 1)..].Trim();
-                        _net.SendPacket(PacketEncoder.Whisper(target, whisperMsg));
+                        Span<byte> buf = stackalloc byte[2 + System.Text.Encoding.UTF8.GetByteCount(target) + System.Text.Encoding.UTF8.GetByteCount(whisperMsg)];
+                        BinaryProtocol.ChatIntentPayload.WriteWhisper(buf, target, whisperMsg);
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentWhisper, buf);
                     }
                     else
                     {
-                        _net.SendPacket(PacketEncoder.Say(trimmed));
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSay, System.Text.Encoding.UTF8.GetBytes(trimmed));
                     }
                 }
                 else
                 {
-                    _net.SendPacket(PacketEncoder.Say(trimmed));
+                    _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSay, System.Text.Encoding.UTF8.GetBytes(trimmed));
                 }
             }
         }
@@ -1223,35 +1358,32 @@ namespace Mir2Client.UI
                 PlayerInstance.Direction = dir;
             }
 
-            // 检查并扣减 MP
-            var meta = SkillFormulas.GetSkill((short)magicId);
-            int mpCost = meta?.MpCost ?? 0;
-            if (PlayerInstance.Mp < mpCost)
+            // 检查并扣减 MP (仅在单机沙盒开发模式下做本地拦截回退；联网模式由服务端权威核验并扣减，杜绝客户端越权吞包)
+#if MIR2_SANDBOX_DEV
+            if (_isSandbox)
             {
-                HudInstance?.AddChat("提示", "魔法值不足，无法施展技能！", new Color(1f, 0.4f, 0.4f));
-                return;
+                var meta = SkillFormulas.GetSkill((short)magicId);
+                int mpCost = meta?.MpCost ?? 0;
+                if (PlayerInstance.Mp < mpCost)
+                {
+                    HudInstance?.AddChat("提示", "魔法值不足，无法施展技能！", new Color(1f, 0.4f, 0.4f));
+                    return;
+                }
             }
+#endif
 
             void SendCastSkillPacket(short magicId, int targetX, int targetY, int targetUid = 0)
             {
-            if (_net == null || !_net.IsConnectedToServer) return;
-            if (_net.UseModernBinaryProtocol)
-            {
-                Span<byte> spellPayload = stackalloc byte[9];
-                new BinaryProtocol.SpellIntentPayload
+                if (_net == null || !_net.IsConnectedToServer) return;
+                var p = new BinaryProtocol.SpellIntentPayload
                 {
                     TargetUid = targetUid,
                     SpellId = (byte)magicId,
                     TargetX = (short)targetX,
                     TargetY = (short)targetY
-                }.Write(spellPayload);
-                _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSpell, spellPayload);
+                };
+                _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSpell, in p);
             }
-            else
-            {
-                _net.SendPacket(PacketEncoder.Spell(magicId, (short)targetX, (short)targetY));
-            }
-        }
 
         switch (magicId)
             {
@@ -1272,6 +1404,7 @@ namespace Mir2Client.UI
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     MagicManagerInstance?.PlayMagic(magicId, playerTile, targetTile);
                     SendCastSkillPacket(6, targetTile.X, targetTile.Y, _selectedTargetUid);
+#if MIR2_SANDBOX_DEV
                     if (_isSandbox)
                     {
                         EntityManager.EntityData? poisonTarget = null;
@@ -1305,6 +1438,7 @@ namespace Mir2Client.UI
                             }
                         }
                     }
+#endif
                     break;
 
                 case 7: // 攻杀剑术
@@ -1312,17 +1446,21 @@ namespace Mir2Client.UI
                     AudioManager.Instance?.PlaySoundId(1);
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.PowerHit((short)dir));
+                        var p = new BinaryProtocol.AttackIntentPayload { TargetUid = _selectedTargetUid, Direction = (byte)dir, SkillType = 1 };
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentAttack, in p);
                     }
+#if MIR2_SANDBOX_DEV
                     else if (_isSandbox)
                     {
                         CheckSandboxMeleeHit(dir, 30);
                     }
+#endif
                     break;
 
                 case 8: // 抗拒火环 (Ring of Fire)
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     AudioManager.Instance?.PlaySoundId(134);
+#if MIR2_SANDBOX_DEV
                     if (_isSandbox)
                     {
                         var surrounding = new List<(int uid, int level, int x, int y, bool isBoss)>();
@@ -1360,12 +1498,14 @@ namespace Mir2Client.UI
                             : "抗拒火环呼啸而过，周围没有可以推动的目标。";
                         HudInstance?.AddChat("技能", fireMsg, new Color(1f, 0.5f, 0.2f));
                     }
+#endif
                     SendCastSkillPacket(8, PlayerInstance.TileX, PlayerInstance.TileY);
                     break;
 
                 case 9: // 诱惑之光 (Temptation)
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     AudioManager.Instance?.PlaySoundId(135);
+#if MIR2_SANDBOX_DEV
                     if (_isSandbox)
                     {
                         EntityManager.EntityData? targetMonster = null;
@@ -1407,6 +1547,7 @@ namespace Mir2Client.UI
                             }
                         }
                     }
+#endif
                     SendCastSkillPacket(9, targetTile.X, targetTile.Y, _selectedTargetUid);
                     break;
 
@@ -1415,12 +1556,15 @@ namespace Mir2Client.UI
                     AudioManager.Instance?.PlaySoundId(1);
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.LongHit((short)dir));
+                        var p = new BinaryProtocol.AttackIntentPayload { TargetUid = _selectedTargetUid, Direction = (byte)dir, SkillType = 3 };
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentAttack, in p);
                     }
+#if MIR2_SANDBOX_DEV
                     else if (_isSandbox)
                     {
                         CheckSandboxMeleeHit(dir, 35, isStabSkill: true);
                     }
+#endif
                     break;
 
                 case 13: // 灵魂火符 (Soul Fire Ball)
@@ -1435,17 +1579,20 @@ namespace Mir2Client.UI
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     MagicManagerInstance?.PlayMagic(13, playerTile, targetTile);
                     SendCastSkillPacket(13, targetTile.X, targetTile.Y, _selectedTargetUid);
+#if MIR2_SANDBOX_DEV
                     if (_isSandbox)
                     {
                         CheckSandboxSpellHit(13, targetTile);
                         HudInstance?.AddChat("法术", $"【灵魂火符】呼啸飞出！{consumeRes.desc}", new Color(1f, 0.8f, 0.2f));
                         AudioManager.Instance?.PlaySoundId(15);
                     }
+#endif
                     break;
 
                 case 22: // 地狱雷光 (HellFire)
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     AudioManager.Instance?.PlaySoundId(132);
+#if MIR2_SANDBOX_DEV
                     if (_isSandbox)
                     {
                         int hitCount = 0;
@@ -1467,6 +1614,7 @@ namespace Mir2Client.UI
                         }
                         HudInstance?.AddChat("技能", $"地狱雷光轰然降临！强劲圣雷震荡波波及周围 {hitCount} 个目标！", new Color(0.4f, 0.9f, 1f));
                     }
+#endif
                     SendCastSkillPacket(22, PlayerInstance.TileX, PlayerInstance.TileY);
                     break;
 
@@ -1475,12 +1623,15 @@ namespace Mir2Client.UI
                     AudioManager.Instance?.PlaySoundId(133);
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.WideHit((short)dir));
+                        var p = new BinaryProtocol.AttackIntentPayload { TargetUid = _selectedTargetUid, Direction = (byte)dir, SkillType = 4 };
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentAttack, in p);
                     }
+#if MIR2_SANDBOX_DEV
                     else if (_isSandbox)
                     {
                         CheckSandboxMeleeHit(dir, 28);
                     }
+#endif
                     break;
 
                 case 26: // 烈火剑法
@@ -1498,25 +1649,21 @@ namespace Mir2Client.UI
                     }
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        if (_net.UseModernBinaryProtocol)
-                        {
-                            SendCastSkillPacket(26, PlayerInstance.TileX, PlayerInstance.TileY);
-                        }
-                        else
-                        {
-                            _net.SendPacket(PacketEncoder.FireHit(0, (short)dir));
-                        }
+                        SendCastSkillPacket(26, PlayerInstance.TileX, PlayerInstance.TileY);
                     }
+#if MIR2_SANDBOX_DEV
                     else if (_isSandbox)
                     {
                         // 蓄力成功后如果正前方有目标，立即挥出烈火第一刀
                         CheckSandboxMeleeHit(dir, 30);
                     }
+#endif
                     break;
 
                 case 27: // 野蛮冲撞
                     PlayerInstance.Anim.SetAction(ActionType.Run, dir);
                     AudioManager.Instance?.PlaySoundId(134);
+#if MIR2_SANDBOX_DEV
                     if (_isSandbox)
                     {
                         var offsetDash = PlayerAuditEngine.DirOffsets[dir & 7];
@@ -1568,16 +1715,11 @@ namespace Mir2Client.UI
                             HudInstance?.AddChat("技能", dashRes.Message, new Color(1f, 0.3f, 0.3f));
                         }
                     }
+#endif
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        if (_net.UseModernBinaryProtocol)
-                        {
-                            SendCastSkillPacket(25, PlayerInstance.TileX, PlayerInstance.TileY);
-                        }
-                        else
-                        {
-                            _net.SendPacket(PacketEncoder.Motaebo((short)dir));
-                        }
+                        var p = new BinaryProtocol.AttackIntentPayload { TargetUid = _selectedTargetUid, Direction = (byte)dir, SkillType = 5 };
+                        _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentAttack, in p);
                     }
                     break;
 
@@ -1586,8 +1728,9 @@ namespace Mir2Client.UI
                     AudioManager.Instance?.PlaySoundId(15);
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.Spell(17, (short)targetTile.X, (short)targetTile.Y));
+                        SendCastSkillPacket(17, targetTile.X, targetTile.Y);
                     }
+#if MIR2_SANDBOX_DEV
                     else if (_isSandbox)
                     {
                         var stats = TaoistCombatEngine.GetSkeletonStats(3);
@@ -1610,6 +1753,7 @@ namespace Mir2Client.UI
                         });
                         HudInstance?.AddChat("召唤", $"消耗 1 张护身符，从地底召唤出了【{stats.Name}】守护在身旁！", new Color(0.3f, 1f, 0.6f));
                     }
+#endif
                     break;
 
                 case 30: // 召唤神兽 (Summon Shinsu)
@@ -1617,8 +1761,9 @@ namespace Mir2Client.UI
                     AudioManager.Instance?.PlaySoundId(16);
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.Spell(30, (short)targetTile.X, (short)targetTile.Y));
+                        SendCastSkillPacket(30, targetTile.X, targetTile.Y);
                     }
+#if MIR2_SANDBOX_DEV
                     else if (_isSandbox)
                     {
                         var stats = TaoistCombatEngine.GetShinsuStats(7);
@@ -1641,17 +1786,23 @@ namespace Mir2Client.UI
                         });
                         HudInstance?.AddChat("召唤", $"消耗 5 张护身符，召唤出了威严强悍的【{stats.Name}】降临人间！", new Color(1f, 0.8f, 0.2f));
                     }
+#endif
                     break;
 
                 case 31: // 魔法盾 (Magic Shield)
                     PlayerInstance.Anim.SetAction(ActionType.Cast, dir);
                     MagicManagerInstance?.PlayMagic(31, playerTile, playerTile);
-                    PlayerStateInstance.ActivateMagicShield(level: 3, durationSec: 30);
+#if MIR2_SANDBOX_DEV
+                    if (_isSandbox)
+                    {
+                        PlayerStateInstance.ActivateMagicShield(level: 3, durationSec: 30);
+                    }
+#endif
                     AudioManager.Instance?.PlaySoundId(137);
                     HudInstance?.AddChat("法术", "【魔法盾】神力激活！化解 70% 伤害，坚固屏障笼罩全身！", new Color(0.4f, 0.9f, 1f));
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.Spell(31, (short)playerTile.X, (short)playerTile.Y));
+                        SendCastSkillPacket(31, playerTile.X, playerTile.Y);
                     }
                     break;
 
@@ -1660,20 +1811,27 @@ namespace Mir2Client.UI
                     MagicManagerInstance?.PlayMagic(magicId, playerTile, targetTile);
                     if (_net != null && _net.IsConnectedToServer)
                     {
-                        _net.SendPacket(PacketEncoder.Spell((short)magicId, (short)targetTile.X, (short)targetTile.Y));
+                        SendCastSkillPacket((short)magicId, targetTile.X, targetTile.Y);
                     }
+#if MIR2_SANDBOX_DEV
                     else if (_isSandbox)
                     {
                         CheckSandboxSpellHit(magicId, targetTile);
                     }
+#endif
                     break;
             }
 
-            if (mpCost > 0)
+#if MIR2_SANDBOX_DEV
+            // 盛大官方 1.5 权威架构铁律：联网模式下 MP 扣减完全由服务端 SM_MYSTATUS / SM_ABILITY 驱动
+            // 本地仅在离线沙盒 (_isSandbox) 下作为单机回退模拟更新
+            int cost = SkillFormulas.GetSkill((short)magicId)?.MpCost ?? 0;
+            if (_isSandbox && cost > 0)
             {
-                PlayerInstance.Mp = Math.Max(0, PlayerInstance.Mp - mpCost);
+                PlayerInstance.Mp = Math.Max(0, PlayerInstance.Mp - cost);
                 HudInstance?.UpdateMp(PlayerInstance.Mp, PlayerInstance.MaxMp);
             }
+#endif
         }
 
         private ulong _lastPickupTick = 0;
@@ -1691,9 +1849,10 @@ namespace Mir2Client.UI
 
             if (_net != null && _net.IsConnectedToServer)
             {
-                // 盛大官方 1.5 格式对齐 (带 x\ty 坐标 Extra，完全闭环网关解包)
-                _net.SendPacket(PacketEncoder.Pickup((short)px, (short)py));
+                var p = new BinaryProtocol.PickupIntentPayload { TileX = (short)px, TileY = (short)py, TargetItemUid = 0 };
+                _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentPickup, in p);
             }
+#if MIR2_SANDBOX_DEV
             else if (_isSandbox)
             {
                 var items = GroundItemManagerInstance.GetItemsAt(px, py);
@@ -1723,6 +1882,7 @@ namespace Mir2Client.UI
                     }
                 }
             }
+#endif
         }
 
         public void PerformButcher(int tx, int ty, int dir)
@@ -1748,8 +1908,10 @@ namespace Mir2Client.UI
             // 3. 真实网络发包
             if (_net != null && _net.IsConnectedToServer)
             {
-                _net.SendPacket(PacketEncoder.ButchItem(targetUid, (short)tx, (short)ty));
+                var p = new BinaryProtocol.ButchIntentPayload { TargetUid = targetUid, TileX = (short)tx, TileY = (short)ty };
+                _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentButch, in p);
             }
+#if MIR2_SANDBOX_DEV
             else if (_isSandbox)
             {
                 // 3. 沙箱单机模式：割肉成功并给予高品质肉块
@@ -1757,8 +1919,10 @@ namespace Mir2Client.UI
                 HudInstance?.AddBagItem("品质15的鹿肉");
                 HudInstance?.AddChat("割肉", "割肉成功，获得了品质 15 的【鹿肉】。", new Color(1f, 0.85f, 0.2f));
             }
+#endif
         }
 
+#if MIR2_SANDBOX_DEV
         private int _dropItemIdSeed = 9000;
 
         public void SpawnMonsterLoot(string monName, int x, int y)
@@ -1857,7 +2021,6 @@ namespace Mir2Client.UI
             }
         }
 
-
         private void CheckSandboxSpellHit(int magicId, Vector2I targetTile)
         {
             int damage = magicId switch
@@ -1886,19 +2049,30 @@ namespace Mir2Client.UI
                 }
             }
         }
+#endif
 
         private void CheckAutoSandbox()
         {
+#if MIR2_SANDBOX_DEV
             if (_net == null && !_isSandbox)
             {
                 InitSandboxMode();
             }
+#else
+            if (_net == null || !_net.IsConnectedToServer)
+            {
+                GD.PrintErr("[GameView] 盛大官方 1.5 客户端严禁离线无网运行，网络连接未建立。");
+                HudInstance?.ShowModalMessage("网络错误", "网络连接未建立或已断开，请返回选服/登录界面重新登录。");
+            }
+#endif
         }
 
         public void InitSandboxMode()
         {
+#if MIR2_SANDBOX_DEV
             if (_isSandbox) return;
             _isSandbox = true;
+            if (HudInstance != null) HudInstance.IsSandboxMode = true;
             GD.Print("[GameView] 启动 1.50 官方纯 C# 单机沙盒演练模式...");
 
             if (ServerMessageRouterInstance == null)
@@ -1984,6 +2158,9 @@ namespace Mir2Client.UI
 
             CurrentMapName = "0";
             UpdateEnvironmentLighting();
+#else
+            throw new NotSupportedException("官方 1.5 正式发布版本严禁使用单机沙盒模式，所有行为必须经由服务端网络权威驱动。");
+#endif
         }
 
         public string CurrentMapName { get; set; } = "0";
@@ -2011,6 +2188,12 @@ namespace Mir2Client.UI
 
         public override void _Process(double delta)
         {
+#if !MIR2_SANDBOX_DEV
+            if (_net == null || !_net.IsConnectedToServer)
+            {
+                return;
+            }
+#endif
             if (PlayerInstance != null && HudInstance?.Minimap != null && HudInstance.Minimap.Visible)
             {
                 HudInstance.Minimap.UpdatePlayerPosition(CurrentMapName == "0" ? "比奇省" : CurrentMapName, PlayerInstance.TileX, PlayerInstance.TileY);
@@ -2029,19 +2212,21 @@ namespace Mir2Client.UI
                         radarList.Add((ent.TileX, ent.TileY, rType));
                     }
                 }
-                else
+#if MIR2_SANDBOX_DEV
+                else if (_isSandbox)
                 {
-                    // 沙盒或初始状态下的默认演示实体点
+                    // 仅在单机沙盒演练模式下显示预置训练假人点
                     radarList.Add((330, 266, MinimapView.RadarEntityType.Npc));
                     radarList.Add((325, 275, MinimapView.RadarEntityType.Npc));
                     radarList.Add((345, 280, MinimapView.RadarEntityType.Monster));
                     radarList.Add((350, 260, MinimapView.RadarEntityType.Monster));
                     radarList.Add((332, 271, MinimapView.RadarEntityType.GroupMember));
                 }
+#endif
                 HudInstance.Minimap.UpdateRadarEntities(radarList.ToArray());
             }
 
-            // 驱动全图实体绿毒掉血与到期清除
+            // 驱动全图实体绿毒到期清除 (联网时伤害由服务端权威广播，仅在脱机沙盒模拟时本地结算)
             long nowTick = (long)Time.GetTicksMsec();
             EntityManagerInstance.ProcessPoisonTicks(nowTick, (uid, dmg, newHp) =>
             {
@@ -2050,7 +2235,11 @@ namespace Mir2Client.UI
                 {
                     HudInstance?.AddChat("施毒", $"【绿毒侵蚀】目标【{ent.Name}】受到 {dmg} 点持续剧毒伤害！", new Color(0.2f, 1f, 0.3f));
                 }
-            });
+#if MIR2_SANDBOX_DEV
+            }, simulateDamage: _isSandbox);
+#else
+            }, simulateDamage: false);
+#endif
 
             // 驱动官方 15 格切比雪夫距离监控 (超距自动关闭 NPC 交互窗口)
             if (PlayerInstance != null)
@@ -2058,6 +2247,7 @@ namespace Mir2Client.UI
                 HudInstance?.OnPlayerPositionChanged(PlayerInstance.TileX, PlayerInstance.TileY);
             }
 
+#if MIR2_SANDBOX_DEV
             // 驱动盛大官方 1.5 药水缓回 Tick 灌注 (仅单机沙盒模式模拟；联网模式完全由服务端 SM_HEALTHSPELLCHANGED 权威驱动)
             if (_isSandbox && PlayerInstance != null && !PlayerInstance.IsDead && HudInstance != null)
             {
@@ -2075,6 +2265,7 @@ namespace Mir2Client.UI
                     }
                 }
             }
+#endif
         }
 
         public void SetNet(NetManager net, int sId, string uname, int ulevel = 35)
@@ -2108,7 +2299,7 @@ namespace Mir2Client.UI
                         {
                             // 权威拉回！主角如果发生越界、加速或穿墙，立即强行修正并停止当前步伐
                             PlayerInstance?.SetTilePos(sync.X, sync.Y);
-                            HudInstance?.AddChat("系统", $"【安全防御】坐标异常已被服务端权威拉回 -> ({sync.X}, {sync.Y})", new Color(1f, 0.2f, 0.2f));
+                            GD.Print($"[GameView] 坐标被服务端权威拉回 -> ({sync.X}, {sync.Y})");
                         }
                         else
                         {
@@ -2146,16 +2337,18 @@ namespace Mir2Client.UI
             {
                 if (_net != null && _net.IsConnectedToServer)
                 {
-                    _net.SendPacket(PacketEncoder.ClickNpc(ent.Name));
+                    _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentClickNpc, System.Text.Encoding.UTF8.GetBytes(ent.Name));
                 }
+#if MIR2_SANDBOX_DEV
                 else if (_isSandbox && HudInstance?.NpcDialog != null)
                 {
                     HudInstance.NpcDialog.CurrentNpcUid = ent.Uid;
                     HudInstance.ShowNpcDialog($"@{ent.Name}\n欢迎来到热血传奇世界！请问有什么可以帮助您的？\n<购买物品/@buy>\n<出售物品/@sell>\n<修理装备/@repair>\n<离开/@exit>");
                 }
+#endif
                 GD.Print($"[GameView] 交互 NPC: {ent.Name} (Uid: {targetUid})");
             }
-            // 2. 玩家交互：查询玩家名与他人装备 (官方实证 0x463649: Shift+双击 CM 82; 普通点击 CM 80)
+            // 2. 玩家交互：查询玩家名与他人装备 (官方实证 0x463649)
             else if (type == EntityManager.EntityType.Player)
             {
                 long now = (long)Time.GetTicksMsec();
@@ -2168,15 +2361,15 @@ namespace Mir2Client.UI
 
                 if (_net != null && _net.IsConnectedToServer)
                 {
-                    byte[] pkt = isShift
-                        ? PacketEncoder.QueryUsernameExt(targetUid)
-                        : PacketEncoder.QueryUsername(targetUid);
-                    _net.SendPacket(pkt);
+                    var p = new BinaryProtocol.QueryUserIntentPayload { TargetUid = targetUid };
+                    _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentQueryUser, in p);
                 }
+#if MIR2_SANDBOX_DEV
                 else if (_isSandbox && HudInstance != null)
                 {
                     HudInstance.OpenInspect(ent.Name);
                 }
+#endif
                 GD.Print($"[GameView] 交互玩家: {ent.Name} (Uid: {targetUid}, isShift: {isShift})");
             }
             // 3. 怪物交互：锁定目标
@@ -2234,14 +2427,17 @@ namespace Mir2Client.UI
                 HudInstance.DeathScreen.Visible = false;
             }
 
+#if MIR2_SANDBOX_DEV
             if (_isSandbox)
             {
                 OnServerRevive(330, 270);
             }
             else
+#endif
             {
-                // 官方原版点击重新开始必须向服务端请求复活 CM_REVIVE (1018, 对齐 bridge.rs:63)
-                _net?.SendPacket(PacketEncoder.Revive(0));
+                // 官方原版点击重新开始必须向服务端请求复活
+                var p = new BinaryProtocol.ReviveIntentPayload { Mode = 0 };
+                _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentRevive, in p);
             }
         }
     }

@@ -45,7 +45,7 @@ public static class WorldEnvironmentAtlasEngine
         public static float GetWomaWaterRipple(float time) => 0.7f + 0.3f * MathF.Sin(time * 3.0f); // 细节 260
     }
 
-    // 细节 261 ~ 280: 沃玛、祖玛、石墓、封魔与赤月地下城
+    // 盛大官方 1.5 核心真值 (细节 261 ~ 280): 沃玛、祖玛、石墓与白日门赤月地下城
     public static class UndergroundDungeonEngine
     {
         public static bool IsWomaStatueBlocked(int x, int y) => (x == 15 && y == 20) || (x == 18 && y == 20); // 细节 261
@@ -77,9 +77,11 @@ public static class WorldEnvironmentAtlasEngine
 
         public static (int petalParticles, float windSpeed) GetPeachBlossomPetals(float time) => (12, 1.2f); // 细节 269
 
-        public static bool IsFengmoSpikeFenceBlocked(int x, int y, HashSet<(int, int)> spikes) => spikes.Contains((x, y)); // 细节 270
+        // 盛大官方 1.5 核心真值 (细节 270): 赤月丛林与峡谷尖刺障碍判定
+        public static bool IsRedMoonSpikeFenceBlocked(int x, int y, HashSet<(int, int)> spikes) => spikes.Contains((x, y));
 
-        public static (int r, int g, int b) FengmoPalaceAmbientLight => (180, 50, 50); // 细节 272
+        // 盛大官方 1.5 核心真值 (细节 272): 赤月抉择之地与恶魔祭坛幽暗红光与蜘蛛巢穴压抑环境光
+        public static (int r, int g, int b) RedMoonAltarAmbientLight => (180, 50, 50);
 
         public static bool IsCliffBlocked(int heightDiff) => Math.Abs(heightDiff) > 2; // 细节 273: 赤月绝壁阻挡
 

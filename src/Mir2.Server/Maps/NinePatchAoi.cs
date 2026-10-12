@@ -135,6 +135,35 @@ public sealed class NinePatchAoi<TEntity> where TEntity : class
     }
 
     /// <summary>
+    /// 直接遍历当前坐标周围九宫格内的所有实体 (零中间缓冲分配，彻底杜绝重入与并发覆盖)
+    /// </summary>
+    public void ForEachInNinePatch(int tileX, int tileY, Action<TEntity> action)
+    {
+        var (zx, zy) = GetZoneCoord(tileX, tileY);
+
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            int currY = zy + dy;
+            if (currY < 0 || currY >= _zonesY) continue;
+
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int currX = zx + dx;
+                if (currX < 0 || currX >= _zonesX) continue;
+
+                int idx = currY * _zonesX + currX;
+                lock (_zones[idx])
+                {
+                    foreach (var entity in _zones[idx])
+                    {
+                        action(entity);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// 获取当前坐标周围九宫格内的所有实体 (广播目标集合)
     /// </summary>
     public void GetEntitiesInNinePatch(int tileX, int tileY, List<TEntity> result)
@@ -163,4 +192,23 @@ public sealed class NinePatchAoi<TEntity> where TEntity : class
             }
         }
     }
+
+    /// <summary>
+    /// 获取当前地图所有活跃实体
+    /// </summary>
+    public void GetAllEntities(List<TEntity> result)
+    {
+        result.Clear();
+        for (int i = 0; i < _zones.Length; i++)
+        {
+            lock (_zones[i])
+            {
+                foreach (var entity in _zones[i])
+                {
+                    result.Add(entity);
+                }
+            }
+        }
+    }
 }
+

@@ -208,7 +208,7 @@ public static class OfficialClientRulesEngine
     }
 
     // ============================================================================
-    // 6. 官方 1.5 七大特戒与装备佩戴门槛本地判定引擎
+    // 6. 官方 1.5 原生特戒与装备佩戴门槛本地判定引擎
     // ============================================================================
     public static class SpecialItemAndSetRules
     {
@@ -221,7 +221,8 @@ public static class OfficialClientRulesEngine
             Invisibility = 4,// 隐身戒指 (怪物完全无视，移动不破隐)
             Teleport = 5,    // 传送戒指 (@move / 客户端点击小地图瞬移)
             Load = 6,        // 超负载戒指 (背包腕力负重上限翻倍)
-            Fire = 7         // 火焰戒指 (战士/道士可直接施放小火球)
+            Fire = 7,        // 火焰戒指 (战士/道士可直接施放小火球)
+            Defense = 8      // 防御戒指 (战士/法师可直接施放治愈术)
         }
 
         public static SpecialRingType IdentifySpecialRing(string itemName) => itemName switch
@@ -233,6 +234,7 @@ public static class OfficialClientRulesEngine
             "传送戒指" => SpecialRingType.Teleport,
             "超负载戒指" => SpecialRingType.Load,
             "火焰戒指" => SpecialRingType.Fire,
+            "防御戒指" or "治愈戒指" => SpecialRingType.Defense,
             _ => SpecialRingType.None
         };
 
@@ -260,30 +262,28 @@ public static class OfficialClientRulesEngine
         }
 
         /// <summary>
-        /// 装备穿戴门槛判定 (根据角色等级与三维属性检查是否满足佩戴要求)
+        /// 盛大官方 1.5 装备穿戴门槛判定 (严格对齐官方 StdItems.DB 的 4 态需求模型: 0等级/1攻击/2魔法/3道术)
         /// </summary>
         public static (bool canWear, string rejectReason) CheckEquipRequirement(
             string itemName, int playerLevel, int dcMax, int mcMax, int scMax)
         {
             if (string.IsNullOrEmpty(itemName)) return (true, string.Empty);
 
-            // 盛大官方 1.5 代表性高阶神兵与重装门槛 (对齐 IDA ItemDB 与 Delphi sub_48A7BC)
-            if (itemName.Contains("裁决之杖") && dcMax < 30) return (false, "需要攻击力达到 30 点");
-            if (itemName.Contains("骨玉权杖") && mcMax < 17) return (false, "需要魔法力达到 17 点");
-            if (itemName.Contains("龙纹剑") && scMax < 17) return (false, "需要道术力达到 17 点");
-            if (itemName.Contains("屠龙") && playerLevel < 35) return (false, "需要等级达到 35 级");
-            if (itemName.Contains("嗜魂法杖") && playerLevel < 35) return (false, "需要等级达到 35 级");
-            if (itemName.Contains("霸者之刃") && playerLevel < 38) return (false, "需要等级达到 38 级");
+            var (needType, needVal) = ItemPropertyCompendiumEngine.GetEquipRequirement(itemName);
+            if (needVal <= 0) return (true, string.Empty);
 
-            // 六大重装 (天魔神甲/圣战宝甲/法神披风/霓裳羽衣/天尊道袍/天师长袍)
-            if ((itemName.Contains("天魔神甲") || itemName.Contains("圣战宝甲") ||
-                 itemName.Contains("法神披风") || itemName.Contains("霓裳羽衣") ||
-                 itemName.Contains("天尊道袍") || itemName.Contains("天师长袍")) && playerLevel < 40)
+            return needType switch
             {
-                return (false, "需要等级达到 40 级");
-            }
-
-            return (true, string.Empty);
+                ItemPropertyCompendiumEngine.EquipNeedType.Level when playerLevel < needVal
+                    => (false, $"需要等级达到 {needVal} 级"),
+                ItemPropertyCompendiumEngine.EquipNeedType.Dc when dcMax < needVal
+                    => (false, $"需要攻击力达到 {needVal} 点"),
+                ItemPropertyCompendiumEngine.EquipNeedType.Mc when mcMax < needVal
+                    => (false, $"需要魔法力达到 {needVal} 点"),
+                ItemPropertyCompendiumEngine.EquipNeedType.Sc when scMax < needVal
+                    => (false, $"需要道术达到 {needVal} 点"),
+                _ => (true, string.Empty)
+            };
         }
     }
 }

@@ -18,7 +18,7 @@ public static class MysticEquipmentEngine
     public static bool IsMysticItem(string itemName)
     {
         return itemName.Contains("神秘头盔") ||
-               itemName.Contains("神秘腰带") ||
+               itemName.Contains("神秘手镯") ||
                itemName.Contains("神秘戒指");
     }
 

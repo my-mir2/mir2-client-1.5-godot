@@ -107,6 +107,29 @@ public sealed class GuildWarAndAllianceEngine
     }
 
     /// <summary>
+    /// 解除行会同盟
+    /// </summary>
+    public (bool success, string message) BreakAlliance(string guildA, string guildB)
+    {
+        if (string.IsNullOrWhiteSpace(guildA) || string.IsNullOrWhiteSpace(guildB) ||
+            string.Equals(guildA, guildB, StringComparison.OrdinalIgnoreCase))
+        {
+            return (false, "解除同盟参数无效。");
+        }
+
+        lock (_lock)
+        {
+            string key = AllianceKey(guildA, guildB);
+            if (!_alliances.Remove(key))
+            {
+                return (false, $"【{guildA}】与【{guildB}】并未结为同盟！");
+            }
+
+            return (true, $"【同盟破裂】行会【{guildA}】与【{guildB}】正式解除同盟关系！");
+        }
+    }
+
+    /// <summary>
     /// 判定两行会是否处于同盟状态
     /// </summary>
     public bool AreGuildsAllied(string? guildA, string? guildB)

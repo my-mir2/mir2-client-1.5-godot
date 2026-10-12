@@ -22,6 +22,8 @@ namespace Mir2Client.Game
         [Signal] public delegate void RevivedEventHandler();
         [Signal] public delegate void TileSteppedEventHandler(Vector2I newTile);
         [Signal] public delegate void StepStartedEventHandler(int targetX, int targetY, int dir, bool isRun);
+        [Signal] public delegate void TurnedEventHandler(int dir);
+        [Signal] public delegate void StepCompletedEventHandler();
 
         public int Uid { get; set; } = 0;
         public string CharacterName { get; set; } = "玩家";
@@ -161,7 +163,7 @@ namespace Mir2Client.Game
         {
             if (_nameLabel == null) return;
 
-            // 依据 PK 点数设置名字颜色 (IDA 0x4D68D0（已证client无函数）: 白名/黄名/红名)
+            // 依据 PK 点数设置名字颜色 (IDA 0x4D68D0: 白名/黄名/红名)
             Color nameColor = PkPoints switch
             {
                 >= 200 => new Color(1.0f, 0.15f, 0.15f), // 鲜红名 (大恶魔)
@@ -187,6 +189,25 @@ namespace Mir2Client.Game
             }
         }
 
+        public Vector2 SmoothOffset { get; set; } = Vector2.Zero;
+        public const float SmoothDampingDecayRate = 20.0f; // 约 150ms 吸收 95% 误差
+        public const float SnapToleranceDistance = 64.0f; // 约 1.3 格，容差内采用平滑阻尼，超出直接瞬移拉回
+
+        public Vector2 GetCurrentWorldPos()
+        {
+            if (_isMoving)
+            {
+                float t = _moveDuration > 0f ? Math.Clamp(_moveTimer / _moveDuration, 0.0f, 1.0f) : 1.0f;
+                return _moveStartWorld.Lerp(_moveTargetWorld, t);
+            }
+            return new Vector2(TileX * 48, TileY * 32);
+        }
+
+        public Vector2 GetCurrentRenderPos()
+        {
+            return GetCurrentWorldPos() + SmoothOffset;
+        }
+
         public void SetTilePos(int tx, int ty)
         {
             TileX = tx;
@@ -195,9 +216,52 @@ namespace Mir2Client.Game
             _targetTileY = ty;
             _isMoving = false;
             _pathQueue.Clear();
+            SmoothOffset = Vector2.Zero;
 
             var staticWorld = new Vector2(tx * 48, ty * 32);
             SyncCameraAndPlayer(staticWorld);
+        }
+
+        /// <summary>
+        /// 服务端权威位置纠偏与碰撞/阻挡/弱网拉回校准
+        /// - 若物理偏移在 1 格容差以内 (<= 64 像素): 阻尼吸收误差，视觉无突兀瞬移，不打断前进动作
+        /// - 若物理偏移超过容差 (如传送、被冲撞退、撞墙硬阻挡): 强制瞬间瞬移拉回并恢复站立
+        /// </summary>
+        public void ReconcilePosition(int tx, int ty, int dir)
+        {
+            Vector2 serverWorld = new Vector2(tx * 48, ty * 32);
+            Vector2 currentRender = GetCurrentRenderPos();
+            float dist = currentRender.DistanceTo(serverWorld);
+
+            if (dist <= SnapToleranceDistance)
+            {
+                // 容差范围内：将当前视觉坐标相对服务端权威坐标的差值赋给 SmoothOffset
+                // 保证当前视觉位置在纠偏瞬间严格连续 (currentRender == serverWorld + SmoothOffset)，消除抽搐拉扯
+                TileX = tx;
+                TileY = ty;
+                Direction = dir & 7;
+
+                if (_isMoving)
+                {
+                    _moveStartWorld = serverWorld;
+                    _moveTimer = 0f;
+                    _moveDuration = Math.Max(0.08f, _moveDuration - _moveTimer);
+                }
+                else
+                {
+                    _targetTileX = tx;
+                    _targetTileY = ty;
+                }
+
+                SmoothOffset = currentRender - serverWorld;
+            }
+            else
+            {
+                // 超出阈值 (如传送门、防外挂拉回、大距离阻挡)，执行绝对瞬移
+                SetTilePos(tx, ty);
+                Direction = dir & 7;
+                Anim?.SetAction(ActionType.Stand, Direction);
+            }
         }
 
         private float _stunTimer = 0f;
@@ -225,9 +289,19 @@ namespace Mir2Client.Game
             AudioManager.Instance?.PlaySoundId(40);
         }
 
+        public void TurnTo(int dir)
+        {
+            if (_isMoving || IsStunned || IsDead) return;
+            int newDir = dir & 7;
+            if (Direction == newDir && Anim.Action == ActionType.Stand) return;
+            Direction = newDir;
+            Anim.SetAction(ActionType.Stand, Direction);
+            EmitSignal(SignalName.Turned, Direction);
+        }
+
         public void StartStepMovement(int tx, int ty, int stepTiles, ActionType action, int dir)
         {
-            if (IsStunned || IsDead) return;
+            if (_isMoving || IsStunned || IsDead) return;
 
             _isMoving = true;
             _moveStartWorld = new Vector2(TileX * 48, TileY * 32);
@@ -236,7 +310,7 @@ namespace Mir2Client.Game
             _targetTileY = ty;
             Direction = dir & 7;
             _moveTimer = 0f;
-            _moveDuration = stepTiles == 1 ? 0.60f : 0.50f;
+            _moveDuration = stepTiles == 1 ? 0.36f : 0.30f;
             Anim.SetAction(action, dir);
 
             // 触发官方 1:1 左右脚交替脚步声 (对齐 Delphi SoundUtil.pas: s_walk_ground / s_run_ground)
@@ -334,12 +408,23 @@ namespace Mir2Client.Game
             Anim.Update(dt * 1000.0f);
             UpdateRenderFrames();
 
+            // 弱网与纠偏误差平滑阻尼吸收 (指数衰减收敛至 0)
+            if (SmoothOffset.LengthSquared() > 0.005f)
+            {
+                float decayFactor = MathF.Exp(-SmoothDampingDecayRate * dt);
+                SmoothOffset *= decayFactor;
+                if (SmoothOffset.LengthSquared() < 0.01f)
+                {
+                    SmoothOffset = Vector2.Zero;
+                }
+            }
+
             if (_isMoving)
             {
                 _moveTimer += dt;
                 float t = Math.Clamp(_moveTimer / _moveDuration, 0.0f, 1.0f);
                 var curWorld = _moveStartWorld.Lerp(_moveTargetWorld, t);
-                SyncCameraAndPlayer(curWorld);
+                SyncCameraAndPlayer(curWorld + SmoothOffset);
                 if (t >= 1.0f)
                 {
                     _isMoving = false;
@@ -351,16 +436,20 @@ namespace Mir2Client.Game
                     {
                         ConsumeNextPathStep();
                     }
-                    else if (!Anim.IsBusy())
+                    else
                     {
-                        Anim.SetAction(ActionType.Stand, Direction);
+                        EmitSignal(SignalName.StepCompleted);
+                        if (!_isMoving && !Anim.IsBusy())
+                        {
+                            Anim.SetAction(ActionType.Stand, Direction);
+                        }
                     }
                 }
             }
             else
             {
                 var staticWorld = new Vector2(TileX * 48, TileY * 32);
-                SyncCameraAndPlayer(staticWorld);
+                SyncCameraAndPlayer(staticWorld + SmoothOffset);
             }
         }
 

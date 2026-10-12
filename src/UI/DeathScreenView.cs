@@ -24,6 +24,7 @@ public partial class DeathScreenView : Control, IManagedWindow
     private Label? _lblMsg;
 
     public string WindowName => "DeathScreenView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.DeathScreen;
     public new bool IsVisible
     {
         get => Visible;

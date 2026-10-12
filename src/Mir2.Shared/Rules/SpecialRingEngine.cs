@@ -31,9 +31,20 @@ public static class SpecialRingEngine
         public static (bool revived, int newHp, int newMp, int remainingDura, string message) ProcessFatalDamage(
             int currentDura, int maxHp, int maxMp)
         {
+            return ProcessFatalDamage(currentDura, maxHp, maxMp, 0, 0, 0);
+        }
+
+        public static (bool revived, int newHp, int newMp, int remainingDura, string message) ProcessFatalDamage(
+            int currentDura, int maxHp, int maxMp, long lastReviveTick, long nowTick, int cooldownSec = 30)
+        {
             if (currentDura <= 0)
             {
                 return (false, 0, 0, 0, "复活戒指已破损失效！无法触发神圣复生！");
+            }
+
+            if (lastReviveTick > 0 && (nowTick - lastReviveTick) < cooldownSec * 1000L)
+            {
+                return (false, 0, 0, currentDura, $"复活戒指处于冷却中！冷却剩余 {(cooldownSec * 1000L - (nowTick - lastReviveTick)) / 1000.0:F1} 秒！");
             }
 
             int nextDura = currentDura - 1;
@@ -87,13 +98,15 @@ public static class SpecialRingEngine
                 return (false, 0, 0, "指令为空");
 
             string trimmed = cmd.Trim();
-            if (!trimmed.StartsWith("@move", StringComparison.OrdinalIgnoreCase))
+            if (!trimmed.StartsWith("@move", StringComparison.OrdinalIgnoreCase) &&
+                !trimmed.StartsWith("@传送", StringComparison.OrdinalIgnoreCase) &&
+                !trimmed.StartsWith("@飞", StringComparison.OrdinalIgnoreCase))
                 return (false, 0, 0, "非传送指令");
 
             var parts = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 3 || !int.TryParse(parts[1], out int tx) || !int.TryParse(parts[2], out int ty))
             {
-                return (false, 0, 0, "传送指令格式错误，正确格式: @move x y");
+                return (false, 0, 0, "传送指令格式错误，正确格式: @move x y 或 @传送 x y");
             }
 
             if (tx < 0 || tx >= mapWidth || ty < 0 || ty >= mapHeight)
@@ -109,4 +122,66 @@ public static class SpecialRingEngine
             return (true, tx, ty, string.Empty);
         }
     }
+
+    // ==================== 6. 火焰戒指 ====================
+    public static class FlameRing
+    {
+        public const int GrantedMagicId = 1; // 火球术
+
+        /// <summary>
+        /// 盛大官方 1.5 规则: 战士(0)或道士(2)佩戴火焰戒指，获得运转火球术施法权限
+        /// </summary>
+        public static bool CanCastFireball(int job, bool hasFlameRing)
+        {
+            if (job == 1) return true; // 法师本职
+            return hasFlameRing;
+        }
+    }
+
+    // ==================== 7. 防御戒指 ====================
+    public static class DefenseRing
+    {
+        public const int GrantedMagicId = 2; // 治愈术
+
+        /// <summary>
+        /// 盛大官方 1.5 规则: 战士(0)或法师(1)佩戴防御戒指，获得运转神圣治愈术施法权限
+        /// </summary>
+        public static bool CanCastHealing(int job, bool hasHealingRing)
+        {
+            if (job == 2) return true; // 道士本职
+            return hasHealingRing;
+        }
+    }
+
+    // ==================== 8. 超负载戒指 ====================
+    public static class LoadRing
+    {
+        public static (int maxBag, int maxWear, int maxHand) ApplyLoadDoubling(
+            int baseBag, int baseWear, int baseHand, bool hasLoadRing)
+        {
+            if (hasLoadRing)
+            {
+                return (baseBag * 2, baseWear * 2, baseHand * 2);
+            }
+            return (baseBag, baseWear, baseHand);
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 特戒跨职业技能权限统一裁决
+    /// </summary>
+    public static (bool allowed, string failReason) ValidateRingSkillPermission(
+        int job, int magicId, bool hasFlameRing, bool hasHealingRing)
+    {
+        if (magicId == FlameRing.GrantedMagicId && job != 1 && !hasFlameRing)
+        {
+            return (false, "【特戒】你未佩戴火焰戒指，无法运转真气施展火球术！");
+        }
+        if (magicId == DefenseRing.GrantedMagicId && job != 2 && !hasHealingRing)
+        {
+            return (false, "【特戒】你未佩戴防御戒指，无法运转神圣力量施展治愈术！");
+        }
+        return (true, string.Empty);
+    }
 }
+

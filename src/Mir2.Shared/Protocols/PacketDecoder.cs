@@ -41,6 +41,26 @@ public static class PacketDecoder
     }
 
     /// <summary>
+    /// 解析现代 HPSocket TCP-Pack 下行封包载荷 (16 字节标准整数字段: Recog, Param, Tag, Series + UTF-8 Extra)
+    /// </summary>
+    public static ServerPacket ParseModernPayload(short ident, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 16)
+        {
+            byte[] rawExtra = payload.Length > 0 ? payload.ToArray() : Array.Empty<byte>();
+            return new ServerPacket(ident, 0, 0, 0, rawExtra);
+        }
+
+        int recog = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[0..4]);
+        int param = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[4..8]);
+        int tag = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[8..12]);
+        int series = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[12..16]);
+        byte[] extra = payload.Length > 16 ? payload[16..].ToArray() : Array.Empty<byte>();
+
+        return new ServerPacket(ident, recog, (short)param, (short)tag, extra);
+    }
+
+    /// <summary>
     /// 解析官方 1.5 仓库物品列表 (SM_USERSTORAGE_ITEMS 704)
     /// 格式：制表符与换行符分隔条目 (name \t dura \t maxDura [\t itemIndex])
     /// </summary>

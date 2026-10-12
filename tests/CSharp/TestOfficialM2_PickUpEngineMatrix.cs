@@ -7,6 +7,8 @@ using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Network.HPSocket;
+using Mir2.Shared.Protocols.Modern;
 using Xunit;
 
 namespace Mir2Client.Tests;
@@ -76,14 +78,86 @@ public class TestOfficialM2_PickUpEngineMatrix
         Assert.Equal("骨玉权杖", item.Name);
     }
 
+    private static int GetRandomTestPort() => TestNetworkPortHelper.GetNextPort();
+
+    private static byte[] BuildPack(ushort msgId, string payloadStr = "", ushort seq = 0)
+    {
+        byte[] payloadBytes = string.IsNullOrEmpty(payloadStr) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(payloadStr);
+        byte[] packet = new byte[BinaryProtocol.HeaderSize + payloadBytes.Length];
+        var span = packet.AsSpan();
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[0..2], BinaryProtocol.DefaultMagic);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[2..4], msgId);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[4..6], (ushort)payloadBytes.Length);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[6..8], seq);
+        if (payloadBytes.Length > 0)
+        {
+            payloadBytes.CopyTo(packet, BinaryProtocol.HeaderSize);
+        }
+        return packet;
+    }
+
+    private static async Task SendPackAsync(System.Net.Sockets.NetworkStream stream, ushort msgId, string payloadStr = "")
+    {
+        byte[] packet = BuildPack(msgId, payloadStr);
+        await stream.WriteAsync(packet);
+        await stream.FlushAsync();
+    }
+
+    private static async Task<string> ReadUntilContainsPackAsync(System.Net.Sockets.NetworkStream stream, string target, int timeoutMs = 2500)
+    {
+        var decoder = new HpPackStreamDecoder();
+        var sb = new StringBuilder();
+        byte[] buf = new byte[4096];
+        long deadline = Environment.TickCount64 + timeoutMs;
+        while (Environment.TickCount64 < deadline)
+        {
+            if (stream.DataAvailable)
+            {
+                int n = await stream.ReadAsync(buf);
+                if (n > 0)
+                {
+                    decoder.FeedData(buf.AsSpan(0, n), (in BinaryProtocol.PacketHeader header, ReadOnlySpan<byte> payload) =>
+                    {
+                        int recog = 0, param = 0, tag = 0, series = 0;
+                        string extra = string.Empty;
+                        if (payload.Length >= 16)
+                        {
+                            recog = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[0..4]);
+                            param = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[4..8]);
+                            tag = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[8..12]);
+                            series = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[12..16]);
+                            if (payload.Length > 16)
+                            {
+                                extra = Encoding.UTF8.GetString(payload[16..]);
+                            }
+                        }
+                        else if (payload.Length > 0)
+                        {
+                            extra = Encoding.UTF8.GetString(payload);
+                        }
+                        string packSummary = $"#{header.MsgId}/{recog}/{param}/{tag}/{series}/{extra}!";
+                        sb.Append(packSummary);
+                        if (!string.IsNullOrEmpty(extra)) sb.Append(extra);
+                    });
+
+                    if (!string.IsNullOrEmpty(target) && sb.ToString().Contains(target))
+                        return sb.ToString();
+                }
+            }
+            await Task.Delay(10);
+        }
+        return sb.ToString();
+    }
+
     [Fact]
     public async Task TestE2E_PickUp_GroundItem_AddsToBag_And_Broadcasts_DelGroundItem()
     {
-        int testPort = 17009;
+        int testPort = GetRandomTestPort();
         var mapManager = new MapManager();
         var dispatcher = new PacketDispatcher(mapManager);
         var gateway = new TcpGateway(testPort);
         gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.BinaryPacketReceivedHandler = (session, header, payload) => dispatcher.DispatchBinary(session, header, payload);
         gateway.Start();
 
         var tickEngine = new GameWorldTick(gateway);
@@ -95,15 +169,13 @@ public class TestOfficialM2_PickUpEngineMatrix
             using var clientA = new System.Net.Sockets.TcpClient();
             await clientA.ConnectAsync("127.0.0.1", testPort);
             var streamA = clientA.GetStream();
-            await streamA.WriteAsync(Encoding.UTF8.GetBytes("#103/拾取者A/200/200!"));
-            await streamA.FlushAsync();
+            await SendPackAsync(streamA, 103, "拾取者A/200/200");
 
             // 客户端 B: 同屏旁观者 (201, 200)
             using var clientB = new System.Net.Sockets.TcpClient();
             await clientB.ConnectAsync("127.0.0.1", testPort);
             var streamB = clientB.GetStream();
-            await streamB.WriteAsync(Encoding.UTF8.GetBytes("#103/旁观者B/201/200!"));
-            await streamB.FlushAsync();
+            await SendPackAsync(streamB, 103, "旁观者B/201/200");
 
             await Task.Delay(200);
 
@@ -132,17 +204,10 @@ public class TestOfficialM2_PickUpEngineMatrix
             while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 客户端 A 发起拾取指令 CM_PICKUP (1001)
-            byte[] pickupPkt = Encoding.UTF8.GetBytes("#1001/!");
-            await streamA.WriteAsync(pickupPkt);
-            await streamA.FlushAsync();
-
-            await Task.Delay(200);
+            await SendPackAsync(streamA, 1001);
 
             // 1. 验证客户端 A 收到添加物品通知 SM_ADDITEM (200) 与地表物品消失广播 SM_DELGROUNDITEM (315)
-            Assert.True(streamA.DataAvailable, "拾取者自身必须收到加物品与地表物品清除包");
-            byte[] bufA = new byte[4096];
-            int lenA = await streamA.ReadAsync(bufA, 0, bufA.Length);
-            string respA = Encoding.UTF8.GetString(bufA, 0, lenA);
+            string respA = await ReadUntilContainsPackAsync(streamA, $"#{ProtocolConsts.SM_DELGROUNDITEM}/", 3000);
 
             Assert.Contains($"#{ProtocolConsts.SM_ADDITEM}/", respA);
             Assert.Contains("井中月", respA);
@@ -154,10 +219,7 @@ public class TestOfficialM2_PickUpEngineMatrix
             Assert.Equal(40, sessionA.State.BagWeight);
 
             // 3. 验证同屏旁观者 B 也必须收到地表物品消失广播 SM_DELGROUNDITEM (315)
-            Assert.True(streamB.DataAvailable, "同屏旁观者必须收到地表物品消失广播");
-            byte[] bufB = new byte[4096];
-            int lenB = await streamB.ReadAsync(bufB, 0, bufB.Length);
-            string respB = Encoding.UTF8.GetString(bufB, 0, lenB);
+            string respB = await ReadUntilContainsPackAsync(streamB, $"#{ProtocolConsts.SM_DELGROUNDITEM}/", 3000);
             Assert.Contains($"#{ProtocolConsts.SM_DELGROUNDITEM}/", respB);
             Assert.Contains("井中月", respB);
         }
@@ -166,5 +228,51 @@ public class TestOfficialM2_PickUpEngineMatrix
             tickEngine.Stop();
             gateway.Stop();
         }
+    }
+
+    [Fact]
+    public void TestOfficialM2_PickUp_MultiItemsStacked_PicksUnprotectedItem()
+    {
+        var map = new GameMap(0, "盟重省", 400, 400);
+        long now = 2_000_000;
+
+        // 物品1: 受到他人 (102) 保护的裁决之杖
+        map.AddGroundItem(new GroundItemEntity
+        {
+            Uid = 1001,
+            Name = "裁决之杖",
+            X = 200,
+            Y = 200,
+            OwnerSessionId = 102,
+            DropTickMs = now,
+            Weight = 50
+        });
+
+        // 物品2: 无保护的金币 (或者归属己方 101 的物品)
+        map.AddGroundItem(new GroundItemEntity
+        {
+            Uid = 1002,
+            Name = "金币",
+            X = 200,
+            Y = 200,
+            OwnerSessionId = 0,
+            DropTickMs = now,
+            Count = 10000,
+            IsGold = true
+        });
+
+        // 玩家 101 尝试拾取 (200, 200)
+        // 应该自动跳过受保护的物品1，成功拾取物品2金币
+        var (ok, item, err) = map.TryPickGroundItem(200, 200, sessionId: 101, nowMs: now + 10_000);
+        Assert.True(ok);
+        Assert.NotNull(item);
+        Assert.Equal(1002, item.Uid);
+        Assert.Equal("金币", item.Name);
+
+        // 再次拾取，此时只剩下受他人保护的裁决之杖，应当被拦截
+        var (ok2, item2, err2) = map.TryPickGroundItem(200, 200, sessionId: 101, nowMs: now + 10_000);
+        Assert.False(ok2);
+        Assert.Null(item2);
+        Assert.Contains("保护", err2);
     }
 }

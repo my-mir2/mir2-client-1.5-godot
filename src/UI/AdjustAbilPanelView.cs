@@ -22,6 +22,7 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
     public static readonly Vector2 DefaultPos = new(234, 126);
 
     public string WindowName => "AdjustAbilPanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.AdjustAbil;
     public new bool IsVisible
     {
         get => Visible;
@@ -280,7 +281,22 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
     private void OnConfirm()
     {
         Visible = false;
-        EmitSignal(SignalName.StatSubmitted, 1);
+        bool hasAlloc = false;
+        for (int i = 0; i < 9; i++)
+        {
+            if (_statAllocations[i] > 0)
+            {
+                hasAlloc = true;
+                for (int c = 0; c < _statAllocations[i]; c++)
+                {
+                    EmitSignal(SignalName.StatSubmitted, i);
+                }
+            }
+        }
+        if (!hasAlloc)
+        {
+            // 若未调整点数，默认不发包
+        }
     }
 
     /// <summary>

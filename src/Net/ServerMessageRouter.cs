@@ -54,7 +54,6 @@ public sealed class ServerMessageRouter
     public const short SM_TAKEOFF_OK             = 619;  // 脱下装备成功
     public const short SM_EQUIPINFO              = 621;  // 全量 9 槽位装备下发
     public const short SM_WEIGHTCHANGED          = 622;  // 负重同步
-    public const short SM_MERCHANTDLG            = 631;  // 商店货架界面下发
     public const short SM_DEALMENU               = 673;  // 交易界面弹出 (IDA 0x46A5AA case 673)
     public const short SM_DEALTRY_FAIL          = 674;  // 交易发起失败/熔断取消
     public const short SM_DEALADDITEM_OK        = 675;  // 己方放入物品成功
@@ -271,9 +270,6 @@ public sealed class ServerMessageRouter
             case SM_NPCDIALOG:
                 HandleNpcDialog(packet);
                 break;
-            case SM_MERCHANTDLG:
-                HandleMerchantDlg(packet);
-                break;
             case SM_DEALMENU:
                 HandleDealMenu(packet);
                 break;
@@ -327,8 +323,8 @@ public sealed class ServerMessageRouter
                 HandleOpenGuildDlg(packet);
                 break;
             case SM_ATTACKMODECHANGED:
-                // 盛大官方 1.5 原版二进制 IDA 0x467920 case 766 @ 0x468A2B: dword_4F938C = HIWORD(v67) (即 packet.Param)
-                int attackMode = packet.Param != 0 ? packet.Param : (packet.Tag != 0 ? packet.Tag : 1);
+                // 盛大官方 1.5 原版二进制 IDA 0x467920 case 766 @ 0x468A2B: dword_4F938C = HIWORD(v67) (即 packet.Param / packet.Recog, 取值 0~4)
+                int attackMode = (packet.Param >= 0 && packet.Param <= 4) ? packet.Param : (packet.Recog >= 0 && packet.Recog <= 4 ? packet.Recog : 0);
                 _hud?.OnServerAttackModeChanged(attackMode);
                 break;
             case SM_NEEDPASSWORD:
@@ -546,6 +542,7 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_REPAIROK_DELPHI: // 669: 铁匠铺修理成功更新金币与持久 (IDA sub_467920 case 669 @ 0x469F9B: close_shop_repair)
                 _hud?.UpdateGold(packet.Recog);
                 _hud?.CloseRepairPanel();
+                Mir2Client.Audio.AudioManager.Instance?.PlaySoundId(11); // 盛大官方 1.5 铁匠铺修理成功专属打铁音
                 if (packet.Param > 0 && packet.Tag > 0)
                 {
                     _hud?.OnServerItemRepaired(packet.Param, packet.Tag, packet.ExtraStr);
@@ -564,15 +561,12 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_OPENGUILDDLGFAIL: // 752: 行会面板打开失败 (未加入行会)
                 _hud?.ShowModalMessage("行会提示", "您尚未加入任何行会，无法查看行会管理面板。");
                 break;
-            // 盛大官方 1.5 原版二进制购买成功为 SM_BUY_OK_DELPHI = 648 (IDA 0x469EDA); 629/632 为非标私服兼容别名
-            case ProtocolConsts.SM_BUYITEMSUCCESS:
-            case ProtocolConsts.SM_BUYITEM_SUCCESS:
-                _hud?.AddChat("商店", $"[商店] 购买成功：{DecodeExtraText(packet.Extra)}", new Color(0.5f, 1f, 0.5f));
-                break;
+
             // 注：SM_STORAGE_ITEMS=682 与 SM_DEALREMOTEADDITEM=682 重号，
             // 真值表 682 归交易对方放物（有 OnServerTradeRemoteAddItem 实证），
             // 仓库列表分支停用，仓库走 SM_USERSTORAGE_DLG=700 开板，L2 待 M2 联调裁决真号。
             case ProtocolConsts.SM_EAT_OK:
+                _hud?.OnServerEatOk();
                 _hud?.AddChat("系统", $"[服药] {DecodeExtraText(packet.Extra)}", new Color(1f, 1f, 0.6f));
                 break;
             case ProtocolConsts.SM_SAVEITEM_OK: // 701: 寄存物品成功
@@ -623,7 +617,12 @@ public sealed class ServerMessageRouter
                 _hud?.UpdateHunger(packet.Recog);
                 break;
             case ProtocolConsts.SM_READMINIMAP_OK: // 710: 小地图读取与雷达刷新 (IDA sub_467920 0x46A7F8 sub_46EA50)
-                _hud?.AddChat("地图", "[小地图] 地图雷达已校准完成。", new Color(0.6f, 0.9f, 1f));
+                string minMapId = packet.Recog.ToString();
+                string minMapName = !string.IsNullOrEmpty(packet.ExtraStr) ? packet.ExtraStr : (packet.Recog == 0 ? "比奇省" : $"地图_{packet.Recog}");
+                int minMapW = packet.Param > 0 ? packet.Param : 400;
+                int minMapH = packet.Tag > 0 ? packet.Tag : 400;
+                _hud?.Minimap?.SetMap(minMapId, minMapName, minMapW, minMapH);
+                _hud?.AddChat("地图", $"[小地图] 已校准 {minMapName} 区域雷达 (尺寸: {minMapW}x{minMapH})。", new Color(0.6f, 0.9f, 1f));
                 break;
             case ProtocolConsts.SM_ITEMHIDE: // 805: 地面物品消失/拾取 (IDA sub_467920 0x4699FE)
                 // 盛大官方 1.5 IDA 行 890 case 805 亦为 handle_sm_teleport2() 空间瞬移突变显现
@@ -653,6 +652,7 @@ public sealed class ServerMessageRouter
                 break;
             case SM_MAGIC_FIRE:
             case SM_LIGHTING_DELPHI:
+            case ProtocolConsts.SM_LIGHTING: // 35: 定向法术闪电/雷击 (IDA case 35 @ 0x46A140)
             case ProtocolConsts.SM_FLYAXE_DELPHI: // 33: 官方 1.5 投掷物飞行弹道 (IDA sub_467920 case '!')
                 HandleMagicFire(packet);
                 break;
@@ -809,6 +809,7 @@ public sealed class ServerMessageRouter
                     if (packet.Param > 0 && packet.Tag > 0)
                     {
                         _entityManager.UpdatePosition(packet.Recog, packet.Param, packet.Tag);
+                        _gameView?.PlayerInstance?.SetTilePos(packet.Param, packet.Tag);
                     }
                 }
                 // 盛大官方 1.5 原版二进制 case 50: byte_4F94F8 = (_BYTE)v64 == 1; (初始组队开关模式同步，v64 为 Extra[8])
@@ -823,8 +824,8 @@ public sealed class ServerMessageRouter
                 if (_entityManager != null && packet.Recog > 0)
                 {
                     _entityManager.LocalPlayerUid = packet.Recog;
-                    var hero = _entityManager.GetEntity(packet.Recog);
-                    if (hero == null)
+                    var actor = _entityManager.GetEntity(packet.Recog);
+                    if (actor == null)
                     {
                         // 盛大官方 1.5 IDA 物理指令: if (!v71) v71 = create_entity(v63, v62, SBYTE2(v68), v68);
                         int x = packet.Param > 0 ? (packet.Param & 0xFFFF) : 100;
@@ -870,8 +871,8 @@ public sealed class ServerMessageRouter
                 _hud?.UpdateItemDurability(packet.Recog);
                 break;
             case ProtocolConsts.SM_OPENSHOP_REC: // 643: 打开商店货架
-            case ProtocolConsts.SM_MERCHANT_NORMAL: // 646: 打开常规买卖面板
-                _hud?.ToggleShop(packet.Recog);
+            case ProtocolConsts.SM_MERCHANT_NORMAL: // 646: 打开常规买卖面板 (IDA open_shop_normal)
+                HandleMerchantDlg(packet);
                 break;
             case ProtocolConsts.SM_MERCHANT_ITEM: // 645: 商店商品明细条目 (IDA case 645 load_shop_detail)
                 {
@@ -1021,7 +1022,17 @@ public sealed class ServerMessageRouter
                 _entityManager?.ToggleFloatingHealthBar(packet.Recog, packet.Param != 0);
                 break;
             case ProtocolConsts.SM_ENTITY_POS_DELPHI: // 1106: 官方 1.5 实体坐标校准缓冲 (IDA case 0x452u)
-                _entityManager?.UpdatePosition(packet.Recog, packet.Param, packet.Tag);
+                if (_entityManager != null)
+                {
+                    if (packet.Recog == _entityManager.LocalPlayerUid)
+                    {
+                        _entityManager.UpdateReconcile(packet.Recog, packet.Param, packet.Tag, 0);
+                    }
+                    else
+                    {
+                        _entityManager.UpdatePosition(packet.Recog, packet.Param, packet.Tag);
+                    }
+                }
                 break;
             case ProtocolConsts.SM_GUILD_WAR_STATUS_DELPHI: // 1200: 官方 1.5 行会战/攻城战战况广播 (IDA case 0x4B0u)
                 HandleGuildWarStatus(packet);
@@ -1208,8 +1219,8 @@ public sealed class ServerMessageRouter
                 int eMaxMp = parts.Length >= 4 && int.TryParse(parts[3], out var maxMpVal) ? maxMpVal : Math.Max(eMp, 1);
                 _hud?.UpdateHp(eHp, eMaxHp);
                 if (parts.Length >= 4) _hud?.UpdateMp(eMp, eMaxMp);
-                var hero = _entityManager?.Hero;
-                if (hero != null) _entityManager?.UpdateHp(hero.Uid, eHp, eMaxHp);
+                var localPlayer = _entityManager?.LocalPlayer;
+                if (localPlayer != null) _entityManager?.UpdateHp(localPlayer.Uid, eHp, eMaxHp);
                 return;
             }
         }
@@ -1237,20 +1248,30 @@ public sealed class ServerMessageRouter
             int hp = pkt.Param;
             int maxHp = pkt.Tag > 0 ? pkt.Tag : Math.Max(hp, 1);
             _hud?.UpdateHp(hp, maxHp);
-            var hero = _entityManager?.Hero;
-            if (hero != null) _entityManager?.UpdateHp(hero.Uid, hp, maxHp);
+            var localPlayer = _entityManager?.LocalPlayer;
+            if (localPlayer != null) _entityManager?.UpdateHp(localPlayer.Uid, hp, maxHp);
         }
         else
         {
-            // 兼容非标老旧协议格式 (Recog=HP, Param=MaxHP, Tag=MP)
+            // 盛大官方 1.5 铁律兼容: 自适应识别 (Hp, MaxHp, Mp) 与 (Hp, Mp, MaxHp)
             int hp = pkt.Recog;
-            int maxHp = pkt.Param > 0 ? pkt.Param : Math.Max(hp, 1);
-            int mp = pkt.Tag;
+            int maxHp;
+            int mp;
+            if (pkt.Param > pkt.Tag)
+            {
+                maxHp = pkt.Param;
+                mp = pkt.Tag;
+            }
+            else
+            {
+                maxHp = pkt.Tag > 0 ? pkt.Tag : Math.Max(pkt.Param, Math.Max(hp, 1));
+                mp = pkt.Param;
+            }
             int maxMp = Math.Max(mp, 1);
             _hud?.UpdateHp(hp, maxHp);
             _hud?.UpdateMp(mp, maxMp);
-            var hero = _entityManager?.Hero;
-            if (hero != null) _entityManager?.UpdateHp(hero.Uid, hp, maxHp);
+            var localPlayer = _entityManager?.LocalPlayer;
+            if (localPlayer != null) _entityManager?.UpdateHp(localPlayer.Uid, hp, maxHp);
         }
     }
 
@@ -1307,7 +1328,29 @@ public sealed class ServerMessageRouter
 
     private void HandleAddItem(ServerPacket pkt)
     {
-        int slot = pkt.Param >= 0 && pkt.Param < 40 ? pkt.Param : (pkt.Recog >= 0 && pkt.Recog < 40 ? pkt.Recog : 0);
+        int slot = -1;
+        if (_hud != null)
+        {
+            if (pkt.Param >= 0 && pkt.Param < 40 && _hud.GetBagItemDetail(pkt.Param) == null)
+            {
+                slot = pkt.Param;
+            }
+            else if (pkt.Recog >= 0 && pkt.Recog < 40 && _hud.GetBagItemDetail(pkt.Recog) == null)
+            {
+                slot = pkt.Recog;
+            }
+            else
+            {
+                slot = _hud.FindFirstEmptyBagSlot();
+            }
+        }
+        else
+        {
+            slot = pkt.Param >= 0 && pkt.Param < 40 ? pkt.Param : (pkt.Recog >= 0 && pkt.Recog < 40 ? pkt.Recog : 0);
+        }
+
+        if (slot < 0 || slot >= 40) return;
+
         string itemName = "新物品";
         string iconFile = "StateItem_0001.png";
         string desc = "[color=#c0c0c0]重量 1   持久力 10/10[/color]";
@@ -1352,7 +1395,38 @@ public sealed class ServerMessageRouter
 
     private void HandleDelItem(ServerPacket pkt)
     {
-        int slot = pkt.Param >= 0 && pkt.Param < 40 ? pkt.Param : pkt.Recog;
+        string rawText = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(rawText)) rawText = pkt.ExtraStr;
+        string itemName = !string.IsNullOrEmpty(rawText) ? rawText.Split(new[] { '/', '|', '\t' })[0].Trim() : string.Empty;
+
+        int slot = pkt.Param >= 0 && pkt.Param < 40 ? pkt.Param : (pkt.Recog >= 0 && pkt.Recog < 40 ? pkt.Recog : -1);
+
+        // 1. 若指定了合法 slot 且该槽位物品名称匹配，直接清空
+        if (slot >= 0 && slot < 40 && _hud != null)
+        {
+            var detail = _hud.GetBagItemDetail(slot);
+            if (string.IsNullOrEmpty(itemName) || (detail != null && detail.Value.Name == itemName))
+            {
+                _hud.ClearBagItem(slot);
+                return;
+            }
+        }
+
+        // 2. 若 slot 槽位不匹配但带有 itemName，遍历寻找对应物品名称的格子安全清空，防误删第 0 格
+        if (!string.IsNullOrEmpty(itemName) && _hud != null)
+        {
+            for (int i = 0; i < 40; i++)
+            {
+                var d = _hud.GetBagItemDetail(i);
+                if (d != null && d.Value.Name == itemName)
+                {
+                    _hud.ClearBagItem(i);
+                    return;
+                }
+            }
+        }
+
+        // 3. 兜底清空合法 slot
         if (slot >= 0 && slot < 40)
         {
             _hud?.ClearBagItem(slot);
@@ -1443,7 +1517,7 @@ public sealed class ServerMessageRouter
     private void HandleEquipInfo(ServerPacket pkt)
     {
         if (string.IsNullOrEmpty(pkt.ExtraStr)) return;
-        var parts = pkt.ExtraStr.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+        var parts = pkt.ExtraStr.Split(new[] { ',', ';' }, StringSplitOptions.None);
         for (int i = 0; i < parts.Length && i < 9; i++)
         {
             var itemParts = parts[i].Split(new[] { '/', '|' }, StringSplitOptions.None);
@@ -1453,10 +1527,28 @@ public sealed class ServerMessageRouter
                 string icon = $"StateItem_{itemId:D4}.png";
                 string desc = itemParts.Length > 2 ? itemParts[2] : "[color=#ffff00]官方实证装备[/color]";
                 _hud?.SetEquipSlot(i, name, icon, desc);
+
+                // 同步本地玩家纸娃娃体态 (衣服 slot=0, 武器 slot=1)
+                if (i == 0 && _gameView?.PlayerInstance != null)
+                {
+                    if (name.Contains("重盔") || name.Contains("战神") || itemId == 2)
+                        _gameView.PlayerInstance.BodyDressType = 2; // 重盔甲男
+                    else if (name.Contains("布衣") || itemId == 1)
+                        _gameView.PlayerInstance.BodyDressType = 1;
+                }
+                else if (i == 1 && _gameView?.PlayerInstance != null)
+                {
+                    if (name.Contains("修罗") || name.Contains("凝霜") || itemId == 2)
+                        _gameView.PlayerInstance.WeaponType = 2; // 修罗
+                    else if (name.Contains("木剑") || itemId == 1)
+                        _gameView.PlayerInstance.WeaponType = 1;
+                }
             }
             else
             {
                 _hud?.SetEquipSlot(i, null, null, null);
+                if (i == 0 && _gameView?.PlayerInstance != null) _gameView.PlayerInstance.BodyDressType = 0;
+                else if (i == 1 && _gameView?.PlayerInstance != null) _gameView.PlayerInstance.WeaponType = 0;
             }
         }
     }
@@ -1475,12 +1567,25 @@ public sealed class ServerMessageRouter
             if (parts.Length >= 3) desc = parts[2];
         }
         _hud?.SetEquipSlot(slot, name, icon, desc);
+
+        if (slot == 0 && _gameView?.PlayerInstance != null)
+        {
+            if (name.Contains("重盔") || name.Contains("战神")) _gameView.PlayerInstance.BodyDressType = 2;
+            else if (name.Contains("布衣")) _gameView.PlayerInstance.BodyDressType = 1;
+        }
+        else if (slot == 1 && _gameView?.PlayerInstance != null)
+        {
+            if (name.Contains("修罗") || name.Contains("凝霜")) _gameView.PlayerInstance.WeaponType = 2;
+            else if (name.Contains("木剑")) _gameView.PlayerInstance.WeaponType = 1;
+        }
     }
 
     private void HandleTakeOffOk(ServerPacket pkt)
     {
         int slot = pkt.Param >= 0 && pkt.Param < 9 ? pkt.Param : pkt.Recog;
         _hud?.SetEquipSlot(slot, null, null, null);
+        if (slot == 0 && _gameView?.PlayerInstance != null) _gameView.PlayerInstance.BodyDressType = 0;
+        else if (slot == 1 && _gameView?.PlayerInstance != null) _gameView.PlayerInstance.WeaponType = 0;
     }
 
     private void HandleNpcDialog(ServerPacket pkt)
@@ -2301,17 +2406,34 @@ public sealed class ServerMessageRouter
 
     private void HandleNewMap(ServerPacket pkt)
     {
-        string mapId = pkt.ExtraStr;
-        if (string.IsNullOrEmpty(mapId))
+        // 优先使用官方地图数字ID (Recog 即 MapId，如 0 对应 0.map 比奇省)
+        string mapId = pkt.Recog.ToString();
+        string mapPath = ResPath.Resolve($"resources/maps/Map/{mapId}.map");
+        if (!System.IO.File.Exists(mapPath) && !string.IsNullOrEmpty(pkt.ExtraStr))
         {
-            mapId = pkt.Recog.ToString();
+            var altPath = ResPath.Resolve($"resources/maps/Map/{pkt.ExtraStr}.map");
+            if (System.IO.File.Exists(altPath))
+            {
+                mapId = pkt.ExtraStr;
+                mapPath = altPath;
+            }
         }
         if (!string.IsNullOrEmpty(mapId) && _gameView != null)
         {
             _gameView.CurrentMapName = mapId;
-            string mapPath = ResPath.Resolve($"resources/maps/Map/{mapId}.map");
             _gameView.MapRendererInstance?.LoadMap(mapPath);
             _gameView.UpdateEnvironmentLighting();
+
+            if (pkt.Param > 0 && pkt.Tag > 0)
+            {
+                _gameView.PlayerInstance?.SetTilePos(pkt.Param, pkt.Tag);
+            }
+
+            int mapW = _gameView.MapRendererInstance?.MapWidth ?? 400;
+            int mapH = _gameView.MapRendererInstance?.MapHeight ?? 400;
+            string mapName = mapId == "0" ? "比奇省" : (mapId == "3" ? "盟重省" : (!string.IsNullOrEmpty(pkt.ExtraStr) ? pkt.ExtraStr : $"地图_{mapId}"));
+            _hud?.Minimap?.SetMap(mapId, mapName, mapW, mapH);
+            _hud?.Minimap?.ClearTarget();
         }
     }
 
@@ -2449,7 +2571,7 @@ public sealed class ServerMessageRouter
         int targetX = pkt.Tag;
         int targetY = 0;
 
-        if (pkt.Ident == SM_LIGHTING_DELPHI)
+        if (pkt.Ident == SM_LIGHTING_DELPHI || pkt.Ident == ProtocolConsts.SM_LIGHTING)
         {
             magicId = 10; // 雷电术
             targetX = pkt.Param;
@@ -2632,6 +2754,8 @@ public sealed class ServerMessageRouter
         _hud?.AddChat("行会", $"[行会战] {msg}", new Color(1f, 0.3f, 0.3f));
         _hud?.ShowModalMessage("行会战况", msg);
     }
+
+
 
     private static string DecodeExtraText(byte[]? extra)
     {

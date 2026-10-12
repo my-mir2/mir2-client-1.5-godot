@@ -7,6 +7,8 @@ using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Network.HPSocket;
+using Mir2.Shared.Protocols.Modern;
 using Xunit;
 
 namespace Mir2Client.Tests;
@@ -113,15 +115,143 @@ public class TestOfficialM2_TradeEngineMatrix
     }
 
     [Fact]
+    public void TestOfficialM2_Trade_GoldOverWeight_Meltdown()
+    {
+        var engine = new TradeEngine();
+
+        var playerA = new ClientSession(1, null!)
+        {
+            CharacterName = "法师A",
+            X = 200,
+            Y = 200,
+            CurrentMapId = 0,
+            State = new PlayerState
+            {
+                Gold = 10_000,
+                MaxBagWeight = 200,
+                BagWeight = 190 // 负重剩余空间仅剩 10 点
+            }
+        };
+
+        var playerB = new ClientSession(2, null!)
+        {
+            CharacterName = "土豪B",
+            X = 201,
+            Y = 200,
+            CurrentMapId = 0,
+            State = new PlayerState
+            {
+                Gold = 5_000_000,
+                MaxBagWeight = 500,
+                BagWeight = 50
+            }
+        };
+
+        engine.TryInitiateTrade(playerA, playerB);
+
+        // 土豪 B 尝试交易 2,000,000 金币 (折算重量 200 点，导致法师A 190 + 200 = 390 > 200 严重超重)
+        engine.ChangeGold(playerB, 2_000_000);
+
+        var trade = engine.GetTrade(playerA.SessionId)!;
+        trade.LastChangeTickA = Environment.TickCount64 - 2000;
+        trade.LastChangeTickB = Environment.TickCount64 - 2000;
+
+        // 双方确认锁定
+        engine.ConfirmDeal(playerA);
+        var (complete, canceled, reason) = engine.ConfirmDeal(playerB);
+
+        // 负重超限强制熔断取消
+        Assert.False(complete);
+        Assert.True(canceled);
+        Assert.Contains("负重", reason);
+
+        // 双方资产未被篡改
+        Assert.Equal(10_000, playerA.State.Gold);
+        Assert.Equal(5_000_000, playerB.State.Gold);
+    }
+
+    private static int GetRandomTestPort() => TestNetworkPortHelper.GetNextPort();
+
+    private static byte[] BuildPack(ushort msgId, string payloadStr = "", ushort seq = 0)
+    {
+        byte[] payloadBytes = string.IsNullOrEmpty(payloadStr) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(payloadStr);
+        byte[] packet = new byte[BinaryProtocol.HeaderSize + payloadBytes.Length];
+        var span = packet.AsSpan();
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[0..2], BinaryProtocol.DefaultMagic);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[2..4], msgId);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[4..6], (ushort)payloadBytes.Length);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[6..8], seq);
+        if (payloadBytes.Length > 0)
+        {
+            payloadBytes.CopyTo(packet, BinaryProtocol.HeaderSize);
+        }
+        return packet;
+    }
+
+    private static async Task SendPackAsync(System.Net.Sockets.NetworkStream stream, ushort msgId, string payloadStr = "")
+    {
+        byte[] packet = BuildPack(msgId, payloadStr);
+        await stream.WriteAsync(packet);
+        await stream.FlushAsync();
+    }
+
+    private static async Task<string> ReadUntilContainsPackAsync(System.Net.Sockets.NetworkStream stream, string target, int timeoutMs = 2500)
+    {
+        var decoder = new HpPackStreamDecoder();
+        var sb = new StringBuilder();
+        byte[] buf = new byte[4096];
+        long deadline = Environment.TickCount64 + timeoutMs;
+        while (Environment.TickCount64 < deadline)
+        {
+            if (stream.DataAvailable)
+            {
+                int n = await stream.ReadAsync(buf);
+                if (n > 0)
+                {
+                    decoder.FeedData(buf.AsSpan(0, n), (in BinaryProtocol.PacketHeader header, ReadOnlySpan<byte> payload) =>
+                    {
+                        int recog = 0, param = 0, tag = 0, series = 0;
+                        string extra = string.Empty;
+                        if (payload.Length >= 16)
+                        {
+                            recog = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[0..4]);
+                            param = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[4..8]);
+                            tag = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[8..12]);
+                            series = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[12..16]);
+                            if (payload.Length > 16)
+                            {
+                                extra = Encoding.UTF8.GetString(payload[16..]);
+                            }
+                        }
+                        else if (payload.Length > 0)
+                        {
+                            extra = Encoding.UTF8.GetString(payload);
+                        }
+                        string packSummary = $"#{header.MsgId}/{recog}/{param}/{tag}/{series}/{extra}!";
+                        sb.Append(packSummary);
+                        if (!string.IsNullOrEmpty(extra)) sb.Append(extra);
+                    });
+
+                    if (!string.IsNullOrEmpty(target) && sb.ToString().Contains(target))
+                        return sb.ToString();
+                }
+            }
+            await Task.Delay(10);
+        }
+        return sb.ToString();
+    }
+
+    [Fact]
     public async Task TestE2E_Trade_FullAtomicExchange_BetweenTwoPlayers()
     {
-        int testPort = 18055;
+        int testPort = GetRandomTestPort();
         var mapManager = new MapManager();
         var tradeEngine = new TradeEngine();
         var dispatcher = new PacketDispatcher(mapManager, regenEngine: null, npcEngine: null, tradeEngine: tradeEngine);
 
         var gateway = new TcpGateway(testPort);
         gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.BinaryPacketReceivedHandler = (session, header, payload) => dispatcher.DispatchBinary(session, header, payload);
         gateway.Start();
 
         var tickEngine = new GameWorldTick(gateway);
@@ -133,15 +263,13 @@ public class TestOfficialM2_TradeEngineMatrix
             using var clientA = new System.Net.Sockets.TcpClient();
             await clientA.ConnectAsync("127.0.0.1", testPort);
             var streamA = clientA.GetStream();
-            await streamA.WriteAsync(Encoding.UTF8.GetBytes("#103/富豪A/300/300!"));
-            await streamA.FlushAsync();
+            await SendPackAsync(streamA, 103, "富豪A/300/300");
 
             // 客户端 B: 面对面位于 (301, 300)
             using var clientB = new System.Net.Sockets.TcpClient();
             await clientB.ConnectAsync("127.0.0.1", testPort);
             var streamB = clientB.GetStream();
-            await streamB.WriteAsync(Encoding.UTF8.GetBytes("#103/神兵B/301/300!"));
-            await streamB.FlushAsync();
+            await SendPackAsync(streamB, 103, "神兵B/301/300");
 
             await Task.Delay(200);
 
@@ -163,26 +291,20 @@ public class TestOfficialM2_TradeEngineMatrix
             while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 1. A 发起交易邀请: CM_DEALTRY (1025)
-            byte[] tryPkt = Encoding.UTF8.GetBytes($"#1025/{sessionB.SessionId}!");
-            await streamA.WriteAsync(tryPkt);
-            await streamA.FlushAsync();
-
-            await Task.Delay(150);
+            await SendPackAsync(streamA, 1025, $"{sessionB.SessionId}");
 
             // 双方弹出交易面板 SM_DEALMENU (673)
-            Assert.True(streamA.DataAvailable);
-            Assert.True(streamB.DataAvailable);
+            await ReadUntilContainsPackAsync(streamA, $"#{ProtocolConsts.SM_DEALMENU}/");
+            await ReadUntilContainsPackAsync(streamB, $"#{ProtocolConsts.SM_DEALMENU}/");
 
             while (streamA.DataAvailable) _ = await streamA.ReadAsync(flushBuf, 0, flushBuf.Length);
             while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 2. A 放入 300,000 交易金币: CM_DEALCHGGOLD (1029)
-            await streamA.WriteAsync(Encoding.UTF8.GetBytes("#1029/300000!"));
-            await streamA.FlushAsync();
+            await SendPackAsync(streamA, 1029, "300000");
 
             // 3. B 放入裁决之杖: CM_DEALADDITEM (1026)
-            await streamB.WriteAsync(Encoding.UTF8.GetBytes("#1026/7777!"));
-            await streamB.FlushAsync();
+            await SendPackAsync(streamB, 1026, "7777");
 
             await Task.Delay(150);
 
@@ -193,28 +315,17 @@ public class TestOfficialM2_TradeEngineMatrix
             while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 4. 双方点击确认锁定: CM_DEALEND (1030)
-            await streamA.WriteAsync(Encoding.UTF8.GetBytes("#1030/!"));
-            await streamA.FlushAsync();
+            await SendPackAsync(streamA, 1030);
 
             await Task.Delay(100);
 
-            await streamB.WriteAsync(Encoding.UTF8.GetBytes("#1030/!"));
-            await streamB.FlushAsync();
-
-            await Task.Delay(200);
+            await SendPackAsync(streamB, 1030);
 
             // 双方必须收到交易完成协议 SM_DEALSUCCESS (687) 与金币变动包
-            Assert.True(streamA.DataAvailable);
-            Assert.True(streamB.DataAvailable);
+            string respA = await ReadUntilContainsPackAsync(streamA, $"#{ProtocolConsts.SM_DEALSUCCESS}/", timeoutMs: 3000);
+            string respB = await ReadUntilContainsPackAsync(streamB, $"#{ProtocolConsts.SM_DEALSUCCESS}/", timeoutMs: 3000);
 
-            byte[] bufA = new byte[4096];
-            int lenA = await streamA.ReadAsync(bufA, 0, bufA.Length);
-            string respA = Encoding.UTF8.GetString(bufA, 0, lenA);
             Assert.Contains($"#{ProtocolConsts.SM_DEALSUCCESS}/", respA);
-
-            byte[] bufB = new byte[4096];
-            int lenB = await streamB.ReadAsync(bufB, 0, bufB.Length);
-            string respB = Encoding.UTF8.GetString(bufB, 0, lenB);
             Assert.Contains($"#{ProtocolConsts.SM_DEALSUCCESS}/", respB);
 
             // 5. 验证原子资产交割真值:

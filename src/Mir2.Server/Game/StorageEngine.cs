@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Mir2.Shared.Models;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Rules;
 
 namespace Mir2.Server.Game;
 
@@ -96,6 +97,7 @@ public static class StorageEngine
         // 移出背包
         player.BagItems.Remove(item);
         player.BagWeight = Math.Max(0, player.BagWeight - item.Weight);
+        player.RecalculateAttributes();
 
         // 存入仓库
         player.StorageItems.Add(item);
@@ -140,6 +142,7 @@ public static class StorageEngine
         player.StorageItems.RemoveAt(storageSlot);
         player.BagItems.Add(item);
         player.BagWeight += item.Weight;
+        player.RecalculateAttributes();
 
         return (StorageResult.Success, item);
     }
@@ -171,6 +174,7 @@ public static class StorageEngine
 
         player.Gold -= amount;
         player.StorageGold += amount;
+        player.RecalculateAuthoritativeWeights(player.Gold);
         return StorageResult.Success;
     }
 
@@ -199,8 +203,20 @@ public static class StorageEngine
             return StorageResult.GoldCapExceeded;
         }
 
+        // 盛大官方 1.5 金币负重物理检定 (每 10,000 金币折算 1 负重)
+        int oldGoldWeight = WeightConstraintEngine.CalcGoldWeight(player.Gold);
+        int newGold = player.Gold + amount;
+        int newGoldWeight = WeightConstraintEngine.CalcGoldWeight(newGold);
+        int deltaWeight = newGoldWeight - oldGoldWeight;
+
+        if (player.BagWeight + deltaWeight > player.MaxBagWeight)
+        {
+            return StorageResult.OverWeight;
+        }
+
         player.StorageGold -= amount;
         player.Gold += amount;
+        player.RecalculateAuthoritativeWeights(player.Gold);
         return StorageResult.Success;
     }
 }

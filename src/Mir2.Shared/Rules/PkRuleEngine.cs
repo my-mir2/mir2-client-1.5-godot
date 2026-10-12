@@ -102,4 +102,54 @@ public static class PkRuleEngine
         int decay = elapsedSec / 50;
         return Math.Max(0, currentPkPoint - decay);
     }
+
+    /// <summary>
+    /// 盛大官方 1.4/1.5 权威攻击模式 (Delphi M2Server btAttackMode 0~4)
+    /// </summary>
+    public enum OfficialAttackMode : byte
+    {
+        All = 0,      // 全体模式 (攻击所有人)
+        Peace = 1,    // 和平模式 (禁止攻击任何玩家，只能打怪)
+        Group = 2,    // 编组模式 (豁免同组队伍成员)
+        Guild = 3,    // 行会模式 (豁免同行会及同盟行会成员，战争敌对行会除外)
+        RedName = 4   // 善恶模式 (仅攻击红名与黄名/灰名玩家，禁止攻击守法白名)
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 攻击模式权威判定 (IDA sub_4B00D4 / CanAttackPlayer)
+    /// </summary>
+    public static bool CanAttackTargetPlayer(
+        byte attackMode,
+        bool isAttackerInSafeZone,
+        bool isTargetInSafeZone,
+        int attackerSessionId,
+        int targetSessionId,
+        bool targetIsDead,
+        bool targetIsRedOrYellow,
+        bool isSameGroup,
+        bool isSameGuild,
+        bool isAlliedGuild,
+        bool isWarGuild)
+    {
+        // 1. 安全区禁武: 攻击者处于安全区或目标处于安全区，绝对禁止任何攻击
+        if (isAttackerInSafeZone || isTargetInSafeZone) return false;
+
+        // 2. 禁止攻击自身，禁止鞭尸
+        if (attackerSessionId == targetSessionId || targetIsDead) return false;
+
+        // 3. 行会宣战战争豁免: 战争双方成员互为第一优先级战争目标，任何攻击模式均放行
+        if (isWarGuild) return true;
+
+        // 4. 按攻击模式逐级裁决
+        return (OfficialAttackMode)attackMode switch
+        {
+            OfficialAttackMode.All => true,
+            OfficialAttackMode.Peace => false, // 和平模式绝对禁止攻击任何玩家
+            OfficialAttackMode.Group => !isSameGroup, // 组队模式豁免队友
+            OfficialAttackMode.Guild => !isSameGuild && !isAlliedGuild, // 行会模式豁免同会与同盟
+            OfficialAttackMode.RedName => targetIsRedOrYellow, // 善恶模式仅能攻击红名或黄名
+            _ => true
+        };
+    }
 }
+

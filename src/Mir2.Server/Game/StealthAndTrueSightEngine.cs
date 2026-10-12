@@ -13,23 +13,26 @@ namespace Mir2.Server.Game;
 /// 2. 怪物仇恨判定:
 ///    - 普通怪物 (僵尸、骷髅、野猪、沃玛怪) 无法察觉隐身目标，自动丢失仇恨，不会主动攻击
 /// 3. 官方真视怪物 (True Sight Monsters):
-///    - 楔蛾 (Moth)、月魔蜘蛛 (MoonSpider)、暗之双头血魔等具备真视之眼，能够无视隐身直接锁定攻击
+///    - 楔蛾 (Moth)、月魔蜘蛛 (MoonSpider)、赤月恶魔、双头金刚、双头血魔等具备真视之眼，能够无视隐身直接锁定攻击
 /// 4. 破隐触发条件:
 ///    - 隐身目标主动移动 (Walk/Run)、发起物理挥刀或释放技能，隐身状态立即破除失效
 /// </summary>
 public static class StealthAndTrueSightEngine
 {
+    // 盛大官方 1.5 权威真视之眼反隐怪物 (对齐官方 1.4/1.5 Monster.DB CoolEye > 0 物理真值)
     public static readonly HashSet<string> TrueSightMonsters = new(StringComparer.OrdinalIgnoreCase)
     {
         "楔蛾",
         "月魔蜘蛛",
-        "暗之双头血魔",
-        "暗之骷髅精灵",
-        "暗之黄泉教主",
-        "暗之沃玛教主",
-        "暗之双头金刚",
+        "角蝇",
         "赤月恶魔",
-        "触龙神"
+        "双头金刚",
+        "双头血魔",
+        "触龙神",
+        "祖玛教主",
+        "沃玛教主",
+        "虎卫",
+        "鹰卫"
     };
 
     /// <summary>

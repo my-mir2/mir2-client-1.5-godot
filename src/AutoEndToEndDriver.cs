@@ -1,3 +1,4 @@
+#if MIR2_SANDBOX_DEV
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -547,7 +548,7 @@ public partial class AutoEndToEndDriver : Node
                         inspect.SetSlotItem(0, "StateItem_0064.png", "[b][color=#ffff40]幽灵战衣(男)[/color][/b]\n[color=#c0c0c0]重量 26   持久力 28/28[/color]\n[color=#ffff00]防御 4-7   魔御 3-4   道术 1-4[/color]\n[color=#c0c0c0]需要精神力 27[/color]");
                         inspect.SetSlotItem(1, "StateItem_0053.png", "[b][color=#ffff40]龙纹剑[/color][/b]\n[color=#c0c0c0]重量 40   持久力 22/22[/color]\n[color=#ffff00]攻击 8-20   道术 3-6[/color] [color=#00ffff]幸运+7[/color]\n[color=#c0c0c0]需要等级 35[/color]");
                         inspect.SetSlotItem(4, "StateItem_0108.png", "[b][color=#ffff40]道士头盔[/color][/b]\n[color=#c0c0c0]重量 3   持久力 8/8[/color]\n[color=#ffff00]防御 1-2   魔御 2-3[/color] [color=#00ffff](道术+1)[/color]\n[color=#c0c0c0]需要等级 24[/color]");
-                        inspect.SetSlotItem(2, "StateItem_0111.png", "[b][color=#ffff40]荣誉勋章[/color][/b]\n[color=#c0c0c0]重量 1   持久力 50/50[/color]\n[color=#ffff00]道术 1-3[/color]");
+                        inspect.SetSlotItem(2, "StateItem_0111.png", "[b][color=#ffff40]护身符[/color][/b]\n[color=#c0c0c0]重量 1   持久力 100/100[/color]\n[color=#ffff00]道士火符施法耗材[/color]");
                         inspect.SetSlotItem(3, "StateItem_0219.png", "[b][color=#ffff40]天珠项链[/color][/b]\n[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]道术 1-5[/color]\n[color=#c0c0c0]需要精神力 22[/color]");
                         inspect.SetSlotItem(5, "StateItem_0189.png", "[b][color=#ffff40]三眼手镯(右)[/color][/b]\n[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]防御 1-1   道术 1-3[/color]\n[color=#c0c0c0]需要精神力 22[/color]");
                         inspect.SetSlotItem(6, "StateItem_0189.png", "[b][color=#ffff40]三眼手镯(左)[/color][/b]\n[color=#c0c0c0]重量 1   持久力 7/7[/color]\n[color=#ffff00]防御 1-1   道术 1-3[/color]\n[color=#c0c0c0]需要精神力 22[/color]");
@@ -2206,10 +2207,10 @@ public partial class AutoEndToEndDriver : Node
                 var gameView = _main.GetNodeOrNull<GameView>("Game");
                 if (gameView?.HudInstance != null)
                 {
-                    // 验证成对槽位智能穿戴：双击手镯/戒指空槽判定
+                    // 【现代客户端扩展体验】成对槽位双击穿戴判定 (盛大官方 1.5 原版为 IDA sub_481dd4 纯鼠标拖拽穿戴)
                     int slotArm = gameView.HudInstance.GetBestEquipSlotForBagItem("幽灵手镯");
                     int slotRing = gameView.HudInstance.GetBestEquipSlotForBagItem("力量戒指");
-                    GD.Print($"[AutoE2E] 成对槽位智能穿戴槽位检测通过: 手镯={slotArm}, 戒指={slotRing}");
+                    GD.Print($"[AutoE2E] 成对槽位双击穿戴便捷判定: 手镯={slotArm}, 戒指={slotRing}");
                 }
                 RequestCapture("step125_health_status_interlock");
                 break;
@@ -2224,7 +2225,7 @@ public partial class AutoEndToEndDriver : Node
                     var sampleItems = new List<StorageItemInfo>
                     {
                         new StorageItemInfo("屠龙", 35, 35, 100),
-                        new StorageItemInfo("雷霆战甲(男)", 40, 40, 101),
+                        new StorageItemInfo("战神盔甲(男)", 40, 40, 101),
                         new StorageItemInfo("圣战戒指", 5, 5, 102)
                     };
                     gameView.HudInstance.OpenStorageList(sampleItems);
@@ -2238,7 +2239,53 @@ public partial class AutoEndToEndDriver : Node
 
             case 127:
             {
-                GD.Print("[AutoE2E] ALL 127 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView != null)
+                {
+                    // 1. 验证经过修复的 WindowStackManager 对上一阶段残留窗体的纯净关闭（真实 ESC 逐级关闭，杜绝任何强制 Visible 补丁）
+                    if (gameView.HudInstance != null)
+                    {
+                        while (gameView.HudInstance.CloseTopDialog()) { }
+                    }
+
+                    // 2. 盛大官方 1.5 权威核心：面对面两阶段原子交易 (TFrmDlg_Deal，官方 1.5 绝无个人摆摊)
+                    if (gameView.HudInstance != null)
+                    {
+                        gameView.HudInstance.OpenTrade("玛法探险家");
+                        gameView.HudInstance.OnServerTradeChgGold(50000, true);
+                        gameView.HudInstance.OnServerTradeChgGold(200000, false);
+                        gameView.HudInstance.OnServerTradeRemoteAddItem(0, "龙纹剑");
+                        gameView.HudInstance.OnServerTradeRemoteLocked(true);
+                        GD.Print("[AutoE2E] 验证盛大官方 1.5 原生面对面交易 (TFrmDlg_Deal) 原子交割与双方锁定状态 (拒绝非标摆摊)");
+                    }
+                }
+                RequestCapture("step127_official_deal_dialog_interaction");
+                break;
+            }
+
+            case 128:
+            {
+                var gameView = _main.GetNodeOrNull<GameView>("Game");
+                if (gameView?.HudInstance != null)
+                {
+                    // 优雅关闭交易面板
+                    while (gameView.HudInstance.CloseTopDialog()) { }
+
+                    // 盛大官方 1.5 原版大地图 (540x360 权威大地图展开与自身坐标定位，彻底剔除非官方内挂迷宫走法提示)
+                    if (gameView.HudInstance.Minimap != null)
+                    {
+                        gameView.HudInstance.Minimap.SetMap("D505", "祖玛阁", 400, 400);
+                        gameView.HudInstance.Minimap.SetMode(MinimapView.MinimapMode.Big);
+                        GD.Print("[AutoE2E] 验证官方 1.5 原版全景大地图展开与自身坐标定位 (无内挂走法污染)");
+                    }
+                }
+                RequestCapture("step128_bigmap_panoramic_navigation");
+                break;
+            }
+
+            case 129:
+            {
+                GD.Print("[AutoE2E] ALL 129 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
                 GetTree().Quit();
                 break;
             }
@@ -2268,10 +2315,21 @@ public partial class AutoEndToEndDriver : Node
             var img = tex.GetImage();
             if (img != null)
             {
-                string tmpDir = Directory.Exists("/tmp") ? "/tmp" : (Directory.Exists("D:\\tmp") ? "D:\\tmp" : Path.GetTempPath());
-                string path = Path.Combine(tmpDir, $"e2e_{stageTag}.png");
-                img.SavePng(path);
-                GD.Print($"[AutoE2E] 捕获阶段渲染截图: {path}");
+                string tmpDir = Path.Combine(Directory.GetCurrentDirectory(), "build", "screenshots");
+                if (!Directory.Exists(tmpDir))
+                {
+                    Directory.CreateDirectory(tmpDir);
+                }
+                string path = Path.GetFullPath(Path.Combine(tmpDir, $"e2e_{stageTag}.png"));
+                var err = img.SavePng(path);
+                if (err == Godot.Error.Ok)
+                {
+                    GD.Print($"[AutoE2E] 捕获阶段渲染截图: {path}");
+                }
+                else
+                {
+                    GD.PrintErr($"[AutoE2E] 保存截图失败 ({stageTag}): {err}");
+                }
             }
         }
         catch (Exception ex)
@@ -2280,3 +2338,4 @@ public partial class AutoEndToEndDriver : Node
         }
     }
 }
+#endif

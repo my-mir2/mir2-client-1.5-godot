@@ -108,9 +108,28 @@ namespace Mir2Client.Render
             }
         }
 
+        public float RemainingLifeSec { get; set; } = 120.0f; // 盛大官方 1.5 地表物品 120 秒寿命
+        private float _blinkTimer = 0f;
+
         public override void _Process(double delta)
         {
             UpdatePosition();
+            float dt = (float)delta;
+            RemainingLifeSec -= dt;
+            if (RemainingLifeSec <= 10.0f && RemainingLifeSec > 0f)
+            {
+                // 盛大官方 1.5 规则: 战利品即将刷新消失前 10 秒进入 200ms 高频 Alpha 闪烁预警
+                _blinkTimer += dt;
+                if (_blinkTimer >= 0.2f)
+                {
+                    _blinkTimer = 0f;
+                    Modulate = Modulate.A > 0.5f ? new Color(1, 1, 1, 0.25f) : new Color(1, 1, 1, 1.0f);
+                }
+            }
+            else if (RemainingLifeSec <= 0f)
+            {
+                Visible = false;
+            }
         }
     }
 }

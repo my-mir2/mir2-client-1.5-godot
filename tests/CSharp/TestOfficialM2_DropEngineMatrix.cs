@@ -7,6 +7,8 @@ using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Network.HPSocket;
+using Mir2.Shared.Protocols.Modern;
 using Mir2.Shared.Rules;
 using Xunit;
 
@@ -68,14 +70,86 @@ public class TestOfficialM2_DropEngineMatrix
         Assert.True(dropsCount >= 60 && dropsCount <= 140, $"白名裁决之杖爆出次数实际为 {dropsCount}，符合 1/30 理论分布");
     }
 
+    private static int GetRandomTestPort() => TestNetworkPortHelper.GetNextPort();
+
+    private static byte[] BuildPack(ushort msgId, string payloadStr = "", ushort seq = 0)
+    {
+        byte[] payloadBytes = string.IsNullOrEmpty(payloadStr) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(payloadStr);
+        byte[] packet = new byte[BinaryProtocol.HeaderSize + payloadBytes.Length];
+        var span = packet.AsSpan();
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[0..2], BinaryProtocol.DefaultMagic);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[2..4], msgId);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[4..6], (ushort)payloadBytes.Length);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[6..8], seq);
+        if (payloadBytes.Length > 0)
+        {
+            payloadBytes.CopyTo(packet, BinaryProtocol.HeaderSize);
+        }
+        return packet;
+    }
+
+    private static async Task SendPackAsync(System.Net.Sockets.NetworkStream stream, ushort msgId, string payloadStr = "")
+    {
+        byte[] packet = BuildPack(msgId, payloadStr);
+        await stream.WriteAsync(packet);
+        await stream.FlushAsync();
+    }
+
+    private static async Task<string> ReadUntilContainsPackAsync(System.Net.Sockets.NetworkStream stream, string target, int timeoutMs = 2500)
+    {
+        var decoder = new HpPackStreamDecoder();
+        var sb = new StringBuilder();
+        byte[] buf = new byte[4096];
+        long deadline = Environment.TickCount64 + timeoutMs;
+        while (Environment.TickCount64 < deadline)
+        {
+            if (stream.DataAvailable)
+            {
+                int n = await stream.ReadAsync(buf);
+                if (n > 0)
+                {
+                    decoder.FeedData(buf.AsSpan(0, n), (in BinaryProtocol.PacketHeader header, ReadOnlySpan<byte> payload) =>
+                    {
+                        int recog = 0, param = 0, tag = 0, series = 0;
+                        string extra = string.Empty;
+                        if (payload.Length >= 16)
+                        {
+                            recog = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[0..4]);
+                            param = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[4..8]);
+                            tag = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[8..12]);
+                            series = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[12..16]);
+                            if (payload.Length > 16)
+                            {
+                                extra = Encoding.UTF8.GetString(payload[16..]);
+                            }
+                        }
+                        else if (payload.Length > 0)
+                        {
+                            extra = Encoding.UTF8.GetString(payload);
+                        }
+                        string packSummary = $"#{header.MsgId}/{recog}/{param}/{tag}/{series}/{extra}!";
+                        sb.Append(packSummary);
+                        if (!string.IsNullOrEmpty(extra)) sb.Append(extra);
+                    });
+
+                    if (!string.IsNullOrEmpty(target) && sb.ToString().Contains(target))
+                        return sb.ToString();
+                }
+            }
+            await Task.Delay(10);
+        }
+        return sb.ToString();
+    }
+
     [Fact]
     public async Task TestE2E_CombatKill_Spawns_GroundItem_Broadcast()
     {
-        int testPort = 17008;
+        int testPort = GetRandomTestPort();
         var mapManager = new MapManager();
         var dispatcher = new PacketDispatcher(mapManager);
         var gateway = new TcpGateway(testPort);
         gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.BinaryPacketReceivedHandler = (session, header, payload) => dispatcher.DispatchBinary(session, header, payload);
         gateway.Start();
 
         var tickEngine = new GameWorldTick(gateway);
@@ -87,15 +161,13 @@ public class TestOfficialM2_DropEngineMatrix
             using var clientA = new System.Net.Sockets.TcpClient();
             await clientA.ConnectAsync("127.0.0.1", testPort);
             var streamA = clientA.GetStream();
-            await streamA.WriteAsync(Encoding.UTF8.GetBytes("#103/狂战士A/200/200!"));
-            await streamA.FlushAsync();
+            await SendPackAsync(streamA, 103, "狂战士A/200/200");
 
             // 濒死红名怪/玩家 B (201, 200)，仅剩 5 点生命值，背包有一把屠龙刀
             using var clientB = new System.Net.Sockets.TcpClient();
             await clientB.ConnectAsync("127.0.0.1", testPort);
             var streamB = clientB.GetStream();
-            await streamB.WriteAsync(Encoding.UTF8.GetBytes("#103/红名老妖B/201/200!"));
-            await streamB.FlushAsync();
+            await SendPackAsync(streamB, 103, "红名老妖B/201/200");
 
             await Task.Delay(200);
 
@@ -119,18 +191,11 @@ public class TestOfficialM2_DropEngineMatrix
             while (streamB.DataAvailable) _ = await streamB.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 狂战士 A 挥刀攻击 (201, 200)，造成 15~30 伤害必致死
-            byte[] killHitPkt = Encoding.UTF8.GetBytes("#3014/201/200/1!");
-            await streamA.WriteAsync(killHitPkt);
-            await streamA.FlushAsync();
-
-            await Task.Delay(200);
+            await SendPackAsync(streamA, 3014, "201/200/1");
 
             // 杀手 A 必须收到红名老妖 B 死亡倒地广播 SM_DEATH_ACTION_DELPHI (28)
             // 以及屠龙刀爆落在地面的广播 SM_GROUNDITEM (314)
-            Assert.True(streamA.DataAvailable, "击杀目标后杀手同屏必须收到死亡倒地与爆装广播");
-            byte[] recvBuf = new byte[4096];
-            int recvLen = await streamA.ReadAsync(recvBuf, 0, recvBuf.Length);
-            string recvStr = Encoding.UTF8.GetString(recvBuf, 0, recvLen);
+            string recvStr = await ReadUntilContainsPackAsync(streamA, $"#{ProtocolConsts.SM_DEATH_ACTION_DELPHI}/", timeoutMs: 3000);
 
             Assert.Contains($"#{ProtocolConsts.SM_DEATH_ACTION_DELPHI}/", recvStr);
             Assert.Contains($"#{ProtocolConsts.SM_GROUNDITEM}/", recvStr);

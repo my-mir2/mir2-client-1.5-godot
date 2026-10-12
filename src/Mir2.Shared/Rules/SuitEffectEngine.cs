@@ -46,16 +46,58 @@ public static class SuitEffectEngine
             return hasWeapon && hasHelmet && hasNecklace && hasBracelet && hasRing;
         }
 
-        public static (bool triggered, string broadcastMessage, bool necklaceBroken) EvaluatePrayerCataclysm(
-            bool isFullSetWearing)
+        /// <summary>
+        /// 盛大官方 1.5 祈祷天谴与随机粉碎结算 (对齐 SuitWorldEventEngine 与 SpecialRings)
+        /// </summary>
+        public static (bool triggered, string broadcastMessage, string brokenPieceName) EvaluatePrayerCataclysm(
+            bool isFullSetWearing, int rngRoll = 0)
         {
             if (!isFullSetWearing)
             {
-                return (false, string.Empty, false);
+                return (false, string.Empty, string.Empty);
             }
 
-            string broadcast = "【全服天谴公告】神明震怒！祈祷套装神力觉醒，所有神兽与骷髅陷入癫狂叛变！祈祷项链碎裂消失！";
-            return (true, broadcast, true);
+            string[] pieces = ["祈祷头盔", "祈祷项链", "祈祷手镯", "祈祷戒指", "祈祷之刃"];
+            int idx = Math.Abs(rngRoll) % pieces.Length;
+            string broken = pieces[idx];
+
+            string broadcast = "神之祈祷，天地变色！玛法大陆所有召唤生物已陷入癫狂，反噬其主！";
+            return (true, broadcast, broken);
+        }
+
+        /// <summary>
+        /// 向后兼容老签名
+        /// </summary>
+        public static (bool triggered, string broadcastMessage, bool pieceBroken) EvaluatePrayerCataclysmLegacy(
+            bool isFullSetWearing)
+        {
+            var res = EvaluatePrayerCataclysm(isFullSetWearing, 0);
+            return (res.triggered, res.broadcastMessage, res.triggered);
+        }
+    }
+
+    // ==================== 4. 记忆套装 (天地合一) ====================
+    public static class MemorySuit
+    {
+        public const int CooldownSeconds = 180; // 盛大官方 1.5 权威 180 秒神力冷却
+
+        public static bool CheckFullSet(bool hasHelmet, bool hasNecklace, bool hasBracelet, bool hasRing)
+        {
+            return hasHelmet && hasNecklace && hasBracelet && hasRing;
+        }
+
+        public static (bool canRecall, string failReason) ValidateRecallPreconditions(
+            bool isLeader, bool isFullSet, bool inSabukPalace, long lastRecallTick, long nowTick)
+        {
+            if (!isLeader) return (false, "只有编组队长方能施展【天地合一】召唤队伍！");
+            if (!isFullSet) return (false, "你尚未穿齐记忆全套 (记忆头盔/项链/手镯/戒指)，无法使用天地合一！");
+            if (inSabukPalace) return (false, "沙巴克皇宫受禁空结界封锁，神力无法穿透，无法施展天地合一！");
+            if (lastRecallTick > 0 && nowTick - lastRecallTick < CooldownSeconds * 1000L)
+            {
+                long remainSec = Math.Max(1, (CooldownSeconds * 1000L - (nowTick - lastRecallTick)) / 1000L);
+                return (false, $"记忆套装神力正在沉睡中，还需等待 {remainSec} 秒方可再次施展天地合一！");
+            }
+            return (true, string.Empty);
         }
     }
 }

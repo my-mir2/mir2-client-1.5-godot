@@ -48,6 +48,7 @@ public class TestModernBinaryProtocolMatrix
         Assert.Equal(9, Marshal.SizeOf<BinaryProtocol.SpellIntentPayload>());
         Assert.Equal(6, Marshal.SizeOf<BinaryProtocol.PositionSyncPayload>());
         Assert.Equal(8, Marshal.SizeOf<BinaryProtocol.HealthSyncPayload>());
+        Assert.Equal(8, Marshal.SizeOf<BinaryProtocol.SplitItemIntentPayload>());
 
         // 验证 MoveIntentPayload 读写
         var move = new BinaryProtocol.MoveIntentPayload
@@ -57,7 +58,6 @@ public class TestModernBinaryProtocolMatrix
             Direction = 3,
             IsRun = 1 // 跑步
         };
-
         Span<byte> moveBytes = stackalloc byte[Marshal.SizeOf<BinaryProtocol.MoveIntentPayload>()];
         move.Write(moveBytes);
 
@@ -66,6 +66,63 @@ public class TestModernBinaryProtocolMatrix
         Assert.Equal(270, restoredMove.TargetY);
         Assert.Equal(3, restoredMove.Direction);
         Assert.Equal(1, restoredMove.IsRun);
+
+        // 验证 SplitItemIntentPayload 读写
+        var splitIntent = new BinaryProtocol.SplitItemIntentPayload
+        {
+            BagSlot = 3,
+            SplitCount = 5
+        };
+        Span<byte> splitBuf = stackalloc byte[8];
+        splitIntent.Write(splitBuf);
+        var restoredSplit = BinaryProtocol.SplitItemIntentPayload.Read(splitBuf);
+        Assert.Equal(3, restoredSplit.BagSlot);
+        Assert.Equal(5, restoredSplit.SplitCount);
+    }
+
+    [Fact]
+    public void Test_ServerAuthoritative_SplitItem_SuccessAndFail()
+    {
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(new Mir2.Server.Maps.MapManager());
+        var session = new Mir2.Server.Network.ClientSession(1, null!)
+        {
+            State = new Mir2.Shared.Models.PlayerState
+            {
+                Hp = 100,
+                MaxHp = 100
+            }
+        };
+
+        // 添加一个可堆叠物品 (金创药 10 份)
+        session.State.BagItems.Add(new Mir2.Shared.Models.EquipItem
+        {
+            Uid = 8888,
+            Name = "金创药(小量)",
+            Dura = 10,
+            MaxDura = 10
+        });
+
+        // 构造 IntentSplitItem 封包: 从 slot 0 拆出 4 份
+        var split = new BinaryProtocol.SplitItemIntentPayload { BagSlot = 0, SplitCount = 4 };
+        byte[] payload = new byte[8];
+        split.Write(payload);
+
+        var header = new BinaryProtocol.PacketHeader
+        {
+            Magic = BinaryProtocol.DefaultMagic,
+            MsgId = (ushort)BinaryProtocol.MsgType.IntentSplitItem,
+            PayloadLength = (ushort)payload.Length,
+            Sequence = 1
+        };
+
+        // 调度分发
+        dispatcher.DispatchBinary(session, in header, payload);
+
+        // 校验权威拆分结果
+        Assert.Equal(2, session.State.BagItems.Count);
+        Assert.Equal(6, session.State.BagItems[0].Dura); // 原槽位剩余 6
+        Assert.Equal(4, session.State.BagItems[1].Dura); // 新槽位获得 4
+        Assert.Equal("金创药(小量)", session.State.BagItems[1].Name);
     }
 
     [Fact]
@@ -193,24 +250,30 @@ public class TestModernBinaryProtocolMatrix
         await pipe.Writer.WriteAsync(packets[1]);
         await pipe.Writer.FlushAsync();
 
-        // 给一点处理时间
-        await Task.Delay(50);
-        Assert.Equal(2, receivedPackets);
+        // 动态等待处理完成
+        for (int w = 0; w < 50 && Volatile.Read(ref receivedPackets) < 2; w++)
+        {
+            await Task.Delay(10);
+        }
+        Assert.Equal(2, Volatile.Read(ref receivedPackets));
 
         // 2. 模拟半包: 将包 3 拆分为两截写入 (先写 5 字节，再写剩余字节)
         await pipe.Writer.WriteAsync(packets[2].AsMemory(0, 5));
         await pipe.Writer.FlushAsync();
         await Task.Delay(30);
         // 此时半包尚未凑齐，包数不应增加
-        Assert.Equal(2, receivedPackets);
+        Assert.Equal(2, Volatile.Read(ref receivedPackets));
 
         // 写入包 3 剩余部分
         await pipe.Writer.WriteAsync(packets[2].AsMemory(5));
         await pipe.Writer.FlushAsync();
-        await Task.Delay(50);
+        for (int w = 0; w < 50 && Volatile.Read(ref receivedPackets) < 3; w++)
+        {
+            await Task.Delay(10);
+        }
 
         // 此时包 3 成功重组并触发解析
-        Assert.Equal(3, receivedPackets);
+        Assert.Equal(3, Volatile.Read(ref receivedPackets));
 
         cts.Cancel();
         pipe.Reader.CancelPendingRead();
@@ -377,5 +440,67 @@ public class TestModernBinaryProtocolMatrix
         Assert.True(playerNearB.SendSequence > bSeqBefore);
         // 2. 远距离玩家 C 被 LOD 算法视距降采样有效剔除 (SendSequence 维持原样，节省网络带宽)
         Assert.Equal(cSeqBefore, playerFarC.SendSequence);
+    }
+
+    [Fact]
+    public void Test_ServerAuthoritative_ShopSell_DirectBlit_Roundtrip()
+    {
+        // 1. 结构体大小契约
+        Assert.Equal(8, Marshal.SizeOf<BinaryProtocol.ShopSellIntentPayload>());
+
+        var sellPayload = new BinaryProtocol.ShopSellIntentPayload
+        {
+            NpcUid = 2001,
+            ItemUid = 9999
+        };
+        Span<byte> buf = stackalloc byte[8];
+        sellPayload.Write(buf);
+
+        var restored = BinaryProtocol.ShopSellIntentPayload.Read(buf);
+        Assert.Equal(2001, restored.NpcUid);
+        Assert.Equal(9999, restored.ItemUid);
+
+        // 2. 服务端权威出售逻辑闭环验证
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(new Mir2.Server.Maps.MapManager());
+        var session = new Mir2.Server.Network.ClientSession(1, null!)
+        {
+            State = new Mir2.Shared.Models.PlayerState
+            {
+                Hp = 100,
+                MaxHp = 100,
+                Gold = 500
+            }
+        };
+
+        // 放入一件生铁戒指
+        var ring = new Mir2.Shared.Models.EquipItem
+        {
+            Uid = 9999,
+            Name = "生铁戒指",
+            Weight = 1,
+            Dura = 5,
+            MaxDura = 5
+        };
+        session.State.BagItems.Add(ring);
+        session.State.BagWeight = ring.Weight;
+
+        // 构造二进制帧并分发
+        byte[] payload = new byte[8];
+        sellPayload.Write(payload);
+
+        var header = new BinaryProtocol.PacketHeader
+        {
+            Magic = BinaryProtocol.DefaultMagic,
+            MsgId = (ushort)BinaryProtocol.MsgType.IntentShopSell,
+            PayloadLength = (ushort)payload.Length,
+            Sequence = 1
+        };
+
+        dispatcher.DispatchBinary(session, in header, payload);
+
+        // 验证背包物品已被服务端权威移除
+        Assert.DoesNotContain(session.State.BagItems, i => i.Uid == 9999);
+        // 验证金币获得增加
+        Assert.True(session.State.Gold > 500);
     }
 }

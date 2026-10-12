@@ -152,6 +152,45 @@ namespace Mir2Client.Game
         }
 
         /// <summary>
+        /// 本地主角权威服务端位置纠偏 (Player Reconciliation)
+        /// 针对公网抖动与微小延迟拉扯，在 1 格容差以内保持平滑阻尼指数衰减，不打断行走；
+        /// 超出容差（如传送、被撞退、撞墙硬阻挡）执行硬瞬移拉回
+        /// </summary>
+        public static void ReconcilePlayerPosition(EntityState state, int serverX, int serverY, byte dir, float snapThreshold = 64.0f)
+        {
+            Vector2 serverPos = TileToWorld(serverX, serverY);
+            Vector2 currentVisual = state.VisualPos + state.SmoothOffset;
+            float dist = currentVisual.DistanceTo(serverPos);
+
+            if (dist > snapThreshold)
+            {
+                InitializeEntity(state, serverX, serverY, dir);
+            }
+            else
+            {
+                state.CurrentTileX = serverX;
+                state.CurrentTileY = serverY;
+                state.Direction = dir;
+
+                if (state.IsMoving)
+                {
+                    state.StartWorldPos = serverPos;
+                    state.VisualPos = serverPos;
+                    state.MoveTimer = 0f;
+                    state.MoveDuration = Math.Max(0.08f, state.MoveDuration - state.MoveTimer);
+                }
+                else
+                {
+                    state.TargetTileX = serverX;
+                    state.TargetTileY = serverY;
+                    state.VisualPos = serverPos;
+                }
+
+                state.SmoothOffset = currentVisual - serverPos;
+            }
+        }
+
+        /// <summary>
         /// 弱网航位推测激活：步进结束但下一帧网络包未到达时，沿上一动作速度平滑外推
         /// </summary>
         public static void TriggerDeadReckoning(EntityState state)

@@ -31,6 +31,7 @@ public partial class NpcDialogView : Control, IManagedWindow
     private Button? _btnClose;
 
     public string WindowName => "NpcDialogView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.NpcDialog;
     public new bool IsVisible
     {
         get => Visible;

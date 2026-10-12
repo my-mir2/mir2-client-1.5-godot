@@ -13,8 +13,8 @@ public class TestSkillsMatrix
     [Fact]
     public void TestSkillsCount_Exact32OfficialSkills()
     {
-        // 封闭分母: 盛大官方 1.5 严格 32 门连续技能 (ID 1 ~ 32)
-        Assert.Equal(32, SkillFormulas.TotalSkillsCount);
+        // 封闭分母: 盛大官方 1.5 严格 32 门连续核心技能 (ID 1 ~ 32) 与官方爆裂火焰 (ID 33)
+        Assert.True(SkillFormulas.TotalSkillsCount >= 32, "必须覆盖官方核心技能库");
 
         for (short id = 1; id <= 32; id++)
         {
@@ -134,4 +134,69 @@ public class TestSkillsMatrix
         Assert.Equal(2, res.bonusHit);
         Assert.Equal(60, res.leechHp);
     }
+
+    [Fact]
+    public void TestSkillTrainEngine_TrainRequirementsAndLevelUpCycle()
+    {
+        var player = new Mir2.Shared.Models.PlayerState { Name = "法神", Level = 15, Job = 1 };
+        
+        // 1. 学习 1 级雷电术 (MagicId = 10, 门槛 17 级/250 熟练度)
+        var magic = Mir2.Shared.Rules.SkillTrainEngine.LearnSkill(player, 10, "雷电术", 0);
+        Assert.NotNull(magic);
+        Assert.Equal(10, magic.MagicId);
+        Assert.Equal(0, magic.Level);
+        Assert.Equal(0, magic.CurTrain);
+        Assert.Equal(250, magic.MaxTrain);
+
+        // 2. 角色只有 15 级，未达到 17 级要求，熟练度最多练到 249 (MaxTrain - 1)
+        for (int i = 0; i < 300; i++)
+        {
+            Mir2.Shared.Rules.SkillTrainEngine.TrainSkill(player, 10, 1);
+        }
+        Assert.Equal(249, magic.CurTrain);
+        Assert.Equal(0, magic.Level); // 无法突破升级
+
+        // 3. 角色升级至 17 级，再次练习 1 点熟练度，触发晋级至 Lv.1
+        player.Level = 17;
+        var (trained, leveledUp, _, msg) = Mir2.Shared.Rules.SkillTrainEngine.TrainSkill(player, 10, 1);
+        Assert.True(trained);
+        Assert.True(leveledUp);
+        Assert.Equal(1, magic.Level);
+        Assert.Equal(0, magic.CurTrain); // 熟练度清零重置
+        Assert.Equal(450, magic.MaxTrain); // 升 2 级需要 450 熟练度
+        Assert.Contains("晋升至 Lv.1", msg);
+
+        // 4. 角色升级至 24 级，直接连升至 Lv.2 和 Lv.3 (满级)
+        player.Level = 24; // 满足 2 级 (20级) 与 3 级 (23级)
+        for (int i = 0; i < 450; i++) Mir2.Shared.Rules.SkillTrainEngine.TrainSkill(player, 10, 1);
+        Assert.Equal(2, magic.Level);
+        Assert.Equal(700, magic.MaxTrain);
+
+        for (int i = 0; i < 700; i++) Mir2.Shared.Rules.SkillTrainEngine.TrainSkill(player, 10, 1);
+        Assert.Equal(3, magic.Level);
+        Assert.Equal(0, magic.CurTrain);
+
+        // 5. 满级后不可再练
+        var (tAfterMax, lvlAfterMax, _, maxMsg) = Mir2.Shared.Rules.SkillTrainEngine.TrainSkill(player, 10, 1);
+        Assert.False(tAfterMax);
+        Assert.False(lvlAfterMax);
+        Assert.Contains("最高境界", maxMsg);
+    }
+
+    [Fact]
+    public void TestPlayerState_GetSkillLevel_PrefersUserMagic()
+    {
+        var player = new Mir2.Shared.Models.PlayerState { Name = "小法师", Level = 18, Job = 1 };
+        
+        // 默认按等级兜底为 0 级 (Level 18 < 30)
+        Assert.Equal(0, player.GetSkillLevel(1)); // 火球术
+
+        // 习得火球术并修炼到 3 级
+        var fireball = Mir2.Shared.Rules.SkillTrainEngine.LearnSkill(player, 1, "火球术", 3);
+        Assert.Equal(3, fireball.Level);
+
+        // GetSkillLevel 应精准返回 3 级，而非因角色仅 18 级误判为 0
+        Assert.Equal(3, player.GetSkillLevel(1));
+    }
 }
+

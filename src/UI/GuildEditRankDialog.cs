@@ -30,6 +30,7 @@ public partial class GuildEditRankDialog : Control, IManagedWindow
     private string _currentMember = "";
 
     public string WindowName => "GuildEditRankDialog";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.GuildPanel;
     public new bool IsVisible
     {
         get => Visible;

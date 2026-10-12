@@ -90,6 +90,7 @@ public partial class GuildPanelView : Control, IManagedWindow
     private string _currentRawNotice = "";
 
     public string WindowName => "GuildPanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.GuildPanel;
     public new bool IsVisible
     {
         get => Visible;

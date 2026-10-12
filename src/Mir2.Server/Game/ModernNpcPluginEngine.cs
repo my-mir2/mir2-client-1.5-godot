@@ -5,65 +5,10 @@ using System.Reflection;
 using System.Text;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
+using Mir2.Shared.Plugins;
 using Mir2.Shared.Protocols;
 
 namespace Mir2.Server.Game;
-
-/// <summary>
-/// NPC 强类型对话上下文模型 (具备 100% 编译期静态安全与类型感知)
-/// </summary>
-public sealed class NpcDialogContext
-{
-    public ClientSession Session { get; }
-    public string NpcName { get; }
-    public string SelectedAction { get; set; } = "@main";
-    public string DialogText { get; set; } = string.Empty;
-    public List<(string label, string actionTag)> Hyperlinks { get; } = new();
-    public bool CloseWindow { get; set; }
-
-    public NpcDialogContext(ClientSession session, string npcName, string initialAction = "@main")
-    {
-        Session = session;
-        NpcName = npcName;
-        SelectedAction = initialAction;
-    }
-
-    public void AddLink(string label, string actionTag) =>
-        Hyperlinks.Add((label, actionTag));
-
-    public string BuildFinalDialogPayload()
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine(DialogText);
-        for (int i = 0; i < Hyperlinks.Count; i++)
-        {
-            var (lbl, act) = Hyperlinks[i];
-            sb.AppendLine($"<{lbl}/{act}>");
-        }
-        return sb.ToString().TrimEnd();
-    }
-}
-
-/// <summary>
-/// 现代化强类型 NPC 行为树插件接口 (INpcBehavior)
-/// 彻底淘汰旧易错的 TXT 语法，在开发机本地编译期即可捕获一切语法与逻辑错误！
-/// </summary>
-public interface INpcBehavior
-{
-    int NpcId { get; }
-    string NpcName { get; }
-    void OnInteract(NpcDialogContext ctx);
-}
-
-/// <summary>
-/// 插件装载结果状态包
-/// </summary>
-public sealed class PluginLoadResult
-{
-    public bool Success { get; init; }
-    public string Message { get; set; } = string.Empty;
-    public List<string> LoadedNpcNames { get; } = new();
-}
 
 /// <summary>
 /// 现代强类型插件化 NPC 调度与内存热更沙箱引擎 (ModernNpcPluginEngine)
@@ -92,15 +37,13 @@ public sealed class ModernNpcPluginEngine
 
     public ModernNpcPluginEngine()
     {
-        // 预注册盛大官方 1.5 全量 14 大经典核心重写插件
+        // 预注册盛大官方 1.5 经典核心重写插件
         RegisterPlugin(new VeteranNpcBehavior());
         RegisterPlugin(new SabukStewardNpcBehavior());
-        RegisterPlugin(new YuelaoNpcBehavior());
         RegisterPlugin(new MengzhongPharmacyNpcBehavior());
         RegisterPlugin(new BlacksmithNpcBehavior());
         RegisterPlugin(new StorageKeeperNpcBehavior());
         RegisterPlugin(new WeaponUpgradeMasterNpcBehavior());
-        RegisterPlugin(new MasterApprenticeRegistrarNpcBehavior());
         RegisterPlugin(new SabukSiegeRegistrarNpcBehavior());
         RegisterPlugin(new FateSwordQuestNpcBehavior());
         RegisterPlugin(new DarkHallTeleporterNpcBehavior());
@@ -139,6 +82,7 @@ public sealed class ModernNpcPluginEngine
     /// </summary>
     [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026:RequiresUnreferencedCode")]
     [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2072:TargetRequiresPublicParameterlessConstructor")]
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2062:TargetRequiresPublicParameterlessConstructor")]
     public PluginLoadResult LoadPluginsFromAssemblyBytes(byte[] assemblyBytes)
     {
         if (assemblyBytes == null || assemblyBytes.Length == 0)
@@ -194,19 +138,62 @@ public sealed class ModernNpcPluginEngine
     }
 
     /// <summary>
+    /// 从磁盘文件中无锁读取字节流并进行内存沙箱热加载 (读取后立即关闭文件句柄，零磁盘锁死)
+    /// </summary>
+    public PluginLoadResult LoadPluginsFromFile(string filePath)
+    {
+        if (!System.IO.File.Exists(filePath))
+        {
+            return new PluginLoadResult { Success = false, Message = $"插件文件不存在: {filePath}" };
+        }
+
+        try
+        {
+            byte[] bytes = System.IO.File.ReadAllBytes(filePath);
+            return LoadPluginsFromAssemblyBytes(bytes);
+        }
+        catch (Exception ex)
+        {
+            return new PluginLoadResult { Success = false, Message = $"读取插件失败: {ex.Message}" };
+        }
+    }
+
+    /// <summary>
+    /// 热重新加载插件 (刷新内置插件或重新加载沙箱)
+    /// </summary>
+    public (bool Success, string Message) HotReloadPlugins(string? pluginPath = null)
+    {
+        if (string.IsNullOrEmpty(pluginPath))
+        {
+            return (true, "NPC插件热重载完成 (已刷新内置插件)");
+        }
+        var res = LoadPluginsFromFile(pluginPath);
+        return (res.Success, res.Message);
+    }
+
+    /// <summary>
     /// 执行强类型 NPC 交互 (按名称)
     /// </summary>
     public (bool handled, string dialogPayload, bool closed) DispatchDialog(ClientSession session, string npcName, string actionTag = "@main")
     {
+        var (h, p, c, _) = DispatchDialogEx(session, npcName, actionTag);
+        return (h, p, c);
+    }
+
+    /// <summary>
+    /// 执行强类型 NPC 交互扩展版本 (按名称，附带返回完整上下文与传送意图)
+    /// </summary>
+    public (bool handled, string dialogPayload, bool closed, NpcDialogContext? context) DispatchDialogEx(ClientSession session, string npcName, string actionTag = "@main")
+    {
         if (!_pluginsByName.TryGetValue(npcName, out var behavior))
         {
-            return (false, string.Empty, true);
+            return (false, string.Empty, true, null);
         }
 
-        var ctx = new NpcDialogContext(session, npcName, actionTag);
+        var ctx = new NpcDialogContext(session, npcName, actionTag, behavior.NpcId);
         behavior.OnInteract(ctx);
 
-        return (true, ctx.BuildFinalDialogPayload(), ctx.CloseWindow);
+        return (true, ctx.BuildFinalDialogPayload(), ctx.CloseWindow, ctx);
     }
 
     /// <summary>
@@ -214,15 +201,24 @@ public sealed class ModernNpcPluginEngine
     /// </summary>
     public (bool handled, string dialogPayload, bool closed) DispatchDialog(ClientSession session, int npcId, string actionTag = "@main")
     {
+        var (h, p, c, _) = DispatchDialogEx(session, npcId, actionTag);
+        return (h, p, c);
+    }
+
+    /// <summary>
+    /// 执行强类型 NPC 交互扩展版本 (按 NPC ID，附带返回完整上下文与传送意图)
+    /// </summary>
+    public (bool handled, string dialogPayload, bool closed, NpcDialogContext? context) DispatchDialogEx(ClientSession session, int npcId, string actionTag = "@main")
+    {
         if (!_pluginsById.TryGetValue(npcId, out var behavior))
         {
-            return (false, string.Empty, true);
+            return (false, string.Empty, true, null);
         }
 
-        var ctx = new NpcDialogContext(session, behavior.NpcName, actionTag);
+        var ctx = new NpcDialogContext(session, behavior.NpcName, actionTag, behavior.NpcId);
         behavior.OnInteract(ctx);
 
-        return (true, ctx.BuildFinalDialogPayload(), ctx.CloseWindow);
+        return (true, ctx.BuildFinalDialogPayload(), ctx.CloseWindow, ctx);
     }
 
     // ==================== 盛大官方 1.5 全量 13 大核心 NPC 强类型行为树 ====================
@@ -245,7 +241,7 @@ public sealed class ModernNpcPluginEngine
                     ctx.DialogText = $"年轻的勇士 {ctx.Session.CharacterName}，这片玛法大陆危机四伏。你想去哪里历练？";
                     ctx.AddLink("前往盟重土城 (需要 2000 金币)", "@move_mengzhong");
                     ctx.AddLink("前往毒蛇山谷 (需要 500 金币)", "@move_snake");
-                    ctx.AddLink("打听封魔谷传闻", "@rumor_fengmo");
+                    ctx.AddLink("打听白日门虎卫堂传闻", "@rumor_huwei");
                     ctx.AddLink("离开", "@close");
                     break;
 
@@ -254,12 +250,8 @@ public sealed class ModernNpcPluginEngine
                     {
                         ctx.Session.State.Gold -= 2000;
                         ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
-                        ctx.Session.CurrentMapId = 3;
-                        ctx.Session.X = 330;
-                        ctx.Session.Y = 330;
-                        ctx.Session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, 3, 330, 330, 0);
+                        ctx.RequestTeleport(3, 330, 330, "传送阵光芒闪烁，你已抵达盟重土城！");
                         ctx.DialogText = "传送阵光芒闪烁，你已抵达盟重土城！";
-                        ctx.CloseWindow = true;
                     }
                     else
                     {
@@ -272,12 +264,8 @@ public sealed class ModernNpcPluginEngine
                     {
                         ctx.Session.State.Gold -= 500;
                         ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
-                        ctx.Session.CurrentMapId = 2;
-                        ctx.Session.X = 500;
-                        ctx.Session.Y = 500;
-                        ctx.Session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, 2, 500, 500, 0);
+                        ctx.RequestTeleport(2, 500, 500, "你已抵达毒蛇山谷！注意避开红蛇毒雾。");
                         ctx.DialogText = "你已抵达毒蛇山谷！注意避开红蛇毒雾。";
-                        ctx.CloseWindow = true;
                     }
                     else
                     {
@@ -285,8 +273,8 @@ public sealed class ModernNpcPluginEngine
                     }
                     break;
 
-                case "@rumor_fengmo":
-                    ctx.DialogText = "封魔谷封印着千万年前的千年树妖与虹魔教主，实力不足 35 级切勿涉险！";
+                case "@rumor_huwei":
+                    ctx.DialogText = "白日门天尊道观深处的虎卫堂有神勇虎卫守护，法师修得 3 级诱惑之光可前往尝试招募！";
                     ctx.AddLink("返回", "@main");
                     break;
 
@@ -354,49 +342,6 @@ public sealed class ModernNpcPluginEngine
         }
     }
 
-    /// <summary>
-    /// 3. 封魔谷月老行为树
-    /// </summary>
-    public sealed class YuelaoNpcBehavior : INpcBehavior
-    {
-        public int NpcId => 103;
-        public string NpcName => "月老";
-
-        public void OnInteract(NpcDialogContext ctx)
-        {
-            if (ctx.Session.State == null) return;
-
-            switch (ctx.SelectedAction.ToLowerInvariant())
-            {
-                case "@main":
-                    ctx.DialogText = "在天愿作比翼鸟，在地愿为连理枝。千里姻缘一线牵，二位新人准备好了吗？";
-                    ctx.AddLink("我们要结婚 (双方各需 1 婚戒与 520,000 金币)", "@marry");
-                    ctx.AddLink("斩断情丝，请求离婚", "@divorce");
-                    ctx.AddLink("离开", "@close");
-                    break;
-
-                case "@marry":
-                    if (ctx.Session.State.Gold >= 520000)
-                    {
-                        ctx.DialogText = "月老红线已系！恭喜二位喜结良缘，永浴爱河！";
-                    }
-                    else
-                    {
-                        ctx.DialogText = "婚礼筹备需要 520,000 金币礼金，金币不足！";
-                    }
-                    break;
-
-                case "@divorce":
-                    ctx.DialogText = "既已情断义绝，需支付 1,000,000 抚恤金解除婚姻关系。";
-                    break;
-
-                case "@close":
-                default:
-                    ctx.CloseWindow = true;
-                    break;
-            }
-        }
-    }
 
     /// <summary>
     /// 4. 盟重药店老板行为树
@@ -501,27 +446,40 @@ public sealed class ModernNpcPluginEngine
                     break;
 
                 case "@unlock":
+                    ctx.Session.IsStorageOpen = true;
+                    ctx.Session.StorageNpcUid = ctx.NpcId;
                     ctx.DialogText = "请在弹出的对话框中输入你的 6 位仓库二级密码。";
                     break;
 
                 case "@open_storage":
+                    ctx.Session.IsStorageOpen = true;
+                    ctx.Session.StorageNpcUid = ctx.NpcId;
+                    ctx.Session.EnqueuePacket(ProtocolConsts.SM_OPENSTORAGEDLG, 0, 0, 0, 0);
                     ctx.DialogText = "保管箱已为你打开，请拖放物品。";
                     break;
 
                 case "@save_gold":
+                    ctx.Session.IsStorageOpen = true;
+                    ctx.Session.StorageNpcUid = ctx.NpcId;
                     ctx.DialogText = "请指定你要存入的金币数量。";
                     break;
 
                 case "@get_gold":
+                    ctx.Session.IsStorageOpen = true;
+                    ctx.Session.StorageNpcUid = ctx.NpcId;
                     ctx.DialogText = "请指定你要提取的金币数量。";
                     break;
 
                 case "@set_password":
+                    ctx.Session.IsStorageOpen = true;
+                    ctx.Session.StorageNpcUid = ctx.NpcId;
                     ctx.DialogText = "二级密码可有效防盗，建议设置 6-12 位强密码。";
                     break;
 
                 case "@close":
                 default:
+                    ctx.Session.IsStorageOpen = false;
+                    ctx.Session.EnqueuePacket(ProtocolConsts.SM_CLOSESTORAGEDLG, 0, 0, 0, 0);
                     ctx.CloseWindow = true;
                     break;
             }
@@ -536,7 +494,7 @@ public sealed class ModernNpcPluginEngine
         public int NpcId => 107;
         public string NpcName => "武器升级大师";
 
-        public sealed record UpgradeRecord(int WeaponUid, string WeaponName, long FinishTickMs, int UpgradeType);
+        public sealed record UpgradeRecord(EquipItem Weapon, long FinishTickMs, int UpgradeType);
         public static readonly ConcurrentDictionary<int, UpgradeRecord> OngoingUpgrades = new();
 
         public void OnInteract(NpcDialogContext ctx)
@@ -551,7 +509,7 @@ public sealed class ModernNpcPluginEngine
                         long now = Environment.TickCount64;
                         if (now >= rec.FinishTickMs)
                         {
-                            ctx.DialogText = $"你的【{rec.WeaponName}】已经修炼完成！请取回武器并在实战中试刀见证成果！";
+                            ctx.DialogText = $"你的【{rec.Weapon.Name}】已经修炼完成！请取回武器并在实战中试刀见证成果！";
                             ctx.AddLink("取回修炼好的武器", "@retrieve_weapon");
                         }
                         else
@@ -577,18 +535,33 @@ public sealed class ModernNpcPluginEngine
                         return;
                     }
 
+                    // 官方权威机制：武器投入熔炉必须从手持槽位卸下收缴，淬炼期间不可使用
+                    ctx.Session.State.Equipment[(int)OfficialEquipSlot.Weapon] = null;
+                    ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
+
                     // 启动升级状态机 (模拟淬火 1 秒完成供即时测试)
-                    OngoingUpgrades[ctx.Session.SessionId] = new UpgradeRecord(weapon.Uid, weapon.Name, Environment.TickCount64 + 1000, 0);
-                    ctx.DialogText = $"【{weapon.Name}】已被老夫投入熔炉！稍后即可前来取回。";
+                    OngoingUpgrades[ctx.Session.SessionId] = new UpgradeRecord(weapon, Environment.TickCount64 + 1000, 0);
+                    ctx.DialogText = $"【{weapon.Name}】已被老夫收缴并投入熔炉！淬炼期间请勿催促，稍后即可前来取回。";
                     break;
 
                 case "@retrieve_weapon":
+                    if (ctx.Session.State.BagItems.Count >= 40)
+                    {
+                        ctx.DialogText = "你的背包已满，无法容纳出炉的武器！请先清理背包！";
+                        return;
+                    }
+
                     if (OngoingUpgrades.TryRemove(ctx.Session.SessionId, out var finishedRec))
                     {
-                        ctx.Session.State.TrialSlashCount = 1; // 激活试刀状态
-                        var curW = ctx.Session.State.Equipment[(int)OfficialEquipSlot.Weapon];
-                        if (curW != null) curW.UpgradeState = 1;
-                        ctx.DialogText = $"已取回【{finishedRec.WeaponName}】！请立刻找怪物或对手开刀，生死由命，成败在天！";
+                        var upgradedWeapon = finishedRec.Weapon;
+                        upgradedWeapon.UpgradeState = 1;       // 标记已开光待试刀
+                        ctx.Session.State.TrialSlashCount = 1; // 激活角色试刀状态
+
+                        // 官方权威机制：取回武器放入背包
+                        ctx.Session.State.BagItems.Add(upgradedWeapon);
+                        ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
+
+                        ctx.DialogText = $"已取回【{upgradedWeapon.Name}】并放入背包！请装备后立刻找怪物或对手开刀，生死由命，成败在天！";
                     }
                     break;
 
@@ -605,61 +578,6 @@ public sealed class ModernNpcPluginEngine
         }
     }
 
-    /// <summary>
-    /// 8. 比奇武馆教头 / 拜师收徒使者行为树
-    /// </summary>
-    public sealed class MasterApprenticeRegistrarNpcBehavior : INpcBehavior
-    {
-        public int NpcId => 108;
-        public string NpcName => "武馆教头";
-
-        public void OnInteract(NpcDialogContext ctx)
-        {
-            if (ctx.Session.State == null) return;
-
-            switch (ctx.SelectedAction.ToLowerInvariant())
-            {
-                case "@main":
-                    ctx.DialogText = "尊师重道，武德流芳。年轻人，未满 28 级可拜师学艺；满 35 级方可开宗立派收徒！";
-                    ctx.AddLink("我要拜师 (未满 28 级)", "@apprentice");
-                    ctx.AddLink("我要收徒 (35 级以上且声望充足)", "@master");
-                    ctx.AddLink("解除师徒关系", "@dissolve");
-                    ctx.AddLink("离开", "@close");
-                    break;
-
-                case "@apprentice":
-                    if (ctx.Session.State.Level < 28)
-                    {
-                        ctx.DialogText = "你资质上乘，请对方师父到我面前共同见证拜师之礼！";
-                    }
-                    else
-                    {
-                        ctx.DialogText = "你已达 28 级武艺小成，不可再拜师！";
-                    }
-                    break;
-
-                case "@master":
-                    if (ctx.Session.State.Level >= 35)
-                    {
-                        ctx.DialogText = "武学宗师之姿！徒弟出师后你将获得大量声望与荣耀奖励！";
-                    }
-                    else
-                    {
-                        ctx.DialogText = "未达 35 级，火候尚浅，不可误人子弟！";
-                    }
-                    break;
-
-                case "@dissolve":
-                    ctx.DialogText = "强行解除师徒关系将扣除 5 点江湖声望，是否执意如此？";
-                    break;
-
-                case "@close":
-                default:
-                    ctx.CloseWindow = true;
-                    break;
-            }
-        }
-    }
 
     /// <summary>
     /// 9. 沙巴克攻城管理员行为树 (祖玛头像申请与 3 天倒计时)
@@ -798,12 +716,8 @@ public sealed class ModernNpcPluginEngine
 
                 case "@enter_darkhall":
                     // 传送至未知暗殿 (Map 9000)
-                    ctx.Session.CurrentMapId = 9000;
-                    ctx.Session.X = 50;
-                    ctx.Session.Y = 50;
-                    ctx.Session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, 9000, 50, 50, 0);
+                    ctx.RequestTeleport(9000, 50, 50, "乾坤逆转，你已踏入未知暗殿！小心看似弱小的生灵！");
                     ctx.DialogText = "乾坤逆转，你已踏入未知暗殿！小心看似弱小的生灵！";
-                    ctx.CloseWindow = true;
                     break;
 
                 case "@darkhall_lore":

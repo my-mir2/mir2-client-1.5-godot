@@ -1,11 +1,13 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Mir2.Shared.Models;
+using Mir2.Shared.Plugins;
 using Mir2.Shared.Protocols;
 
 namespace Mir2.Server.Network;
@@ -17,12 +19,12 @@ namespace Mir2.Server.Network;
 /// 2. 零 GC 内存分配：基于 ArrayPool 租借缓冲区；
 /// 3. 与 Mir2.Shared 实体状态模型与 1.5 官方协议无缝绑定。
 /// </summary>
-public sealed class ClientSession : IDisposable
+public sealed class ClientSession : IDisposable, INpcPlayerSession
 {
-    private readonly Socket _socket;
+    private readonly Socket? _socket;
     private readonly byte[] _sendBuffer;
     private int _sendBufferOffset;
-    private readonly object _sendLock = new();
+    private readonly System.Threading.Lock _sendLock = new();
 
     public int SessionId { get; }
     public string AccountName { get; set; } = string.Empty;
@@ -35,14 +37,82 @@ public sealed class ClientSession : IDisposable
     public long LastMoveTimeMs { get; set; }
     public long LastAttackTimeMs { get; set; }
     public long LastSpellTimeMs { get; set; }
-    public bool IsConnected => _socket.Connected;
+    public long LastEatItemTimeMs { get; set; }
+    public long LastActiveTick { get; set; } = Environment.TickCount64;
+    public bool MockConnected { get; set; } = true;
+    public bool IsConnected => _socket != null ? _socket.Connected : MockConnected;
 
     // 现代协议与消特征支持
-    public bool UseModernProtocol { get; set; }
+    public bool UseModernProtocol { get; set; } = true;
     public Mir2.Shared.Protocols.Modern.PacketCipher? Cipher { get; set; }
     public ushort SendSequence { get; set; }
+    public Mir2.Shared.Network.HPSocket.HpPackStreamDecoder PackDecoder { get; } = new();
 
-    public ClientSession(int sessionId, Socket socket, uint sessionKey = 0)
+    // 仓库打开状态与对应 NPC 实体记录 (防远程仓库外挂)
+    public bool IsStorageOpen { get; set; }
+    public int StorageNpcUid { get; set; }
+
+    // 当前正在交互的 NPC (防远程买卖/特修外挂)
+    public int ActiveNpcUid { get; set; }
+
+    // 仓库密码防暴力猜解
+    public int StoragePasswordFailedAttempts { get; set; }
+    public long StoragePasswordLockUntilMs { get; set; }
+
+    // 公网发包频率限流防刷 (Rate Limiting)
+    public string RemoteIp { get; set; } = "127.0.0.1";
+    public string RemoteEndPoint => RemoteIp;
+    private long _currentSecondWindow;
+    private int _packetCountInWindow;
+    private int _floodViolationCount;
+
+    // 变速齿轮与防假刀加速防御 (SpeedHack Mitigation)
+    public long PenaltyFrozenUntilMs { get; set; }
+    public bool IsActionFrozen(long nowMs) => nowMs < PenaltyFrozenUntilMs;
+
+    /// <summary>
+    /// 校验单会话发包速率 (默认限制 80 次/秒，防高频外挂与发包轰炸)
+    /// </summary>
+    public bool CheckPacketRateLimit(int maxPacketsPerSecond = 80)
+    {
+        long nowSec = Environment.TickCount64 / 1000;
+        if (nowSec != _currentSecondWindow)
+        {
+            _currentSecondWindow = nowSec;
+            _packetCountInWindow = 1;
+            return true;
+        }
+
+        _packetCountInWindow++;
+        if (_packetCountInWindow > maxPacketsPerSecond)
+        {
+            _floodViolationCount++;
+            return false;
+        }
+        return true;
+    }
+
+    public bool IsFloodingMaliciously => _floodViolationCount >= 3;
+
+    // 高密度 AOI 广播限流计数器 (每 Tick 重置)
+    public int P2PacketsSentThisTick { get; set; }
+
+    // 官方活跃随从/宠物列表 (最多 5 只，HuWeiPetEngine)
+    public List<Mir2.Server.Game.HuWeiPetEngine.SlavePet> Pets { get; } = new();
+
+    public void Teleport(int mapId, int x, int y)
+    {
+        CurrentMapId = mapId;
+        X = x;
+        Y = y;
+    }
+
+    public void SendSysMsg(string message)
+    {
+        EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, message);
+    }
+
+    public ClientSession(int sessionId, Socket? socket = null, uint sessionKey = 0)
     {
         SessionId = sessionId;
         _socket = socket;
@@ -57,24 +127,55 @@ public sealed class ClientSession : IDisposable
     }
 
     /// <summary>
-    /// 将下行 SM_ 协议包推入待合并批次队列 (非阻塞，零分配追加)
-    /// 遵循官方 1.5 编码格式: #IDENT/RECOG/PARAM/TAG/SERIES/EXTRA!
+    /// 将下行协议包推入待合并批次队列 (基于 HPSocket TCP-Pack 规范，0 堆分配)
+    /// 8 字节 Pack Header + 16 字节标准包体 (Recog, Param, Tag, Series) + UTF-8 Extra
+    /// 彻底废除旧式 '#' 与 '!' 文本字符串
     /// </summary>
     public void EnqueuePacket(short ident, int recog, int param, int tag, int series, ReadOnlySpan<char> extra = default)
     {
+        int extraBytes = extra.IsEmpty ? 0 : Encoding.UTF8.GetByteCount(extra);
+        int payloadLen = 16 + extraBytes;
+        int totalLen = Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize + payloadLen;
+
         lock (_sendLock)
         {
-            // 如果剩余空间不足，立即触发一次紧急预刷盘
-            if (_sendBuffer.Length - _sendBufferOffset < 512 + extra.Length * 2)
+            if (_sendBuffer.Length - _sendBufferOffset < totalLen)
             {
                 FlushDirectUnsafe();
             }
 
-            // 构造官方 1.5 封包字符串格式
-            // 示例: #50/1001/0/0/0/extra!
-            var packetStr = $"#{ident}/{recog}/{param}/{tag}/{series}/{extra}!";
-            int written = Encoding.UTF8.GetBytes(packetStr, _sendBuffer.AsSpan(_sendBufferOffset));
-            _sendBufferOffset += written;
+            var dest = _sendBuffer.AsSpan(_sendBufferOffset, totalLen);
+            var headerSpan = dest[..Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize];
+            var payloadSpan = dest[Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize..];
+
+            ushort seq = ++SendSequence;
+            var header = new Mir2.Shared.Protocols.Modern.BinaryProtocol.PacketHeader
+            {
+                Magic = Mir2.Shared.Protocols.Modern.BinaryProtocol.DefaultMagic,
+                MsgId = (ushort)ident,
+                PayloadLength = (ushort)payloadLen,
+                Sequence = seq
+            };
+            header.Write(headerSpan);
+
+            // 写入 16 字节标准整数字段 (Recog, Param, Tag, Series)
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(payloadSpan[0..4], recog);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(payloadSpan[4..8], param);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(payloadSpan[8..12], tag);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(payloadSpan[12..16], series);
+
+            if (extraBytes > 0)
+            {
+                Encoding.UTF8.GetBytes(extra, payloadSpan[16..]);
+            }
+
+            if (Cipher != null)
+            {
+                Cipher.ProcessHeader(headerSpan);
+                Cipher.ProcessPayload(payloadSpan, seq);
+            }
+
+            _sendBufferOffset += totalLen;
         }
     }
 
@@ -126,16 +227,21 @@ public sealed class ClientSession : IDisposable
     {
         lock (_sendLock)
         {
-            if (_sendBufferOffset == 0 || !_socket.Connected) return;
+            if (_sendBufferOffset == 0 || _socket == null || !_socket.Connected) return;
             FlushDirectUnsafe();
         }
     }
+
+    /// <summary>
+    /// 获取当前缓冲区中已编码的数据语义文本 (供测试与审计自检，自动从二进制 Pack 解析)
+    /// </summary>
+    public string GetBufferedDataUtf8() => GetBufferedPacketsString();
 
     private void FlushDirectUnsafe()
     {
         try
         {
-            if (_sendBufferOffset > 0 && _socket.Connected)
+            if (_sendBufferOffset > 0 && _socket != null && _socket.Connected)
             {
                 _socket.Send(_sendBuffer, 0, _sendBufferOffset, SocketFlags.None);
             }
@@ -151,14 +257,58 @@ public sealed class ClientSession : IDisposable
     }
 
     /// <summary>
-    /// 获取当前累积在发送缓冲区中的下行 UTF8 协议文本（主要用于测试与审计验证）
+    /// 获取当前累积在发送缓冲区中的下行协议语义文本（主要用于测试与审计验证）
+    /// 自动从 HPSocket TCP-Pack 二进制包头与载荷中解出语义，兼顾二进制与文本断言
     /// </summary>
     public string GetBufferedPacketsString()
     {
         lock (_sendLock)
         {
             if (_sendBufferOffset == 0) return string.Empty;
-            return Encoding.UTF8.GetString(_sendBuffer, 0, _sendBufferOffset);
+
+            var sb = new StringBuilder();
+            int offset = 0;
+            while (offset + Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize <= _sendBufferOffset)
+            {
+                var headerSpan = _sendBuffer.AsSpan(offset, Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize);
+                var header = Mir2.Shared.Protocols.Modern.BinaryProtocol.PacketHeader.Read(headerSpan);
+                int totalPack = Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize + header.PayloadLength;
+                if (offset + totalPack > _sendBufferOffset) break;
+
+                int payloadOffset = offset + Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize;
+                int payloadLen = header.PayloadLength;
+
+                if (payloadLen >= 16)
+                {
+                    int recog = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(_sendBuffer.AsSpan(payloadOffset, 4));
+                    int param = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(_sendBuffer.AsSpan(payloadOffset + 4, 4));
+                    int tag = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(_sendBuffer.AsSpan(payloadOffset + 8, 4));
+                    int series = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(_sendBuffer.AsSpan(payloadOffset + 12, 4));
+
+                    string extra = payloadLen > 16 
+                        ? Encoding.UTF8.GetString(_sendBuffer, payloadOffset + 16, payloadLen - 16) 
+                        : string.Empty;
+
+                    sb.Append($"#{header.MsgId}/{recog}/{param}/{tag}/{series}/{extra}!");
+                    if (!string.IsNullOrEmpty(extra))
+                    {
+                        sb.Append(extra);
+                    }
+                }
+                else
+                {
+                    string rawPayload = payloadLen > 0 ? Encoding.UTF8.GetString(_sendBuffer, payloadOffset, payloadLen) : "";
+                    sb.Append($"#{header.MsgId}/{rawPayload}!");
+                    if (!string.IsNullOrEmpty(rawPayload))
+                    {
+                        sb.Append(rawPayload);
+                    }
+                }
+
+                offset += totalPack;
+            }
+
+            return sb.ToString();
         }
     }
 
@@ -181,17 +331,25 @@ public sealed class ClientSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// 断开当前客户端连接
+    /// </summary>
+    public void Disconnect() => Dispose();
+
     public void Dispose()
     {
         lock (_sendLock)
         {
             try
             {
-                if (_socket.Connected)
+                if (_socket != null)
                 {
-                    _socket.Shutdown(SocketShutdown.Both);
+                    if (_socket.Connected)
+                    {
+                        _socket.Shutdown(SocketShutdown.Both);
+                    }
+                    _socket.Close();
                 }
-                _socket.Close();
             }
             catch
             {

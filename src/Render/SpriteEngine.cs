@@ -56,18 +56,18 @@ namespace Mir2Client.Render
         public static readonly Dictionary<ActionType, int> ActionIntervalMs = new()
         {
             [ActionType.Stand] = 200,
-            [ActionType.Walk] = 130,
-            [ActionType.Run] = 110,
-            [ActionType.Hit] = 110,
-            [ActionType.HeavyHit] = 120,
-            [ActionType.BigHit] = 120,
-            [ActionType.PowerHit] = 120,
-            [ActionType.LongHit] = 120,
-            [ActionType.FireHit] = 120,
-            [ActionType.CrsHit] = 120,
-            [ActionType.Cast] = 120,
-            [ActionType.Struck] = 140,
-            [ActionType.Die] = 140,
+            [ActionType.Walk] = 60,
+            [ActionType.Run] = 50,
+            [ActionType.Hit] = 60,
+            [ActionType.HeavyHit] = 60,
+            [ActionType.BigHit] = 60,
+            [ActionType.PowerHit] = 60,
+            [ActionType.LongHit] = 60,
+            [ActionType.FireHit] = 60,
+            [ActionType.CrsHit] = 60,
+            [ActionType.Cast] = 60,
+            [ActionType.Struck] = 100,
+            [ActionType.Die] = 100,
             [ActionType.SitDown] = 200
         };
 
@@ -293,7 +293,7 @@ namespace Mir2Client.Render
 
         public bool IsBusy() => IsAttack() || Action == ActionType.Struck || Action == ActionType.Die;
 
-        public void SetAction(ActionType newAction, int newDir = -1)
+        public void SetAction(ActionType newAction, int newDir = -1, bool? loop = null)
         {
             if (newDir >= 0) Direction = newDir & 7;
             if (Action != newAction)
@@ -302,7 +302,7 @@ namespace Mir2Client.Render
                 AnimFrame = 0;
                 ElapsedMs = 0f;
                 Finished = false;
-                Loop = (newAction == ActionType.Stand);
+                Loop = loop ?? (newAction == ActionType.Stand || newAction == ActionType.Walk || newAction == ActionType.Run);
             }
         }
 

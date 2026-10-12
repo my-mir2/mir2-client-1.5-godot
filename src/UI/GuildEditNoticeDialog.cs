@@ -25,6 +25,7 @@ public partial class GuildEditNoticeDialog : Control, IManagedWindow
     private TextureButton? _btnClose;
 
     public string WindowName => "GuildEditNoticeDialog";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.GuildPanel;
     public new bool IsVisible
     {
         get => Visible;

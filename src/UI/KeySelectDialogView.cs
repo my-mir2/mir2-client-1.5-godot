@@ -35,6 +35,7 @@ public partial class KeySelectDialogView : Control, IManagedWindow
     private int _selectedKey = 0;
 
     public string WindowName => "KeySelectDialogView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.KeyConfig;
     public new bool IsVisible
     {
         get => Visible;

@@ -34,6 +34,7 @@ public partial class GroupPanelView : Control, IManagedWindow
     private bool _groupModeEnabled = true;
 
     public string WindowName => "GroupPanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.GroupPanel;
     public new bool IsVisible
     {
         get => Visible;
@@ -46,7 +47,8 @@ public partial class GroupPanelView : Control, IManagedWindow
     {
         Visible = false;
         Size = new Vector2(PanelWidth, PanelHeight);
-        Position = new Vector2(262, 179);
+        // 盛大官方停靠位置实证：停靠在屏幕右上侧，绝不居中遮挡视野与 HUD 快捷药水栏
+        Position = new Vector2(524, 0);
 
         _panel = new Panel
         {
@@ -83,10 +85,11 @@ public partial class GroupPanelView : Control, IManagedWindow
         var btnAllowGroup = new TextureButton
         {
             Name = "BtnAllowGroup",
-            Position = new Vector2(20, 18),
-            Size = new Vector2(20, 19),
+            Position = new Vector2(23, 20),
+            Size = new Vector2(14, 14),
             TextureNormal = _groupModeEnabled ? texCheckChecked : null,
-            TexturePressed = texCheckPressed
+            TexturePressed = texCheckPressed,
+            StretchMode = TextureButton.StretchModeEnum.KeepAspectCentered
         };
         btnAllowGroup.Pressed += () =>
         {
@@ -177,6 +180,9 @@ public partial class GroupPanelView : Control, IManagedWindow
             }
         };
         _panel.AddChild(btnLeave);
+
+        // 默认初始化空队伍状态，呈现居中提示文本消除黑框死感
+        SetMembers("", null);
     }
 
     public void TogglePanel()
@@ -228,7 +234,19 @@ public partial class GroupPanelView : Control, IManagedWindow
             child.QueueFree();
         }
 
-        if (string.IsNullOrEmpty(leader)) return;
+        if (string.IsNullOrEmpty(leader))
+        {
+            var lblEmpty = new Label
+            {
+                Name = "LblEmptyGroup",
+                Position = new Vector2(50, 110),
+                Text = "暂无队伍信息\n(可点击下方[新建]创建队伍)"
+            };
+            lblEmpty.AddThemeFontSizeOverride("font_size", 11);
+            lblEmpty.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.6f));
+            _membersContainer.AddChild(lblEmpty);
+            return;
+        }
 
         var colorGray = new Color(0.753f, 0.753f, 0.753f); // 0xC0C0C0
 

@@ -54,7 +54,16 @@ public partial class HudController : CanvasLayer
     public delegate void StorageWithdrawRequestedEventHandler(int storageSlot);
 
     [Signal]
+    public delegate void StorageDepositGoldRequestedEventHandler(int amount);
+
+    [Signal]
+    public delegate void StorageWithdrawGoldRequestedEventHandler(int amount);
+
+    [Signal]
     public delegate void MinimapToggledEventHandler();
+
+    [Signal]
+    public delegate void SplitItemRequestedEventHandler(int bagSlot, int splitCount);
 
     public enum ChatChannel
     {
@@ -190,6 +199,10 @@ public partial class HudController : CanvasLayer
     private readonly int[] _quickSlotAmounts = new int[6];
     public event Action<int, string>? QuickItemUsed;
     private long _lastEatTick = 0; // 盛大官方 1.5 IDA sub_48E33C / sub_48C188 吃药 200ms 全局防连点时钟
+#if MIR2_SANDBOX_DEV
+    public bool IsSandboxMode { get; set; } = false;
+#endif
+    private int _lastUsedQuickSlot = -1;
 
     // 官方 1.5 HUD 右下角弧形 4 按键 (底板已自带暗色按键，常态 TextureNormal 为空，按下或对应面板激活时显示高亮贴图)
     private TextureButton? _btnHudBag;
@@ -220,19 +233,21 @@ public partial class HudController : CanvasLayer
     public TextureButton? BtnHudOption => _btnHudOption;
     public TextureButton? BtnEquipToStatus { get; private set; }
     private TextureRect? _attackModeIcon;
+    private Label? _lblExpValue;
+    private Label? _lblWeightValue;
 
-    private int _currentAttackMode = 1;
+    private int _currentAttackMode = 0;
     public int CurrentAttackMode => _currentAttackMode;
 
     private int _currentGold = 0;
     public int CurrentGold => _currentGold;
 
-    /// <summary>攻击模式图标(官方 sub_48B2A0 0x48b8e0..0x48b92b): mode∈[1,4] 取 Prguse_(15+mode),其余不绘制。</summary>
+    /// <summary>攻击模式图标(官方 sub_48B2A0 0x48b8e0..0x48b92b): mode∈[1,4] 取 Prguse_(15+mode), 其余(全体模式0)绝不绘制月亮。</summary>
     public void SetAttackMode(int mode)
     {
         _currentAttackMode = mode;
         if (_attackModeIcon == null) return;
-        if (mode < 1 || mode > 4) { _attackModeIcon.Visible = false; return; }
+        if (mode <= 0 || mode > 4) { _attackModeIcon.Visible = false; return; }
         var tex = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{15 + mode:D4}.png");
         _attackModeIcon.Texture = tex;
         if (tex != null) _attackModeIcon.Size = tex.GetSize();
@@ -286,20 +301,11 @@ public partial class HudController : CanvasLayer
         EmitSignal(SignalName.ToggleHalfMoonRequested, _isHalfMoon);
     }
 
-    /// <summary>快捷键 Ctrl+H 攻击模式循环切换 (全体 -> 和平 -> 夫妻/组队 -> 行会)</summary>
+    /// <summary>快捷键 Ctrl+H 攻击模式循环切换意图上报 (0全体 -> 1和平 -> 2组队 -> 3行会 -> 4善恶)</summary>
     public void CycleNextAttackMode()
     {
-        int nextMode = _currentAttackMode >= 4 ? 1 : _currentAttackMode + 1;
-        SetAttackMode(nextMode);
-        string modeDesc = nextMode switch
-        {
-            1 => "全体攻击模式",
-            2 => "和平攻击模式",
-            3 => "夫妻/组队攻击模式",
-            4 => "行会攻击模式",
-            _ => "全体攻击模式"
-        };
-        AddChat("系统", $"[系统] 切换为{modeDesc}。", new Color(1f, 1f, 0f));
+        int nextMode = _currentAttackMode >= 4 ? 0 : _currentAttackMode + 1;
+        // 现代服务端权威架构：客户端只向服务端上报切换意图，由服务端权威仲裁并回发 SM_ATTACKMODECHANGED 驱动同步
         EmitSignal(SignalName.ChangeAttackModeRequested, nextMode);
     }
 
@@ -322,29 +328,28 @@ public partial class HudController : CanvasLayer
         });
     }
 
-    /// <summary>官方 1.5 丢弃金币 (IDA TFrmDlg_DGoldClick 0x48e564, 发包 CM_DROPGOLD 1016)</summary>
+    /// <summary>官方 1.5 丢弃金币意图上报 (IDA TFrmDlg_DGoldClick 0x48e564, 发包 CM_DROPGOLD 1016)</summary>
     public void RequestDropGold(int amount)
     {
         if (amount <= 0 || amount > _currentGold) return;
-        _currentGold -= amount;
-        UpdateGold(_currentGold);
-        AddChat("系统", $"[系统] 丢弃金币 {amount} 枚至地面。", new Color(1f, 1f, 0.4f));
+        // 现代服务端权威架构：严禁客户端本地擅自扣减金币！仅发出丢弃意图，由服务端成功交割后权威下发同步
         EmitSignal(SignalName.DropGoldRequested, amount);
     }
 
-    /// <summary>服务端 SM_ATTACKMODECHANGED (766, IDA sub_467920 case 766 @ 0x468A2B) 驱动回显</summary>
+    /// <summary>服务端 SM_ATTACKMODECHANGED (766, IDA sub_467920 case 766 @ 0x468A2B) 权威驱动回显</summary>
     public void OnServerAttackModeChanged(int mode)
     {
         SetAttackMode(mode);
         string modeDesc = mode switch
         {
-            1 => "全体攻击模式",
-            2 => "和平攻击模式",
-            3 => "夫妻/组队攻击模式",
-            4 => "行会攻击模式",
+            0 => "全体攻击模式",
+            1 => "和平攻击模式",
+            2 => "组队攻击模式",
+            3 => "行会攻击模式",
+            4 => "善恶攻击模式",
             _ => "全体攻击模式"
         };
-        AddChat("系统", $"[系统] 攻击模式同步为: {modeDesc}。", new Color(1f, 0.95f, 0.3f));
+        AddChat("系统", $"[系统] 攻击模式已切换为: {modeDesc}。", new Color(1f, 0.95f, 0.3f));
     }
 
     private TextureRect? _dayNightIcon;
@@ -482,20 +487,23 @@ public partial class HudController : CanvasLayer
         }
 
         // 挂载官方 1.5 等级、经验条与负重条 (IDA sub_48B2A0 @ 0x48b840 & 0x48b8d0, Prguse_0007 76x13)
-        // 1. 等级文本框：精准嵌入 HUD 右下角 Lv 金属徽章右侧黑槽 (636, 484, 110, 20)
+        // 1. 等级文本框：精准嵌入 HUD 右下角 Lv 金属徽章右侧黑槽 (642, 492, 40, 16)
         _lblLevel = new Label
         {
             Name = "HudLevelLabel",
-            Position = new Vector2(636, 484),
-            Size = new Vector2(100, 20),
-            Text = "45",
+            Position = new Vector2(642, 492),
+            Size = new Vector2(40, 16),
+            Text = "35",
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            ZIndex = 0,
-            Visible = false // IDA sub_48B2A0 不绘制等级数字,无官方依据的 (636,484) 文本按铁律隐藏
+            ZIndex = 2,
+            Visible = true
         };
-        _lblLevel.AddThemeFontSizeOverride("font_size", 12);
-        _lblLevel.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.7f));
+        _lblLevel.AddThemeFontSizeOverride("font_size", 13);
+        _lblLevel.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.5f));
+        _lblLevel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.9f));
+        _lblLevel.AddThemeConstantOverride("shadow_offset_x", 1);
+        _lblLevel.AddThemeConstantOverride("shadow_offset_y", 1);
         AddChild(_lblLevel);
 
         // 攻击模式图标 (IDA sub_48B2A0 0x48b8e0..0x48b92b: 当 mode∈[1,4] 时取 Prguse_(15+mode)，以 (754,553) 叠加绘制于日夜齿轮上层)
@@ -507,7 +515,7 @@ public partial class HudController : CanvasLayer
             ZIndex = 1
         };
         AddChild(_attackModeIcon);
-        SetAttackMode(1);
+        SetAttackMode(0);
 
         // 昼夜月相轮盘 (盛大官方 1.5 IDA sub_48B2A0 0x48b3bd..0x48b476 实证:
         // Prguse_0001 停靠于屏幕 Top=349, 右上半月金属D槽相对偏移为 (748, 79), 全局绝对坐标为 (748, 349+79=428),
@@ -536,10 +544,33 @@ public partial class HudController : CanvasLayer
                 MinValue = 0,
                 MaxValue = 100,
                 Value = 0,
-                MouseFilter = Control.MouseFilterEnum.Ignore,
-                ZIndex = 0
+                MouseFilter = Control.MouseFilterEnum.Pass,
+                ZIndex = 1
             };
+            _expBar.MouseEntered += () =>
+            {
+                ShowSlotTooltip("经验值", $"[color=#5cd8ff]当前经验: {_expBar.Value} / {_expBar.MaxValue}[/color]\n[color=#c0c0c0]升级进度: {(_expBar.MaxValue > 0 ? (_expBar.Value * 100.0 / _expBar.MaxValue) : 0):F2}%[/color]", _expBar.GlobalPosition, showFloating: true);
+            };
+            _expBar.MouseExited += HideSlotTooltip;
             AddChild(_expBar);
+
+            _lblExpValue = new Label
+            {
+                Name = "ExpValueLabel",
+                Position = new Vector2(666, 526),
+                Size = new Vector2(76, 14),
+                Text = "0.00%",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+                ZIndex = 2
+            };
+            _lblExpValue.AddThemeFontSizeOverride("font_size", 9);
+            _lblExpValue.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
+            _lblExpValue.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.9f));
+            _lblExpValue.AddThemeConstantOverride("shadow_offset_x", 1);
+            _lblExpValue.AddThemeConstantOverride("shadow_offset_y", 1);
+            AddChild(_lblExpValue);
 
             _weightBar = new TextureProgressBar
             {
@@ -551,10 +582,33 @@ public partial class HudController : CanvasLayer
                 MinValue = 0,
                 MaxValue = 100,
                 Value = 0,
-                MouseFilter = Control.MouseFilterEnum.Ignore,
-                ZIndex = 0
+                MouseFilter = Control.MouseFilterEnum.Pass,
+                ZIndex = 1
             };
+            _weightBar.MouseEntered += () =>
+            {
+                ShowSlotTooltip("背包负重", $"[color=#55ff77]当前负重: {_weightBar.Value} / {_weightBar.MaxValue}[/color]\n[color=#c0c0c0]负重超限时行动力将受阻[/color]", _weightBar.GlobalPosition, showFloating: true);
+            };
+            _weightBar.MouseExited += HideSlotTooltip;
             AddChild(_weightBar);
+
+            _lblWeightValue = new Label
+            {
+                Name = "WeightValueLabel",
+                Position = new Vector2(666, 559),
+                Size = new Vector2(76, 14),
+                Text = "0/40",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+                ZIndex = 2
+            };
+            _lblWeightValue.AddThemeFontSizeOverride("font_size", 9);
+            _lblWeightValue.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
+            _lblWeightValue.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.9f));
+            _lblWeightValue.AddThemeConstantOverride("shadow_offset_x", 1);
+            _lblWeightValue.AddThemeConstantOverride("shadow_offset_y", 1);
+            AddChild(_lblWeightValue);
         }
 
         // 挂载官方 1.5 地牢黑暗迷雾遮罩 (800x450 游戏主视口，ZIndex = -2，低于 HUD 面板与底栏)
@@ -944,7 +998,7 @@ public partial class HudController : CanvasLayer
 
             // 盛大官方 1.5 角色 9 大装备槽位 (IDA sub_481dd4 [0x483eb0..0x484180] & sub_48A9BC 官方实证):
             // 控件基于 EquipPanel (232x325) 原点 (0, 0) 的绝对局部坐标：
-            // 0:衣服(0x39C), 1:武器(0x398), 2:勋章/右项链(0x384), 3:项链(0x380), 4:头盔(0x3A0)
+            // 0:衣服(0x39C), 1:武器(0x398), 2:照明/右持物(火把/蜡烛/护符/毒药/药粉)(0x384), 3:项链(0x380), 4:头盔(0x3A0)
             // 5:右手镯(0x38C), 6:左手镯(0x388), 7:右戒指(0x394), 8:左戒指/符(0x390)
             var slotDefs = new (int Slot, float X, float Y, float W, float H)[]
             {
@@ -952,7 +1006,7 @@ public partial class HudController : CanvasLayer
                 (0, 96, 122, 53, 112),  // 衣服 (0x39C, IDA 0x484142..0x484180: Left=96, Top=122, W=53, H=112)
                 (4, 115, 93, 18, 18),   // 头盔 (0x3A0, IDA 0x483f2e..0x483f6c: Left=115, Top=93, W=18, H=18)
                 (3, 168, 87, 34, 31),   // 项链 (0x380, IDA 0x483ee2..0x483f20: Left=168, Top=87, W=34, H=31)
-                (2, 168, 125, 34, 31),  // 勋章/右项链 (0x384, IDA 0x483f7a..0x483fb8: Left=168, Top=125, W=34, H=31)
+                (2, 168, 125, 34, 31),  // 照明/右持物 (0x384, IDA 0x483f7a..0x483fb8: Left=168, Top=125, W=34, H=31)
                 (6, 42, 176, 34, 31),   // 左手镯 (0x388, IDA 0x483fc6..0x484004: Left=42, Top=176, W=34, H=31)
                 (5, 168, 176, 34, 31),  // 右手镯 (0x38C, IDA 0x484012..0x484050: Left=168, Top=176, W=34, H=31)
                 (8, 42, 215, 34, 31),   // 左戒指/符 (0x390, IDA 0x48405e..0x48409c: Left=42, Top=215, W=34, H=31)
@@ -964,11 +1018,11 @@ public partial class HudController : CanvasLayer
                 int equipSlot = s.Slot;
 
                 // 盛大官方 1.5 角色装备栏真实部件贴图映射 (StateItem.wil 独立外观):
-                // 首饰类（项链、勋章、手镯、戒指）在槽位中展示标准原版独立立绘，居中对齐槽位框；
+                // 首饰与手持类（项链、手镯、戒指、照明/药粉）在槽位中展示标准原版独立立绘，居中对齐槽位框；
                 // 衣服/武器/头盔则作为纸娃娃真实穿戴贴合在人物身上，槽位热区保留透明点击与 Tooltip 交互！
                 string? iconFile = equipSlot switch
                 {
-                    2 => "StateItem_0111.png", // 勋章 (荣誉勋章 32x27)
+                    2 => "StateItem_0001.png", // 官方 1.5 物理真值: 右持物/火把/蜡烛/药粉 (StateItem 贴图)
                     3 => "StateItem_0218.png", // 项链 (幽灵项链 32x30)
                     5 => "StateItem_0188.png", // 右手镯 (死神手套 36x35)
                     6 => "StateItem_0141.png", // 左手镯 (金手镯 16x15)
@@ -1008,7 +1062,7 @@ public partial class HudController : CanvasLayer
                     {
                         0 => ("重盔甲(男)", "[color=#c0c0c0]重量 23   持久力 25/25[/color]\n[color=#ffff00]防御 4-7[/color] [color=#00ffff](+1)[/color]   [color=#ffff00]魔御 2-3[/color]\n[color=#c0c0c0]需要等级 22[/color]"),
                         1 => ("炼狱", "[color=#c0c0c0]重量 60   持久力 28/28[/color]\n[color=#ffff00]攻击 0-25[/color] [color=#00ffff](+1)[/color]\n[color=#c0c0c0]需要等级 26[/color]"),
-                        2 => ("荣誉勋章", "[color=#c0c0c0]重量 1   持久力 50/50[/color]\n[color=#ffff00]防御 1-2   攻击 0-1[/color]"),
+                        2 => ("火把", "[color=#c0c0c0]重量 1   持久力 20/20[/color]\n[color=#ffff00]黑夜与地牢中提供光亮范围[/color]"),
                         3 => ("幽灵项链", "[color=#c0c0c0]重量 1   持久力 8/8[/color]\n[color=#ffff00]攻击 0-5[/color]\n[color=#c0c0c0]需要等级 24[/color]"),
                         4 => ("道士头盔", "[color=#c0c0c0]重量 3   持久力 8/8[/color]\n[color=#ffff00]防御 1-2   魔御 2-3[/color]\n[color=#c0c0c0]需要等级 24[/color]"),
                         5 => ("死神手套(右)", "[color=#c0c0c0]重量 2   持久力 8/8[/color]\n[color=#ffff00]攻击 1-3[/color] [color=#00ffff](+1)[/color]\n[color=#c0c0c0]需要等级 22[/color]"),
@@ -1031,6 +1085,10 @@ public partial class HudController : CanvasLayer
         _npcDialogView = GetNodeOrNull<NpcDialogView>("NpcDialog");
         if (_npcDialogView != null)
         {
+            _npcDialogView.DialogClosed += () =>
+            {
+                _stackManager.PopWindow(_npcDialogView);
+            };
             _npcDialogView.ActionTriggered += (actionTag) =>
             {
                 GD.Print($"[HudController] NPC 对话点击 Action: {actionTag}");
@@ -1084,6 +1142,7 @@ public partial class HudController : CanvasLayer
         };
         _tradePanelView.TradeCancelled += () =>
         {
+            _stackManager.PopWindow(_tradePanelView);
             RollbackTradeItemsToBag();
             EmitSignal(SignalName.TradeCancelRequested);
             AddChat("系统", "[交易] 交易已取消，物品原路退回背包。", new Color(1f, 0.4f, 0.4f));
@@ -1132,8 +1191,29 @@ public partial class HudController : CanvasLayer
         };
         AddChild(_tradePanelView);
 
-        // 官方无独立仓库窗体 (IDA: sub_4579F0 全量调用者仅 sub_481DD4/sub_486DF0,无仓库底板);
-        // 服务端协议将仓库作为商人窗口的 Storage 模式,故不再创建非官方的 StoragePanelView (Prguse_0402)。
+        _storagePanelView = new StoragePanelView();
+        _storagePanelView.DepositRequested += (slot) =>
+        {
+            EmitSignal(SignalName.StorageDepositRequested, slot, "");
+        };
+        _storagePanelView.WithdrawRequested += (slot) =>
+        {
+            EmitSignal(SignalName.StorageWithdrawRequested, slot);
+        };
+        _storagePanelView.DepositGoldRequested += (amount) =>
+        {
+            EmitSignal(SignalName.StorageDepositGoldRequested, amount);
+        };
+        _storagePanelView.WithdrawGoldRequested += (amount) =>
+        {
+            EmitSignal(SignalName.StorageWithdrawGoldRequested, amount);
+        };
+        _storagePanelView.PanelClosed += () =>
+        {
+            if (_storagePanelView != null)
+                _stackManager.PopWindow(_storagePanelView);
+        };
+        AddChild(_storagePanelView);
 
         _shopPanelView = new ShopPanelView();
         _shopPanelView.BuyRequested += (npcUid, itemIdx, count) =>
@@ -1193,6 +1273,8 @@ public partial class HudController : CanvasLayer
         };
 
         _messageBoxDialog = new MessageBoxDialog();
+        _messageBoxDialog.Confirmed += () => _stackManager.PopWindow(_messageBoxDialog);
+        _messageBoxDialog.Cancelled += () => _stackManager.PopWindow(_messageBoxDialog);
         AddChild(_messageBoxDialog);
 
         _guildPanelView.SetMessageBoxDialog(_messageBoxDialog);
@@ -1239,6 +1321,26 @@ public partial class HudController : CanvasLayer
 
         _itemTooltipView = new ItemTooltipView();
         AddChild(_itemTooltipView);
+
+        // 默认初始化 35 级战神经验条、负重条、血球数值与金币 (对齐官方 1.5 初始战士规格)
+        UpdateExp(650000, 1200000);
+        UpdateWeight(25, 60);
+        UpdateHp(520, 520);
+        UpdateMp(100, 100);
+        UpdateLevel(35);
+        UpdateGold(88888);
+
+        // 盛大官方 1.5 35 级战士初始装备属性预载 (衣服与武器立绘已在 DollCloth/DollWeapon 层 100% 真实穿戴贴合)
+        if (_equipSlots[0] != null)
+        {
+            _equipSlots[0]!.ItemTexture = null;
+            _equipItemDetails[0] = ("重盔甲(男)", "重量 23   持久力 25/25\n防御 4-7   魔御 2-3\n需要等级 22");
+        }
+        if (_equipSlots[1] != null)
+        {
+            _equipSlots[1]!.ItemTexture = null;
+            _equipItemDetails[1] = ("修罗", "重量 40   持久力 25/25\n攻击 0-20\n需要等级 22");
+        }
 
         GD.Print("[HudController] 官方 1.5 C# HUD 控制器初始化就绪 (全量大世界原生窗体 100% 挂载完成)");
     }
@@ -1433,6 +1535,9 @@ public partial class HudController : CanvasLayer
         }
     }
 
+    public int GetQuickSlotCount(int slot) => (slot >= 0 && slot < 6) ? _quickSlotAmounts[slot] : 0;
+    public string GetQuickSlotItem(int slot) => (slot >= 0 && slot < 6) ? _quickSlotItems[slot] : string.Empty;
+
     public void UseQuickSlot(int slot)
     {
         if (slot < 0 || slot >= 6) return;
@@ -1452,6 +1557,33 @@ public partial class HudController : CanvasLayer
             AddChat("系统", "[系统] 当前处于眩晕/麻痹硬直状态，无法使用物品。", new Color(1f, 0.4f, 0.4f));
             return;
         }
+
+        string itemName = _quickSlotItems[slot];
+        _lastUsedQuickSlot = slot;
+
+        // 播放经典吃药音效 (药水吞咽音: 官方 sound 107, 对齐 Delphi SoundUtil.pas:s_eat_drug)
+        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.EatDrug);
+
+        GD.Print($"[HudController] 使用快捷药水栏 {slot + 1} 物品: {itemName}, 剩余数量: {_quickSlotAmounts[slot]}");
+        QuickItemUsed?.Invoke(slot, itemName);
+
+        // 盛大官方 1.5 权威架构铁律：联网模式下物品消耗与扣减由服务端权威驱动 (SM_DELITEM / SM_EAT_OK)
+        // 客户端本地仅在离线沙盒模式下模拟扣减与自动补给
+#if MIR2_SANDBOX_DEV
+        if (IsSandboxMode)
+        {
+            ApplyQuickSlotConsume(slot);
+        }
+#endif
+    }
+
+    /// <summary>
+    /// 执行快捷栏槽位扣减与自动从背包补充药水
+    /// </summary>
+    public void ApplyQuickSlotConsume(int slot)
+    {
+        if (slot < 0 || slot >= 6) return;
+        if (_quickSlotAmounts[slot] <= 0 || string.IsNullOrEmpty(_quickSlotItems[slot])) return;
 
         string itemName = _quickSlotItems[slot];
         _quickSlotAmounts[slot]--;
@@ -1490,12 +1622,19 @@ public partial class HudController : CanvasLayer
             if (_quickSlotCounts[slot] != null)
                 _quickSlotCounts[slot].Text = _quickSlotAmounts[slot] > 1 ? _quickSlotAmounts[slot].ToString() : "";
         }
+    }
 
-        // 播放经典吃药音效 (药水吞咽音: 官方 sound 107, 对齐 Delphi SoundUtil.pas:s_eat_drug)
-        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.EatDrug);
-
-        GD.Print($"[HudController] 使用快捷药水栏 {slot + 1} 物品: {itemName}, 剩余数量: {_quickSlotAmounts[slot]}");
-        QuickItemUsed?.Invoke(slot, itemName);
+    /// <summary>
+    /// 服务端 SM_EAT_OK (606) 权威确认服药成功，驱动快捷栏扣减
+    /// </summary>
+    public void OnServerEatOk()
+    {
+        if (_lastUsedQuickSlot >= 0 && _lastUsedQuickSlot < 6)
+        {
+            int slot = _lastUsedQuickSlot;
+            _lastUsedQuickSlot = -1;
+            ApplyQuickSlotConsume(slot);
+        }
     }
 
     public void UpdateHp(int hp, int maxHp)
@@ -1557,8 +1696,13 @@ public partial class HudController : CanvasLayer
             _expBar.Value = Math.Clamp(curExp, 0, (long)_expBar.MaxValue);
             _expBar.Modulate = new Color(0.35f, 0.9f, 1.0f); // 官方经典青蓝色经验条
         }
+        string expPercentStr = maxExp > 0 ? $"{100.0 * curExp / maxExp:F2}%" : "0.00%";
+        if (_lblExpValue != null)
+        {
+            _lblExpValue.Text = expPercentStr;
+        }
         // 官方能力页第 0 行 (IDA sub_488AF4 0x48935e: 100*[+48h]/[+4Ch],保留 2 位小数并追加 "%")
-        _statusPanelView?.UpdateAbilityValue(0, maxExp > 0 ? $"{100.0 * curExp / maxExp:F2}%" : "0.00%");
+        _statusPanelView?.UpdateAbilityValue(0, expPercentStr);
     }
 
     public void UpdateWeight(int curWeight, int maxWeight)
@@ -1569,6 +1713,11 @@ public partial class HudController : CanvasLayer
             _weightBar.Value = Math.Clamp(curWeight, 0, (int)_weightBar.MaxValue);
             // 盛大官方 1.5 规则：负重超限时呈鲜红警示色，未超限时为翠绿色
             _weightBar.Modulate = curWeight > maxWeight ? new Color(1f, 0.25f, 0.25f) : new Color(0.25f, 0.95f, 0.35f);
+        }
+        if (_lblWeightValue != null)
+        {
+            _lblWeightValue.Text = $"{curWeight}/{maxWeight}";
+            _lblWeightValue.AddThemeColorOverride("font_color", curWeight > maxWeight ? new Color(1f, 0.3f, 0.3f) : new Color(1f, 1f, 1f));
         }
         // 官方能力页第 1 行 背包重量 (IDA 0x4893f4: [+50h]/[+52h] 两个 word,超限时红色 0x0000FF)
         _statusPanelView?.UpdateAbilityValue(1, $"{curWeight}/{maxWeight}", curWeight > maxWeight);
@@ -1632,10 +1781,10 @@ public partial class HudController : CanvasLayer
 
     public int GetTalismanOrPoisonDura(int requiredDura)
     {
-        // 优先检查 Slot 8 (官方护身符/毒药包槽位)
-        if (_equipItemDetails[8] != null)
+        // 优先检查 Slot 2 (官方照明/护身符/毒药包槽位 Lighting = 2)
+        if (_equipItemDetails[2] != null)
         {
-            var item = _equipItemDetails[8]!.Value;
+            var item = _equipItemDetails[2]!.Value;
             int dura = ExtractItemCountOrDura(item.Desc);
             if (dura >= requiredDura) return dura;
         }
@@ -2363,6 +2512,15 @@ public partial class HudController : CanvasLayer
         _chatInput.CaretColumn = _chatInput.Text.Length;
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 聊天框快捷私聊: 双击玩家名字或点击角色名，自动填充 "/{targetName} " 并聚焦输入框 (IDA sub_4915CC)
+    /// </summary>
+    public void StartWhisperToPlayer(string playerName)
+    {
+        if (string.IsNullOrWhiteSpace(playerName)) return;
+        SetChatPrefix($"/{playerName.Trim()} ");
+    }
+
     private void TriggerChatHistoryClick()
     {
         if (_chatInput == null) return;
@@ -2640,6 +2798,24 @@ public partial class HudController : CanvasLayer
             return true;
         }
 
+        if (_messageBoxDialog != null && _messageBoxDialog.Visible)
+        {
+            _messageBoxDialog.Visible = false;
+            return true;
+        }
+
+        if (_tradePanelView != null && _tradePanelView.Visible)
+        {
+            CloseTrade();
+            return true;
+        }
+
+        if (_npcDialogView != null && _npcDialogView.Visible)
+        {
+            CloseNpcDialog();
+            return true;
+        }
+
         if (_equipPanel != null && _equipPanel.Visible)
         {
             _equipPanel.Visible = false;
@@ -2762,7 +2938,12 @@ public partial class HudController : CanvasLayer
             var btn = _equipSlots[equipSlot];
             if (btn != null)
             {
-                btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}");
+                // 盛大官方 1.5 铁律：衣服(0)、武器(1)、头盔(4) 穿戴在纸娃娃全身立绘上，槽位按钮上绝不可重复绘制独立贴图，否则会导致两重立绘严重错位！
+                // 仅首饰与副手类（2:照明/药粉, 3:项链, 5:右手镯, 6:左手镯, 7:右戒指, 8:左戒指）才在槽位按钮上显示图标！
+                bool isJewelryOrLight = (equipSlot != 0 && equipSlot != 1 && equipSlot != 4);
+                btn.ItemTexture = (isJewelryOrLight && !string.IsNullOrEmpty(iconFile))
+                    ? ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}")
+                    : null;
             }
 
             if (equipSlot == 0 && !string.IsNullOrEmpty(iconFile)) UpdateDollVisuals(iconFile, null, null);
@@ -2891,10 +3072,7 @@ public partial class HudController : CanvasLayer
         if (_npcDialogView != null)
         {
             _npcDialogView.ShowDialog(content);
-            if (!_npcDialogView.Visible)
-            {
-                _stackManager.ToggleWindow(_npcDialogView);
-            }
+            _stackManager.PushWindow(_npcDialogView);
         }
     }
 
@@ -2906,10 +3084,7 @@ public partial class HudController : CanvasLayer
         if (_shopPanelView != null)
         {
             _shopPanelView.SetItems(items);
-            if (!_shopPanelView.Visible)
-            {
-                _stackManager.ToggleWindow(_shopPanelView);
-            }
+            _stackManager.PushWindow(_shopPanelView);
         }
     }
 
@@ -2950,6 +3125,20 @@ public partial class HudController : CanvasLayer
                     _repairPanelView.SetSlotItem(_bagSlots[fromSlot]?.ItemTexture, fromSlot, item.Value.Name);
                     string actionDesc = toType == SlotButton.SlotType.Storage ? "准备交付仓库保管" : "放置于铁匠修理台";
                     AddChat("系统", $"[系统] 物品 [{item.Value.Name}] 已{actionDesc}。", new Color(0.8f, 0.8f, 1f));
+                }
+            }
+            return;
+        }
+
+        // 4.1 从背包拖入商店面板出售 (Bag -> Shop)
+        if (fromType == SlotButton.SlotType.Bag && toType == SlotButton.SlotType.Shop)
+        {
+            if (_shopPanelView != null && _shopPanelView.Visible)
+            {
+                var item = _bagItemDetails[fromSlot];
+                if (item != null)
+                {
+                    _shopPanelView.RequestSellItem(fromSlot, item.Value.Name);
                 }
             }
             return;
@@ -3011,7 +3200,12 @@ public partial class HudController : CanvasLayer
 
         _tradeItemOrigins[tradeSlot] = (bagItem.Value.Name, bagItem.Value.Desc, bagSlot);
         _tradePanelView.SetMyItem(tradeSlot, bagItem.Value.Name, tex);
-        ClearBagItem(bagSlot);
+#if MIR2_SANDBOX_DEV
+        if (IsSandboxMode)
+        {
+            ClearBagItem(bagSlot);
+        }
+#endif
 
         EmitSignal(SignalName.TradeAddItemRequested, tradeSlot, bagItem.Value.Name);
         AddChat("系统", $"[交易] 放入物品 [{bagItem.Value.Name}] 到交易栏 #{tradeSlot + 1} 格。", new Color(0.8f, 1f, 0.8f));
@@ -3045,16 +3239,22 @@ public partial class HudController : CanvasLayer
         }
 
         string itemName = origin.Value.Name;
-        SetBagItem(bagSlot, itemName, "", origin.Value.Desc);
+#if MIR2_SANDBOX_DEV
+        if (IsSandboxMode)
+        {
+            SetBagItem(bagSlot, itemName, "", origin.Value.Desc);
+        }
+#endif
         _tradeItemOrigins[tradeSlot] = null;
         _tradePanelView.ClearMyItem(tradeSlot);
 
         EmitSignal(SignalName.TradeDelItemRequested, tradeSlot);
-        AddChat("系统", $"[交易] 取回交易物品 [{itemName}] 到背包 #{bagSlot + 1} 格。", new Color(0.8f, 0.8f, 1f));
+        AddChat("系统", $"[交易] 取回交易物品 [{itemName}]，等待服务端确认...", new Color(0.8f, 0.8f, 1f));
     }
 
     /// <summary>
     /// 官方交易取消闭环 (IDA sub_467920 @ 0x46A5E3 与 sub_49FE38 实证: 遍历 10 格交易栏退回背包)
+    /// 联网模式下背包物品完全由服务端权威 SM_ADDITEM / SM_DELITEM 恢复
     /// </summary>
     public void RollbackTradeItemsToBag()
     {
@@ -3063,12 +3263,17 @@ public partial class HudController : CanvasLayer
         {
             if (_tradeItemOrigins[i] != null)
             {
-                var origin = _tradeItemOrigins[i]!.Value;
-                int bagSlot = (_bagItemDetails[origin.OriginBagSlot] == null) ? origin.OriginBagSlot : FindFirstEmptyBagSlot();
-                if (bagSlot >= 0)
+#if MIR2_SANDBOX_DEV
+                if (IsSandboxMode)
                 {
-                    SetBagItem(bagSlot, origin.Name, "", origin.Desc);
+                    var origin = _tradeItemOrigins[i]!.Value;
+                    int bagSlot = (_bagItemDetails[origin.OriginBagSlot] == null) ? origin.OriginBagSlot : FindFirstEmptyBagSlot();
+                    if (bagSlot >= 0)
+                    {
+                        SetBagItem(bagSlot, origin.Name, "", origin.Desc);
+                    }
                 }
+#endif
                 _tradeItemOrigins[i] = null;
                 _tradePanelView.ClearMyItem(i);
             }
@@ -3100,10 +3305,7 @@ public partial class HudController : CanvasLayer
         if (_tradePanelView != null)
         {
             _tradePanelView.OpenTrade(targetName);
-            if (!_tradePanelView.Visible)
-            {
-                _stackManager.ToggleWindow(_tradePanelView);
-            }
+            _stackManager.PushWindow(_tradePanelView);
             if (_bagPanel != null)
             {
                 _bagPanel.Position = Vector2.Zero;
@@ -3120,6 +3322,7 @@ public partial class HudController : CanvasLayer
     {
         if (_tradePanelView != null && _tradePanelView.Visible)
         {
+            _stackManager.PopWindow(_tradePanelView);
             _tradePanelView.CloseTrade();
         }
     }
@@ -3265,7 +3468,7 @@ public partial class HudController : CanvasLayer
 
     /// <summary>
     /// 判断物品是否符合指定装备槽位规约 (IDA sub_488AF4 槽位合法性验证)
-    /// 0: 衣服, 1: 武器, 2: 勋章/饰品, 3: 项链, 4: 头盔, 5/6: 手镯, 7/8: 戒指
+    /// 0: 衣服, 1: 武器, 2: 照明/右持物(火把/蜡烛/护符/毒药/药粉), 3: 项链, 4: 头盔, 5/6: 手镯, 7/8: 戒指
     /// </summary>
     public static bool IsItemCompatibleWithEquipSlot(string itemName, int equipSlot)
     {
@@ -3282,8 +3485,8 @@ public partial class HudController : CanvasLayer
                  itemName.Contains("炼狱") || itemName.Contains("降魔") || itemName.Contains("银蛇") ||
                  itemName.Contains("井中月") || itemName.Contains("海魂") || itemName.Contains("修罗") ||
                  itemName.Contains("偃月"),
-            2 => itemName.Contains("勋章") || itemName.Contains("火把") || itemName.Contains("蜡烛") ||
-                 itemName.Contains("护身符") || itemName.Contains("药粉") || itemName.Contains("毒药"),
+            2 => itemName.Contains("火把") || itemName.Contains("蜡烛") ||
+                 itemName.Contains("护身符") || itemName.Contains("药粉") || itemName.Contains("毒药"), // 官方 1.5 权威照明/右持物
             3 => itemName.Contains("项链") || itemName.Contains("铃铛"),
             4 => itemName.Contains("头盔") || itemName.Contains("头巾") || itemName.Contains("冠"),
             5 or 6 => itemName.Contains("手镯") || itemName.Contains("手套"),
@@ -3356,7 +3559,7 @@ public partial class HudController : CanvasLayer
             return;
         }
 
-        // 盛大官方 1.5 装备等级与三维属性门槛检定 (如屠龙35级、六大重装40级、裁决攻击30等)
+        // 盛大官方 1.5 装备等级与三维属性门槛检定 (如屠龙35级、战神盔甲30级、裁决攻击30等)
         var (canWearAttr, reqReason) = OfficialClientRulesEngine.SpecialItemAndSetRules.CheckEquipRequirement(
             bagItem.Value.Name, _playerLevel, _dcMax, _mcMax, _scMax);
         if (!canWearAttr)
@@ -3624,13 +3827,16 @@ public partial class HudController : CanvasLayer
 
     private void ExecuteDropItem(int bagSlot, string itemName, Vector2 screenPos)
     {
-        // 扣减清空背包槽位
-        ClearBagItem(bagSlot);
-
-        // 派发信号通知大世界场景生成战利品
+#if MIR2_SANDBOX_DEV
+        if (IsSandboxMode)
+        {
+            // 离线沙盒单机模式回退
+            ClearBagItem(bagSlot);
+            AddChat("系统", $"[系统] 物品 [{itemName}] 已丢弃至地面。", new Color(1f, 0.8f, 0.4f));
+        }
+#endif
+        // 派发信号上报服务端丢弃意图 (由服务端权威核验并下发 SM_DELITEM 物理清空)
         EmitSignal(SignalName.ItemDropToGroundRequested, bagSlot, itemName, screenPos);
-
-        AddChat("系统", $"[系统] 物品 [{itemName}] 已丢弃至地面。", new Color(1f, 0.8f, 0.4f));
     }
 
     /// <summary>
@@ -3732,17 +3938,16 @@ public partial class HudController : CanvasLayer
     {
         if (string.IsNullOrEmpty(itemName)) return -1;
         if (itemName.Contains("甲") || itemName.Contains("袍") || itemName.Contains("衣") || 
-            itemName.Contains("布衣") || itemName.Contains("披风") || itemName.Contains("铠") || itemName.Contains("重盔")) return 0; // 衣服 (含官方六大重装: 法神披风/天魔神甲/圣战宝甲/霓裳羽衣/天尊道袍/天师长袍)
+            itemName.Contains("布衣") || itemName.Contains("披风") || itemName.Contains("铠") || itemName.Contains("重盔")) return (int)OfficialEquipSlot.Dress; // 0: 衣服 (战神盔甲/恶魔长袍/幽灵战衣等)
         if (itemName.Contains("剑") || itemName.Contains("刀") || itemName.Contains("斧") || itemName.Contains("杖") || 
-            itemName.Contains("扇") || itemName.Contains("枪") || itemName.Contains("棍") || itemName.Contains("弓") || 
-            itemName.Contains("匕首") || itemName.Contains("刃") || itemName.Contains("月") || itemName.Contains("屠龙") || 
-            itemName.Contains("炼狱") || itemName.Contains("银蛇") || itemName.Contains("降魔") || itemName.Contains("凝霜") || 
-            itemName.Contains("修罗") || itemName.Contains("破魂") || itemName.Contains("凌风")) return 1; // 武器
-        if (itemName.Contains("头盔") || itemName.Contains("冠") || itemName.Contains("帽") || itemName.Contains("头巾")) return 4; // 头盔
-        if (itemName.Contains("项链") || itemName.Contains("链")) return 3; // 项链
-        if (itemName.Contains("手镯") || itemName.Contains("手套") || itemName.Contains("镯")) return 5; // 手镯 (默认左手镯)
-        if (itemName.Contains("戒") || itemName.Contains("指")) return 7; // 戒指 (默认左戒指)
-        if (itemName.Contains("勋章") || itemName.Contains("佩") || itemName.Contains("符") || itemName.Contains("饰品")) return 2; // 勋章/饰品
+            itemName.Contains("棍") || itemName.Contains("匕首") || itemName.Contains("刃") || itemName.Contains("月") || 
+            itemName.Contains("屠龙") || itemName.Contains("炼狱") || itemName.Contains("银蛇") || itemName.Contains("降魔") || 
+            itemName.Contains("凝霜") || itemName.Contains("修罗") || itemName.Contains("破魂") || itemName.Contains("凌风")) return (int)OfficialEquipSlot.Weapon; // 1: 武器
+        if (itemName.Contains("符") || itemName.Contains("毒") || itemName.Contains("粉") || itemName.Contains("火把") || itemName.Contains("蜡烛") || itemName.Contains("佩")) return (int)OfficialEquipSlot.Lighting; // 2: 照明/护身符/毒药/药粉
+        if (itemName.Contains("项链") || itemName.Contains("链")) return (int)OfficialEquipSlot.Necklace; // 3: 项链
+        if (itemName.Contains("头盔") || itemName.Contains("冠") || itemName.Contains("帽") || itemName.Contains("头巾")) return (int)OfficialEquipSlot.Helmet; // 4: 头盔
+        if (itemName.Contains("手镯") || itemName.Contains("手套") || itemName.Contains("镯")) return (int)OfficialEquipSlot.ArmringL; // 5: 手镯 (默认左手镯)
+        if (itemName.Contains("戒") || itemName.Contains("指")) return (int)OfficialEquipSlot.RingL; // 7: 戒指 (默认左戒指)
         return -1;
     }
 
@@ -3771,10 +3976,15 @@ public partial class HudController : CanvasLayer
         // 派发信号供网络层发包 CM_EATITEM (1006)，携带完整物品名称对齐官方协议
         EmitSignal(SignalName.UseItemRequested, bagSlot, itemName);
 
-        // 清理/扣减背包槽位
-        ClearBagItem(bagSlot);
-
-        AddChat("系统", $"[系统] 使用了 [{itemName}]。", new Color(0.4f, 1f, 0.4f));
+        // 盛大官方 1.5 权威架构铁律：联网模式下背包物品扣减完全由服务端 SM_DELITEM 驱动
+        // 客户端本地仅在离线沙盒模式下作为单机回退模拟清空
+#if MIR2_SANDBOX_DEV
+        if (IsSandboxMode)
+        {
+            ClearBagItem(bagSlot);
+            AddChat("系统", $"[系统] 使用了 [{itemName}]。", new Color(0.4f, 1f, 0.4f));
+        }
+#endif
     }
 
     /// <summary>
@@ -3784,6 +3994,7 @@ public partial class HudController : CanvasLayer
     {
         if (_npcDialogView != null && _npcDialogView.Visible)
         {
+            _stackManager.PopWindow(_npcDialogView);
             _npcDialogView.Visible = false;
             AddChat("系统", "[系统] NPC 对话已关闭。", new Color(0.7f, 0.7f, 0.7f));
         }
@@ -3797,6 +4008,7 @@ public partial class HudController : CanvasLayer
         if (_messageBoxDialog != null)
         {
             _messageBoxDialog.ShowMessage($"[{title}]\n\n{msg}", hasCancel: false);
+            _stackManager.PushWindow(_messageBoxDialog);
         }
         else
         {
@@ -3812,6 +4024,7 @@ public partial class HudController : CanvasLayer
         if (_messageBoxDialog != null)
         {
             _messageBoxDialog.ShowMessage($"[{title}]\n\n{msg}", hasCancel: hasCancel, onConfirm: onConfirm);
+            _stackManager.PushWindow(_messageBoxDialog);
         }
         else
         {
@@ -3883,39 +4096,48 @@ public partial class HudController : CanvasLayer
         var item = _bagItemDetails[slot];
         if (item == null || splitCount <= 0) return false;
 
-        int emptySlot = FindFirstEmptyBagSlot();
-        if (emptySlot == -1)
+        // 盛大官方 1.5 权威架构铁律：向服务端提交 IntentSplitItem 二进制意图，由服务端全权裁决
+        EmitSignal(SignalName.SplitItemRequested, slot, splitCount);
+
+#if MIR2_SANDBOX_DEV
+        if (IsSandboxMode)
         {
-            AddChat("系统", "[背包] 背包已满，无法拆分物品！", new Color(1f, 0.4f, 0.4f));
-            return false;
+            int emptySlot = FindFirstEmptyBagSlot();
+            if (emptySlot == -1)
+            {
+                AddChat("系统", "[背包] 背包已满，无法拆分物品！", new Color(1f, 0.4f, 0.4f));
+                return false;
+            }
+
+            string desc = item.Value.Desc ?? "";
+            int currentCount = ExtractItemCountOrDura(desc);
+            if (currentCount <= 1 || splitCount >= currentCount)
+            {
+                AddChat("系统", $"[背包] 该物品无法拆分为 {splitCount} 份 (当前最大可拆分数量: {currentCount - 1})。", new Color(1f, 0.4f, 0.4f));
+                return false;
+            }
+
+            int remainingCount = currentCount - splitCount;
+            string updatedDesc = UpdateItemCountOrDura(desc, remainingCount);
+            string newDesc = UpdateItemCountOrDura(desc, splitCount);
+
+            var tex = _bagSlots[slot]?.ItemTexture;
+
+            // 刷新原槽位
+            _bagItemDetails[slot] = (item.Value.Name, updatedDesc);
+
+            // 放入新槽位
+            _bagItemDetails[emptySlot] = (item.Value.Name, newDesc);
+            if (_bagSlots[emptySlot] != null && tex != null)
+            {
+                _bagSlots[emptySlot]!.ItemTexture = tex;
+            }
+
+            AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick);
+            AddChat("系统", $"[背包] 成功将 [{item.Value.Name}] 拆分出 {splitCount} 份至背包第 {emptySlot + 1} 格。", new Color(0.4f, 1f, 0.5f));
+            return true;
         }
-
-        string desc = item.Value.Desc ?? "";
-        int currentCount = ExtractItemCountOrDura(desc);
-        if (currentCount <= 1 || splitCount >= currentCount)
-        {
-            AddChat("系统", $"[背包] 该物品无法拆分为 {splitCount} 份 (当前最大可拆分数量: {currentCount - 1})。", new Color(1f, 0.4f, 0.4f));
-            return false;
-        }
-
-        int remainingCount = currentCount - splitCount;
-        string updatedDesc = UpdateItemCountOrDura(desc, remainingCount);
-        string newDesc = UpdateItemCountOrDura(desc, splitCount);
-
-        var tex = _bagSlots[slot]?.ItemTexture;
-
-        // 刷新原槽位
-        _bagItemDetails[slot] = (item.Value.Name, updatedDesc);
-
-        // 放入新槽位
-        _bagItemDetails[emptySlot] = (item.Value.Name, newDesc);
-        if (_bagSlots[emptySlot] != null && tex != null)
-        {
-            _bagSlots[emptySlot]!.ItemTexture = tex;
-        }
-
-        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick);
-        AddChat("系统", $"[背包] 成功将 [{item.Value.Name}] 拆分出 {splitCount} 份至背包第 {emptySlot + 1} 格。", new Color(0.4f, 1f, 0.5f));
+#endif
         return true;
     }
 

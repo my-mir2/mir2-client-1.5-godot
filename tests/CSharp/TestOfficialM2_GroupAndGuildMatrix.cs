@@ -120,7 +120,7 @@ public sealed class TestOfficialM2_GroupAndGuildMatrix
         session.State!.Gold = 2_000_000;
 
         // 1. 无沃玛号角创建行会 -> 失败
-        var (noHornRes, _) = engine.CreateGuild(session, "沙巴克行会");
+        var (noHornRes, _, _) = engine.CreateGuild(session, "沙巴克行会");
         Assert.Equal(GuildEngine.GuildResult.MissingHorn, noHornRes);
 
         // 2. 放入沃玛号角
@@ -129,9 +129,11 @@ public sealed class TestOfficialM2_GroupAndGuildMatrix
         session.State.BagWeight += horn.Weight;
 
         // 3. 正常创建行会 (消耗号角与 1,000,000 金币)
-        var (okRes, guild) = engine.CreateGuild(session, "沙巴克行会");
+        var (okRes, guild, consumedHorn) = engine.CreateGuild(session, "沙巴克行会");
         Assert.Equal(GuildEngine.GuildResult.Success, okRes);
         Assert.NotNull(guild);
+        Assert.NotNull(consumedHorn);
+        Assert.Equal("沃玛号角", consumedHorn.Name);
         Assert.Equal("沙巴克行会", guild.Name);
         Assert.Equal("布衣行会掌门", guild.MasterName);
         Assert.Equal(1_000_000, session.State.Gold); // 2M - 1M = 1M
@@ -186,4 +188,53 @@ public sealed class TestOfficialM2_GroupAndGuildMatrix
         Assert.NotNull(session.State.Equipment[(int)OfficialEquipSlot.Weapon]);
         Assert.Contains("锄", session.State.Equipment[(int)OfficialEquipSlot.Weapon]!.Name);
     }
+
+    [Fact]
+    public void Group_ExpDistribution_ExcludesDeadPartyMembers()
+    {
+        var party = new GroupEngine.Party { LeaderSessionId = 1, LeaderName = "队长战神" };
+        var leader = CreateMockSession(1, "队长战神");
+        var aliveMember = CreateMockSession(2, "活着的道士");
+        var deadMember = CreateMockSession(3, "躺尸法师");
+        deadMember.State!.Hp = 0; // 阵亡
+
+        party.Members.Add(leader);
+        party.Members.Add(aliveMember);
+        party.Members.Add(deadMember);
+
+        // 基础经验 1000，同屏 2 人存活 (1 人阵亡)
+        // 2 人组队加成: 1.0 + (2 - 1) * 0.20 = 120% 总池 (1200 Exp)
+        // 每位存活队员平摊: 1200 / 2 = 600 Exp
+        var shares = GroupEngine.CalculateGroupExpDistribution(party, leader, 1000);
+
+        Assert.Equal(2, shares.Count);
+        Assert.Equal(600, shares[0].expGained);
+        Assert.Equal(600, shares[1].expGained);
+        Assert.Contains(shares, s => s.member.SessionId == leader.SessionId);
+        Assert.Contains(shares, s => s.member.SessionId == aliveMember.SessionId);
+        Assert.DoesNotContain(shares, s => s.member.SessionId == deadMember.SessionId);
+    }
+
+    [Fact]
+    public void Group_GoldDistribution_ExcludesDeadPartyMembers()
+    {
+        var party = new GroupEngine.Party { LeaderSessionId = 1, LeaderName = "队长战神" };
+        var picker = CreateMockSession(1, "捡钱战士");
+        var aliveMember = CreateMockSession(2, "活着的法师");
+        var deadMember = CreateMockSession(3, "躺尸道士");
+        deadMember.State!.Hp = 0; // 阵亡
+
+        party.Members.Add(picker);
+        party.Members.Add(aliveMember);
+        party.Members.Add(deadMember);
+
+        // 地面拾取 105 金币，2 个存活队员平分: 105 / 2 = 52，余数 1 给拾取者 -> 53 & 52
+        var splits = GroupEngine.DistributeGroupGold(party, picker, 105);
+
+        Assert.Equal(2, splits.Count);
+        Assert.Contains(splits, s => s.member.SessionId == picker.SessionId && s.goldGained == 53);
+        Assert.Contains(splits, s => s.member.SessionId == aliveMember.SessionId && s.goldGained == 52);
+        Assert.DoesNotContain(splits, s => s.member.SessionId == deadMember.SessionId);
+    }
 }
+

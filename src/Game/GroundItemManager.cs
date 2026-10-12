@@ -1,13 +1,15 @@
-// ============================================================================
-// Mir2 客户端 - 大世界地表掉落物管理器 (GroundItemManager) (1:1 盛大 1.5 官方实证)
-// 官方实证：IDA sub_46AEF0 & SM_GROUNDITEM (314) / SM_DELGROUNDITEM (315)
-// ============================================================================
-
 using System;
 using System.Collections.Generic;
+using Mir2.Shared.Rules;
 
 namespace Mir2Client.Game
 {
+    /// <summary>
+    /// 盛大官方 1.5 客户端大世界地表掉落物管理器与渲染表现容器 (1:1 官方实证)
+    /// 官方实证：IDA sub_46AEF0 & SM_GROUNDITEM (314) / SM_DELGROUNDITEM (315)
+    /// 掉落物拾取保护规则下沉至 Mir2.Shared.Rules.AdvancedCombatRuleEngine.GroundItemPickupEngine
+    /// 联网模式下客户端仅负责视觉呈现与发送 CM_PICKUP 请求包，拾取权由 M2Server 唯一权威判定
+    /// </summary>
     public class GroundItemManager
     {
         public sealed class GroundItemData
@@ -26,8 +28,7 @@ namespace Mir2Client.Game
         public bool CanPickup(int itemId, string pickerName)
         {
             if (!_items.TryGetValue(itemId, out var item)) return false;
-            if (item.ProtectionTime <= 0.0f) return true;
-            return string.IsNullOrEmpty(item.OwnerName) || item.OwnerName == pickerName;
+            return AdvancedCombatRuleEngine.GroundItemPickupEngine.CanPickup(item.ProtectionTime, item.OwnerName, pickerName);
         }
 
         public event Action<GroundItemData>? ItemAdded;

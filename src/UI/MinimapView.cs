@@ -39,9 +39,12 @@ public partial class MinimapView : Control, IManagedWindow
     private TextureRect? _mapTexRect;
     private Label? _lblMapCoord;
     private Label? _lblHoverCoord;
+    private Label? _lblNoMapNotice;
+    private Label? _lblShortcutsHint;
     private TextureButton? _btnClose;
     private ColorRect? _playerDot;
     private ColorRect? _targetMarker;
+    private Line2D? _directionArrow;
     private Control? _entityDotsContainer;
     private Control? _landmarksContainer;
     private readonly List<ColorRect> _dotPool = new();
@@ -50,10 +53,13 @@ public partial class MinimapView : Control, IManagedWindow
 
     private float _blinkTimer = 0.0f;
     private bool _blinkState = true;
+    private float _portalBlinkTimer = 0.0f;
+    private bool _portalBlinkState = true;
     private string _mapName = "比奇省";
     private string _mapId = "0";
     private int _playerX = 330;
     private int _playerY = 270;
+    private int _playerDir = 0;
     private int _hoverX = -1;
     private int _hoverY = -1;
     private int _targetX = -1;
@@ -64,6 +70,8 @@ public partial class MinimapView : Control, IManagedWindow
     private int _mapHeightTiles = 400;
 
     public string WindowName => "MinimapView";
+    public string MapName => _mapName;
+    public string MapId => _mapId;
     public new bool IsVisible
     {
         get => Visible;
@@ -150,6 +158,36 @@ public partial class MinimapView : Control, IManagedWindow
         _lblHoverCoord.AddThemeColorOverride("font_color", new Color(0.4f, 1.0f, 0.8f));
         AddChild(_lblHoverCoord);
 
+        _lblNoMapNotice = new Label
+        {
+            Name = "LblNoMapNotice",
+            Size = new Vector2(500, 30),
+            Position = new Vector2(20, 160),
+            Text = "【当前环境受磁场干扰，无法侦测全景雷达】",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visible = false,
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        _lblNoMapNotice.AddThemeFontSizeOverride("font_size", 12);
+        _lblNoMapNotice.AddThemeColorOverride("font_color", new Color(0.65f, 0.65f, 0.7f, 0.85f));
+        AddChild(_lblNoMapNotice);
+
+        _lblShortcutsHint = new Label
+        {
+            Name = "LblShortcutsHint",
+            Size = new Vector2(220, 20),
+            Position = new Vector2(310, 335),
+            Text = "[TAB/V] 切换  [ESC] 关闭",
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visible = false,
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        _lblShortcutsHint.AddThemeFontSizeOverride("font_size", 9);
+        _lblShortcutsHint.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.5f, 0.8f));
+        AddChild(_lblShortcutsHint);
+
         // 官方右上角关闭红叉按钮 (Prguse_0064 16x23)
         var closeTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0064.png");
         _btnClose = new TextureButton
@@ -199,20 +237,58 @@ public partial class MinimapView : Control, IManagedWindow
         };
         AddChild(_landmarksContainer);
 
+        _directionArrow = new Line2D
+        {
+            Name = "DirectionArrow",
+            Width = 1.5f,
+            DefaultColor = new Color(1f, 1f, 0.3f, 0.95f),
+            Visible = false
+        };
+        _directionArrow.AddPoint(Vector2.Zero);
+        _directionArrow.AddPoint(new Vector2(0, -5));
+        AddChild(_directionArrow);
+
         GD.Print("[MinimapView] 官方 1.5 双模地图场景与交互引擎就绪");
+    }
+
+    public static bool IsMinimapBlocked(string mapId)
+    {
+        return mapId.ToUpperInvariant() switch
+        {
+            "M001" => true, // 未知暗殿屏蔽区域 (盛大官方 1.5 权威真值，严禁 1.76 幻境等高版本残留)
+            _ => false
+        };
     }
 
     private Texture2D? LoadMapTexture(string mapId)
     {
-        string formattedIndex = mapId.PadLeft(4, '0');
-        string pngPath = $"resources/wil/png/mmap/mmap_{formattedIndex}.png";
-        var tex = ResPath.LoadImageTexture(pngPath);
-        if (tex == null)
+        if (IsMinimapBlocked(mapId)) return null;
+
+        int mmapIdx = -1;
+        if (int.TryParse(mapId, out int numericId))
         {
-            // 回退到默认比奇省大地图
-            tex = ResPath.LoadImageTexture("resources/wil/png/mmap/mmap_0000.png");
+            mmapIdx = numericId;
         }
-        return tex;
+        else
+        {
+            mmapIdx = mapId.ToUpperInvariant() switch
+            {
+                "D501" or "D502" or "D503" or "D504" or "D505" or "D506" or "D507" => 50, // 祖玛寺庙系列
+                "D701" or "D702" or "D703" or "D704" or "D705" or "D706" or "D707" => 70, // 石墓系列
+                "D601" or "D602" or "D603" or "D604" or "D605" => 60,                     // 死亡山谷系列
+                _ => -1
+            };
+        }
+
+        if (mmapIdx >= 0 && mmapIdx <= 127)
+        {
+            string formattedIndex = mmapIdx.ToString().PadLeft(4, '0');
+            string pngPath = $"resources/wil/png/mmap/mmap_{formattedIndex}.png";
+            var tex = ResPath.LoadImageTexture(pngPath);
+            if (tex != null) return tex;
+        }
+
+        return null;
     }
 
     public void SetMap(string mapId, string mapName, int widthTiles = 400, int heightTiles = 400)
@@ -229,14 +305,21 @@ public partial class MinimapView : Control, IManagedWindow
         UpdatePlayerPosition(_mapName, _playerX, _playerY);
     }
 
-    public void UpdatePlayerPosition(string mapName, int x, int y)
+    public void UpdatePlayerPosition(string mapName, int x, int y, int dir = -1)
     {
-        _mapName = mapName;
+        if (!string.IsNullOrEmpty(mapName) && mapName != "0" && mapName != _mapId)
+        {
+            _mapName = mapName;
+        }
         _playerX = x;
         _playerY = y;
+        if (dir >= 0) _playerDir = dir & 7;
+
         if (_lblMapCoord != null)
         {
-            string title = _currentMode == MinimapMode.Big ? $"【{_mapName}】全景地图 (自身: {_playerX}, {_playerY})" : $"{_mapName} ({_playerX},{_playerY})";
+            string title = _currentMode == MinimapMode.Big 
+                ? $"【{_mapName}】全景地图 (自身: {_playerX}, {_playerY})" 
+                : $"{_mapName} ({_playerX},{_playerY})";
             _lblMapCoord.Text = title;
         }
 
@@ -268,6 +351,14 @@ public partial class MinimapView : Control, IManagedWindow
             float px = 2 + (_playerX / (float)_mapWidthTiles) * mapAreaW;
             float py = 24 + (_playerY / (float)_mapHeightTiles) * mapAreaH;
             _playerDot.Position = new Vector2(Math.Clamp(px - 2, 2, 534), Math.Clamp(py - 2, 24, 350));
+        }
+
+        // 盛大官方 1.5 原生 8 方向雷达尖角朝向指针
+        if (_directionArrow != null)
+        {
+            _directionArrow.Position = _playerDot.Position + new Vector2(2, 2);
+            _directionArrow.Rotation = _playerDir * (MathF.PI / 4.0f);
+            _directionArrow.Visible = _currentMode != MinimapMode.Closed;
         }
     }
 
@@ -475,7 +566,8 @@ public partial class MinimapView : Control, IManagedWindow
     {
         if (_currentMode == MinimapMode.Closed) return;
 
-        _blinkTimer += (float)delta;
+        float dt = (float)delta;
+        _blinkTimer += dt;
         if (_blinkTimer >= 0.3f) // 官方 300ms 闪烁 (IDA sub_46FF0C @ 0x46ff31)
         {
             _blinkTimer = 0.0f;
@@ -483,6 +575,26 @@ public partial class MinimapView : Control, IManagedWindow
             if (_playerDot != null)
             {
                 _playerDot.Visible = _blinkState;
+            }
+            if (_directionArrow != null)
+            {
+                _directionArrow.Visible = _blinkState;
+            }
+        }
+
+        // 盛大官方 1.5 大地图传送门点阵 500ms 呼吸闪烁
+        _portalBlinkTimer += dt;
+        if (_portalBlinkTimer >= 0.5f)
+        {
+            _portalBlinkTimer = 0.0f;
+            _portalBlinkState = !_portalBlinkState;
+            for (int i = 0; i < _landmarkMarkers.Count; i++)
+            {
+                var lm = _landmarkMarkers[i];
+                if (lm.Visible && lm.Color.B > 0.8f) // 传送门天蓝标记
+                {
+                    lm.Modulate = new Color(1, 1, 1, _portalBlinkState ? 1.0f : 0.3f);
+                }
             }
         }
     }
@@ -508,6 +620,8 @@ public partial class MinimapView : Control, IManagedWindow
                 if (_btnClose != null) _btnClose.Visible = false;
                 if (_lblHoverCoord != null) _lblHoverCoord.Visible = false;
                 if (_landmarksContainer != null) _landmarksContainer.Visible = false;
+                if (_lblNoMapNotice != null) _lblNoMapNotice.Visible = false;
+                if (_lblShortcutsHint != null) _lblShortcutsHint.Visible = false;
                 break;
 
             case MinimapMode.Mini:
@@ -529,6 +643,15 @@ public partial class MinimapView : Control, IManagedWindow
                 if (_btnClose != null) _btnClose.Visible = false;
                 if (_lblHoverCoord != null) _lblHoverCoord.Visible = false;
                 if (_landmarksContainer != null) _landmarksContainer.Visible = false;
+                if (_lblShortcutsHint != null) _lblShortcutsHint.Visible = false;
+                if (_lblNoMapNotice != null)
+                {
+                    _lblNoMapNotice.Visible = _mapTexRect?.Texture == null;
+                    _lblNoMapNotice.Position = new Vector2(10, 50);
+                    _lblNoMapNotice.Size = new Vector2(100, 20);
+                    _lblNoMapNotice.Text = "无地图数据";
+                    _lblNoMapNotice.AddThemeFontSizeOverride("font_size", 10);
+                }
                 UpdatePlayerDotPosition();
                 UpdateTargetMarkerPosition();
                 break;
@@ -560,6 +683,18 @@ public partial class MinimapView : Control, IManagedWindow
                     _lblHoverCoord.Position = new Vector2(10, 335);
                     _lblHoverCoord.Size = new Vector2(300, 20);
                     _lblHoverCoord.Visible = false;
+                }
+                if (_lblShortcutsHint != null)
+                {
+                    _lblShortcutsHint.Visible = true;
+                }
+                if (_lblNoMapNotice != null)
+                {
+                    _lblNoMapNotice.Visible = _mapTexRect?.Texture == null;
+                    _lblNoMapNotice.Position = new Vector2(20, 160);
+                    _lblNoMapNotice.Size = new Vector2(500, 30);
+                    _lblNoMapNotice.Text = "【当前环境受磁场干扰，无法侦测全景雷达】";
+                    _lblNoMapNotice.AddThemeFontSizeOverride("font_size", 12);
                 }
                 UpdatePlayerDotPosition();
                 UpdateTargetMarkerPosition();

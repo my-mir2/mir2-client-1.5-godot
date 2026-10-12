@@ -114,9 +114,10 @@ public partial class SelectCharView : Control
     private Label? _msgText;
     private TextureButton? _btnMsgOk;
 
-    // 动画状态机
+    // 动画状态机 (盛大官方 1.5 IDA sub_47F264: 火环为激活选中的瞬发 14 帧光效，播放完毕即隐去；角色呼吸动作为常驻循环待机)
     private double _flameTimer = 0.0;
     private int _flameFrame = 0;
+    private bool _isFlamePlaying = false;
     private double _charAnimTimer = 0.0;
     private int _charAnimFrame = 0;
 
@@ -147,6 +148,20 @@ public partial class SelectCharView : Control
         _flameSlot1 = GetNodeOrNull<TextureRect>("FlameSlot1");
         _charSlot0 = GetNodeOrNull<TextureRect>("CharSlot0");
         _charSlot1 = GetNodeOrNull<TextureRect>("CharSlot1");
+
+        // 盛大官方 1.5 原版神龛实证：
+        // 官方 1.5 选角神龛纯净无多余冲天光束，角色直接坐落于石雕神龛中；
+        // 彻底禁用非标的 FlameSlot 动画与加法混合穿透，恢复官方纯净石雕立绘与呼吸动画
+        if (_flameSlot0 != null)
+        {
+            _flameSlot0.Visible = false;
+        }
+        if (_flameSlot1 != null)
+        {
+            _flameSlot1.Visible = false;
+        }
+        if (_charSlot0 != null) _charSlot0.ZIndex = 1;
+        if (_charSlot1 != null) _charSlot1.ZIndex = 1;
 
         // 3. 绑定 1号位 / 2号位 角色信息控件 (sub_47F264 @ 0x47FAAD / 0x47FB93)
         _char1Name = GetNodeOrNull<Label>("Char1Info/Name");
@@ -286,19 +301,14 @@ public partial class SelectCharView : Control
 
     public override void _Process(double delta)
     {
-        // 1. 脚底神龛火环粒子动画 (110ms / 0x6E 帧步长, sub_47F264 @ 0x47F57D)
-        _flameTimer += delta;
-        if (_flameTimer >= OfficialFlameFrameDuration)
+        // 1. 脚底神龛火环粒子动画：单次 14 帧冲天光效 (110ms / 0x6E 帧步长, sub_47F264 @ 0x47F57D)
+        // 盛大官方 1.5 机制：选角神龛纯净无冲天光柱，角色直接进行呼吸待机
+        if (_isFlamePlaying)
         {
-            _flameTimer = 0.0;
-            _flameFrame = (_flameFrame + 1) % OfficialFlameTotalFrames;
-            UpdateFlameTextures();
+            _isFlamePlaying = false;
+            if (_flameSlot0 != null) _flameSlot0.Visible = false;
+            if (_flameSlot1 != null) _flameSlot1.Visible = false;
         }
-
-        // 盛大官方 1.5 烛火火把明暗呼吸调光 (正弦波 4 阶明暗调制，呈现烛火微明微暗)
-        float flameAlpha = 0.85f + 0.15f * MathF.Sin((float)(_flameFrame * (MathF.PI / 7.0f)));
-        if (_flameSlot0 != null && _flameSlot0.Visible) _flameSlot0.Modulate = new Color(1f, 1f, 1f, flameAlpha);
-        if (_flameSlot1 != null && _flameSlot1.Visible) _flameSlot1.Modulate = new Color(1f, 1f, 1f, flameAlpha);
 
         // 2. 角色呼吸动作循环动画 (300ms / 0x12C 帧步长, sub_47F264 @ 0x47F9EB)
         _charAnimTimer += delta;
@@ -310,35 +320,18 @@ public partial class SelectCharView : Control
         }
     }
 
+    public void TriggerFlameAnimation()
+    {
+        // 官方 1.5 纯净模式：不播放火环穿模光效
+        _isFlamePlaying = false;
+        if (_flameSlot0 != null) _flameSlot0.Visible = false;
+        if (_flameSlot1 != null) _flameSlot1.Visible = false;
+    }
+
     private void UpdateFlameTextures()
     {
-        int flameIdx = OfficialFlameStartFrame + _flameFrame;
-        var texFlame = ResPath.LoadImageTexture($"resources/wil/png/ChrSel/ChrSel_{flameIdx:D4}.png");
-
-        // 只有当前激活选中的席位或存在角色的席位才展现火环
-        if (_flameSlot0 != null)
-        {
-            bool show0 = _characters.Count > 0 && _selectedSlot == 0;
-            _flameSlot0.Visible = show0;
-            if (show0 && texFlame != null)
-            {
-                _flameSlot0.Texture = texFlame;
-                _flameSlot0.Size = texFlame.GetSize();
-                _flameSlot0.Position = new Vector2(90, 58);
-            }
-        }
-
-        if (_flameSlot1 != null)
-        {
-            bool show1 = _characters.Count > 1 && _selectedSlot == 1;
-            _flameSlot1.Visible = show1;
-            if (show1 && texFlame != null)
-            {
-                _flameSlot1.Texture = texFlame;
-                _flameSlot1.Size = texFlame.GetSize();
-                _flameSlot1.Position = new Vector2(430, 60);
-            }
-        }
+        if (_flameSlot0 != null) _flameSlot0.Visible = false;
+        if (_flameSlot1 != null) _flameSlot1.Visible = false;
     }
 
     private void UpdateCharTextures()
@@ -464,6 +457,10 @@ public partial class SelectCharView : Control
         _characters.AddRange(chars);
         RefreshCharacterDisplay();
         UpdateAnimations(0);
+        if (_characters.Count > 0)
+        {
+            TriggerFlameAnimation();
+        }
     }
 
     private int _lastClickedSlot = -1;
@@ -494,6 +491,10 @@ public partial class SelectCharView : Control
             }
         }
         UpdateAnimations(0);
+        if (slot < _characters.Count)
+        {
+            TriggerFlameAnimation();
+        }
 
         // 盛大官方 1.5 双击神龛直接进入游戏实证 (sub_463BFC DXDraw1DblClick / sub_4886C0 DscSelect1Click)
         if (isDoubleClick && slot < _characters.Count)

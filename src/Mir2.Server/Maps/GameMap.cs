@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Mir2.Server.Network;
+using Mir2.Shared.Models;
 
 namespace Mir2.Server.Maps;
 
@@ -32,6 +33,20 @@ public sealed class GameMap
         _walkableGrid = new BitArray(width * height, true); // 默认全图可通行
     }
 
+    private readonly HashSet<(int x, int y)> _dynamicObstacles = new();
+
+    /// <summary>
+    /// 盛大官方 1.5 触龙神等大型 Boss 动态注册与注销 3x3 地图占位阻挡
+    /// </summary>
+    public void SetDynamicObstacle(int x, int y, bool blocked)
+    {
+        lock (_dynamicObstacles)
+        {
+            if (blocked) _dynamicObstacles.Add((x, y));
+            else _dynamicObstacles.Remove((x, y));
+        }
+    }
+
     /// <summary>
     /// 判定坐标 (x, y) 是否位于地图边界内且无阻挡可通行
     /// </summary>
@@ -42,8 +57,50 @@ public sealed class GameMap
             return false; // 超出地图物理边界，绝对不可通行
         }
 
+        lock (_dynamicObstacles)
+        {
+            if (_dynamicObstacles.Contains((x, y))) return false;
+        }
+
         int index = x * Height + y;
         return _walkableGrid.Get(index);
+    }
+
+    /// <summary>
+    /// 判定奔跑跨两格物理路径碰撞 (起点 -> 中间瓦片 -> 终点瓦片)
+    /// 严格杜绝外挂隔墙隔山瞬移！
+    /// </summary>
+    public bool IsRunPathWalkable(int fromX, int fromY, int toX, int toY)
+    {
+        int midX = fromX + (toX - fromX) / 2;
+        int midY = fromY + (toY - fromY) / 2;
+        return IsWalkable(midX, midY) && IsWalkable(toX, toY);
+    }
+
+    /// <summary>
+    /// 校验指定目标坐标是否存在活体生物实体碰撞阻挡 (官方 1:1 人挡人、怪挡人卡位权威检测)
+    /// </summary>
+    public bool HasEntityCollision(int targetX, int targetY, int ignoreSessionId = 0, Func<int, int, bool>? monsterCheck = null)
+    {
+        // 1. 查询九宫格范围内的其他存活玩家
+        var buffer = new List<ClientSession>();
+        Aoi.GetEntitiesInNinePatch(targetX, targetY, buffer);
+        for (int i = 0; i < buffer.Count; i++)
+        {
+            var s = buffer[i];
+            if (s.SessionId != ignoreSessionId && s.X == targetX && s.Y == targetY && s.State != null && s.State.Hp > 0)
+            {
+                return true; // 目标位置已有存活玩家占据，阻挡无法进入
+            }
+        }
+
+        // 2. 检查是否有怪物占据
+        if (monsterCheck != null && monsterCheck(targetX, targetY))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -188,6 +245,23 @@ public sealed class GameMap
         return new List<FireWallEntity>();
     }
 
+    public List<(int x, int y, List<FireWallEntity> fires)> GetAllActiveFireWalls()
+    {
+        var result = new List<(int x, int y, List<FireWallEntity> fires)>();
+        foreach (var kvp in _fireWalls)
+        {
+            var list = kvp.Value;
+            lock (list)
+            {
+                if (list.Count > 0)
+                {
+                    result.Add((list[0].X, list[0].Y, new List<FireWallEntity>(list)));
+                }
+            }
+        }
+        return result;
+    }
+
     public int CleanExpiredFireWalls(long nowMs)
     {
         int cleaned = 0;
@@ -232,6 +306,8 @@ public sealed class GameMap
         _doors.TryGetValue(key, out var door);
         return door;
     }
+
+    public bool HasDoor(int x, int y) => GetDoor(x, y) != null;
 
     public bool OpenDoor(int x, int y, long nowMs)
     {
@@ -305,30 +381,41 @@ public sealed class GameMap
                 return (false, null, "地上没有任何物品");
             }
 
-            // 优先拾取列表顶部物品
-            var candidate = list[0];
+            // 盛大官方多物品堆叠拾取判定: 遍历寻找首个无保护或归属己方的可拾取物品
+            int pickIndex = -1;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var candidate = list[i];
+                // 官方保护期判定: 80,000 毫秒 = 80秒 (IDA 0x4C5CB0 @ 0x13880)
+                if (nowMs - candidate.DropTickMs <= 80000 && candidate.OwnerSessionId != 0 && candidate.OwnerSessionId != sessionId)
+                {
+                    continue; // 处于他人保护期，跳过并尝试下一个
+                }
+                pickIndex = i;
+                break;
+            }
 
-            // 官方保护期判定: 80,000 毫秒 = 80秒 (IDA 0x4C5CB0 @ 0x13880)
-            if (nowMs - candidate.DropTickMs <= 80000 && candidate.OwnerSessionId != 0 && candidate.OwnerSessionId != sessionId)
+            if (pickIndex < 0)
             {
                 return (false, null, "物品受保护中，无法拾取");
             }
 
-            list.RemoveAt(0);
+            var picked = list[pickIndex];
+            list.RemoveAt(pickIndex);
             if (list.Count == 0)
             {
                 _groundItems.TryRemove(key, out _);
             }
-            return (true, candidate, string.Empty);
+            return (true, picked, string.Empty);
         }
     }
 
     /// <summary>
-    /// 清理存活超过 maxLifeMs (默认2分钟) 的地面物品，防止内存堆积与泄露
+    /// 清理存活超过 maxLifeMs (默认2分钟) 的地面物品，并返回过期实体列表供九宫格广播消失
     /// </summary>
-    public int CleanExpiredGroundItems(long nowMs, long maxLifeMs = 120_000)
+    public List<GroundItemEntity> CleanExpiredGroundItemsWithEntities(long nowMs, long maxLifeMs = 120_000)
     {
-        int removedCount = 0;
+        var removed = new List<GroundItemEntity>();
         foreach (var kvp in _groundItems)
         {
             var list = kvp.Value;
@@ -338,8 +425,8 @@ public sealed class GameMap
                 {
                     if (nowMs - list[i].DropTickMs > maxLifeMs)
                     {
+                        removed.Add(list[i]);
                         list.RemoveAt(i);
-                        removedCount++;
                     }
                 }
             }
@@ -348,7 +435,47 @@ public sealed class GameMap
                 _groundItems.TryRemove(kvp.Key, out _);
             }
         }
-        return removedCount;
+        return removed;
+    }
+
+    /// <summary>
+    /// 清理存活超过 maxLifeMs (默认2分钟) 的地面物品，防止内存堆积与泄露
+    /// </summary>
+    public int CleanExpiredGroundItems(long nowMs, long maxLifeMs = 120_000)
+    {
+        return CleanExpiredGroundItemsWithEntities(nowMs, maxLifeMs).Count;
+    }
+
+    public List<GroundItemEntity> GetAllGroundItems()
+    {
+        var all = new List<GroundItemEntity>();
+        foreach (var kvp in _groundItems)
+        {
+            lock (kvp.Value)
+            {
+                all.AddRange(kvp.Value);
+            }
+        }
+        return all;
+    }
+
+    public bool RemoveGroundItem(int uid)
+    {
+        foreach (var kvp in _groundItems)
+        {
+            lock (kvp.Value)
+            {
+                for (int i = 0; i < kvp.Value.Count; i++)
+                {
+                    if (kvp.Value[i].Uid == uid)
+                    {
+                        kvp.Value.RemoveAt(i);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }
 
@@ -361,11 +488,12 @@ public sealed class GroundItemEntity
     public string Name { get; init; } = string.Empty;
     public int X { get; init; }
     public int Y { get; init; }
-    public int Count { get; init; } = 1;
+    public int Count { get; set; } = 1;
     public bool IsGold { get; init; }
     public int Weight { get; init; } = 1;
     public int OwnerSessionId { get; set; }
     public long DropTickMs { get; init; }
+    public EquipItem? ItemData { get; set; }
 }
 
 /// <summary>

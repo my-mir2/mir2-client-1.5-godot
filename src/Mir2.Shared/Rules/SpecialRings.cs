@@ -62,6 +62,9 @@ public static class SpecialRings
         if (!hasRevive)
             return (false, curHp, curDura, false, "NO_REVIVE_RING");
 
+        if (curDura <= 0)
+            return (false, curHp, curDura, false, "BROKEN");
+
         if (lastReviveTick > 0 && nowTick - lastReviveTick < 30000)
             return (false, curHp, curDura, false, "COOLDOWN");
 
@@ -139,17 +142,21 @@ public static class SpecialRings
         string trimmed = command.Trim();
         bool isMoveCmd = trimmed.StartsWith("@move", StringComparison.OrdinalIgnoreCase) ||
                          trimmed.StartsWith("@飞", StringComparison.OrdinalIgnoreCase) ||
+                         trimmed.StartsWith("@传送", StringComparison.OrdinalIgnoreCase) ||
                          trimmed.StartsWith("@瞬移", StringComparison.OrdinalIgnoreCase);
 
         if (!isMoveCmd)
             return (false, currentX, currentY, "非传送指令");
 
         if (!hasRing)
-            return (false, currentX, currentY, "你没有佩戴传送戒指，无法使用瞬移指令");
+            return (false, currentX, currentY, "你未佩戴传送戒指，无法使用空间瞬移！");
 
-        // 检查传送冷却 (5 秒防刷屏)
-        if (lastTeleportTick > 0 && nowTick - lastTeleportTick < 5000)
-            return (false, currentX, currentY, "传送戒指能量凝聚中，请稍后再试");
+        // 检查传送冷却 (盛大官方 1.5 严格 10 秒冷却)
+        if (lastTeleportTick > 0 && nowTick - lastTeleportTick < 10000)
+        {
+            int remainSec = Math.Max(1, (int)Math.Ceiling((10000 - (nowTick - lastTeleportTick)) / 1000.0));
+            return (false, currentX, currentY, $"传送戒指魔力正在凝聚中，请等待 {remainSec} 秒后再试！");
+        }
 
         // 解析参数
         string[] parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -160,12 +167,12 @@ public static class SpecialRings
 
         if (targetX < 0 || targetX >= mapWidth || targetY < 0 || targetY >= mapHeight)
         {
-            return (false, currentX, currentY, $"目标坐标 ({targetX}, {targetY}) 超出地图边界");
+            return (false, currentX, currentY, $"传送失败：目标坐标 ({targetX}, {targetY}) 超出地图边界");
         }
 
         if (isTileBlocked != null && isTileBlocked(targetX, targetY))
         {
-            return (false, currentX, currentY, $"目标坐标 ({targetX}, {targetY}) 处于阻挡区域，无法降落");
+            return (false, currentX, currentY, $"传送失败：目标坐标 ({targetX}, {targetY}) 处于阻挡区域，无法降落");
         }
 
         return (true, targetX, targetY, $"传送成功至 ({targetX}, {targetY})");

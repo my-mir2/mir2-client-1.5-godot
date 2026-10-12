@@ -13,6 +13,7 @@ namespace Mir2Client.Game
     {
         [Signal] public delegate void WalkRequestedEventHandler(int dir);
         [Signal] public delegate void RunRequestedEventHandler(int dir);
+        [Signal] public delegate void TurnRequestedEventHandler(int dir);
         [Signal] public delegate void HitRequestedEventHandler(int dir);
         [Signal] public delegate void PowerHitRequestedEventHandler(int dir);
         [Signal] public delegate void PickupRequestedEventHandler();
@@ -54,7 +55,8 @@ namespace Mir2Client.Game
         private EntityManager? _entityManager;
 
         private ulong _lastRightRunMs = 0;
-        public const ulong RightRunIntervalMs = 360;
+        // 盛大官方 1.5 奔跑动作步频对齐 (单次奔跑动画为 0.50s，采样周期设为 480ms 确保步频平滑且绝不发生时序倒挂)
+        public const ulong RightRunIntervalMs = 480;
 
         public void SetMapRenderer(MapRenderer mr) => _mapRenderer = mr;
         public void SetEntityManager(EntityManager em) => _entityManager = em;
@@ -74,18 +76,19 @@ namespace Mir2Client.Game
 
         private Vector2 GetPlayerScreenPos()
         {
-            if (_mapRenderer != null && _playerNode != null)
+            if (_playerNode is PlayerNode pn)
             {
-                var tileX = (int)(_playerNode.Get("tile_x").AsInt32());
-                var tileY = (int)(_playerNode.Get("tile_y").AsInt32());
-                return _mapRenderer.TileToScreen(tileX, tileY) + new Vector2(24, 16);
+                if (_mapRenderer != null)
+                {
+                    return _mapRenderer.WorldToScreen(pn.GetCurrentRenderPos()) + new Vector2(24, 16);
+                }
+                return pn.Position + new Vector2(24, 16);
             }
-            if (_playerNode != null && _playerNode.IsInsideTree())
+            if (_playerNode != null)
             {
-                var vp = _playerNode.GetViewport();
-                if (vp != null) return vp.GetVisibleRect().Size / 2.0f;
+                return _playerNode.Position + new Vector2(24, 16);
             }
-            return _playerNode?.Position ?? Vector2.Zero;
+            return new Vector2(400, 225);
         }
 
         private int CalcTileDirection(Vector2I from, Vector2I to)
@@ -127,22 +130,45 @@ namespace Mir2Client.Game
 
         public override void _Process(double delta)
         {
-            if (_playerNode != null && Input.IsMouseButtonPressed(MouseButton.Right))
-            {
-                var mousePos = _playerNode.IsInsideTree() ? _playerNode.GetViewport().GetMousePosition() : Vector2.Zero;
-                if (IsCursorOverUi(mousePos)) return;
+            if (_playerNode == null) return;
+            if (_playerNode is PlayerNode pnl && (pnl.IsStunned || pnl.IsDead)) return;
 
-                ulong now = Time.GetTicksMsec();
-                if (now - _lastRightRunMs >= RightRunIntervalMs)
+            // 盛大官方 1.5 规则：上一动作移动插值未完成时，等待当前步完成再衔接下一步
+            bool isMoving = false;
+            if (_playerNode is PlayerNode pnr)
+            {
+                isMoving = pnr.IsMoving;
+            }
+            else
+            {
+                isMoving = _playerNode.Get("is_moving").AsBool();
+            }
+
+            if (isMoving) return;
+
+            var mousePos = _playerNode.IsInsideTree() ? _playerNode.GetViewport().GetMousePosition() : Vector2.Zero;
+            if (IsCursorOverUi(mousePos)) return;
+
+            var playerPos = GetPlayerScreenPos();
+            var diff = mousePos - playerPos;
+            if (diff.Length() <= 20.0f) return; // 20 像素脚下死区，彻底杜绝原地打转
+
+            int dir = CalcDirection(diff);
+
+            // 1. 盛大官方 1.5 右键长按连续奔跑 (Run)
+            if (Input.IsMouseButtonPressed(MouseButton.Right))
+            {
+                EmitSignal(SignalName.RunRequested, dir);
+                return;
+            }
+
+            // 2. 盛大官方 1.5 左键长按连续走动 (Walk)
+            if (Input.IsMouseButtonPressed(MouseButton.Left))
+            {
+                // 功能键组合优先 (Shift 强制攻击, Ctrl 刺杀, Alt 挖肉)，不触发走动
+                if (!Input.IsKeyPressed(Key.Shift) && !Input.IsKeyPressed(Key.Ctrl) && !Input.IsKeyPressed(Key.Alt))
                 {
-                    _lastRightRunMs = now;
-                    var playerPos = GetPlayerScreenPos();
-                    var diff = mousePos - playerPos;
-                    if (diff.Length() > 24)
-                    {
-                        int dir = CalcDirection(diff);
-                        EmitSignal(SignalName.RunRequested, dir);
-                    }
+                    EmitSignal(SignalName.WalkRequested, dir);
                 }
             }
         }
@@ -297,17 +323,31 @@ namespace Mir2Client.Game
                 return;
             }
 
-            // 4. 空地走动或奔跑寻路
-            if (chebyshev <= 1)
+            // 4. 盛大官方 1.5 空地走动逻辑：
+            // 若点击近邻格 (Chebyshev 距离 <= 1)，直接迈步 1 格走动
+            // 若点击远处有效瓦片 (Chebyshev 距离 > 1)，触发连续寻路走向目标点 (NavigateRequested)
+            if (targetTile.X >= 0)
             {
-                EmitSignal(SignalName.WalkRequested, dir);
+                if (chebyshev <= 1)
+                {
+                    var deltaScreen = screenPos - playerScreen;
+                    if (deltaScreen.Length() > 16.0f)
+                    {
+                        EmitSignal(SignalName.WalkRequested, dir);
+                    }
+                }
+                else
+                {
+                    EmitSignal(SignalName.NavigateRequested, targetTile);
+                }
             }
             else
             {
-                if (targetTile.X >= 0)
-                    EmitSignal(SignalName.NavigateRequested, targetTile);
-                else
-                    EmitSignal(SignalName.RunRequested, dir);
+                var deltaScreen = screenPos - playerScreen;
+                if (deltaScreen.Length() > 16.0f)
+                {
+                    EmitSignal(SignalName.WalkRequested, dir);
+                }
             }
         }
 
@@ -318,9 +358,49 @@ namespace Mir2Client.Game
 
             var playerScreen = GetPlayerScreenPos();
             var delta = screenPos - playerScreen;
-            int dir = CalcDirection(delta);
+            if (delta.Length() < 24.0f)
+            {
+                int turnDir = CalcDirection(delta);
+                EmitSignal(SignalName.TurnRequested, turnDir);
+                return;
+            }
 
+            int dir = CalcDirection(delta);
             EmitSignal(SignalName.RunRequested, dir);
+        }
+
+        /// <summary>
+        /// 当角色单步刚走完时主动调用，立即衔接下一步长按移动，消除步与步之间的卡顿抽搐
+        /// </summary>
+        public void PollContinuousMovement()
+        {
+            if (_playerNode == null) return;
+            if (_playerNode is PlayerNode pnl && (pnl.IsStunned || pnl.IsDead)) return;
+
+            var mousePos = _playerNode.IsInsideTree() ? _playerNode.GetViewport().GetMousePosition() : Vector2.Zero;
+            if (IsCursorOverUi(mousePos)) return;
+
+            var playerPos = GetPlayerScreenPos();
+            var diff = mousePos - playerPos;
+            if (diff.Length() <= 20.0f) return;
+
+            int dir = CalcDirection(diff);
+
+            // 1. 右键长按连续奔跑
+            if (Input.IsMouseButtonPressed(MouseButton.Right))
+            {
+                EmitSignal(SignalName.RunRequested, dir);
+                return;
+            }
+
+            // 2. 左键长按连续走动
+            if (Input.IsMouseButtonPressed(MouseButton.Left))
+            {
+                if (!Input.IsKeyPressed(Key.Shift) && !Input.IsKeyPressed(Key.Ctrl) && !Input.IsKeyPressed(Key.Alt))
+                {
+                    EmitSignal(SignalName.WalkRequested, dir);
+                }
+            }
         }
 
         public static int CalcDirection(float dx, float dy)

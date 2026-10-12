@@ -35,6 +35,7 @@ public partial class StoragePanelView : Control, IManagedWindow
     private Label? _lblGold;
 
     public string WindowName => "StoragePanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.StoragePanel;
     public new bool IsVisible
     {
         get => Visible;
@@ -139,6 +140,18 @@ public partial class StoragePanelView : Control, IManagedWindow
         };
         btnDepositGold.Pressed += OnDepositGoldClicked;
         _panel.AddChild(btnDepositGold);
+
+        // 取出金币按钮 (Prguse_0060 76x33 @ 330, 242)
+        var texWithdraw = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0060.png") ?? texConfirm;
+        var btnWithdrawGold = new TextureButton
+        {
+            Name = "BtnWithdrawGold",
+            Position = new Vector2(330, 242),
+            Size = new Vector2(76, 33),
+            TextureNormal = texWithdraw
+        };
+        btnWithdrawGold.Pressed += OnWithdrawGoldClicked;
+        _panel.AddChild(btnWithdrawGold);
     }
 
     public const int MaxStorageGold = 50_000_000; // 盛大官方 5000 万金币安全上限
@@ -180,11 +193,78 @@ public partial class StoragePanelView : Control, IManagedWindow
         GD.Print($"[StoragePanelView] 切换仓库页码至: 第 {_currentPage + 1} 页 (格 {_currentPage * 40}..{_currentPage * 40 + 39})");
     }
 
+    private MessageBoxDialog? GetOrFindMessageBox()
+    {
+        var hud = GetParent() as HudController;
+        if (hud?.MessageBoxDialog != null) return hud.MessageBoxDialog;
+        return GetTree()?.Root.FindChild("MessageBoxDialog", true, false) as MessageBoxDialog;
+    }
+
     private void OnDepositGoldClicked()
     {
-        if (CheckDepositGoldValid(10000, out string _))
+        var msgBox = GetOrFindMessageBox();
+        if (msgBox != null)
         {
-            EmitSignal(SignalName.DepositGoldRequested, 10000);
+            msgBox.ShowNumericInput("请输入你要存入保管箱的金币金额：", MaxStorageGold, 10000, amount =>
+            {
+                if (CheckDepositGoldValid(amount, out string reason))
+                {
+                    EmitSignal(SignalName.DepositGoldRequested, amount);
+                }
+                else
+                {
+                    msgBox.ShowMessage(reason, false);
+                }
+            });
+        }
+        else
+        {
+            if (CheckDepositGoldValid(10000, out string _))
+            {
+                EmitSignal(SignalName.DepositGoldRequested, 10000);
+            }
+        }
+    }
+
+    public bool CheckWithdrawGoldValid(int withdrawAmount, out string reason)
+    {
+        if (withdrawAmount <= 0)
+        {
+            reason = "取出金币金额必须大于 0！";
+            return false;
+        }
+        if (_currentStorageGold < withdrawAmount)
+        {
+            reason = "保管箱现有金币不足！";
+            return false;
+        }
+        reason = string.Empty;
+        return true;
+    }
+
+    private void OnWithdrawGoldClicked()
+    {
+        var msgBox = GetOrFindMessageBox();
+        if (msgBox != null)
+        {
+            msgBox.ShowNumericInput("请输入你要从保管箱取出的金币金额：", _currentStorageGold, Math.Min(10000, _currentStorageGold), amount =>
+            {
+                if (CheckWithdrawGoldValid(amount, out string reason))
+                {
+                    EmitSignal(SignalName.WithdrawGoldRequested, amount);
+                }
+                else
+                {
+                    msgBox.ShowMessage(reason, false);
+                }
+            });
+        }
+        else
+        {
+            if (CheckWithdrawGoldValid(10000, out string _))
+            {
+                EmitSignal(SignalName.WithdrawGoldRequested, 10000);
+            }
         }
     }
 

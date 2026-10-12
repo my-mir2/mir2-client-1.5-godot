@@ -5,11 +5,21 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <OutputType>Exe</OutputType>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoWarn>$(NoWarn);CS8785</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EnableSandboxDev)' == 'true'">
+    <DefineConstants>$(DefineConstants);MIR2_SANDBOX_DEV</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -21,5 +31,12 @@
     <ProjectReference Include="..\..\Mir2Client.csproj" />
     <ProjectReference Include="..\..\src\Mir2.Shared\Mir2.Shared.csproj" />
     <ProjectReference Include="..\..\src\Mir2.Server\Mir2.Server.csproj" />
+    <ProjectReference Include="..\..\src\Mir2.ScriptPlugin\Mir2.ScriptPlugin.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

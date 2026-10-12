@@ -153,17 +153,50 @@ public sealed class TestOfficialM2_StorageAndPotionMatrix
         var overDep = StorageEngine.DepositGold(player, 4_000_000);
         Assert.Equal(StorageEngine.StorageResult.InsufficientGold, overDep);
 
-        // 取出 100 万金币
+        // 取出 100 万金币 (增加 100 负重)
+        player.MaxBagWeight = 500;
         var wdRes = StorageEngine.WithdrawGold(player, 1_000_000);
         Assert.Equal(StorageEngine.StorageResult.Success, wdRes);
         Assert.Equal(4_000_000, player.Gold);
         Assert.Equal(2_000_000, player.StorageGold);
+        Assert.Equal(400, player.BagWeight); // 400万金币 = 400负重
 
         // 超过 10,000,000 上限防溢出
         player.Gold = 9_500_000;
         player.StorageGold = 1_000_000;
         var capRes = StorageEngine.WithdrawGold(player, 800_000);
         Assert.Equal(StorageEngine.StorageResult.GoldCapExceeded, capRes);
+    }
+
+    [Fact]
+    public void Storage_WithdrawGold_OverWeight_BlocksWithdrawal()
+    {
+        var player = new PlayerState
+        {
+            Level = 22, // 22 级战士官方背包负重上限为 211 (50 + 22*22/3)
+            Job = 0,
+            Gold = 0,
+            StorageGold = 5_000_000
+        };
+        // 向背包添加真实 150 重量的装备
+        player.BagItems.Add(new EquipItem { Uid = 5555, Name = "重型战甲", Weight = 150 });
+        player.RecalculateAuthoritativeWeights(player.Gold);
+        Assert.Equal(150, player.BagWeight);
+        Assert.True(player.MaxBagWeight >= 200);
+
+        // 尝试支取 100 万金币 (重量 100 点，150 + 100 = 250 > 200)
+        var res = StorageEngine.WithdrawGold(player, 1_000_000);
+        Assert.Equal(StorageEngine.StorageResult.OverWeight, res);
+        Assert.Equal(0, player.Gold);
+        Assert.Equal(5_000_000, player.StorageGold);
+        Assert.Equal(150, player.BagWeight);
+
+        // 支取 50 万金币 (重量 50 点，150 + 50 = 200 <= 200 允许)
+        var okRes = StorageEngine.WithdrawGold(player, 500_000);
+        Assert.Equal(StorageEngine.StorageResult.Success, okRes);
+        Assert.Equal(500_000, player.Gold);
+        Assert.Equal(4_500_000, player.StorageGold);
+        Assert.Equal(200, player.BagWeight);
     }
 
     [Fact]
@@ -240,4 +273,105 @@ public sealed class TestOfficialM2_StorageAndPotionMatrix
         Assert.Equal(0, player.IncHealth); // 阵亡清空血池
         Assert.Single(player.BagItems); // 药水不被消耗
     }
+
+    [Fact]
+    public void Potion_ConsumePotionEx_ReturnsConsumedItemAndSlotAndDeductsWeight()
+    {
+        var player = new PlayerState
+        {
+            MaxHp = 200,
+            Hp = 50,
+            BagWeight = 10
+        };
+        var potion = new EquipItem { Uid = 10086, Name = "太阳水", Weight = 2 };
+        player.BagItems.Add(potion);
+
+        var (res, effect, item, slot) = PotionEngine.ConsumePotionEx(player, 0);
+        Assert.Equal(PotionEngine.PotionResult.Success, res);
+        Assert.NotNull(effect);
+        Assert.NotNull(item);
+        Assert.Equal(10086, item.Uid);
+        Assert.Equal(0, slot);
+        Assert.Empty(player.BagItems);
+        Assert.Equal(8, player.BagWeight); // 10 - 2 = 8
+    }
+
+    [Fact]
+    public void Potion_FullHealthPlayer_PreservesIncPool_ForPreDrinkingCombat()
+    {
+        var player = new PlayerState
+        {
+            MaxHp = 300,
+            Hp = 300, // 初始为满血
+            MaxMp = 200,
+            Mp = 200  // 初始为满魔
+        };
+        player.BagItems.Add(new EquipItem { Uid = 501, Name = "强效金创药", Weight = 3 });
+        player.BagItems.Add(new EquipItem { Uid = 502, Name = "强效魔法药", Weight = 3 });
+
+        // 1. 满血满魔状态下喝下强效金创药 (+90 HP) 与强效魔法药 (+90 MP)
+        var (hpRes, _) = PotionEngine.ConsumePotion(player, 0);
+        var (mpRes, _) = PotionEngine.ConsumePotion(player, 0);
+        Assert.Equal(PotionEngine.PotionResult.Success, hpRes);
+        Assert.Equal(PotionEngine.PotionResult.Success, mpRes);
+        Assert.Equal(90, player.IncHealth);
+        Assert.Equal(90, player.IncSpell);
+
+        // 2. 连续经过 3 个心跳 Tick: 由于角色此时满血满魔，血池与蓝池绝不被抹杀清零，而是完整保留
+        for (int i = 0; i < 3; i++)
+        {
+            var (gainHp, gainMp) = PotionEngine.TickIncHealthSpell(player);
+            Assert.Equal(0, gainHp);
+            Assert.Equal(0, gainMp);
+        }
+        Assert.Equal(300, player.Hp);
+        Assert.Equal(90, player.IncHealth); // 血池依然完好
+        Assert.Equal(90, player.IncSpell);  // 蓝池依然完好
+
+        // 3. 玩家冲入怪物群受到 50 点打击 (HP 变为 250)
+        player.Hp -= 50;
+        Assert.Equal(250, player.Hp);
+
+        // 4. 下一个心跳 Tick: 血池立即介入生效，匀速释放 5 点生命
+        var (actualGainHp, _) = PotionEngine.TickIncHealthSpell(player);
+        Assert.Equal(5, actualGainHp);
+        Assert.Equal(255, player.Hp);
+        Assert.Equal(85, player.IncHealth); // 90 - 5 = 85，血池平稳消耗
+    }
+
+    [Fact]
+    public void Test_MysticEquipment_Purify_And_OilRepair_RequireRealBagItem()
+    {
+        var player = new PlayerState
+        {
+            Uid = 3001,
+            MaxBagWeight = 200,
+            BagWeight = 10
+        };
+
+        // 1. 穿戴被诅咒的神秘头盔
+        var mysticHelmet = new EquipItem
+        {
+            Uid = 701,
+            Name = "神秘头盔",
+            Curse = 1,
+            Weight = 5
+        };
+        player.Equipment[(int)OfficialEquipSlot.Helmet] = mysticHelmet;
+
+        // 验证脱下被拦截
+        var (canTakeOff, curseReason) = MysticEquipmentEngine.CheckCanTakeOff(mysticHelmet);
+        Assert.False(canTakeOff);
+        Assert.Contains("诅咒", curseReason);
+
+        // 2. 使用神水净化
+        var (pOk, pMsg) = MysticEquipmentEngine.PurifyMysticCurseWithHolyWater(mysticHelmet);
+        Assert.True(pOk);
+        Assert.Equal(0, mysticHelmet.Curse);
+
+        // 再次验证脱下被允许
+        var (canTakeOffAfter, _) = MysticEquipmentEngine.CheckCanTakeOff(mysticHelmet);
+        Assert.True(canTakeOffAfter);
+    }
 }
+

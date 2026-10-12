@@ -30,6 +30,8 @@ namespace Mir2Client.Render
 
         private int _mapW = 0;
         private int _mapH = 0;
+        public int MapWidth => _mapW;
+        public int MapHeight => _mapH;
         private byte[] _cells = Array.Empty<byte>();
 
         private float _camX = 0f;

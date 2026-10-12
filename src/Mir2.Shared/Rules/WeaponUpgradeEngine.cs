@@ -206,9 +206,20 @@ public static class WeaponUpgradeEngine
 
     /// <summary>
     /// 执行沙巴克/铁匠铺取回武器并在开刀试刀时触发最终结算 (0x4C27C0（已证client无函数） & sub_4C2854)
+    /// 盛大官方 1.5 规则: 试刀出刀第一击纳入目标物理/魔法防御因子计算试刀物理穿透
     /// </summary>
     public static TrialResult ExecuteTrialSlash(
-        EquipItem weapon,
+        EquipItem? weapon,
+        int currentTotalUpgrades,
+        int targetDefenseAc,
+        out int trialSlashActualDamage)
+    {
+        trialSlashActualDamage = Math.Max(1, (weapon != null ? weapon.Dc : 10) - targetDefenseAc / 2);
+        return ExecuteTrialSlash(weapon, currentTotalUpgrades);
+    }
+
+    public static TrialResult ExecuteTrialSlash(
+        EquipItem? weapon,
         int currentTotalUpgrades = 0)
     {
         if (weapon == null)

@@ -8,6 +8,8 @@ using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Network.HPSocket;
+using Mir2.Shared.Protocols.Modern;
 using Mir2.Shared.Rules;
 using Xunit;
 
@@ -106,10 +108,81 @@ public class TestOfficialM2_MonsterCombatMatrix
         Assert.Equal(100 - act.DamageDealt, playerSession.State.Hp); // 玩家血量被实打实扣减！
     }
 
+    private static int GetRandomTestPort() => TestNetworkPortHelper.GetNextPort();
+
+    private static byte[] BuildPack(ushort msgId, string payloadStr = "", ushort seq = 0)
+    {
+        byte[] payloadBytes = string.IsNullOrEmpty(payloadStr) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(payloadStr);
+        byte[] packet = new byte[BinaryProtocol.HeaderSize + payloadBytes.Length];
+        var span = packet.AsSpan();
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[0..2], BinaryProtocol.DefaultMagic);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[2..4], msgId);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[4..6], (ushort)payloadBytes.Length);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[6..8], seq);
+        if (payloadBytes.Length > 0)
+        {
+            payloadBytes.CopyTo(packet, BinaryProtocol.HeaderSize);
+        }
+        return packet;
+    }
+
+    private static async Task SendPackAsync(System.Net.Sockets.NetworkStream stream, ushort msgId, string payloadStr = "")
+    {
+        byte[] packet = BuildPack(msgId, payloadStr);
+        await stream.WriteAsync(packet);
+        await stream.FlushAsync();
+    }
+
+    private static async Task<string> ReadUntilContainsPackAsync(System.Net.Sockets.NetworkStream stream, string target, int timeoutMs = 2500)
+    {
+        var decoder = new HpPackStreamDecoder();
+        var sb = new StringBuilder();
+        byte[] buf = new byte[4096];
+        long deadline = Environment.TickCount64 + timeoutMs;
+        while (Environment.TickCount64 < deadline)
+        {
+            if (stream.DataAvailable)
+            {
+                int n = await stream.ReadAsync(buf);
+                if (n > 0)
+                {
+                    decoder.FeedData(buf.AsSpan(0, n), (in BinaryProtocol.PacketHeader header, ReadOnlySpan<byte> payload) =>
+                    {
+                        int recog = 0, param = 0, tag = 0, series = 0;
+                        string extra = string.Empty;
+                        if (payload.Length >= 16)
+                        {
+                            recog = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[0..4]);
+                            param = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[4..8]);
+                            tag = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[8..12]);
+                            series = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[12..16]);
+                            if (payload.Length > 16)
+                            {
+                                extra = Encoding.UTF8.GetString(payload[16..]);
+                            }
+                        }
+                        else if (payload.Length > 0)
+                        {
+                            extra = Encoding.UTF8.GetString(payload);
+                        }
+                        string packSummary = $"#{header.MsgId}/{recog}/{param}/{tag}/{series}/{extra}!";
+                        sb.Append(packSummary);
+                        if (!string.IsNullOrEmpty(extra)) sb.Append(extra);
+                    });
+
+                    if (!string.IsNullOrEmpty(target) && sb.ToString().Contains(target))
+                        return sb.ToString();
+                }
+            }
+            await Task.Delay(10);
+        }
+        return sb.ToString();
+    }
+
     [Fact]
     public async Task TestE2E_FullCycle_PlayerKillsMonster_SpawnsLoot_And_PicksUp()
     {
-        int testPort = 29010;
+        int testPort = GetRandomTestPort();
         var mapManager = new MapManager();
         var regen = new MonsterRegenEngine(mapManager);
 
@@ -132,6 +205,7 @@ public class TestOfficialM2_MonsterCombatMatrix
         var dispatcher = new PacketDispatcher(mapManager, regen);
         var gateway = new TcpGateway(testPort);
         gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.BinaryPacketReceivedHandler = (session, header, payload) => dispatcher.DispatchBinary(session, header, payload);
         gateway.Start();
 
         var tickEngine = new GameWorldTick(gateway);
@@ -143,8 +217,7 @@ public class TestOfficialM2_MonsterCombatMatrix
             using var client = new System.Net.Sockets.TcpClient();
             await client.ConnectAsync("127.0.0.1", testPort);
             var stream = client.GetStream();
-            await stream.WriteAsync(Encoding.UTF8.GetBytes("#103/传奇勇士/249/250!"));
-            await stream.FlushAsync();
+            await SendPackAsync(stream, 103, "传奇勇士/249/250");
 
             await Task.Delay(200);
 
@@ -156,22 +229,17 @@ public class TestOfficialM2_MonsterCombatMatrix
             var session = buffer.Find(s => s.CharacterName == "传奇勇士");
             Assert.NotNull(session);
             session.State!.Hit = 100;
+            session.State.Dc = 50;
+            session.State.MaxDc = 50;
 
             byte[] flushBuf = new byte[4096];
             while (stream.DataAvailable) _ = await stream.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 1. 勇士向怪物 (250, 250) 挥刀攻击 CM_HIT (3014)
-            byte[] hitPkt = Encoding.UTF8.GetBytes("#3014/250/250/2!");
-            await stream.WriteAsync(hitPkt);
-            await stream.FlushAsync();
-
-            await Task.Delay(200);
+            await SendPackAsync(stream, 3014, "250/250/2");
 
             // 勇士必须收到怪物受击、怪物死亡倒地与掉落地表战利品的广播
-            Assert.True(stream.DataAvailable, "击杀怪物必须收到全套战斗与掉落广播");
-            byte[] buf1 = new byte[4096];
-            int len1 = await stream.ReadAsync(buf1, 0, buf1.Length);
-            string resp1 = Encoding.UTF8.GetString(buf1, 0, len1);
+            string resp1 = await ReadUntilContainsPackAsync(stream, $"#{ProtocolConsts.SM_GROUNDITEM}/", timeoutMs: 3000);
 
             Assert.Contains($"#{ProtocolConsts.SM_OBJECTSTRUCK}/", resp1); // 怪物受击
             Assert.Contains($"#{ProtocolConsts.SM_DEATH_ACTION_DELPHI}/", resp1); // 怪物死亡倒地
@@ -187,17 +255,10 @@ public class TestOfficialM2_MonsterCombatMatrix
             while (stream.DataAvailable) _ = await stream.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 3. 勇士发送拾取指令 CM_PICKUP (1001)
-            byte[] pickupPkt = Encoding.UTF8.GetBytes("#1001/!");
-            await stream.WriteAsync(pickupPkt);
-            await stream.FlushAsync();
-
-            await Task.Delay(200);
+            await SendPackAsync(stream, 1001);
 
             // 验证勇士收到物品入包 SM_ADDITEM (200) 与地表物品消除 SM_DELGROUNDITEM (315)
-            Assert.True(stream.DataAvailable, "拾取战利品必须收到加物品与清除广播");
-            byte[] buf2 = new byte[4096];
-            int len2 = await stream.ReadAsync(buf2, 0, buf2.Length);
-            string resp2 = Encoding.UTF8.GetString(buf2, 0, len2);
+            string resp2 = await ReadUntilContainsPackAsync(stream, $"#{ProtocolConsts.SM_DELGROUNDITEM}/", timeoutMs: 3000);
 
             Assert.Contains($"#{ProtocolConsts.SM_ADDITEM}/", resp2);
             Assert.Contains("半兽战士_战利品", resp2);
@@ -527,4 +588,116 @@ public class TestOfficialM2_MonsterCombatMatrix
         Assert.Equal(88, gold.OwnerSessionId); // 杀手 80 秒归属权
         Assert.Equal(nowMs, gold.DropTickMs);
     }
+
+    [Fact]
+    public void Test_RingOfFire_RealMonsterLevelSuppression()
+    {
+        // 盛大官方 1.5 铁证: 法师抗拒火环对真实怪物等级进行压制
+        var mapManager = new Mir2.Server.Maps.MapManager();
+        var regenEngine = new Mir2.Server.Game.MonsterRegenEngine(mapManager);
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(mapManager, regenEngine);
+        var map = mapManager.DefaultMap;
+
+        // 15 级法师在开阔陆地 (300, 300)
+        var mage = new ClientSession(1501, null!)
+        {
+            CurrentMapId = 0,
+            CharacterName = "测试法师",
+            X = 300,
+            Y = 300,
+            State = new PlayerState { Job = 1, Level = 15, Hp = 100, MaxHp = 100, Mp = 100, MaxMp = 100 }
+        };
+        dispatcher.RegisterSession(mage);
+        map.Aoi.Enter(mage, 300, 300);
+
+        // 5 级钉耙猫在 (301, 300) -> 15 > 5，应该被推退到 (302, 300)
+        var cat = new MonsterInstance { Uid = 5001, Name = "钉耙猫", MapId = 0, X = 301, Y = 300, Level = 6, Hp = 40, MaxHp = 40, CanMove = true };
+        dispatcher.RegenEngine!.AddMonster(cat);
+
+        // 35 级白野猪在 (300, 301) -> 15 <= 35，应该推不动，保持在 (300, 301)
+        var boar = new MonsterInstance { Uid = 5002, Name = "白野猪", MapId = 0, X = 300, Y = 301, Level = 35, Hp = 1000, MaxHp = 1000, CanMove = true };
+        dispatcher.RegenEngine.AddMonster(boar);
+
+        long nowMs = Environment.TickCount64;
+        dispatcher.Dispatch(mage, $"#{ProtocolConsts.CM_SPELL}/0/8/300/300!");
+
+        Assert.Equal(302, cat.X); // 钉耙猫被推开 1 格
+        Assert.Equal(300, cat.Y);
+        Assert.Equal(300, boar.X); // 白野猪巍然不动
+        Assert.Equal(301, boar.Y);
+    }
+
+    [Fact]
+    public void Test_ShoulderDash_Cooldown_WallSelfDamage_And_LevelComparison()
+    {
+        // 盛大官方 1.5 铁证: 战士野蛮冲撞 3000ms CD、撞墙反噬自伤与等级比拼
+        var mapManager = new Mir2.Server.Maps.MapManager();
+        var regenEngine = new Mir2.Server.Game.MonsterRegenEngine(mapManager);
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(mapManager, regenEngine);
+        var map = mapManager.DefaultMap;
+
+        // 30 级战士在 (200, 200)，朝东 (dir = 2)
+        var warrior = new ClientSession(2001, null!)
+        {
+            CurrentMapId = 0,
+            CharacterName = "测试战士",
+            X = 200,
+            Y = 200,
+            Direction = 2,
+            State = new PlayerState { Job = 0, Level = 30, Hp = 500, MaxHp = 500, Mp = 100, MaxMp = 100 }
+        };
+        dispatcher.RegisterSession(warrior);
+        map.Aoi.Enter(warrior, 200, 200);
+
+        // 1. 施展第 1 次野蛮冲撞 (平地顺畅位移)
+        long nowMs = Environment.TickCount64;
+        dispatcher.Dispatch(warrior, $"#{ProtocolConsts.CM_SPELL}/0/27/201/200!");
+        Assert.True(warrior.X > 200); // 冲撞向前推进
+        long firstSlamTick = warrior.State.LastWildSlamTickMs;
+        Assert.True(firstSlamTick > 0);
+
+        // 2. 立即施展第 2 次野蛮冲撞 (在 3000ms CD 内)，应该被严格拦截
+        warrior.LastSpellTimeMs = 0; // 清除通用 500ms CD
+        int curX = warrior.X;
+        dispatcher.Dispatch(warrior, $"#{ProtocolConsts.CM_SPELL}/0/27/{curX + 1}/200!");
+        Assert.Equal(curX, warrior.X); // 被 3000ms CD 拦截，位置未变！
+
+        // 3. 面对 35 级白野猪进行撞击比拼 (30 级战士 vs 35 级白野猪)
+        warrior.State.LastWildSlamTickMs = 0; // 手动重置冷却以测碰撞
+        warrior.LastSpellTimeMs = 0;
+        var highBoar = new MonsterInstance { Uid = 5003, Name = "白野猪", MapId = 0, X = warrior.X + 1, Y = 200, Level = 35, Hp = 1000, MaxHp = 1000, CanMove = true };
+        dispatcher.RegenEngine!.AddMonster(highBoar);
+        int hpBefore = warrior.State.Hp;
+
+        dispatcher.Dispatch(warrior, $"#{ProtocolConsts.CM_SPELL}/0/27/{warrior.X + 1}/200!");
+        Assert.Equal(highBoar.X, warrior.X + 1); // 白野猪未被撞动
+        Assert.Equal(hpBefore - 15, warrior.State.Hp); // 战士等级低，撞击失败受到 15 点反震伤害
+        Assert.True(warrior.State.StatusBits[5]); // 战士陷入硬直麻痹
+    }
+
+    [Fact]
+    public void Test_InvisibilityRing_AttackBreakDuration2Sec_And_Recover()
+    {
+        // 盛大官方 1.5 铁证: 隐身戒指出刀破隐 2 秒，脱战 2 秒后自动恢复隐身
+        var state = new PlayerState { Job = 0, Level = 35, Hp = 400, MaxHp = 400 };
+        // 佩戴隐身戒指
+        state.WearItem(OfficialEquipSlot.RingL, new EquipItem { Name = "隐身戒指", Dura = 5000, MaxDura = 5000 });
+        Assert.True(state.HasInvisibleRing);
+
+        // 初始未攻击时: 隐身生效
+        Assert.True(state.IsInvisible);
+
+        // 出刀攻击: 刷新 LastAttackTickMs
+        long now = Environment.TickCount64;
+        state.LastAttackTickMs = now;
+
+        // 攻击瞬间与 1 秒内: 破隐显形
+        Assert.False(SpecialRingEngine.InvisibilityRing.IsInvisible(state.HasInvisibleRing, state.LastAttackTickMs, now + 500));
+        Assert.False(SpecialRingEngine.InvisibilityRing.IsInvisible(state.HasInvisibleRing, state.LastAttackTickMs, now + 1500));
+
+        // 停止攻击达到 2000ms (2秒) 时: 恢复隐身
+        Assert.True(SpecialRingEngine.InvisibilityRing.IsInvisible(state.HasInvisibleRing, state.LastAttackTickMs, now + 2000));
+        Assert.True(SpecialRingEngine.InvisibilityRing.IsInvisible(state.HasInvisibleRing, state.LastAttackTickMs, now + 3000));
+    }
 }
+

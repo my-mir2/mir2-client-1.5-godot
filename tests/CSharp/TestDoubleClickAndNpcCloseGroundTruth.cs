@@ -40,7 +40,7 @@ public class TestDoubleClickAndNpcCloseGroundTruth
     public void TestEquipSlotMapping_OfficialDelphiGroundTruth()
     {
         // 2. 验证装备槽位自动映射 (GetBestEquipSlotForItem)
-        // 0: 衣服, 1: 武器, 2: 勋章/饰品, 3: 项链, 4: 头盔, 5: 手镯, 7: 戒指
+        // 0: 衣服, 1: 武器, 2: 照明/护身符/毒药 (Lighting), 3: 项链, 4: 头盔, 5: 手镯, 7: 戒指
         Assert.Equal(1, HudController.GetBestEquipSlotForItem("井中月"));
         Assert.Equal(1, HudController.GetBestEquipSlotForItem("裁决之杖"));
         Assert.Equal(1, HudController.GetBestEquipSlotForItem("乌木剑"));
@@ -62,8 +62,12 @@ public class TestDoubleClickAndNpcCloseGroundTruth
         Assert.Equal(7, HudController.GetBestEquipSlotForItem("力量戒指"));
         Assert.Equal(7, HudController.GetBestEquipSlotForItem("生铁戒指"));
 
-        Assert.Equal(2, HudController.GetBestEquipSlotForItem("荣誉勋章43号"));
+        Assert.Equal(2, HudController.GetBestEquipSlotForItem("蜡烛"));
+        Assert.Equal(2, HudController.GetBestEquipSlotForItem("火把"));
+        Assert.Equal(2, HudController.GetBestEquipSlotForItem("黄色药粉"));
+        Assert.Equal(-1, HudController.GetBestEquipSlotForItem("荣誉勋章43号")); // 官方 1.5 绝无勋章槽位，识别返回 -1
         Assert.Equal(-1, HudController.GetBestEquipSlotForItem("未知金币"));
+
     }
 
     [Fact]

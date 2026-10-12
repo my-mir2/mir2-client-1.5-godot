@@ -70,12 +70,19 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         Assert.Equal(80, player.Hp);
         Assert.Equal(0, player.IncHealth); // 30 点全部释放完毕
 
-        // 满血时清空多余血池
+        // 官方 1.5 权威顶药规则：满血时不扣减血池，亦不强行清空血池（保留顶药以备战斗受击）
         player.Hp = 100;
         player.IncHealth = 50;
         var (hpGainFull, _) = PotionEngine.TickIncHealthSpell(player);
         Assert.Equal(0, hpGainFull);
-        Assert.Equal(0, player.IncHealth); // 满血自动归零
+        Assert.Equal(50, player.IncHealth); // 官方机制：满血保留血池
+
+        // 受到伤害扣血后，血池在后续 Tick 立即继续释放
+        player.Hp = 80;
+        var (hpGainAfterDamage, _) = PotionEngine.TickIncHealthSpell(player);
+        Assert.Equal(5, hpGainAfterDamage);
+        Assert.Equal(85, player.Hp);
+        Assert.Equal(45, player.IncHealth);
     }
 
     [Fact]
@@ -104,9 +111,9 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         // 客户端发送死亡复活协议: #1018/0/0/0/0/!
         dispatcher.Dispatch(session, "#1018/0/0/0/0/!");
 
-        // 验证服务端权威复活裁决结果
-        Assert.Equal(250, session.State.Hp); // 满血
-        Assert.Equal(120, session.State.Mp); // 满魔
+        // 验证服务端权威复活裁决结果 (盛大官方 1.5 规则: 半血半魔复活)
+        Assert.Equal(125, session.State.Hp); // 半血
+        Assert.Equal(60, session.State.Mp);  // 半魔
         Assert.False(session.State.HasGreenPoison); // 绿毒清除
         Assert.False(session.State.HasRedPoison);   // 红毒清除
         Assert.Equal(330, session.X);              // 传送回银杏山谷安全区
@@ -133,6 +140,13 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
                 MaxHp = 150
             }
         };
+        session.State.Equipment[(int)OfficialEquipSlot.RingR] = new EquipItem
+        {
+            Uid = 991,
+            Name = "传送戒指",
+            Shape = 112
+        };
+        session.State.RecalculateAttributes();
         map.Aoi.Enter(session, 330, 270);
 
         // 1. 发送合法特戒传送指令: @move 345 285
@@ -143,6 +157,7 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         Assert.True(session.HasBufferedPacket("瞬移至 (345, 285) 成功"));
 
         // 2. 发送越界或非法坐标: @move 9999 9999
+        session.State.LastTeleportTickMs = 0; // 重置冷却以测试坐标合法性
         dispatcher.Dispatch(session, "#3030/0/0/0/0/@move 9999 9999!");
         Assert.Equal(345, session.X); // 坐标未变
         Assert.True(session.HasBufferedPacket("传送失败"));
@@ -294,12 +309,16 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
             State = new PlayerState
             {
                 Job = 0,
+                Level = 40,
                 Hp = 300,
                 MaxHp = 300,
                 Mp = 100,
-                MaxMp = 100
+                MaxMp = 100,
+                Dc = 15,
+                MaxDc = 30
             }
         };
+        SkillTrainEngine.LearnSkill(warrior.State, 25, "半月弯刀", 3);
         map.Aoi.Enter(warrior, 100, 100);
 
         // 朝向 0 时，扇面 4 个格子:
@@ -493,16 +512,16 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         };
         map.Aoi.Enter(player, 120, 120);
 
-        player.State.BagItems.Add(new EquipItem { Uid = 9999, Name = "天魔神甲", Weight = 23, Shape = 2 });
+        player.State.BagItems.Add(new EquipItem { Uid = 9999, Name = "战神盔甲", Weight = 40, Shape = 2 });
         player.State.RecalculateAuthoritativeWeights(player.State.Gold);
 
-        // 1. 丢弃背包槽位 0 的天魔神甲 (CM_DROPITEM = 1000)
+        // 1. 丢弃背包槽位 0 的战神盔甲 (CM_DROPITEM = 1000)
         dispatcher.Dispatch(player, "#1000/0/!");
 
         Assert.Empty(player.State.BagItems);
         var groundDrops = map.GetGroundItemsAt(120, 120);
         Assert.Single(groundDrops);
-        Assert.Equal("天魔神甲", groundDrops[0].Name);
+        Assert.Equal("战神盔甲", groundDrops[0].Name);
         Assert.Equal(0, groundDrops[0].OwnerSessionId); // 自由拾取
 
         // 2. 丢弃 3000 金币 (CM_DROPGOLD = 1016)
@@ -698,7 +717,8 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         Assert.Equal(50, player.State.Mp); // 10 + 40
         Assert.True(player.HasBufferedPacket($"#{ProtocolConsts.SM_EAT_OK}/"));
 
-        // 4. 使用解毒药水: 清除全部中毒状态
+        // 4. 使用解毒药水: 清除全部中毒状态 (模拟 300ms 吃药冷却过去)
+        player.LastEatItemTimeMs = 0;
         player.ClearBufferedPackets();
         dispatcher.Dispatch(player, $"#{ProtocolConsts.CM_EATITEM}/0/解毒药水/!");
         Assert.False(player.State.HasGreenPoison);
@@ -1035,7 +1055,7 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
             Y = 200,
             Direction = 4, // 朝南
             CharacterName = "逍遥散人",
-            State = new PlayerState { Uid = 1001, Name = "逍遥散人", Level = 35, Hp = 200, MaxHp = 200, Mp = 400, MaxMp = 400 }
+            State = new PlayerState { Uid = 1001, Name = "逍遥散人", Level = 35, Job = 2, Hp = 200, MaxHp = 200, Mp = 400, MaxMp = 400, BaseMaxHp = 200, BaseMaxMp = 400 }
         };
         // 佩戴护身符 (OfficialEquipSlot.Lighting = 2)
         var amulet = new EquipItem { Uid = 301, Name = "道士护身符", Weight = 1, Dura = 100, MaxDura = 100 };
@@ -1043,17 +1063,19 @@ public sealed class TestServerWorldTickAndAuthoritativeFullLoop
         map.Aoi.Enter(taoist, 200, 200);
 
         // 1. 测试神圣战甲术 (MagicId = 15) 与 幽灵盾 (MagicId = 14)
-        int prevBonusAc = taoist.State.BonusAc;
-        int prevBonusMac = taoist.State.BonusMac;
+        int prevAc = taoist.State.Ac;
+        int prevMac = taoist.State.Mac;
         taoist.ClearBufferedPackets();
         taoist.LastSpellTimeMs = 0;
         dispatcher.Dispatch(taoist, $"#{ProtocolConsts.CM_SPELL}/0/15/200/200/!");
-        Assert.Equal(prevBonusAc + TaoistCombatEngine.AuraBuffs.BonusAc, taoist.State.BonusAc);
+        Assert.True(taoist.State.HasHolyArmor, "必须激活神圣战甲术状态");
+        Assert.Equal(prevAc + TaoistCombatEngine.AuraBuffs.BonusAc, taoist.State.Ac);
 
         taoist.ClearBufferedPackets();
         taoist.LastSpellTimeMs = 0;
         dispatcher.Dispatch(taoist, $"#{ProtocolConsts.CM_SPELL}/0/14/200/200/!");
-        Assert.Equal(prevBonusMac + TaoistCombatEngine.AuraBuffs.BonusMac, taoist.State.BonusMac);
+        Assert.True(taoist.State.HasGhostShield, "必须激活幽灵盾状态");
+        Assert.Equal(prevMac + TaoistCombatEngine.AuraBuffs.BonusMac, taoist.State.Mac);
 
         // 2. 测试召唤骷髅 (MagicId = 17) 与 召唤神兽 (MagicId = 30)
         int prevAmuletDura = amulet.Dura;

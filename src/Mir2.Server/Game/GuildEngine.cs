@@ -30,6 +30,7 @@ public sealed class GuildEngine
         public string MasterName { get; set; } = string.Empty;
         public string Notice { get; set; } = "热血传奇官方行会";
         public List<string> Members { get; } = new();
+        public Dictionary<string, string> MemberRanks { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     private readonly Dictionary<string, Guild> _guilds = new(StringComparer.OrdinalIgnoreCase);
@@ -51,36 +52,36 @@ public sealed class GuildEngine
     /// <summary>
     /// 沃玛号角创建行会 (CM_CREATEGUILD 1041)
     /// </summary>
-    public (GuildResult result, Guild? guild) CreateGuild(ClientSession session, string guildName)
+    public (GuildResult result, Guild? guild, EquipItem? consumedHorn) CreateGuild(ClientSession session, string guildName)
     {
         if (session.State == null || string.IsNullOrWhiteSpace(guildName))
         {
-            return (GuildResult.TargetNotFound, null);
+            return (GuildResult.TargetNotFound, null, null);
         }
 
         lock (_lock)
         {
             if (_playerToGuild.ContainsKey(session.CharacterName))
             {
-                return (GuildResult.AlreadyInGuild, null);
+                return (GuildResult.AlreadyInGuild, null, null);
             }
 
             if (_guilds.ContainsKey(guildName))
             {
-                return (GuildResult.GuildNameExists, null);
+                return (GuildResult.GuildNameExists, null, null);
             }
 
             // 检查金币 1,000,000
             if (session.State.Gold < CreateGuildGoldCost)
             {
-                return (GuildResult.InsufficientGold, null);
+                return (GuildResult.InsufficientGold, null, null);
             }
 
             // 检查沃玛号角
             var hornItem = session.State.BagItems.Find(i => i.Name.Contains(HornItemName));
             if (hornItem == null)
             {
-                return (GuildResult.MissingHorn, null);
+                return (GuildResult.MissingHorn, null, null);
             }
 
             // 扣除号角与金币
@@ -98,7 +99,57 @@ public sealed class GuildEngine
             _guilds[guild.Name] = guild;
             _playerToGuild[session.CharacterName] = guild.Name;
 
-            return (GuildResult.Success, guild);
+            return (GuildResult.Success, guild, hornItem);
+        }
+    }
+
+    /// <summary>
+    /// 从存档/数据引擎直接注册已存在行会 (单测与服务加载使用)
+    /// </summary>
+    public Guild RegisterGuildDirect(string guildName, string masterName)
+    {
+        lock (_lock)
+        {
+            var guild = new Guild
+            {
+                Name = guildName.Trim(),
+                MasterName = masterName
+            };
+            guild.Members.Add(masterName);
+            _guilds[guild.Name] = guild;
+            _playerToGuild[masterName] = guild.Name;
+            return guild;
+        }
+    }
+
+    /// <summary>
+    /// 从存档/数据引擎直接向指定行会添加成员 (单测与服务加载使用)
+    /// </summary>
+    public bool AddMemberDirect(string guildName, string memberName)
+    {
+        lock (_lock)
+        {
+            if (_guilds.TryGetValue(guildName, out var guild))
+            {
+                if (!guild.Members.Contains(memberName))
+                {
+                    guild.Members.Add(memberName);
+                }
+                _playerToGuild[memberName] = guild.Name;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 获取指定名称的行会
+    /// </summary>
+    public Guild? GetGuild(string guildName)
+    {
+        lock (_lock)
+        {
+            return _guilds.TryGetValue(guildName, out var guild) ? guild : null;
         }
     }
 
@@ -191,6 +242,46 @@ public sealed class GuildEngine
     }
 
     /// <summary>
+    /// 调整行会成员封号职位 (CM_GUILD_UPDATE_RANK 1041)
+    /// </summary>
+    public GuildResult UpdateMemberRank(ClientSession masterSession, string targetName, string newRank)
+    {
+        lock (_lock)
+        {
+            var guild = GetGuildByPlayer(masterSession.CharacterName);
+            if (guild == null || !guild.MasterName.Equals(masterSession.CharacterName, StringComparison.OrdinalIgnoreCase))
+            {
+                return GuildResult.NotMaster;
+            }
+
+            if (!guild.Members.Exists(m => m.Equals(targetName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return GuildResult.TargetNotFound;
+            }
+
+            guild.MemberRanks[targetName] = newRank;
+            return GuildResult.Success;
+        }
+    }
+
+    /// <summary>
+    /// 获取行会成员封号头衔
+    /// </summary>
+    public string GetMemberRank(string playerName)
+    {
+        lock (_lock)
+        {
+            var guild = GetGuildByPlayer(playerName);
+            if (guild == null) return string.Empty;
+            if (guild.MasterName.Equals(playerName, StringComparison.OrdinalIgnoreCase))
+            {
+                return guild.MemberRanks.TryGetValue(playerName, out var r) ? r : "掌门人";
+            }
+            return guild.MemberRanks.TryGetValue(playerName, out var rank) ? rank : "帮众";
+        }
+    }
+
+    /// <summary>
     /// 下发官方 1.5 格式行会成员列表 (SM_GUILDMEMBERLIST 671)
     /// </summary>
     public void SendGuildMemberList(ClientSession session)
@@ -205,5 +296,53 @@ public sealed class GuildEngine
         // 格式: 行会名/掌门人/公告/成员1/成员2/...
         var data = $"{guild.Name}/{guild.MasterName}/{guild.Notice}/{string.Join('/', guild.Members)}";
         session.EnqueuePacket(ProtocolConsts.SM_GUILDMEMBERLIST, guild.Members.Count, 0, 0, 0, data);
+    }
+
+    /// <summary>
+    /// 获取全服所有行会 (供持久化存档使用)
+    /// </summary>
+    public IReadOnlyCollection<Guild> GetAllGuilds()
+    {
+        lock (_lock)
+        {
+            return new List<Guild>(_guilds.Values);
+        }
+    }
+
+    /// <summary>
+    /// 从持久化存档加载行会数据
+    /// </summary>
+    public void LoadGuild(string name, string masterName, string notice, IEnumerable<string>? members)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        lock (_lock)
+        {
+            var guild = new Guild
+            {
+                Name = name.Trim(),
+                MasterName = masterName?.Trim() ?? string.Empty,
+                Notice = notice ?? "热血传奇官方行会"
+            };
+
+            if (!string.IsNullOrWhiteSpace(guild.MasterName))
+            {
+                guild.Members.Add(guild.MasterName);
+                _playerToGuild[guild.MasterName] = guild.Name;
+            }
+
+            if (members != null)
+            {
+                foreach (var m in members)
+                {
+                    if (!string.IsNullOrWhiteSpace(m) && !guild.Members.Contains(m))
+                    {
+                        guild.Members.Add(m);
+                        _playerToGuild[m] = guild.Name;
+                    }
+                }
+            }
+
+            _guilds[guild.Name] = guild;
+        }
     }
 }

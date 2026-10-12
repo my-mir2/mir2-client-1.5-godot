@@ -4,44 +4,63 @@ using System.Collections.Generic;
 namespace Mir2.Shared.Rules;
 
 /// <summary>
-/// 盛大官方 1.5 经济摆摊、社交系统、客户端底层防护与反作弊引擎 (细节 231 ~ 250)
+/// 盛大官方 1.5 经济交易、行会社交系统、客户端底层防护与反作弊引擎 (细节 231 ~ 250)
 /// 严格依据官方服务端安全逻辑与客户端底层规范
 /// </summary>
 public static class EconomySecurityEngine
 {
-    // 细节 231: 玩家安全区摆摊模式 (招牌文字、盘坐姿态)
-    public static class PlayerStallModeEngine
+    // 盛大官方 1.5 权威细节 231: 面对面两阶段交易原子锁定状态机 (TFrmDlg_Deal，官方 1.5 绝无个人摆摊)
+    public static class DealAtomicLockEngine
     {
-        public static (bool isStalling, string poseAction, string cleanTitle) SetupStall(bool inSafeZone, string rawTitle)
+        public static (bool bothLocked, bool canProceedToExchange) CheckDealLock(bool myLocked, bool remoteLocked)
         {
-            if (!inSafeZone) return (false, "Stand", "");
-            string clean = rawTitle.Trim();
-            if (clean.Length > 12) clean = clean.Substring(0, 12);
-            return (true, "SitDown", clean);
+            bool both = myLocked && remoteLocked;
+            return (both, both);
         }
     }
 
-    // 细节 232: 摆摊物品标价金币合法性安全检查 (防 0 元购、负数与溢出)
-    public static class StallPriceValidationEngine
+    // 盛大官方 1.5 权威细节 232: 装备普通修理与特殊修理持久递减公式 (IDA sub_4A1F30)
+    public static class EquipmentRepairWearEngine
     {
-        public const int MaxPrice = 2000000000; // 20 亿金币上限
-        public static bool ValidatePrice(int price)
+        public static (int newMaxDura, int newCurrentDura, int costGold) ExecuteRepair(int currentDura, int maxDura, bool isSpecialRepair, int basePrice)
         {
-            return price > 0 && price <= MaxPrice;
+            if (isSpecialRepair)
+            {
+                // 特殊修理: 0 损耗，但修理费用为普通修理的 3 倍
+                return (maxDura, maxDura, Math.Max(100, basePrice * 3));
+            }
+            // 普通修理: 扣减 1 点最大持久上限 (1000 内部单位表示 1 点持久)
+            int decayedMax = Math.Max(1000, maxDura - 1000);
+            return (decayedMax, decayedMax, Math.Max(50, basePrice));
         }
     }
 
-    // 细节 233: 购买摆摊物品背包空间与金币原子扣除
-    public static class StallPurchaseAtomicEngine
+    // 盛大官方 1.5 权威细节 233: 祝福油幸运与诅咒几率判定公式 (IDA sub_4C6238)
+    public static class BlessOilCurseLuckEngine
     {
-        public static (bool success, int remainingBuyerGold, int sellerEarnGold, string failReason) ExecutePurchase(
-            int buyerGold, int bagFreeSlots, int price)
+        public static (bool success, int newLuck, int newCurse, string message) ApplyBlessOil(int currentLuck, int currentCurse, int roll100)
         {
-            if (bagFreeSlots <= 0) return (false, buyerGold, 0, "背包已满，无法容纳该物品！");
-            if (buyerGold < price) return (false, buyerGold, 0, "金币不足，无法购买！");
-            return (true, buyerGold - price, price, "");
+            if (currentCurse > 0)
+            {
+                // 诅咒清洗
+                return (true, currentLuck, currentCurse - 1, "武器上的诅咒力量消退了。");
+            }
+            if (currentLuck >= 7)
+            {
+                return (false, currentLuck, currentCurse, "武器的幸运值已达到玛法极限，无法再通过祝福油提升！");
+            }
+            if (roll100 < 35) // 35% 几率加幸运
+            {
+                return (true, currentLuck + 1, 0, "你的武器被注入了神圣的祝福力量！");
+            }
+            if (roll100 >= 85) // 15% 几率加诅咒
+            {
+                return (false, Math.Max(0, currentLuck - 1), currentCurse + 1, "武器被邪恶力量污染，受到了诅咒！");
+            }
+            return (false, currentLuck, currentCurse, "祝福油化作一缕青烟消散了。");
         }
     }
+
 
     // 细节 234: 交易双向锁定后 3 秒防换物倒计时冷却
     public static class TradeConfirmDelayEngine
@@ -79,30 +98,37 @@ public static class EconomySecurityEngine
         public static (bool valid, string formattedTitle) SanitizeTitle(string rawTitle)
         {
             if (string.IsNullOrEmpty(rawTitle)) return (true, "");
-            var bytes = System.Text.Encoding.GetEncoding("GBK", System.Text.EncoderFallback.ReplacementFallback, System.Text.DecoderFallback.ReplacementFallback).GetBytes(rawTitle);
-            if (bytes.Length > MaxTitleBytes) return (false, "封号长度超出限制 (最多 14 字节/7 个汉字)！");
+            int byteLen = 0;
+            foreach (char c in rawTitle)
+            {
+                byteLen += c > 127 ? 2 : 1;
+            }
+            if (byteLen > MaxTitleBytes) return (false, "封号长度超出限制 (最多 14 字节/7 个汉字)！");
             return (true, rawTitle);
         }
     }
 
-    // 细节 237: 师徒系统出师声望奖励 (师傅 +35，徒弟祝福卷轴)
-    public static class MasterApprenticeEngine
+    // 盛大官方 1.5 权威细节 237: 白日门虎卫堂虎卫招募机制 (诱惑之光 Lv.3 检定)
+    public static class HuWeiTameEngine
     {
-        public static (int masterPrestigeReward, string apprenticeRewardItem) GraduateApprentice()
+        public static (bool canTame, float baseSuccessRate) CheckHuWeiTame(int playerJob, int spellLevel, int playerLevel)
         {
-            return (35, "出师祝福卷轴");
+            // 官方 1.5 规则: 仅法师 (Job=1) 且诱惑之光达到 3 级、角色等级 >= 13 方可招募虎卫
+            if (playerJob != 1 || spellLevel < 3 || playerLevel < 13)
+            {
+                return (false, 0f);
+            }
+            return (true, 0.15f); // 基础 15% 招募几率
         }
     }
 
-    // 细节 238: 婚姻系统求婚协议消耗结婚戒指
-    public static class MarriageCeremonyEngine
+    // 盛大官方 1.5 权威细节 238: 丛林迷宫鹰卫荒野索敌与超远距离物理箭矢射击机制
+    public static class YingWeiCombatEngine
     {
-        public static (bool success, string notice) ProposeMarriage(bool hasWeddingRing, string targetPlayer)
-        {
-            if (!hasWeddingRing) return (false, "求婚需要一枚真诚的求婚戒指！");
-            return (true, $"你已向 {targetPlayer} 发出求婚请求，愿结连理！");
-        }
+        public const int MaxAttackRange = 8; // 官方 1.5 鹰卫射程 8 格
+        public static bool IsInAttackRange(int distance) => distance >= 1 && distance <= MaxAttackRange;
     }
+
 
     // 细节 239: 天下第一雕像每周属性与外观同步更新
     public static class StatueWeeklySyncEngine
@@ -120,19 +146,19 @@ public static class EconomySecurityEngine
         }
     }
 
-    // 细节 241: 沙巴克藏宝阁密道凭证检定
-    public static class TreasurePavilionPassEngine
+    // 盛大官方 1.5 权威细节 241: 沙巴克秘密通道传送凭证检定 (沙巴克密道老人/香石墓穴通行卷认证，严禁混淆 1.76 幻境藏宝阁)
+    public static class SabukSecretPassageEngine
     {
         public static bool CanEnter(HashSet<string> bagItemNames)
         {
-            return bagItemNames.Contains("藏宝阁通行证");
+            return bagItemNames.Contains("密道传送卷") || bagItemNames.Contains("沙巴克凭证");
         }
     }
 
-    // 细节 242: 客户端移动加速作弊检测 (间隔 < 380ms 强制拉回)
+    // 细节 242: 客户端移动加速作弊检测 (允许合理网络时序抖动，阈值设为 240ms 拦截极端变速齿轮外挂，保障 300ms 官方奔跑流畅通过)
     public static class SpeedHackDetectorEngine
     {
-        public const int MinMoveIntervalMs = 380;
+        public const int MinMoveIntervalMs = 240;
         public static (bool isSpeedHack, bool rollbackToLastPos) CheckMovePacket(long currentPacketTimeMs, long lastPacketTimeMs)
         {
             if (currentPacketTimeMs - lastPacketTimeMs < MinMoveIntervalMs)
@@ -143,13 +169,18 @@ public static class EconomySecurityEngine
         }
     }
 
-    // 细节 243: 客户端挥刀出刀速度检测 (攻击间隔 < 680ms 忽略无效攻击)
+    // 细节 243: 客户端挥刀出刀速度检测 (攻击间隔动态对齐攻击速度 AttackSpeed)
     public static class AttackSpeedValidatorEngine
     {
         public const int MinAttackIntervalMs = 680;
-        public static bool IsAttackValid(long currentAttackMs, long lastAttackMs)
+
+        /// <summary>
+        /// 校验出刀攻击间隔 (盛大官方 1.5 规则: 狂风套/极品攻速动态缩短攻击硬直，每点攻速缩减 60ms，下限 420ms，上限 1000ms)
+        /// </summary>
+        public static bool IsAttackValid(long currentAttackMs, long lastAttackMs, int attackSpeed = 0)
         {
-            return (currentAttackMs - lastAttackMs) >= MinAttackIntervalMs;
+            int effectiveInterval = Math.Clamp(MinAttackIntervalMs - attackSpeed * 60, 420, 1000);
+            return (currentAttackMs - lastAttackMs) >= effectiveInterval;
         }
     }
 

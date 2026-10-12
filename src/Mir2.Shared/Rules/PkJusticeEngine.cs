@@ -22,14 +22,26 @@ public static class PkJusticeEngine
         Red     // 红名
     }
 
-    public const int RedNameThreshold = 100; // 累计 PK 值 >= 100 变红名
-    public const int GuardDetectRange = 6;   // 卫士主动仇恨巡逻半径 6 格
-    public const int GuardLethalDamage = 9999; // 大刀卫士绝对秒杀伤害
+    public const int YellowNameThreshold = 100; // 累计 PK 值 >= 100 (击杀 1 名白名) 变黄名
+    public const int RedNameThreshold = 200;    // 累计 PK 值 >= 200 (击杀 2 名及以上白名) 正式变红名
+    public const int GuardDetectRange = 6;      // 卫士主动仇恨巡逻半径 6 格
+    public const int GuardLethalDamage = 9999;  // 大刀卫士绝对秒杀伤害
+
+    public const int SelfDefenseWindowMs = 60_000; // 盛大官方 1.5 规则: 60 秒自卫反击窗口 (毫秒级防卫过当判定)
+
+    /// <summary>
+    /// 正当防卫判定: 自受攻击时刻起 60 秒内反击属于正当防卫，反杀不加 PK 点数；超过 60 秒则判定为防卫过当
+    /// </summary>
+    public static bool IsLegitimateSelfDefense(long attackTimeMs, long nowMs)
+    {
+        if (attackTimeMs <= 0) return false;
+        return nowMs >= attackTimeMs && (nowMs - attackTimeMs <= SelfDefenseWindowMs);
+    }
 
     public static NameColorType DetermineNameColor(int pkPoints, bool isGrayAttacking)
     {
         if (pkPoints >= RedNameThreshold) return NameColorType.Red;
-        if (isGrayAttacking) return NameColorType.Yellow;
+        if (pkPoints >= YellowNameThreshold || isGrayAttacking) return NameColorType.Yellow;
         return NameColorType.White;
     }
 

@@ -368,11 +368,12 @@ public sealed class Official15ProtocolDispatcher
 
         Register(53, (id, rec, p, t, s, b) =>
         {
-            // SM_HEALTHSPELLCHANGED HP/MP 血量魔法值变动
+            // 盛大官方 1.5 铁律: SM_HEALTHSPELLCHANGED (53)
+            // 协议参数映射: rec=HP, p=MP, t=MaxHp, s=MaxMp
             int hp = rec;
-            int maxHp = p;
-            int mp = t;
-            int maxMp = s;
+            int mp = p;
+            int maxHp = t > 0 ? t : Math.Max(hp, 1);
+            int maxMp = s > 0 ? s : Math.Max(mp, 1);
             if (_gameView?.PlayerInstance != null)
             {
                 _gameView.PlayerInstance.Hp = hp;
@@ -453,9 +454,9 @@ public sealed class Official15ProtocolDispatcher
             _hud?.ShowNpcDialog(script);
         });
 
-        Register(631, (id, rec, p, t, s, b) =>
+        Register(646, (id, rec, p, t, s, b) =>
         {
-            // SM_MERCHANTDLG 弹出商店买卖货架界面
+            // SM_MERCHANT_NORMAL (646) 弹出商店买卖货架界面 (IDA open_shop_normal)
             _hud?.ShowShop("商店老板", Array.Empty<ShopItemEntry>());
         });
 
@@ -517,12 +518,10 @@ public sealed class Official15ProtocolDispatcher
             {
                 0 => "全体攻击模式",
                 1 => "和平攻击模式",
-                2 => "夫妻攻击模式",
-                3 => "师徒攻击模式",
-                4 => "编组攻击模式",
-                5 => "行会攻击模式",
-                6 => "红名攻击模式",
-                _ => "未知攻击模式"
+                2 => "组队攻击模式",
+                3 => "行会攻击模式",
+                4 => "善恶攻击模式",
+                _ => "全体攻击模式"
             };
             _hud?.AddChat("系统", $"[攻击模式] 已切换为: {modeName}", new Color(1f, 0.9f, 0.3f));
         });

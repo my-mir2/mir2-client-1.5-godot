@@ -16,16 +16,29 @@ namespace Mir2.Server.Game;
 public sealed class TeleportScrollEngine
 {
     public static (bool success, int targetMapId, int targetX, int targetY, string message) UseTownTeleport(
-        ClientSession session, MapManager mapMgr)
+        ClientSession session, MapManager mapMgr, SabukSiegeEngine? sabukEngine = null, string? playerGuild = null)
     {
         if (session.State == null || session.State.Hp <= 0)
         {
             return (false, session.CurrentMapId, session.X, session.Y, "死亡状态下无法使用回城卷。");
         }
 
+        // 盛大官方 1.4/1.5 规则: 沙巴克攻城期间，守城行会成员在盟重或沙巴克皇宫使用回城卷直达沙巴克城堡
+        if (sabukEngine != null && sabukEngine.Phase == SabukSiegeEngine.WarPhase.InWar)
+        {
+            if (session.CurrentMapId == SabukSiegeEngine.SabukCastleMapId || session.CurrentMapId == SabukSiegeEngine.SabukPalaceMapId)
+            {
+                if (!string.IsNullOrWhiteSpace(playerGuild) &&
+                    playerGuild.Equals(sabukEngine.OwnerGuild, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (true, SabukSiegeEngine.SabukCastleMapId, 644, 290, "【沙城战备】回城卷闪耀行会军徽，你已火速传送回沙巴克城池阵地！");
+                }
+            }
+        }
+
         // 根据当前地图决定回城目的地:
         // 地图 0 (比奇省周边) -> 回比奇安全区 (330, 270)
-        // 其余地图 (盟重/封魔/白日门/毒蛇) -> 回盟重土城 (330, 330)
+        // 其余地图 (盟重/白日门/毒蛇/沃玛) -> 回盟重土城 (330, 330)
         int targetMap = session.CurrentMapId == 0 ? 0 : 3;
         int targetX = targetMap == 0 ? 330 : 330;
         int targetY = targetMap == 0 ? 270 : 330;

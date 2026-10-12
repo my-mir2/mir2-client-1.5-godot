@@ -21,7 +21,7 @@ public partial class LoginView : Control
     public delegate void ChangePasswordRequestedEventHandler(string username, string oldPassword, string newPassword);
 
     public string ServerHost { get; set; } = "127.0.0.1";
-    public int ServerPort { get; set; } = 7001;
+    public int ServerPort { get; set; } = 7000;
 
     // 官方 1.5 IDA 逆向存疑：0x47D6CC 处无函数（已实证 is_func=False），开门帧 23..32 以 ChrSel.wil 为准；0x47D864 待证
     public const int OfficialDoorStartFrame = 23; // ChrSel.wil[23] 开门首帧
@@ -37,7 +37,15 @@ public partial class LoginView : Control
     private Button? _btnNewUser;
     private Button? _btnChangePwd;
     private Label? _lblStatus;
+#if MIR2_SANDBOX_DEV
     private Button? _btnSandbox;
+#endif
+
+    // 官方 1.5 原生模态石质提示弹窗 (IDA sub_486DF0 / Prguse.wil[360] 452x179)
+    private Panel? _msgModal;
+    private Label? _msgText;
+    private TextureButton? _btnMsgOk;
+    private Action? _pendingOkAction;
 
     // 石门动画节点与纹理缓存
     private TextureRect? _doorAnimRect;
@@ -122,7 +130,16 @@ public partial class LoginView : Control
         _btnNewUser = GetNodeOrNull<Button>("Panel/BtnNewUser");
         _btnChangePwd = GetNodeOrNull<Button>("Panel/BtnChangePwd");
         _lblStatus = GetNodeOrNull<Label>("Panel/LblStatus");
+#if MIR2_SANDBOX_DEV
         _btnSandbox = GetNodeOrNull<Button>("BtnSandbox");
+#else
+        var devBtnSandbox = GetNodeOrNull<Button>("BtnSandbox");
+        if (devBtnSandbox != null)
+        {
+            devBtnSandbox.Visible = false;
+            devBtnSandbox.QueueFree();
+        }
+#endif
 
         var texRedX = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0064.png");
         var texCloseNormal = ResPath.LoadImageTexture("resources/wil/png/Prguse/btn_close_normal.png");
@@ -138,6 +155,7 @@ public partial class LoginView : Control
         if (_btnClose != null) _btnClose.Pressed += OnCloseClicked;
         if (_btnNewUser != null) _btnNewUser.Pressed += () => SwitchSubState(1); // 0x0B 新用户
         if (_btnChangePwd != null) _btnChangePwd.Pressed += () => SwitchSubState(2); // 0x0C 改密码
+#if MIR2_SANDBOX_DEV
         if (_btnSandbox != null)
         {
             _btnSandbox.Pressed += OnSandboxClicked;
@@ -147,6 +165,7 @@ public partial class LoginView : Control
                 _btnSandbox.Visible = false;
             }
         }
+#endif
 
         if (_txtUsername != null)
         {
@@ -221,7 +240,44 @@ public partial class LoginView : Control
             if (_btnChangeClose != null) _btnChangeClose.Pressed += () => SwitchSubState(0);
         }
 
-        GD.Print("[LoginView] 官方 1.5 登录场景逆向对齐完毕: 石门动画(ChrSel 23~32)、登录面板(60)、注册面板(63)、改密面板(50) 全部就绪");
+        // 7. 绑定官方石质提示模态弹窗 (MsgModal，严格对齐官方 IDA sub_486DF0 / Prguse_0360 452x179 居中)
+        _msgModal = GetNodeOrNull<Panel>("MsgModal");
+        if (_msgModal != null)
+        {
+            var texBox = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0360.png");
+            if (texBox != null)
+            {
+                _msgModal.AddThemeStyleboxOverride("panel", new StyleBoxTexture { Texture = texBox });
+            }
+            _msgModal.Position = new Vector2(174, 210);
+            _msgModal.Size = new Vector2(452, 179);
+
+            _msgText = _msgModal.GetNodeOrNull<Label>("MsgText");
+            if (_msgText != null)
+            {
+                _msgText.Position = new Vector2(30, 25);
+                _msgText.Size = new Vector2(392, 95);
+            }
+
+            _btnMsgOk = _msgModal.GetNodeOrNull<TextureButton>("BtnMsgOk");
+            if (_btnMsgOk != null)
+            {
+                var texNorm = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0062.png");
+                var texPress = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0081.png");
+                if (texNorm != null) _btnMsgOk.TextureNormal = texNorm;
+                if (texPress != null) _btnMsgOk.TexturePressed = texPress;
+                _btnMsgOk.Position = new Vector2(188, 126);
+                _btnMsgOk.Size = new Vector2(76, 33);
+                _btnMsgOk.Pressed += () =>
+                {
+                    _msgModal.Visible = false;
+                    _pendingOkAction?.Invoke();
+                    _pendingOkAction = null;
+                };
+            }
+        }
+
+        GD.Print("[LoginView] 官方 1.5 登录场景逆向对齐完毕: 石门动画(ChrSel 23~32)、登录面板(60)、注册面板(63)、改密面板(50)、官方模态弹窗(360) 全部就绪");
     }
 
     public override void _Process(double delta)
@@ -263,7 +319,9 @@ public partial class LoginView : Control
         if (_panel != null) _panel.Visible = false;
         if (_newUserPanel != null) _newUserPanel.Visible = false;
         if (_changePwdPanel != null) _changePwdPanel.Visible = false;
+#if MIR2_SANDBOX_DEV
         if (_btnSandbox != null) _btnSandbox.Visible = false;
+#endif
 
         if (_doorAnimRect != null)
         {
@@ -297,9 +355,46 @@ public partial class LoginView : Control
         if (_panel != null) _panel.Visible = (state == 0);
         if (_newUserPanel != null) _newUserPanel.Visible = (state == 1);
         if (_changePwdPanel != null) _changePwdPanel.Visible = (state == 2);
+#if MIR2_SANDBOX_DEV
         if (_btnSandbox != null) _btnSandbox.Visible = (state == 0);
+#endif
 
         GD.Print($"[LoginView] 切换官方登录子状态: state={state} (0=登录, 1=新用户, 2=改密)");
+    }
+
+    /// <summary>
+    /// 弹出官方石质提示模态弹窗 (IDA sub_486DF0 / Prguse.wil[360])
+    /// 绝不在登录面板主界面按钮上覆盖红字，严格还原盛大官方 1.5 行为
+    /// </summary>
+    public void ShowMessageModal(string text, Action? onOk = null)
+    {
+        _pendingOkAction = onOk;
+        if (_msgModal != null && _msgText != null)
+        {
+            string normalized = string.IsNullOrEmpty(text) ? string.Empty : text.Replace("\\\\", "\n").Replace('\\', '\n');
+            _msgText.Text = normalized;
+            _msgModal.Visible = true;
+        }
+        else
+        {
+            GD.PrintErr($"[LoginView] 官方模态弹窗未找到，回退文本: {text}");
+        }
+    }
+
+    /// <summary>
+    /// 状态提示（兼容旧调用，统一路由至官方模态弹窗或后台单测属性）
+    /// </summary>
+    public void SetStatusText(string text, Color? color = null)
+    {
+        if (_lblStatus != null)
+        {
+            _lblStatus.Text = text;
+        }
+
+        if (!string.IsNullOrEmpty(text) && !text.Contains("正在连接"))
+        {
+            ShowMessageModal(text);
+        }
     }
 
     private void OnLoginClicked()
@@ -309,18 +404,8 @@ public partial class LoginView : Control
 
         if (string.IsNullOrEmpty(u) || string.IsNullOrEmpty(p))
         {
-            if (_lblStatus != null)
-            {
-                _lblStatus.Text = "请输入账号和密码！";
-                _lblStatus.AddThemeColorOverride("font_color", new Color(1.0f, 0.3f, 0.3f));
-            }
+            ShowMessageModal("请输入账号和密码！");
             return;
-        }
-
-        if (_lblStatus != null)
-        {
-            _lblStatus.Text = "正在连接登录网关...";
-            _lblStatus.AddThemeColorOverride("font_color", new Color(1.0f, 0.85f, 0.2f));
         }
 
         EmitSignal(SignalName.LoginRequested, ServerHost, ServerPort, u, p);
@@ -332,11 +417,13 @@ public partial class LoginView : Control
         GetTree().Quit();
     }
 
+#if MIR2_SANDBOX_DEV
     private void OnSandboxClicked()
     {
         GD.Print("[LoginView] 触发单机试玩 / 官方 1.5 沙盒演练");
         EmitSignal(SignalName.LoginRequested, "127.0.0.1", 7100, "sandbox_player", "123456");
     }
+#endif
 
     private void OnSubmitRegister()
     {
@@ -346,24 +433,20 @@ public partial class LoginView : Control
 
         if (string.IsNullOrEmpty(u) || string.IsNullOrEmpty(p1))
         {
-            GD.Print("[LoginView] 注册失败：账号或密码不能为空");
+            ShowMessageModal("账号或密码不能为空！");
             return;
         }
 
         if (p1 != p2)
         {
-            GD.Print("[LoginView] 注册失败：两次输入密码不一致");
+            ShowMessageModal("两次输入密码不一致，请重新输入！");
             return;
         }
 
         GD.Print($"[LoginView] 提交官方注册新账号: {u}");
         EmitSignal(SignalName.RegisterRequested, u, p1);
         SwitchSubState(0);
-        if (_lblStatus != null)
-        {
-            _lblStatus.Text = $"账号 {u} 注册成功，请登录！";
-            _lblStatus.AddThemeColorOverride("font_color", new Color(0.2f, 1.0f, 0.3f));
-        }
+        ShowMessageModal($"账号 {u} 注册申请已提交，请登录！");
     }
 
     private void OnSubmitChangePassword()
@@ -374,13 +457,13 @@ public partial class LoginView : Control
 
         if (string.IsNullOrEmpty(oldP) || string.IsNullOrEmpty(newP1))
         {
-            GD.Print("[LoginView] 改密失败：旧密码或新密码不能为空");
+            ShowMessageModal("旧密码或新密码不能为空！");
             return;
         }
 
         if (newP1 != newP2)
         {
-            GD.Print("[LoginView] 改密失败：两次输入新密码不一致");
+            ShowMessageModal("两次输入新密码不一致，请重新输入！");
             return;
         }
 
@@ -388,10 +471,7 @@ public partial class LoginView : Control
         GD.Print($"[LoginView] 提交修改密码请求成功: account={acc}");
         EmitSignal(SignalName.ChangePasswordRequested, acc, oldP, newP1);
         SwitchSubState(0);
-        if (_lblStatus != null)
-        {
-            _lblStatus.Text = "密码修改成功，请使用新密码登录！";
-            _lblStatus.AddThemeColorOverride("font_color", new Color(0.2f, 1.0f, 0.3f));
-        }
+        ShowMessageModal("密码修改申请已提交！");
     }
 }
+

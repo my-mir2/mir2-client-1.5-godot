@@ -6,32 +6,38 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Mir2.Shared.Rules;
 
 namespace Mir2Client.Game
 {
+    /// <summary>
+    /// 盛大官方 1.5 沙巴克攻城战与皇宫争夺客户端驱动与表现引擎 (1:1 官方实证)
+    /// 核心战斗与占领权更迭逻辑权威下沉至 Mir2.Shared.Rules.SabukCastleRulesEngine 与服务端 SabukSiegeEngine
+    /// 客户端只负责地图瓦片阻挡动态开关与战争状态表现渲染
+    /// </summary>
     public class SabukCastleEngine
     {
         public enum GateState
         {
-            Intact = 0,   // 完好无损 (阻挡开启)
-            Damaged = 1,  // 遭受重创 (裂开，阻挡依然开启)
-            Broken = 2    // 彻底倒塌 (阻挡消除，可自由穿行)
+            Intact = SabukCastleRulesEngine.GateState.Intact,   // 完好无损 (阻挡开启)
+            Damaged = SabukCastleRulesEngine.GateState.Damaged,  // 遭受重创 (裂开，阻挡依然开启)
+            Broken = SabukCastleRulesEngine.GateState.Broken    // 彻底倒塌 (阻挡消除，可自由穿行)
         }
 
         public enum WarPhase
         {
-            Peace = 0,    // 和平期
-            InWar = 1,    // 攻城战役激烈交火中 (官方 2 小时)
-            Ended = 2     // 战役结算结束
+            Peace = SabukCastleRulesEngine.WarPhase.Peace,    // 和平期
+            InWar = SabukCastleRulesEngine.WarPhase.InWar,    // 攻城战役激烈交火中 (官方 2 小时)
+            Ended = SabukCastleRulesEngine.WarPhase.Ended     // 战役结算结束
         }
 
         /// <summary>
-        /// 沙巴克城门管理
+        /// 沙巴克城门管理 (客户端瓦片驱动层)
         /// </summary>
         public class SabukGate
         {
-            public int MaxHp { get; set; } = 2000;
-            public int CurrentHp { get; private set; } = 2000;
+            public int MaxHp { get; set; } = SabukCastleRulesEngine.DefaultGateMaxHp;
+            public int CurrentHp { get; private set; } = SabukCastleRulesEngine.DefaultGateMaxHp;
             public GateState State { get; private set; } = GateState.Intact;
 
             // 官方沙巴克城门占位瓦片 (盟重沙巴克正门 672, 331 及其两侧)
@@ -58,19 +64,19 @@ namespace Mir2Client.Game
             }
 
             /// <summary>
-            /// 攻击城门结算并动态消除阻挡
+            /// 攻击城门结算并动态消除阻挡 (权威规则委托给 SabukCastleRulesEngine)
             /// </summary>
-            /// <param name="damage">承受伤害</param>
-            /// <param name="setTileBlocked">地图阻挡回调 (x, y, blocked)</param>
-            /// <returns>返回攻击后最新状态</returns>
             public GateState TakeDamage(int damage, Action<int, int, bool>? setTileBlocked = null)
             {
                 if (State == GateState.Broken) return GateState.Broken;
 
-                CurrentHp = Math.Max(0, CurrentHp - damage);
+                var (newHp, newState, broke, damaged) = SabukCastleRulesEngine.EvaluateGateDamage(
+                    CurrentHp, MaxHp, (SabukCastleRulesEngine.GateState)State, damage);
+
+                CurrentHp = newHp;
                 GateHpChanged?.Invoke(CurrentHp, MaxHp);
 
-                if (CurrentHp <= 0)
+                if (broke)
                 {
                     State = GateState.Broken;
                     GateStateChanged?.Invoke(State);
@@ -80,11 +86,11 @@ namespace Mir2Client.Game
                     {
                         foreach (var tile in DoorTiles)
                         {
-                            setTileBlocked(tile.X, tile.Y, false); // blocked = false
+                            setTileBlocked(tile.X, tile.Y, false);
                         }
                     }
                 }
-                else if (CurrentHp <= MaxHp / 2 && State == GateState.Intact)
+                else if (damaged && State == GateState.Intact)
                 {
                     State = GateState.Damaged;
                     GateStateChanged?.Invoke(State);
@@ -108,14 +114,14 @@ namespace Mir2Client.Game
                 {
                     foreach (var tile in DoorTiles)
                     {
-                        setTileBlocked(tile.X, tile.Y, true); // blocked = true
+                        setTileBlocked(tile.X, tile.Y, true);
                     }
                 }
             }
         }
 
         /// <summary>
-        /// 官方 1.5 皇宫争夺与占领裁决器 (IDA 0x4C9B80（已证client无函数）)
+        /// 官方 1.5 皇宫争夺与占领裁决器 (权威下沉至 SabukCastleRulesEngine)
         /// </summary>
         public class PalaceWarDecider
         {
@@ -147,45 +153,18 @@ namespace Mir2Client.Game
             }
 
             /// <summary>
-            /// 判定皇宫大殿当前占领者 (官方实证 0x4C9B80（已证client无函数）：皇宫内清空敌对势力时方可占领)
+            /// 判定皇宫大殿当前占领者 (权威委托给 SabukCastleRulesEngine)
             /// </summary>
             public bool EvaluatePalaceOccupancy(IEnumerable<(string guild, int uid)> playersInPalace)
             {
-                if (Phase != WarPhase.InWar) return false;
+                var (changed, newOccupier) = SabukCastleRulesEngine.EvaluatePalaceOccupancy(
+                    (SabukCastleRulesEngine.WarPhase)Phase, OccupyingGuild, playersInPalace);
 
-                string? dominantGuild = null;
-                bool hasConflict = false;
-
-                foreach (var (guild, _) in playersInPalace)
+                if (changed)
                 {
-                    if (string.IsNullOrWhiteSpace(guild))
-                    {
-                        // 无行会散人存在，视为混战未清理完毕
-                        hasConflict = true;
-                        break;
-                    }
-
-                    if (dominantGuild == null)
-                    {
-                        dominantGuild = guild;
-                    }
-                    else if (!dominantGuild.Equals(guild, StringComparison.OrdinalIgnoreCase))
-                    {
-                        // 存在两个以上不同行会的成员在皇宫内厮杀
-                        hasConflict = true;
-                        break;
-                    }
-                }
-
-                // 皇宫内只剩下某一个合法行会的成员
-                if (!hasConflict && !string.IsNullOrEmpty(dominantGuild))
-                {
-                    if (!OccupyingGuild.Equals(dominantGuild, StringComparison.OrdinalIgnoreCase))
-                    {
-                        OccupyingGuild = dominantGuild;
-                        PalaceOccupantChanged?.Invoke(OccupyingGuild);
-                        return true;
-                    }
+                    OccupyingGuild = newOccupier;
+                    PalaceOccupantChanged?.Invoke(OccupyingGuild);
+                    return true;
                 }
 
                 return false;

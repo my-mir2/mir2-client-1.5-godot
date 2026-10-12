@@ -140,9 +140,10 @@ public static class ItemLifecycleEngine
             return (false, "请指定要升级的武器。");
         }
         var weapon = session.State.BagItems[weaponSlot];
-        if (weapon.UpgradeCount >= 25)
+        // 盛大官方 1.5 铁律: 沙巴克武器升级累计最高 7 点属性 (UpgradeCount >= 7)
+        if (weapon.UpgradeCount >= 7)
         {
-            return (false, "该武器已达到累计 25 次强化极限，无法继续升级！");
+            return (false, "该武器已达到累计 7 次修炼极限，无法继续升级！");
         }
 
         // 2. 收集黑铁矿石与首饰
@@ -258,22 +259,33 @@ public static class ItemLifecycleEngine
     /// </summary>
     public static (bool success, string message) ApplyBlessOilToEquippedWeapon(ClientSession session, Random rng)
     {
-        if (session.State == null) return (false, "角色状态异常。");
+        var (succ, msg, _, _) = ApplyBlessOilToEquippedWeaponEx(session, rng);
+        return (succ, msg);
+    }
+
+    /// <summary>
+    /// 使用背包中的祝福油为手持武器涂抹开光扩展版本 (返回被消耗的祝福油物品与背包槽位，供网络层下发 SM_DELITEM 物理清格)
+    /// </summary>
+    public static (bool success, string message, EquipItem? oilItem, int oilSlot) ApplyBlessOilToEquippedWeaponEx(ClientSession session, Random rng)
+    {
+        if (session.State == null) return (false, "角色状态异常。", null, -1);
 
         // 1. 校验手持武器
         var weapon = session.State.Equipment[(int)OfficialEquipSlot.Weapon];
         if (weapon == null)
         {
-            return (false, "你手中未握持武器，无法使用祝福油！");
+            return (false, "你手中未握持武器，无法使用祝福油！", null, -1);
         }
 
-        // 2. 校验并扣除背包祝福油
+        // 2. 校验并扣除背包祝福油与负重
         int oilSlot = session.State.BagItems.FindIndex(i => i.Name.Contains("祝福油"));
         if (oilSlot < 0)
         {
-            return (false, "背包中没有祝福油！");
+            return (false, "背包中没有祝福油！", null, -1);
         }
+        var oilItem = session.State.BagItems[oilSlot];
         session.State.BagItems.RemoveAt(oilSlot);
+        session.State.BagWeight = Math.Max(0, session.State.BagWeight - oilItem.Weight);
 
         // 3. 代入官方 1.5 祝福油判定引擎 (PlayerAuditEngine.AuditDrinkBlessOil)
         int maxDc = session.State.MaxDc;
@@ -288,23 +300,23 @@ public static class ItemLifecycleEngine
             weapon.Curse = res.NewCurse;
             weapon.Luck = res.NewLuck;
             session.State.RecalculateAttributes();
-            return (false, "一股不祥的灰雾笼罩了刀身！武器被诅咒了！");
+            return (false, "一股不祥的灰雾笼罩了刀身！武器被诅咒了！", oilItem, oilSlot);
         }
         else if (res.CurseCleared)
         {
             weapon.Curse = res.NewCurse;
             session.State.RecalculateAttributes();
-            return (true, "神圣的油香驱散了刀身上的邪气！武器诅咒被净化了！");
+            return (true, "神圣的油香驱散了刀身上的邪气！武器诅咒被净化了！", oilItem, oilSlot);
         }
         else if (res.Success)
         {
             weapon.Luck = res.NewLuck;
             session.State.RecalculateAttributes();
-            return (true, $"圣光闪耀！武器被祝福了！当前幸运: +{weapon.Luck}！");
+            return (true, $"圣光闪耀！武器被祝福了！当前幸运: +{weapon.Luck}！", oilItem, oilSlot);
         }
         else
         {
-            return (true, "药油渗透进刀纹，刀身毫无变化。");
+            return (true, "药油渗透进刀纹，刀身毫无变化。", oilItem, oilSlot);
         }
     }
 

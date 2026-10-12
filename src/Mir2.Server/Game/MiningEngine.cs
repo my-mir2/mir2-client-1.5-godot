@@ -34,6 +34,9 @@ public static class MiningEngine
     public sealed class MineResult
     {
         public bool Success { get; set; }
+        public bool PickaxeWorn { get; set; }
+        public int PickaxeDura { get; set; }
+        public int PickaxeMaxDura { get; set; }
         public EquipItem? MinedOre { get; set; }
         public bool PickaxeBroken { get; set; }
         public string Message { get; set; } = string.Empty;
@@ -64,7 +67,10 @@ public static class MiningEngine
             return result;
         }
 
-        if (weapon!.Dura <= 0)
+        result.PickaxeDura = weapon!.Dura;
+        result.PickaxeMaxDura = weapon.MaxDura;
+
+        if (weapon.Dura <= 0)
         {
             result.PickaxeBroken = true;
             result.Message = "你的鹤嘴锄已经彻底折断损坏，无法继续挖矿！";
@@ -75,6 +81,9 @@ public static class MiningEngine
         if (rng.Next(10) == 0)
         {
             weapon.Dura = Math.Max(0, weapon.Dura - 1);
+            result.PickaxeWorn = true;
+            result.PickaxeDura = weapon.Dura;
+            result.PickaxeMaxDura = weapon.MaxDura;
             if (weapon.Dura == 0)
             {
                 result.PickaxeBroken = true;
@@ -123,16 +132,25 @@ public static class MiningEngine
                 purity = 5 + rng.Next(26); // 纯度 5~30
             }
 
+            int oreWeight = Math.Max(1, purity / 5);
+            // 盛大官方 1.5 铁律：背包负重严格限制，超重无法将矿石放入包裹
+            if (state.BagWeight + oreWeight > state.MaxBagWeight)
+            {
+                result.Message = "你挖到了矿石，但太重了拿不动！";
+                return result;
+            }
+
             var ore = new EquipItem
             {
                 Name = oreName,
                 Shape = purity, // Shape 字段记录纯度
-                Weight = Math.Max(1, purity / 5),
+                Weight = oreWeight,
                 Dura = purity,
                 MaxDura = purity
             };
 
             state.BagItems.Add(ore);
+            state.BagWeight += oreWeight;
             result.Success = true;
             result.MinedOre = ore;
             result.Message = $"铛！一声脆响，你从岩壁中挖出了一块【{oreName}】(纯度: {purity})！";

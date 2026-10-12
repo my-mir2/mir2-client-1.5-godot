@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Mir2Client.Audio;
 using Mir2Client.Net;
 using Mir2Client.Render;
 using Mir2Client.Utils;
+using Mir2.Shared.Protocols.Modern;
 
 namespace Mir2Client;
 
@@ -23,7 +25,7 @@ public partial class Main : Node
     }
 
     public const string DefaultHost = "127.0.0.1";
-    public const int DefaultPort = 7001;
+    public const int DefaultPort = 7000;
 
     private Phase _currentPhase = Phase.Login;
     private NetManager? _net;
@@ -50,7 +52,10 @@ public partial class Main : Node
         if (_net != null)
         {
             _net.PacketReceived += OnGlobalPacketReceived;
+            _net.BinaryPacketReceived += (msgId, payload) => OnGlobalPacketReceived((short)msgId, payload);
             _net.Connected += OnNetworkConnected;
+            _net.ConnectFailed += OnNetworkConnectFailed;
+            _net.Disconnected += OnNetworkDisconnected;
         }
 
         SetupCustomCursor();
@@ -65,18 +70,27 @@ public partial class Main : Node
         var allArgs = new List<string>();
         if (args != null) allArgs.AddRange(args);
         if (userArgs != null) allArgs.AddRange(userArgs);
+        GD.Print($"[Main] 收到启动参数 [{allArgs.Count}]: {string.Join(" | ", allArgs)}");
 
         // 满足人工与自动化机器审计：启动 1 像素高对比度细线框审计层（当携带 --debug-grid 时启用，避免 --autotest 残留调试辅助线）
-        if (allArgs.Contains("--debug-grid"))
+        if (allArgs.Any(a => a.Contains("debug-grid")))
         {
             AddChild(new DebugGridOverlay());
         }
 
-        if (allArgs.Contains("--autotest") || allArgs.Contains("--auto-e2e"))
+#if MIR2_SANDBOX_DEV
+        if (allArgs.Any(a => a.Contains("autotest") || a.Contains("auto-e2e")))
         {
             AddChild(new AutoEndToEndDriver());
         }
+#endif
+        if (allArgs.Any(a => a.Contains("auto-screenshot")))
+        {
+            AddChild(new AutoLiveScreenshotRunner());
+        }
     }
+
+    public Node? CurrentSceneNode => _currentSceneNode;
 
     public override void _ExitTree()
     {
@@ -143,10 +157,25 @@ public partial class Main : Node
                     {
                         if (_net != null && _net.IsConnectedToServer)
                         {
-                            _net.SendPacket(PacketEncoder.SelectServer(idx));
-                            _net.SendPacket(PacketEncoder.MakePacket(119, 0, 0, 0, System.Text.Encoding.UTF8.GetBytes(_account)));
+                            var selServ = new BinaryProtocol.SelectServerIntentPayload { ServerIndex = idx };
+                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSelectServer, in selServ);
+                            var queryChar = BinaryProtocol.QueryCharIntentPayload.Create(_account);
+                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentQueryChar, in queryChar);
                         }
-                        SwitchPhase(Phase.SelectChar);
+#if MIR2_SANDBOX_DEV
+                        else
+                        {
+                            SwitchPhase(Phase.SelectChar);
+                        }
+#else
+                        else
+                        {
+                            if (_currentSceneNode is UI.SelectServerView srvView)
+                            {
+                                srvView.SetStatusText("未连接到游戏网关，请检查网络！");
+                            }
+                        }
+#endif
                     };
                     AddChild(node);
                     _currentSceneNode = node;
@@ -163,6 +192,7 @@ public partial class Main : Node
                     {
                         node.SetCharacters(_serverCharList);
                     }
+#if MIR2_SANDBOX_DEV
                     else
                     {
                         node.SetCharacters(new[]
@@ -171,28 +201,45 @@ public partial class Main : Node
                             new UI.SelectCharView.CharEntry("烈焰法师", 1, 1, 38)
                         });
                     }
+#endif
                     node.CharSelected += (idx, name, lvl) =>
                     {
                         _selectedCharName = name;
                         _selectedCharLevel = lvl;
                         if (_net != null && _net.IsConnectedToServer)
                         {
-                            _net.SendPacket(PacketEncoder.MakePacket(ProtocolConsts.CM_SELECTCHAR, idx, 0, 0, System.Text.Encoding.UTF8.GetBytes(name)));
+                            var selChar = BinaryProtocol.SelectCharIntentPayload.Create(idx, name);
+                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.SelectCharRequest, in selChar);
                         }
-                        SwitchPhase(Phase.Game);
+#if MIR2_SANDBOX_DEV
+                        else
+                        {
+                            SwitchPhase(Phase.Game);
+                        }
+#else
+                        else
+                        {
+                            if (_currentSceneNode is UI.SelectCharView selView)
+                            {
+                                selView.ShowMessageModal("未连接到游戏服务器，无法开始游戏！");
+                            }
+                        }
+#endif
                     };
                     node.NewCharRequested += (name, job, sex) =>
                     {
                         if (_net != null && _net.IsConnectedToServer)
                         {
-                            _net.SendPacket(PacketEncoder.NewChar(name, job, sex));
+                            var newChar = BinaryProtocol.CreateCharIntentPayload.Create(name, (byte)job, (byte)sex);
+                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.CreateCharRequest, in newChar);
                         }
                     };
                     node.DelCharRequested += (idx) =>
                     {
                         if (_net != null && _net.IsConnectedToServer)
                         {
-                            _net.SendPacket(PacketEncoder.DelChar(idx));
+                            var delChar = BinaryProtocol.DeleteCharIntentPayload.Create(idx);
+                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentDeleteChar, in delChar);
                         }
                     };
                     AddChild(node);
@@ -213,7 +260,8 @@ public partial class Main : Node
                         node.SetNet(_net, _sessionId, _selectedCharName, _selectedCharLevel);
                         if (_net.IsConnectedToServer)
                         {
-                            _net.SendPacket(PacketEncoder.LoginNoticeOk());
+                            var loginOk = new BinaryProtocol.LoginNoticeOkPayload { Acknowledged = 1 };
+                            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentLoginNoticeOk, in loginOk);
                         }
                     }
                 }
@@ -227,32 +275,45 @@ public partial class Main : Node
         GD.Print($"[Main] 收到登录请求: {host}:{port}, 用户: {user}");
         _account = user;
         _password = pass;
-        if (_net != null)
+
+        if (_net == null)
         {
-            if (_net.IsConnectedToServer)
+            if (_currentSceneNode is UI.LoginView loginView)
             {
-                _net.SendPacket(PacketEncoder.Login(user, pass));
+                loginView.ShowMessageModal("网络通信组件未初始化！");
             }
-            else
-            {
-                _net.ConnectTo(host, port, autoReconnect: false);
-            }
+            return;
         }
 
-        // 官方 1.5 存疑：0x47D6CC 处无函数（已实证），原 0x47D859 调用点归属待查，流程逻辑不变：
-        // 登录成功或进入选区时，先启动 ChrSel.wil[23..32] 10 帧石门开启序列动画，开门完毕后再切换至选服/选角
-        if (_currentSceneNode is UI.LoginView loginView)
+        if (_net.IsConnectedToServer)
         {
-            GD.Print("[Main] 播放官方石门开启序列动画 (23~32帧, 230ms 帧时钟)...");
-            loginView.PlayDoorOpeningAnimation(() =>
-            {
-                SwitchPhase(Phase.SelectServer);
-            });
+            var loginIntent = BinaryProtocol.LoginIntentPayload.Create(user, pass);
+            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.LoginRequest, in loginIntent);
         }
         else
         {
-            SwitchPhase(Phase.SelectServer);
+            GD.Print($"[Main] 正在异步发起连接 {host}:{port}...");
+            _net.ConnectTo(host, port, autoReconnect: false);
         }
+
+#if MIR2_SANDBOX_DEV
+        // 开发者沙盒演练模式：若处于离线单机开发环境，允许本地直接触发石门动画
+        if (!_net.IsConnectedToServer)
+        {
+            if (_currentSceneNode is UI.LoginView sandboxLoginView)
+            {
+                GD.Print("[Main] [SANDBOX] 开发离线模式播放石门开启序列动画 (23~32帧)...");
+                sandboxLoginView.PlayDoorOpeningAnimation(() =>
+                {
+                    SwitchPhase(Phase.SelectServer);
+                });
+            }
+            else
+            {
+                SwitchPhase(Phase.SelectServer);
+            }
+        }
+#endif
     }
 
     private void OnNetworkConnected()
@@ -261,23 +322,75 @@ public partial class Main : Node
         if (_currentPhase == Phase.Login && !string.IsNullOrEmpty(_account))
         {
             GD.Print($"[Main] 连接建立完毕，发送登录封包: account={_account}");
-            _net?.SendPacket(PacketEncoder.Login(_account, _password));
+            var loginIntent = BinaryProtocol.LoginIntentPayload.Create(_account, _password);
+            _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.LoginRequest, in loginIntent);
         }
+    }
+
+    private void OnNetworkConnectFailed()
+    {
+        GD.PrintErr($"[Main] 连接游戏服务器失败，当前生命周期阶段: {_currentPhase}");
+        if (_currentSceneNode is UI.LoginView loginView)
+        {
+            loginView.ShowMessageModal("无法连接到游戏服务器，请检查网络连接！");
+        }
+    }
+
+    private void OnNetworkDisconnected(string reason)
+    {
+        GD.PrintErr($"[Main] 与游戏服务器断开连接，原因: {reason}，当前阶段: {_currentPhase}");
+        if (_currentSceneNode is UI.LoginView loginView)
+        {
+            loginView.ShowMessageModal("与服务器断开连接！");
+        }
+    }
+
+    private static ServerPacket? DecodeServerPacket(short smCode, byte[] data)
+    {
+        if (data == null || data.Length == 0) return null;
+        if (data.Length >= 16)
+        {
+            return PacketDecoder.ParseModernPayload(smCode, data);
+        }
+        return PacketDecoder.Parse(data);
     }
 
     private void OnGlobalPacketReceived(short smCode, byte[] data)
     {
         switch (smCode)
         {
+            case ProtocolConsts.SM_STARTPLAY: // 20: 盛大官方 1.5 原版角色进入游戏世界确认 (IDA 0x468867)
+            {
+                GD.Print($"[Main] 收到服务端进入游戏确认协议 SM_{smCode}，角色身份验证通过，进入游戏大世界！");
+                if (_currentPhase == Phase.SelectChar)
+                {
+                    SwitchPhase(Phase.Game);
+                }
+                break;
+            }
             case ProtocolConsts.SM_PASSOK: // 500
             case 530: // SM_LOGINSUCCESS
             {
-                GD.Print($"[Main] 收到登录成功回执 SM_{smCode}");
+                GD.Print($"[Main] 收到登录成功回执 SM_{smCode}，启动官方石门开启序列动画...");
+                if (_currentPhase == Phase.Login)
+                {
+                    if (_currentSceneNode is UI.LoginView lv)
+                    {
+                        lv.PlayDoorOpeningAnimation(() =>
+                        {
+                            SwitchPhase(Phase.SelectServer);
+                        });
+                    }
+                    else
+                    {
+                        SwitchPhase(Phase.SelectServer);
+                    }
+                }
                 break;
             }
             case 114: // SM_SERVERINDEX (服务端下发分区列表)
             {
-                var parsed = PacketDecoder.Parse(data);
+                var parsed = DecodeServerPacket(smCode, data);
                 string text = parsed?.ExtraStr ?? string.Empty;
                 if (!string.IsNullOrEmpty(text))
                 {
@@ -297,12 +410,13 @@ public partial class Main : Node
             case ProtocolConsts.SM_QUERYCHR: // 518
             case ProtocolConsts.SM_CHARLIST_DELPHI: // 211: 盛大官方 1.5 原版角色列表下发 (IDA case 0xD3u @ 0x469AE0 handle_sm_char_list)
             case 120: // SM_CHARLIST (官方 1.5 桥接网关下发角色列表)
+            case ProtocolConsts.SM_QUERYCHAR_OK: // 523: 盛大官方 1.5 查询角色成功进入角色槽位
             {
-                var parsed = PacketDecoder.Parse(data);
+                var parsed = DecodeServerPacket(smCode, data);
                 string text = parsed?.ExtraStr ?? string.Empty;
+                var list = new List<UI.SelectCharView.CharEntry>();
                 if (!string.IsNullOrEmpty(text))
                 {
-                    var list = new List<UI.SelectCharView.CharEntry>();
                     var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                     foreach (var l in lines)
                     {
@@ -318,34 +432,36 @@ public partial class Main : Node
                             list.Add(new UI.SelectCharView.CharEntry(cname, job, gender, level));
                         }
                     }
-                    if (list.Count > 0)
-                    {
-                        _serverCharList.Clear();
-                        _serverCharList.AddRange(list);
-                        if (_currentSceneNode is UI.SelectCharView selView)
-                        {
-                            selView.SetCharacters(list);
-                        }
-                    }
+                }
+                
+                _serverCharList.Clear();
+                _serverCharList.AddRange(list);
+                if (_currentPhase == Phase.SelectServer || _currentPhase == Phase.Login)
+                {
+                    SwitchPhase(Phase.SelectChar);
+                }
+                else if (_currentSceneNode is UI.SelectCharView selView)
+                {
+                    selView.SetCharacters(list);
                 }
                 break;
             }
             case ProtocolConsts.SM_NEWCHR_SUCCESS: // 121
             case ProtocolConsts.SM_DELCHR_SUCCESS: // 123
             case ProtocolConsts.SM_DELCHAR_DELPHI: // 212: 盛大官方 1.5 原版删角成功 (IDA case 0xD4u @ 0x469B00 handle_sm_char_list_del)
-            case ProtocolConsts.SM_DELCHAR_SUCCESS_DELPHI: // 523: 盛大官方 1.5 删角成功重新查询
             {
                 GD.Print($"[Main] 角色创建/删除成功，重新向网关查询角色列表 (SM_{smCode})");
                 if (_net != null && _net.IsConnectedToServer)
                 {
-                    _net.SendPacket(PacketEncoder.QueryChr(_account));
+                    var queryChar = BinaryProtocol.QueryCharIntentPayload.Create(_account);
+                    _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentQueryChar, in queryChar);
                 }
                 break;
             }
             case ProtocolConsts.SM_NEWCHR_FAIL: // 122
             case ProtocolConsts.SM_NEWCHAR_FAIL_DELPHI: // 522: 盛大官方 1.5 原版创建角色失败 (IDA case 522 @ 0x46B4C8~0x46B55C)
             {
-                var parsed = PacketDecoder.Parse(data);
+                var parsed = DecodeServerPacket(smCode, data);
                 int code = parsed?.Recog ?? 0;
                 string failMsg = code switch
                 {
@@ -374,7 +490,7 @@ public partial class Main : Node
             }
             case ProtocolConsts.SM_SELECTSERVER_FAIL: // 507: 盛大官方 1.5 选服连接失败 (IDA case 507 @ 0x46B5DC 0x46B668)
             {
-                var parsed = PacketDecoder.Parse(data);
+                var parsed = DecodeServerPacket(smCode, data);
                 int code = parsed?.Recog ?? 0;
                 string failMsg = code == -2
                     ? "帐户被锁定 .请稍后再试。" // 0x46B5DC

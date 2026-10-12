@@ -1,17 +1,19 @@
-// ============================================================================
-// Mir2 客户端 - 仓库保管箱与金币管理器 (1:1 盛大 1.5 官方实证)
-// ============================================================================
-
 using System;
 using System.Collections.Generic;
+using Mir2.Shared.Rules;
 
 namespace Mir2Client.Game
 {
+    /// <summary>
+    /// 盛大官方 1.5 客户端仓库保管箱代理与 UI 数据容器 (1:1 官方实证)
+    /// 核心业务规则 (上限50格、金币上限一千万、密码锁) 权威下沉至 Mir2.Shared.Rules.StorageRulesEngine 与服务端 StorageEngine
+    /// 客户端只负责 UI 呈现与网络发包代理
+    /// </summary>
     public class StorageManager
     {
-        public const int MaxStorageCapacity = 50;
-        public const int MaxStorageGold = 10_000_000;
-        public const int MaxPlayerGold = 5_000_000;
+        public const int MaxStorageCapacity = StorageRulesEngine.MaxStorageCapacity;
+        public const int MaxStorageGold = StorageRulesEngine.MaxStorageGold;
+        public const int MaxPlayerGold = StorageRulesEngine.MaxPlayerGold;
 
         public event Action? StorageOpened;
         public event Action<List<EquipItem>>? StorageItemsUpdated;
@@ -44,7 +46,7 @@ namespace Mir2Client.Game
                 IsPasswordUnlocked = true;
                 return true;
             }
-            if (pwd == _storagePassword)
+            if (StorageRulesEngine.VerifyPassword(_storagePassword, pwd))
             {
                 IsPasswordUnlocked = true;
                 StorageLockedStatusChanged?.Invoke(false);
@@ -57,14 +59,10 @@ namespace Mir2Client.Game
 
         public bool DepositItem(EquipItem item, out string error)
         {
-            if (HasPasswordProtection && !IsPasswordUnlocked)
+            var (allowed, err) = StorageRulesEngine.ValidateDepositItem(StorageItems.Count, HasPasswordProtection && !IsPasswordUnlocked);
+            if (!allowed)
             {
-                error = "仓库已被二级密码锁定，请先输入密码解锁";
-                return false;
-            }
-            if (StorageItems.Count >= MaxStorageCapacity)
-            {
-                error = "仓库空间已满 (上限50格)，无法继续存放！";
+                error = err;
                 return false;
             }
             StorageItems.Add(item);
@@ -76,19 +74,10 @@ namespace Mir2Client.Game
         public bool WithdrawItem(int index, int playerBagCount, int bagCap, out EquipItem? item, out string error)
         {
             item = null;
-            if (HasPasswordProtection && !IsPasswordUnlocked)
+            var (allowed, err) = StorageRulesEngine.ValidateWithdrawItem(index, StorageItems.Count, playerBagCount, bagCap, HasPasswordProtection && !IsPasswordUnlocked);
+            if (!allowed)
             {
-                error = "仓库已被二级密码锁定，请先输入密码解锁";
-                return false;
-            }
-            if (index < 0 || index >= StorageItems.Count)
-            {
-                error = "物品不存在";
-                return false;
-            }
-            if (playerBagCount >= bagCap)
-            {
-                error = "背包已满，无法取回物品！";
+                error = err;
                 return false;
             }
             item = StorageItems[index];
@@ -100,19 +89,16 @@ namespace Mir2Client.Game
 
         public bool DepositGold(int amount, int playerGold, out int newPlayerGold, out string error)
         {
-            newPlayerGold = playerGold;
-            if (amount <= 0 || amount > playerGold)
+            var (allowed, npg, nsg, err) = StorageRulesEngine.ValidateDepositGold(
+                amount, StorageGold, playerGold, HasPasswordProtection && !IsPasswordUnlocked);
+            if (!allowed)
             {
-                error = "存入金币数额非法";
+                newPlayerGold = playerGold;
+                error = err;
                 return false;
             }
-            if (StorageGold + amount > MaxStorageGold)
-            {
-                error = "仓库金币即将超出存储上限 (10,000,000)，无法继续存入！";
-                return false;
-            }
-            StorageGold += amount;
-            newPlayerGold = playerGold - amount;
+            StorageGold = nsg;
+            newPlayerGold = npg;
             StorageGoldUpdated?.Invoke(StorageGold);
             error = string.Empty;
             return true;
@@ -120,19 +106,16 @@ namespace Mir2Client.Game
 
         public bool WithdrawGold(int amount, int playerGold, out int newPlayerGold, out string error)
         {
-            newPlayerGold = playerGold;
-            if (amount <= 0 || amount > StorageGold)
+            var (allowed, npg, nsg, err) = StorageRulesEngine.ValidateWithdrawGold(
+                amount, StorageGold, playerGold, HasPasswordProtection && !IsPasswordUnlocked);
+            if (!allowed)
             {
-                error = "仓库中没有足够的金币！";
+                newPlayerGold = playerGold;
+                error = err;
                 return false;
             }
-            if (playerGold + amount > MaxPlayerGold)
-            {
-                error = "身上携带金币已达上限，无法提取！";
-                return false;
-            }
-            StorageGold -= amount;
-            newPlayerGold = playerGold + amount;
+            StorageGold = nsg;
+            newPlayerGold = npg;
             StorageGoldUpdated?.Invoke(StorageGold);
             error = string.Empty;
             return true;

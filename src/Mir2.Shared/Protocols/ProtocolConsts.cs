@@ -77,7 +77,6 @@ public static class ProtocolConsts
     public const short CM_USERLEAVEGROUP         = 73;   // 已废禁发：网关/Rust 无退组入口（仅 GROUPCLOSE=1036 解散），73 无 arm
     public const short CM_GROUPMODE              = 1019; // 切换允许组队模式开关
     public const short CM_ADJUST_BONUS           = 1043; // 官方 1.5 提交分配自由属性点 (IDA 0x466E78 DAdjustAbilOkClick 0x4952A8)
-    public const short CM_ADJUST_BONUS_ALT       = 85;   // 历史私服兼容别名
     public const short CM_MAGICKEYCHANGE         = 1008; // 官方 1.5 技能快捷键设置同步 (IDA case 1008 / bridge)
     public const short CM_OPENDOOR               = 1002; // 官方 1.5 请求打开石门 (IDA case 1002 / bridge)
     public const short CM_WANTMINIMAP            = 1033; // 官方 1.5 请求小地图数据 (IDA case 1033 / bridge)
@@ -85,7 +84,7 @@ public static class ProtocolConsts
     public const short CM_GUILD_MEMBER_LIST      = 1037; // 获取行会成员列表
     public const short CM_GUILD_NOTICE_UPDATE    = 1040; // 更新发布行会公告
     public const short CM_GUILDADDMEMBER         = 1038; // 官方 1.5 添加行会成员 (CM_GUILDADDMEMBER)
-    public const short CM_GUILD_APPLY_WAR        = 1038; // 兼容历史标识
+    public const short CM_GUILD_APPLY_WAR        = 1038; // 官方行会宣战
     public const short CM_GUILD_ALLY_REQUEST     = 1044; // 发送行会结盟申请
     public const short CM_GUILD_BREAK_ALLY       = 1045; // 解除行会结盟关系
     public const short CM_GUILD_KICK_MEMBER      = 1039; // 开除行会成员
@@ -94,7 +93,6 @@ public static class ProtocolConsts
     public const short CM_GUILDOPEN              = 1035; // 打开行会面板别名 (对齐 CM_GUILD_OPEN_PAGE)
     public const short CM_CHECKPASSWORD          = 1046; // 官方仓库二级密码校验
     public const short CM_LOGOUT                 = 3001; // 强退下线断开连接
-    public const short CM_CHANGEATTACKMODE       = 1019; // 历史私服误用别名 (盛大官方 1.5 原版 1019 为 CM_GROUPMODE 允许编组/退组，攻击模式在双端权威走 @AttackMode 文本指令)
 
     // ============ 官方 1.5 权威 SM 协议号 (下行) ============
     public const short SM_ATTACKMODECHANGED      = 766;  // 官方攻击模式变更回显 (IDA sub_467920 case 766 @ 0x468A2B)
@@ -182,6 +180,7 @@ public static class ProtocolConsts
     public const short SM_CHANGELIGHT            = 46;   // 昼夜光照范围
     public const short SM_LOGON_DELPHI           = 50;   // 主角进入世界绑定
     public const short SM_SENDUSERSTATE          = 52;   // 玩家基础四维属性 (IDA case 52)
+    public const short SM_SENDUSERSTATE_INSPECT  = 751;  // 观人/他人状态下发 (IDA 0x46A857)
     public const short SM_HEALTHSPELLCHANGED     = 53;   // HP/MP 血量魔法值变动
     public const short SM_NPCDIALOG              = 54;   // NPC 对话脚本页面
     public const short SM_SYSMSG_DELPHI          = 100;  // 系统提示消息
@@ -215,30 +214,6 @@ public static class ProtocolConsts
     // 购买成功: 648 (SM_BUY_OK_DELPHI) | 出售成功: 650 (SM_SELL_OK_DELPHI)
     // 购买失败: 651 (SM_BUY_FAIL_DELPHI) | 出售失败: 649 (SM_SELL_FAIL_DELPHI)
     // 修理成功: 669 (SM_REPAIROK_DELPHI) | 修理失败: 670 (SM_REPAIRFAIL_DELPHI)
-    // -------------------------------------------------------------------------
-    // 【隔离铁律】：以下 623/625/626/629/630/631/632 均为非标 1.5+ (delphi-custom) 私服魔改号，
-    // 盛大官方 1.5 原版二进制 (MIR_final_v3_p.exe) 无此协议，仅保留别名以防外部反射断裂：
-    public const short SM_MERCHANTDLG_CUSTOM      = 631;  // [非标delphi-custom] 商店货架 (官方为 646)
-    public const short SM_BUYITEM_SUCCESS_CUSTOM  = 632;  // [非标delphi-custom] 购买成功 (官方为 648)
-    public const short SM_BUYITEM_FAIL_CUSTOM     = 633;  // [非标delphi-custom] 购买失败 (官方为 651)
-    public const short SM_BUYITEMFAIL_CUSTOM      = 630;  // [非标delphi-custom] 购买失败 (官方为 651)
-    public const short SM_BUYITEMSUCCESS_CUSTOM   = 629;  // [非标delphi-custom] 购买成功 (官方为 648)
-    public const short SM_REPAIRFAIL_CUSTOM       = 626;  // [非标delphi-custom] 修理失败 (官方为 670)
-    public const short SM_REPAIROK_CUSTOM         = 625;  // [非标delphi-custom] 修理成功 (官方为 669)
-    public const short SM_SELLITEMFAIL_CUSTOM     = 632;  // [非标delphi-custom] 出售失败 (官方为 649)
-    public const short SM_SELLITEMOK_CUSTOM       = 631;  // [非标delphi-custom] 出售成功 (官方为 650)
-    public const short SM_SENDREPAIRCOST_CUSTOM   = 623;  // [非标delphi-custom] 修理费用
-    // 兼容历史命名别名引用
-    public const short SM_MERCHANTDLG            = SM_MERCHANTDLG_CUSTOM;
-    public const short SM_BUYITEM_SUCCESS        = SM_BUYITEM_SUCCESS_CUSTOM;
-    public const short SM_BUYITEM_FAIL           = SM_BUYITEM_FAIL_CUSTOM;
-    public const short SM_BUYITEMFAIL             = SM_BUYITEMFAIL_CUSTOM;
-    public const short SM_BUYITEMSUCCESS          = SM_BUYITEMSUCCESS_CUSTOM;
-    public const short SM_REPAIRFAIL              = SM_REPAIRFAIL_CUSTOM;
-    public const short SM_REPAIROK                = SM_REPAIROK_CUSTOM;
-    public const short SM_SELLITEMFAIL            = SM_SELLITEMFAIL_CUSTOM;
-    public const short SM_SELLITEMOK              = SM_SELLITEMOK_CUSTOM;
-    public const short SM_SENDREPAIRCOST          = SM_SENDREPAIRCOST_CUSTOM;
     // =========================================================================
     public const short SM_GUILDMEMBERLIST        = 671;  // 行会成员列表
     public const short SM_STORAGE_ITEMS          = 682;  // 仓库物品列表
@@ -282,6 +257,7 @@ public static class ProtocolConsts
     public const short SM_OPENGUILDDLGFAIL        = 752;  // 打开行会面板失败
     public const short SM_OPENSTORAGEDLG          = 700;  // 打开仓库面板
     public const short SM_USERSTORAGE_DLG         = 700;  // 仓库保管箱托管界面弹出 (对齐 SM_OPENSTORAGEDLG)
+    public const short SM_CLOSESTORAGEDLG         = 644;  // 关闭仓库保管箱面板 (对齐 SM_MERCHANTDLG_CLOSE)
     public const short SM_OPENREPAIRDLG           = 668;  // 铁匠铺打开修理面板 (IDA open_shop_repair 0x46dae8)
     public const short SM_BUY_OK_DELPHI           = 648;  // 购买成功更新金币 (IDA sub_467920 0x469EDA)
     public const short SM_SELL_FAIL_DELPHI         = 649;  // 出售物品失败 (IDA sub_467920 0x469F04)

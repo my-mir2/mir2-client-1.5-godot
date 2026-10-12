@@ -37,9 +37,8 @@ public static class SkillActionTimelineEngine
 
         public static (float stunDurationSeconds, bool fatalShatter) EvaluateHolyWord(bool isUndead, bool isSuccess)
         {
-            // 细节 369: 圣言术一击必杀碎骨化灰
-            if (isUndead && isSuccess) return (0f, true);
-            return (0.25f, false);
+            // 细节 369: 圣言术一击必杀碎骨化灰 (权威下沉至 SpellRuleEngine)
+            return Mir2.Shared.Rules.AdvancedCombatRuleEngine.SpellRuleEngine.HolyWordExecutionEngine.EvaluateHolyWord(isUndead, isSuccess);
         }
 
         public static (int fallingIcicles, float spinSpeed) GetIceStormVfx(float elapsed)
@@ -86,17 +85,14 @@ public static class SkillActionTimelineEngine
 
         public static (int wallDamageTicks, float intervalSec) GetFirewallDamageCadence()
         {
-            // 细节 435: 火墙每秒触发 2 次伤害判定
-            return (2, 0.5f);
+            // 细节 435: 火墙每秒触发 2 次伤害判定 (权威下沉至 SpellRuleEngine)
+            return Mir2.Shared.Rules.AdvancedCombatRuleEngine.SpellRuleEngine.FirewallCadenceEngine.GetFirewallDamageCadence();
         }
 
         public static (int absorbedHp, int consumedMp) CalculateShieldAbsorb(int incomingDmg, int currentMp)
         {
-            // 细节 448: 魔法盾 1 点伤害扣 0.5 点 MP
-            int mpCost = (int)(incomingDmg * 0.5f);
-            if (currentMp >= mpCost) return (incomingDmg, mpCost);
-            int partialDmg = (int)(currentMp / 0.5f);
-            return (partialDmg, currentMp);
+            // 细节 448: 魔法盾 1 点伤害扣 0.5 点 MP (权威下沉至 SpellRuleEngine)
+            return Mir2.Shared.Rules.AdvancedCombatRuleEngine.SpellRuleEngine.MagicShieldAbsorbEngine.CalculateShieldAbsorb(incomingDmg, currentMp);
         }
 
         public static int SpellGlobalCooldownMs => 800; // 细节 450: 官方 800ms 施法节律

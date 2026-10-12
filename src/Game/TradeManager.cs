@@ -191,7 +191,8 @@ namespace Mir2Client.Game
         }
 
         /// <summary>
-        /// 服务端确认交易成功，执行本地原子交换
+        /// 权威网络架构下：成交由服务端下发 SM_DEALSUCCESS 驱动 UI 与背包刷新。
+        /// 本方法仅在本地离线/单机驱动模式下作为模拟状态同步，真实联机下严禁越俎代庖。
         /// </summary>
         public (bool success, string reason) ExecuteAtomicExchange(PlayerState player)
         {
@@ -200,7 +201,7 @@ namespace Mir2Client.Game
                 return (false, "未通过前置确认流程");
             }
 
-            // 扣除本地放入的物品和金币
+            // 本地模拟同步：扣除本地放入的物品和金币，存入对方物品与金币
             player.Gold -= LocalGold;
             for (int i = 0; i < LocalItems.Length; i++)
             {
@@ -211,7 +212,6 @@ namespace Mir2Client.Game
                 }
             }
 
-            // 存入对方放入的物品和金币
             player.Gold += RemoteGold;
             for (int i = 0; i < RemoteItems.Length; i++)
             {
@@ -223,7 +223,7 @@ namespace Mir2Client.Game
             }
 
             CompleteTrade();
-            return (true, "交易成功完成！物品与金币已入袋！");
+            return (true, "交易成功完成！已同步至本地视图！");
         }
 
         public void CancelTrade(string reason = "交易已取消")

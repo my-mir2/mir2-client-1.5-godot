@@ -63,6 +63,9 @@ public static class WarriorCombatEngine
             return (false, baseDamage, "烈火蓄力已超时自然熄灭");
         }
 
+        public long LastHitTime { get; private set; }
+        public const int BaseAttackIntervalMs = 680; // 盛大官方 1.5 战士出刀动作基准硬直 680ms
+
         /// <summary>
         /// 判定当前是否处于合法的 "双烈火" 施法窗口期 (CD 转好 10s 后、蓄力 20s 超时前，对齐 Rust is_double_fire_hit_window)
         /// </summary>
@@ -72,6 +75,43 @@ public static class WarriorCombatEngine
             long elapsed = nowTick - ReadyStartTime;
             // 技能冷却已转好 (>= 10000ms) 且第一刀蓄力尚未超时 (<= 20000ms)
             return elapsed >= FireHitCooldownMs && elapsed <= FireHitReadyDurationMs;
+        }
+
+        /// <summary>
+        /// 判定物理出刀动作间隔是否满足攻速约束 (基础 680ms，严禁无间隙瞬发双刀)
+        /// </summary>
+        public bool CanExecuteHit(long nowTick, int attackSpeed = 0)
+        {
+            int interval = Math.Max(400, BaseAttackIntervalMs - attackSpeed * 50);
+            return LastHitTime == 0 || (nowTick - LastHitTime >= interval);
+        }
+
+        public void RecordHit(long nowTick)
+        {
+            LastHitTime = nowTick;
+        }
+
+        /// <summary>
+        /// 检查烈火剑法蓄力是否超时 (20 秒)，若超时则主动熄灭火焰并返回 true
+        /// </summary>
+        public bool CheckTimeout(long nowTick)
+        {
+            if (IsReady && nowTick - ReadyStartTime > FireHitReadyDurationMs)
+            {
+                IsReady = false;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 强制重置/熄灭烈火蓄力
+        /// </summary>
+        public void Reset()
+        {
+            IsReady = false;
+            ReadyStartTime = 0;
+            LastHitTime = 0;
         }
     }
 
@@ -91,8 +131,9 @@ public static class WarriorCombatEngine
 
         /// <summary>
         /// 判定攻击距离与刺杀剑气类型 (必须为正向 8 方向直线)
+        /// 盛大官方 1.5 IDA sub_4D6510: 隔位刺杀第 2 格必须要求中间第 1 格无静态地图障碍或城门阻挡
         /// </summary>
-        public static HitDistanceType CheckHitDistance(int attackerX, int attackerY, int targetX, int targetY, int dir)
+        public static HitDistanceType CheckHitDistance(int attackerX, int attackerY, int targetX, int targetY, int dir, Func<int, int, bool>? isTileBlocked = null)
         {
             var offset = PlayerAuditEngine.DirOffsets[dir & 7];
             // 第 1 格: 正前方 1 格
@@ -103,6 +144,11 @@ public static class WarriorCombatEngine
             // 第 2 格: 正前方 2 格
             if (attackerX + offset.X * 2 == targetX && attackerY + offset.Y * 2 == targetY)
             {
+                // 若中间第 1 格为实心障碍物，剑气撞碎阻断，无法穿透至第 2 格
+                if (isTileBlocked != null && isTileBlocked(attackerX + offset.X, attackerY + offset.Y))
+                {
+                    return HitDistanceType.None;
+                }
                 return HitDistanceType.StabbingFar;
             }
             return HitDistanceType.None;

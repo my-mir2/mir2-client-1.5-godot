@@ -53,6 +53,7 @@ public class EntityManager
         public long LastActionTick { get; set; } = 0; // 实体动作校验时间戳 (SM_ACTOR_TIMESTAMP 656)
         public bool ShowHealthBar { get; set; } = true; // 浮动血条显隐 (SM_HEALTHBAR_DELPHI 1105)
         public bool DigUpFinished { get; set; } = false; // 钻出/破土完成状态 (官方 IDA case 15 offset 220: *(_BYTE *)(v71 + 220) = 1)
+        public EntityInterpolationBuffer InterpolationBuffer { get; } = new();
     }
 
     public event Action<EntityData>? EntityAdded;
@@ -80,8 +81,8 @@ public class EntityManager
     /// <summary>本地主角实体的权威 UID (由 SM_STARTPLAY / SM_LOGON_DELPHI 绑定)</summary>
     public int LocalPlayerUid { get; set; } = 0;
 
-    /// <summary>本地主角实体数据引用</summary>
-    public EntityData? Hero => _entities.TryGetValue(LocalPlayerUid, out var e) ? e : null;
+    /// <summary>本地主角实体数据引用 (盛大官方 1.5 权威本地玩家，绝非合击英雄)</summary>
+    public EntityData? LocalPlayer => _entities.TryGetValue(LocalPlayerUid, out var e) ? e : null;
 
     public int Count => _entities.Count;
     public IEnumerable<EntityData> AllEntities => _entities.Values;
@@ -172,6 +173,8 @@ public class EntityManager
             ent.TileX = x;
             ent.TileY = y;
             ent.Direction = dir;
+            double nowSec = System.Environment.TickCount64 / 1000.0;
+            ent.InterpolationBuffer.PushSnapshot(nowSec, DeadReckoningEngine.TileToWorld(x, y), dir, isMoving: true, isRunning: false);
             EntityMoved?.Invoke(uid, x, y, dir);
             EntityStepMoved?.Invoke(uid, x, y, dir, false);
         }
@@ -186,8 +189,27 @@ public class EntityManager
         {
             ent.TileX = x;
             ent.TileY = y;
+            double nowSec = System.Environment.TickCount64 / 1000.0;
+            ent.InterpolationBuffer.PushSnapshot(nowSec, DeadReckoningEngine.TileToWorld(x, y), ent.Direction, isMoving: false, isRunning: false);
             EntityMoved?.Invoke(uid, x, y, ent.Direction);
         }
+    }
+
+    /// <summary>
+    /// 获取实体平滑弱网插值渲染坐标
+    /// </summary>
+    public Vector2 GetEntityRenderPosition(int uid, double clientTime)
+    {
+        if (_entities.TryGetValue(uid, out var ent))
+        {
+            if (ent.InterpolationBuffer.Count > 0)
+            {
+                var (pos, _, _) = ent.InterpolationBuffer.Sample(clientTime);
+                return pos;
+            }
+            return DeadReckoningEngine.TileToWorld(ent.TileX, ent.TileY);
+        }
+        return Vector2.Zero;
     }
 
     public void UpdateStepMove(int uid, int x, int y, byte dir, bool isRun)
@@ -287,8 +309,12 @@ public class EntityManager
 
     /// <summary>
     /// 心跳帧驱动中毒周期掉血与到期清除 (每 2500ms 一跳绿毒扣血)
+    /// <summary>
+    /// 心跳帧驱动中毒状态机与到期清除 (每 2500ms 一跳绿毒扣血)
+    /// 权威架构规范：联网模式下仅维护毒素 Mask 与到期清除，生命扣减由服务端 SM_OBJECTSTRUCK 权威驱动；
+    /// 仅在脱机单机沙盒或本地测试模式下 (simulateDamage=true) 执行本地扣血模拟。
     /// </summary>
-    public void ProcessPoisonTicks(long nowTick, Action<int, int, int>? onGreenPoisonDamage = null)
+    public void ProcessPoisonTicks(long nowTick, Action<int, int, int>? onGreenPoisonDamage = null, bool simulateDamage = true)
     {
         foreach (var ent in _entities.Values)
         {
@@ -307,14 +333,17 @@ public class EntityManager
                 ent.PoisonMask &= ~2;
             }
 
-            // 3. 绿毒周期扣血
+            // 3. 绿毒周期扣血 (仅在脱机沙盒模拟时由客户端先行扣减，联网时交由服务端权威推送)
             if ((ent.PoisonMask & 1) != 0 && nowTick >= ent.NextPoisonTick)
             {
                 ent.NextPoisonTick = nowTick + TaoistCombatEngine.PoisonTickIntervalMs;
-                int dmg = TaoistCombatEngine.CalculateGreenPoisonTickDamage(ent.PoisonStrength);
-                int newHp = Math.Max(0, ent.Hp - dmg);
-                TriggerStruck(ent.Uid, dmg, newHp);
-                onGreenPoisonDamage?.Invoke(ent.Uid, dmg, newHp);
+                if (simulateDamage)
+                {
+                    int dmg = TaoistCombatEngine.CalculateGreenPoisonTickDamage(ent.PoisonStrength);
+                    int newHp = Math.Max(0, ent.Hp - dmg);
+                    TriggerStruck(ent.Uid, dmg, newHp);
+                    onGreenPoisonDamage?.Invoke(ent.Uid, dmg, newHp);
+                }
             }
 
             if (ent.PoisonMask != oldMask)
@@ -433,6 +462,7 @@ public class EntityManager
     {
         EntityEffectTriggered?.Invoke(uid, effectId, effectParam);
     }
+
 
     /// <summary>
     /// 盛大官方 1.5 实体浮动血条显隐切换 (SM_HEALTHBAR_DELPHI 1105, IDA case 0x451 @ 0x469690)

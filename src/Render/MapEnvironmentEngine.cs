@@ -41,7 +41,7 @@ public static class MapEnvironmentEngine
         }
     }
 
-    // 细节 154: 封魔谷与毒蛇山谷水流瓦片连续 4 帧波光倒影动画
+    // 盛大官方 1.5 核心真值 (细节 154): 白日门与毒蛇山谷水流瓦片连续 4 帧波光倒影动画
     public static class WaterFlowTileEngine
     {
         public const int TotalFrames = 4;

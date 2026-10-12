@@ -14,7 +14,7 @@ public static class OfficialMonsterCompendium
         Beast = 0,         // 禽兽牲畜 (鸡、鹿、羊、狼) - 可挖肉
         Undead = 1,        // 不死骷髅僵尸 (骷髅、骷髅战将、僵尸) - 圣言术/地狱雷光奇效
         Insect = 2,        // 昆虫毒虫 (蝎子、蜈蚣、跳跳蜂、黑色恶蛆、巨型多角虫)
-        Demon = 3,         // 恶魔统领 (沃玛卫士、沃玛教主、祖玛卫士、虹魔教主)
+        Demon = 3,         // 恶魔统领 (沃玛卫士、沃玛教主、祖玛卫士、祖玛教主)
         Spider = 4,        // 赤月蜘蛛 (黑锷蜘蛛、月魔蜘蛛、钢牙蜘蛛、双头金刚、双头血魔)
         DragonBoss = 5,    // 巨型领主 (触龙神、赤月恶魔)
         Guard = 6          // 城镇守卫 (大刀守卫、弓箭守卫)
@@ -102,7 +102,7 @@ public static class OfficialMonsterCompendium
         Register(new MonsterDef { RaceId = 47, Name = "黑锷蜘蛛", RaceType = MonsterRace.Spider, WilIndex = 7, ApprOffset = 100, WalkFrames = 6, AttackFrames = 8, DieFrames = 6, SoundAttack = 192, SoundDie = 193 });
         Register(new MonsterDef { RaceId = 48, Name = "钢牙蜘蛛", RaceType = MonsterRace.Spider, WilIndex = 7, ApprOffset = 200, WalkFrames = 6, AttackFrames = 8, DieFrames = 6, SoundAttack = 194, SoundDie = 195 });
         Register(new MonsterDef { RaceId = 49, Name = "花吻蜘蛛", RaceType = MonsterRace.Spider, WilIndex = 7, ApprOffset = 300, WalkFrames = 6, AttackFrames = 8, DieFrames = 6, SoundAttack = 196, SoundDie = 197 });
-        Register(new MonsterDef { RaceId = 50, Name = "双头金刚", RaceType = MonsterRace.Spider, WilIndex = 7, ApprOffset = 400, WalkFrames = 6, AttackFrames = 10, DieFrames = 8, SoundAttack = 198, SoundDie = 199, CorpseRemainSec = 150 });
+        Register(new MonsterDef { RaceId = 50, Name = "双头金刚", RaceType = MonsterRace.Spider, WilIndex = 7, ApprOffset = 400, WalkFrames = 6, AttackFrames = 10, DieFrames = 8, SoundAttack = 198, SoundDie = 199, CanButcherMeat = true, CorpseRemainSec = 150 });
         Register(new MonsterDef { RaceId = 51, Name = "双头血魔", RaceType = MonsterRace.Spider, WilIndex = 7, ApprOffset = 500, WalkFrames = 6, AttackFrames = 10, DieFrames = 8, SoundAttack = 200, SoundDie = 201, CorpseRemainSec = 150 });
         Register(new MonsterDef { RaceId = 52, Name = "赤月恶魔", RaceType = MonsterRace.DragonBoss, WilIndex = 7, ApprOffset = 600, WalkFrames = 0, AttackFrames = 12, DieFrames = 10, SoundAttack = 202, SoundDie = 203, CorpseRemainSec = 240 });
 

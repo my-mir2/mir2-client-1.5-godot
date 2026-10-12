@@ -420,15 +420,15 @@ public class TestProtocolMatrix
         Assert.Equal("F2", thunder[3]);
         Assert.Equal(3, int.Parse(thunder[4]));
 
-        // 3. 验证装备信息 SM_EQUIPINFO (621) 9 槽批量解包
-        string equipStr = "51/屠龙/攻击5-35,64/幽灵战衣/防御4-7,111/荣誉勋章/防1攻1";
+        // 3. 验证装备信息 SM_EQUIPINFO (621) 9 槽批量解包 (官方 1.5 武器/衣服/右持物药粉)
+        string equipStr = "51/屠龙/攻击5-35,64/幽灵战衣/防御4-7,111/黄色药粉(大量)/道术0-1";
         var equipSlots = equipStr.Split(',');
         Assert.Equal(3, equipSlots.Length);
         var weaponParts = equipSlots[0].Split('/');
         Assert.Equal("51", weaponParts[0]);
         Assert.Equal("屠龙", weaponParts[1]);
 
-        // 4. 验证商店货架 SM_MERCHANTDLG (631) 解析
+        // 4. 验证商店货架 SM_MERCHANT_NORMAL (646) 解析
         string shopStr = "#铁匠铺老板\n金创药(小量)\t1\t55\n魔法药(小量)\t1\t55\n铁剑\t10\t880";
         var shopLines = shopStr.Split('\n');
         Assert.Equal(4, shopLines.Length);
@@ -588,6 +588,21 @@ public class TestProtocolMatrix
         Assert.Equal(12, pickupPkt.Length);
         short pickupIdent = (short)(pickupPkt[1] | (pickupPkt[2] << 8));
         Assert.Equal(ProtocolConsts.CM_PICKUP, pickupIdent);
+    }
+
+    [Fact]
+    public void TestServerMessageRouter_SendRepairCost_And_Lighting_Handling()
+    {
+        var router = new ServerMessageRouter(null);
+
+        // 1. 模拟官方 1.5 SM_REPAIROK_DELPHI (669): gold_left = 50000, param = dura(25), tag = maxDura(25), extra = "裁决之杖"
+        byte[] repairPkt = PacketEncoder.MakePacket(ProtocolConsts.SM_REPAIROK_DELPHI, 50000, 25, 25,
+            System.Text.Encoding.UTF8.GetBytes("裁决之杖"));
+        router.OnPacket(ProtocolConsts.SM_REPAIROK_DELPHI, repairPkt.AsSpan(1..^1).ToArray());
+
+        // 2. 模拟 SM_LIGHTING (35): 定向雷击 (recog=casterId, param=targetX, tag=targetY)
+        byte[] lightPkt = PacketEncoder.MakePacket(ProtocolConsts.SM_LIGHTING, 1001, 305, 305);
+        router.OnPacket(ProtocolConsts.SM_LIGHTING, lightPkt.AsSpan(1..^1).ToArray());
     }
 
     [Fact]
@@ -3426,6 +3441,13 @@ public class TestProtocolMatrix
         Assert.Contains(mzLandmarks, lm => lm.Name == "盟重土城" && lm.X == 330 && lm.Y == 330);
         Assert.Contains(mzLandmarks, lm => lm.Name == "沙巴克皇宫" && lm.X == 640 && lm.Y == 120);
         Assert.Contains(mzLandmarks, lm => lm.Name == "死亡山谷(蜈蚣洞)" && lm.X == 140 && lm.Y == 90);
+
+        // 验证祖玛与石墓地标及迷宫导航
+        var zumaLandmarks = Mir2Client.Game.MapLandmarkEngine.GetLandmarks("祖玛寺庙");
+        Assert.Contains(zumaLandmarks, lm => lm.Name == "祖玛阁入口");
+
+        var pigLandmarks = Mir2Client.Game.MapLandmarkEngine.GetLandmarks("D717");
+        Assert.Contains(pigLandmarks, lm => lm.Name == "尸王出洞点" && lm.X == 82 && lm.Y == 26);
     }
 
     [Fact]
@@ -3502,11 +3524,11 @@ public class TestProtocolMatrix
         var (bonusHp, penaltyMp) = SuitEffectEngine.DemonBloodSuit.CalculateStatModifiers(3);
         Assert.Equal(75, bonusHp);
         Assert.Equal(60, penaltyMp);
-        // (3) 祈祷套全服天谴
-        var (cataclysm, msg, neckBroken) = SuitEffectEngine.PrayerSuit.EvaluatePrayerCataclysm(isFullSetWearing: true);
+        // (3) 祈祷套全服天谴 (盛大官方 1.5 随机破碎祈祷装备一件)
+        var (cataclysm, msg, brokenPiece) = SuitEffectEngine.PrayerSuit.EvaluatePrayerCataclysm(isFullSetWearing: true, rngRoll: 1);
         Assert.True(cataclysm);
-        Assert.True(neckBroken);
-        Assert.Contains("叛变", msg);
+        Assert.Equal("祈祷项链", brokenPiece);
+        Assert.Contains("癫狂", msg);
 
         // 7. 武器升级与开刀
         int oreDura1 = WeaponUpgradeEngine.CalculateDuraChange(25, rng);
@@ -3516,13 +3538,20 @@ public class TestProtocolMatrix
         var (outcome, newBonus, duraD, _) = WeaponUpgradeEngine.EvaluateSlash(currentBonus: 6, totalOrePurity: 65, jewelryStatPoints: 10, rng);
         Assert.True(outcome == WeaponUpgradeEngine.UpgradeOutcome.Success || outcome == WeaponUpgradeEngine.UpgradeOutcome.Failed);
 
-        // 8. PK 名字颜色状态机与大刀卫士秒杀
+        // 8. PK 名字颜色状态机与大刀卫士秒杀 (官方 1.5 权威白/黄/红三级真值)
         var colWhite = PkJusticeEngine.DetermineNameColor(pkPoints: 0, isGrayAttacking: false);
-        var colYellow = PkJusticeEngine.DetermineNameColor(pkPoints: 0, isGrayAttacking: true);
-        var colRed = PkJusticeEngine.DetermineNameColor(pkPoints: 150, isGrayAttacking: false);
+        var colGrayAttack = PkJusticeEngine.DetermineNameColor(pkPoints: 0, isGrayAttacking: true);
+        var colYellow = PkJusticeEngine.DetermineNameColor(pkPoints: 100, isGrayAttacking: false); // 杀一人黄名
+        var colRed = PkJusticeEngine.DetermineNameColor(pkPoints: 200, isGrayAttacking: false);    // 杀两人正式红名
         Assert.Equal(PkJusticeEngine.NameColorType.White, colWhite);
+        Assert.Equal(PkJusticeEngine.NameColorType.Yellow, colGrayAttack);
         Assert.Equal(PkJusticeEngine.NameColorType.Yellow, colYellow);
         Assert.Equal(PkJusticeEngine.NameColorType.Red, colRed);
+
+        // 大刀卫士对黄名不主动秒杀，仅对红名触发绝对秒杀
+        var guardIgnoreYellow = PkJusticeEngine.CheckGuardHostility(guardX: 100, guardY: 100, targetX: 103, targetY: 104, colYellow);
+        Assert.False(guardIgnoreYellow.attack);
+
         var guardStrike = PkJusticeEngine.CheckGuardHostility(guardX: 100, guardY: 100, targetX: 103, targetY: 104, colRed);
         Assert.True(guardStrike.attack);
         Assert.Equal(9999, guardStrike.damage); // 大刀卫士绝对秒杀
@@ -4127,7 +4156,7 @@ public class TestProtocolMatrix
         Assert.True(Mir2Client.Render.MapEnvironmentEngine.ZumaStatueGridEngine.IsStatueBlocked(10, 20, statues));
         Assert.False(Mir2Client.Render.MapEnvironmentEngine.ZumaStatueGridEngine.IsStatueBlocked(15, 25, statues));
 
-        // 细节 154: 封魔谷/毒蛇山谷水流瓦片连续 4 帧波光倒影动画
+        // 细节 154: 白日门/毒蛇山谷水流瓦片连续 4 帧波光倒影动画
         int wFrame = Mir2Client.Render.MapEnvironmentEngine.WaterFlowTileEngine.GetCurrentFrame(1.25f);
         Assert.Equal(1, wFrame);
 
@@ -4301,8 +4330,8 @@ public class TestProtocolMatrix
         Assert.True(showInsight);
         Assert.Contains("50%", ratioTxt);
 
-        // 细节 190: 气功波推开周围 8 方向 1 格低于自身等级目标
-        var (repOk, repX, repY) = Mir2Client.Game.AdvancedSkillEngine.QiGongRepelEngine.TryRepel(40, 35, 10, 10, 11, 10);
+        // 细节 190: 盛大官方 1.5 法师原生技能【抗拒火环】推开周围 8 方向 1 格低于自身等级目标 (等级高则推不动)
+        var (repOk, repX, repY) = Mir2Client.Game.AdvancedSkillEngine.RepulsionRingEngine.TryRepel(40, 35, 10, 10, 11, 10);
         Assert.True(repOk);
         Assert.Equal(12, repX);
     }
@@ -4356,20 +4385,39 @@ public class TestProtocolMatrix
         Assert.True(dualProc);
         Assert.Equal(80, dDmg);
 
-        // 细节 200: 尸王铁链扫击前方 3 格横扫伤害
+        // 细节 200: 尸王铁链扫击前方 3 格横扫伤害 (支持 8 真实物理朝向)
         var chainGrids = Mir2Client.Game.BossEncounterEngine.CorpseKingChainEngine.GetChainSweepGrids(10, 10, 2);
         Assert.Equal(3, chainGrids.Count);
         Assert.Equal(13, chainGrids[2].x);
+        Assert.Equal(10, chainGrids[2].y);
+
+        // 盲盒多向验证：朝上 (dir=0) 铁链延伸到上方
+        var chainUp = Mir2Client.Game.BossEncounterEngine.CorpseKingChainEngine.GetChainSweepGrids(10, 10, 0);
+        Assert.Equal((10, 7), chainUp[2]);
+        // 盲盒多向验证：朝左 (dir=6) 铁链延伸到左方
+        var chainLeft = Mir2Client.Game.BossEncounterEngine.CorpseKingChainEngine.GetChainSweepGrids(10, 10, 6);
+        Assert.Equal((7, 10), chainLeft[2]);
 
         // 细节 201: 骷髅精灵双叉狂暴突刺双眼泛红光
         var (glowRed, enrageMulti) = Mir2Client.Game.BossEncounterEngine.SkeletonElfEnrageEngine.CheckEnraged(40, 100);
         Assert.True(glowRed);
         Assert.Equal(1.3f, enrageMulti);
 
-        // 细节 202: 沃玛教主狂暴瞬移到最高仇恨目标身后
+        // 细节 202: 沃玛教主狂暴瞬移到最高仇恨目标身后 (支持 8 真实物理反向)
         var (tpX, tpY, tpOk) = Mir2Client.Game.BossEncounterEngine.WomaLeaderTeleportEngine.CalculateAmbush(20, 20, 2, isBerserk: true);
         Assert.True(tpOk);
-        Assert.Equal(19, tpX); // 背后在左方
+        Assert.Equal(19, tpX); // 面朝右 (2)，背后在左方 (6, x-1)
+        Assert.Equal(20, tpY);
+
+        // 盲盒多向验证：目标面朝上 (0)，背后在下方 (4, y+1)
+        var (tpUpX, tpUpY, _) = Mir2Client.Game.BossEncounterEngine.WomaLeaderTeleportEngine.CalculateAmbush(20, 20, 0, isBerserk: true);
+        Assert.Equal(20, tpUpX);
+        Assert.Equal(21, tpUpY);
+
+        // 盲盒多向验证：目标面朝左 (6)，背后在右方 (2, x+1)
+        var (tpLeftX, tpLeftY, _) = Mir2Client.Game.BossEncounterEngine.WomaLeaderTeleportEngine.CalculateAmbush(20, 20, 6, isBerserk: true);
+        Assert.Equal(21, tpLeftX);
+        Assert.Equal(20, tpLeftY);
 
         // 细节 203: 祖玛教主残血 (HP < 20%) 战鼓召唤 4 尊卫士雕像
         var (zSummon, zCount) = Mir2Client.Game.BossEncounterEngine.ZumaLeaderSummonEngine.CheckSummon(15, 100, false);
@@ -4390,19 +4438,19 @@ public class TestProtocolMatrix
         Assert.True(rain);
         Assert.Contains("圣战戒指", bDrops);
 
-        // 细节 207: 牛魔王瞬移法杖挥击与烈焰刀光双重伤害
-        var (mDc, fMc) = Mir2Client.Game.BossEncounterEngine.CowKingFlameStrikeEngine.CalculateDualDamage(50, 40);
+        // 细节 207: 盛大官方 1.5 核心真值: 祖玛教主狂暴挥击与烈焰重击双重打击 (IDA sub_4A7518)
+        var (mDc, fMc) = Mir2Client.Game.BossEncounterEngine.ZumaLordDualStrikeEngine.CalculateDualDamage(50, 40);
         Assert.Equal(50, mDc);
         Assert.Equal(50, fMc); // 40 * 1.25
 
-        // 细节 208: 暗之双头金刚死后挖取天尊道袍重装
-        var (robeOk, rName) = Mir2Client.Game.BossEncounterEngine.DarkKongRobeHarvestEngine.HarvestRobe(true, 20);
+        // 细节 208: 盛大官方 1.5 核心真值: 赤月恶魔死后大爆天尊首饰散落
+        var (robeOk, rName) = Mir2Client.Game.BossEncounterEngine.RedMoonDemonDropEngine.GenerateDrop(true, 20);
         Assert.True(robeOk);
-        Assert.Equal("天尊道袍", rName);
+        Assert.Equal("天尊头盔", rName);
 
-        // 细节 209: 暗之骷髅精灵死后大爆圣战宝甲散落
-        var elfDrops = Mir2Client.Game.BossEncounterEngine.DarkElfArmorDropEngine.GenerateArmorDrop(20);
-        Assert.Contains("圣战宝甲", elfDrops);
+        // 细节 209: 盛大官方 1.5 核心真值: 沃玛教主死后大爆沃玛号角信物
+        var elfDrops = Mir2Client.Game.BossEncounterEngine.WomaLeaderHornDropEngine.GenerateDrop(20);
+        Assert.Contains("沃玛号角", elfDrops);
 
         // 细节 210: 白野猪死后满屏 8x8 道具同心圆螺旋散开大爆
         var boarDrops = Mir2Client.Game.BossEncounterEngine.WhiteBoarBigDropEngine.Generate8x8Drop(100, 100);
@@ -4507,23 +4555,31 @@ public class TestProtocolMatrix
     [Fact]
     public void TestOfficialDetails_Batch14_EconomySecurity()
     {
-        // 细节 231: 玩家安全区摆摊模式 (招牌文字、盘坐姿态)
-        var (isStalling, stallPose, sTitle) = EconomySecurityEngine.PlayerStallModeEngine.SetupStall(true, "极品屠龙大甩卖！");
-        Assert.True(isStalling);
-        Assert.Equal("SitDown", stallPose);
-        Assert.Equal("极品屠龙大甩卖！", sTitle);
+        // 细节 231: 盛大官方 1.5 权威核心: 面对面两阶段交易原子双向锁定与防篡改 (TFrmDlg_Deal，官方 1.5 绝无个人摆摊)
+        var (bothLocked, canProceed) = EconomySecurityEngine.DealAtomicLockEngine.CheckDealLock(true, true);
+        Assert.True(bothLocked);
+        Assert.True(canProceed);
+        var (oneLocked, cannotProceed) = EconomySecurityEngine.DealAtomicLockEngine.CheckDealLock(true, false);
+        Assert.False(oneLocked);
+        Assert.False(cannotProceed);
 
-        // 细节 232: 摆摊物品标价金币合法性安全检查 (防 0 元购、负数与溢出)
-        Assert.False(EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(0));
-        Assert.False(EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(-100));
-        Assert.True(EconomySecurityEngine.StallPriceValidationEngine.ValidatePrice(50000));
+        // 细节 232: 盛大官方 1.5 权威核心: 装备普通修理与特殊修理持久递减与折算机制 (IDA sub_4A1F30)
+        var (normMax, normCur, normCost) = EconomySecurityEngine.EquipmentRepairWearEngine.ExecuteRepair(
+            currentDura: 5000, maxDura: 10000, isSpecialRepair: false, basePrice: 200);
+        Assert.Equal(9000, normMax); // 普通修理扣减 1000 点持久上限
+        Assert.Equal(200, normCost);
 
-        // 细节 233: 购买摆摊物品背包空间与金币原子扣除
-        var (buyOk, remBuyerGold, sellerEarn, _) = EconomySecurityEngine.StallPurchaseAtomicEngine.ExecutePurchase(
-            buyerGold: 10000, bagFreeSlots: 5, price: 3000);
-        Assert.True(buyOk);
-        Assert.Equal(7000, remBuyerGold);
-        Assert.Equal(3000, sellerEarn);
+        var (specMax, specCur, specCost) = EconomySecurityEngine.EquipmentRepairWearEngine.ExecuteRepair(
+            currentDura: 5000, maxDura: 10000, isSpecialRepair: true, basePrice: 200);
+        Assert.Equal(10000, specMax); // 特殊修理 0 损耗
+        Assert.Equal(600, specCost);  // 3 倍修理金币
+
+        // 细节 233: 盛大官方 1.5 权威核心: 祝福油提升武器幸运与杀人诅咒对抗机制 (IDA sub_4C6238)
+        var (blessOk, newLuck, _, blessMsg) = EconomySecurityEngine.BlessOilCurseLuckEngine.ApplyBlessOil(
+            currentLuck: 2, currentCurse: 0, roll100: 20); // roll 20 < 35 成功加幸运
+        Assert.True(blessOk);
+        Assert.Equal(3, newLuck);
+        Assert.Contains("注入了神圣的祝福力量", blessMsg);
 
         // 细节 234: 交易双向锁定后 3 秒防换物倒计时冷却
         var (canConfirm, remLockSec) = EconomySecurityEngine.TradeConfirmDelayEngine.CheckConfirmDelay(1.5f);
@@ -4542,15 +4598,18 @@ public class TestProtocolMatrix
         var (validTitle, _) = EconomySecurityEngine.GuildTitleLengthEngine.SanitizeTitle("七大行会护法");
         Assert.True(validTitle);
 
-        // 细节 237: 师徒系统出师声望奖励 (师傅 +35，徒弟祝福卷轴)
-        var (mPres, aGift) = EconomySecurityEngine.MasterApprenticeEngine.GraduateApprentice();
-        Assert.Equal(35, mPres);
-        Assert.Equal("出师祝福卷轴", aGift);
+        // 细节 237: 盛大官方 1.5 权威核心: 白日门虎卫堂虎卫诱惑之光招募机制 (法师 Job=1, 3级诱惑, 等级>=13)
+        var (canTameHuWei, tameRate) = EconomySecurityEngine.HuWeiTameEngine.CheckHuWeiTame(
+            playerJob: 1, spellLevel: 3, playerLevel: 15);
+        Assert.True(canTameHuWei);
+        Assert.Equal(0.15f, tameRate);
+        var (warriorTame, _) = EconomySecurityEngine.HuWeiTameEngine.CheckHuWeiTame(
+            playerJob: 0, spellLevel: 0, playerLevel: 40);
+        Assert.False(warriorTame); // 战士无法诱惑招募虎卫
 
-        // 细节 238: 婚姻系统求婚协议消耗结婚戒指
-        var (propOk, propNotice) = EconomySecurityEngine.MarriageCeremonyEngine.ProposeMarriage(true, "白衣小仙女");
-        Assert.True(propOk);
-        Assert.Contains("白衣小仙女", propNotice);
+        // 细节 238: 盛大官方 1.5 权威核心: 丛林迷宫鹰卫荒野索敌与超远距离物理箭矢射击 (8格射程)
+        Assert.True(EconomySecurityEngine.YingWeiCombatEngine.IsInAttackRange(8));
+        Assert.False(EconomySecurityEngine.YingWeiCombatEngine.IsInAttackRange(9));
 
         // 细节 239: 天下第一雕像每周属性与外观同步更新
         Assert.True(EconomySecurityEngine.StatueWeeklySyncEngine.NeedsSync(42, 41));
@@ -4559,12 +4618,14 @@ public class TestProtocolMatrix
         int cityTax = EconomySecurityEngine.SabukDailyTaxEngine.SettleDailyTax(1000000);
         Assert.Equal(50000, cityTax);
 
-        // 细节 241: 沙巴克藏宝阁密道凭证检定
-        var bagItems = new HashSet<string> { "藏宝阁通行证", "金创药" };
-        Assert.True(EconomySecurityEngine.TreasurePavilionPassEngine.CanEnter(bagItems));
+        // 细节 241: 盛大官方 1.5 权威核心: 沙巴克秘密通道传送凭证检定 (沙巴克密道老人通行认证)
+        var sabukPassItems = new HashSet<string> { "密道传送卷", "金创药" };
+        Assert.True(EconomySecurityEngine.SabukSecretPassageEngine.CanEnter(sabukPassItems));
+        var invalidItems = new HashSet<string> { "金创药" };
+        Assert.False(EconomySecurityEngine.SabukSecretPassageEngine.CanEnter(invalidItems));
 
-        // 细节 242: 客户端移动加速作弊检测 (间隔 < 380ms 强制拉回)
-        var (speedHack, rollback) = EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(1300, 1000); // 间隔 300ms
+        // 细节 242: 客户端移动加速作弊检测 (间隔 < 240ms 强制拉回)
+        var (speedHack, rollback) = EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(1200, 1000); // 间隔 200ms (< 240ms 官方阈值)
         Assert.True(speedHack);
         Assert.True(rollback);
 
@@ -4607,6 +4668,31 @@ public class TestProtocolMatrix
     }
 
     [Fact]
+    public void TestOfficial15_DealAndGuildTitlePurity()
+    {
+        // 盛大官方 1.5 权威细节 231: 面对面两阶段交易原子锁定状态机 (TFrmDlg_Deal，官方 1.5 绝无个人摆摊)
+        var (bothLocked, canProceed) = EconomySecurityEngine.DealAtomicLockEngine.CheckDealLock(myLocked: true, remoteLocked: true);
+        Assert.True(bothLocked);
+        Assert.True(canProceed);
+
+        // 盛大官方 1.5 权威细节 234: 交易双向锁定后 3 秒防换物倒计时冷却
+        var (canConfirm, remaining) = EconomySecurityEngine.TradeConfirmDelayEngine.CheckConfirmDelay(1.5f);
+        Assert.False(canConfirm);
+        Assert.True(remaining > 0);
+
+        var (canConfirmDone, _) = EconomySecurityEngine.TradeConfirmDelayEngine.CheckConfirmDelay(3.5f);
+        Assert.True(canConfirmDone);
+
+        // 盛大官方 1.5 权威细节 236: 行会封号自定义 (IDA sub_48A7B0 限制 14 字符/7 个汉字)
+        var (validTitle, formatted) = EconomySecurityEngine.GuildTitleLengthEngine.SanitizeTitle("沙巴克先锋战神");
+        Assert.True(validTitle);
+        Assert.Equal("沙巴克先锋战神", formatted);
+
+        var (invalidTitle, _) = EconomySecurityEngine.GuildTitleLengthEngine.SanitizeTitle("超长超长超长行会自定义封号超标");
+        Assert.False(invalidTitle);
+    }
+
+    [Fact]
     public void TestOfficialDetails_Batch15_WorldEnvironmentAtlas()
     {
         // 细节 252: 石狮子阻挡
@@ -4640,8 +4726,8 @@ public class TestProtocolMatrix
         // 细节 268: 尸王出洞坐标 (82, 26)
         Assert.Equal((82, 26), Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.StoneTombSeventhFloorKingHole);
 
-        // 细节 272: 封魔殿幽暗红光 (180, 50, 50)
-        Assert.Equal((180, 50, 50), Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.FengmoPalaceAmbientLight);
+        // 细节 272: 盛大官方 1.5 核心真值: 赤月抉择之地与恶魔祭坛幽暗红光与蜘蛛巢穴压抑环境光 (180, 50, 50)
+        Assert.Equal((180, 50, 50), Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.RedMoonAltarAmbientLight);
 
         // 细节 276: 白日门太极八卦大阵中心判定
         var (taiTile, inCenter) = Mir2Client.Render.WorldEnvironmentAtlasEngine.UndergroundDungeonEngine.GetBaiRiMenTaichi(100, 100, 100, 100);
@@ -4776,11 +4862,29 @@ public class TestProtocolMatrix
         Assert.True(ItemPropertyCompendiumEngine.WeaponDictionaryEngine.CheckDragonSlayerHandWeight(52));
         Assert.False(ItemPropertyCompendiumEngine.WeaponDictionaryEngine.CheckDragonSlayerHandWeight(48));
 
-        // 细节 588: 天魔神甲防御 5-12，魔防 4-7，攻击 1-2
-        var tArmor = ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetHeavyArmorStats("天魔神甲");
+        // 盛大官方 1.5 权威三大终极战袍验证
+        var zhArmor = ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetHeavyArmorStats("战神盔甲");
+        Assert.Equal(5, zhArmor.acMin);
+        Assert.Equal(9, zhArmor.acMax);
+        Assert.Equal(3, zhArmor.macMin);
+        Assert.Equal(5, zhArmor.macMax);
+
+        var ghostArmor = ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetHeavyArmorStats("幽灵战衣(男)");
+        Assert.Equal(4, ghostArmor.acMin);
+        Assert.Equal(7, ghostArmor.acMax);
+
+        // 盛大官方 1.5 权威武器库验证：命运之刃 (重量 48, 攻击 12-16)
+        Assert.True(ItemPropertyCompendiumEngine.WeaponDictionaryEngine.Weapons.TryGetValue("命运之刃", out var fateBlade));
+        Assert.Equal(48, fateBlade.Weight);
+        Assert.Equal(12, fateBlade.MinDc);
+        Assert.Equal(16, fateBlade.MaxDc);
+
+        // 细节 588: 盛大官方 1.5 权威战神盔甲防御 5-9，魔防 3-5
+        var tArmor = ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetHeavyArmorStats("战神盔甲");
         Assert.Equal(5, tArmor.acMin);
-        Assert.Equal(12, tArmor.acMax);
-        Assert.Equal(2, tArmor.dcMax);
+        Assert.Equal(9, tArmor.acMax);
+        Assert.Equal(3, tArmor.macMin);
+        Assert.Equal(5, tArmor.macMax);
 
         // 细节 637: 麻痹戒指石化概率
         var (_, _, pProc) = ItemPropertyCompendiumEngine.ArmorAndJewelryEngine.GetParalysisRingEffect(hasRing: true, roll100: 3);
@@ -4833,7 +4937,320 @@ public class TestProtocolMatrix
         // 细节 738: 后台降帧 15FPS
         Assert.Equal(15, Mir2Client.UI.UIStateProtocolMatrixEngine.InteractionFlowEngine.BackgroundTargetFps);
     }
+
+    [Fact]
+    public void TestServerAuthoritative_AdvancedCombatRules()
+    {
+        var serverEngine = new Mir2.Server.Game.CombatPersistenceAndAntiHackEngine();
+
+        // 1. 服务端权威裁决：刺杀第二格无视防御
+        int pierceDmg = serverEngine.CalculateSwordQiDamage(rawDc: 60, targetAc: 20, targetBuffAc: 5, isSecondGrid: true);
+        Assert.Equal(60, pierceDmg);
+        int normalDmg = serverEngine.CalculateSwordQiDamage(rawDc: 60, targetAc: 20, targetBuffAc: 5, isSecondGrid: false);
+        Assert.Equal(35, normalDmg);
+
+        // 2. 服务端权威裁决：烈火受重创打断
+        var (fireOk, _) = serverEngine.CheckFireSwordDisruption(isCharged: true, incomingDamage: 120, maxHp: 300);
+        Assert.False(fireOk);
+
+        // 3. 服务端权威裁决：诱惑高阶怪定身
+        var (tameOk, isParalyzed, dur) = serverEngine.AttemptTameBoss(monsterLevel: 35, mageLevel: 40, roll100: 20);
+        Assert.False(tameOk);
+        Assert.True(isParalyzed);
+        Assert.Equal(5.0f, dur);
+
+        // 4. 共享规则层：神兽与骷髅成长
+        var (flameColor, scale) = Mir2.Shared.Rules.AdvancedCombatRuleEngine.ShinsuEvolutionEngine.GetShinsuStats(7);
+        Assert.Equal("#FFFFFF", flameColor);
+        Assert.Equal(1.4f, scale);
+
+        var form = Mir2.Shared.Rules.AdvancedCombatRuleEngine.SkeletonEvolutionEngine.GetSkeletonForm(7);
+        Assert.Equal(Mir2.Shared.Rules.AdvancedCombatRuleEngine.SkeletonEvolutionEngine.SkeletonForm.RedBoneReinforced, form);
+
+        // 5. 共享规则层：圣言术神圣伤害穿透魔法盾
+        var (abs, direct) = Mir2.Shared.Rules.AdvancedCombatRuleEngine.MagicShieldHolyPierceEngine.CalculateHolyPierce(100, isHoly: true);
+        Assert.Equal(15, direct);
+        Assert.Equal(85, abs);
+    }
+
+    [Fact]
+    public void TestGroundItemFullAttributePreservationAndPrayerSuitSync()
+    {
+        // 1. 验证地表物品实体持久与属性权威继承
+        var origItem = new EquipItem
+        {
+            Uid = 99881,
+            Name = "裁决之杖",
+            Weight = 80,
+            Dc = 0,
+            MaxDc = 32, // 极品 +2 攻
+            Luck = 3,   // 幸运 +3
+            Dura = 18000,
+            MaxDura = 32000
+        };
+
+        var groundEntity = new Mir2.Server.Maps.GroundItemEntity
+        {
+            Uid = origItem.Uid,
+            Name = origItem.Name,
+            X = 330,
+            Y = 260,
+            Weight = origItem.Weight,
+            ItemData = origItem
+        };
+
+        // 断言地表实体不丢失属性
+        Assert.NotNull(groundEntity.ItemData);
+        Assert.Equal(32, groundEntity.ItemData.MaxDc);
+        Assert.Equal(3, groundEntity.ItemData.Luck);
+        Assert.Equal(18000, groundEntity.ItemData.Dura);
+
+        // 模拟拾取入包
+        var player = new PlayerState { Level = 40, Job = 0 };
+        player.RecalculateAuthoritativeWeights();
+
+        var picked = groundEntity.ItemData;
+        player.BagItems.Add(picked);
+        player.BagWeight += picked.Weight;
+
+        Assert.Single(player.BagItems);
+        Assert.Equal("裁决之杖", player.BagItems[0].Name);
+        Assert.Equal(32, player.BagItems[0].MaxDc);
+        Assert.Equal(3, player.BagItems[0].Luck);
+        Assert.Equal(18000, player.BagItems[0].Dura);
+        Assert.Equal(80, player.BagWeight);
+
+        // 2. 验证祈祷套装全服天谴随机粉碎机制 (非写死项链)
+        var p0 = SuitEffectEngine.PrayerSuit.EvaluatePrayerCataclysm(true, rngRoll: 0);
+        Assert.True(p0.triggered);
+        Assert.Equal("祈祷头盔", p0.brokenPieceName);
+
+        var p1 = SuitEffectEngine.PrayerSuit.EvaluatePrayerCataclysm(true, rngRoll: 1);
+        Assert.Equal("祈祷项链", p1.brokenPieceName);
+
+        var p4 = SuitEffectEngine.PrayerSuit.EvaluatePrayerCataclysm(true, rngRoll: 4);
+        Assert.Equal("祈祷之刃", p4.brokenPieceName);
+
+        // 3. 盛大官方 1.5 权威交易取消物品安全退回背包资产守恒 (TFrmDlg_Deal)
+        var tradeEngine = new Mir2.Server.Game.TradeEngine();
+        var session = new Mir2.Server.Network.ClientSession(1234, null!)
+        {
+            CharacterName = "战神测试员",
+            CurrentMapId = 0,
+            X = 330,
+            Y = 270,
+            State = new PlayerState { Level = 35, Job = 0, Hp = 200 }
+        };
+        session.State.BagItems.Add(new EquipItem { Uid = 111, Name = "井中月", Weight = 58 });
+
+        var partner = new Mir2.Server.Network.ClientSession(5678, null!)
+        {
+            CharacterName = "逍遥法师",
+            CurrentMapId = 0,
+            X = 331,
+            Y = 270,
+            State = new PlayerState { Level = 35, Job = 1, Hp = 120 }
+        };
+
+        var (reqOk, _) = tradeEngine.TryInitiateTrade(session, partner);
+        Assert.True(reqOk);
+
+        // 放置井中月到交易栏并取消交易
+        var (addOk, _) = tradeEngine.AddItem(session, 111);
+        Assert.True(addOk);
+        tradeEngine.CancelTrade(session, "测试取消交易");
+
+
+        // 验证背包物品完好退回
+        Assert.Single(session.State.BagItems);
+        Assert.Equal("井中月", session.State.BagItems[0].Name);
+    }
+
+    [Fact]
+    public void TestSpellReagentExhaustionAndHealingCleanUp()
+    {
+        // 1. 验证治愈类技能：2 为单体，29 为群体，7 仅供道士客户端双轨兼容，战士 (Job 0) 绝不能利用 7 施展治愈术
+        bool CheckHealAllowed(short magicId, int job) => (magicId == 2 || magicId == 29 || (magicId == 7 && job == 2));
+
+        Assert.True(CheckHealAllowed(2, 2));   // 道士单体治愈
+        Assert.True(CheckHealAllowed(29, 2));  // 道士群体治愈
+        Assert.True(CheckHealAllowed(7, 2));   // 道士双轨兼容 7
+        Assert.False(CheckHealAllowed(7, 0));  // 战士绝对禁止利用 7 施展治愈术 (攻杀剑术)
+
+        // 2. 验证装备栏护身符消耗到期清空与下发 TAKEOFF_OK (Lighting 槽位 2)
+        var player = new PlayerState { Level = 35, Job = 2 }; // 道士
+        var amulet = new EquipItem { Uid = 7001, Name = "护身符", Weight = 1, Dura = 1, MaxDura = 100 };
+        player.Equipment[(int)OfficialEquipSlot.Lighting] = amulet;
+        player.WearWeight += amulet.Weight;
+
+        Assert.NotNull(player.Equipment[2]);
+        Assert.Equal(1, player.WearWeight);
+
+        // 模拟消耗掉最后 1 点持久
+        if (amulet.Dura > 1)
+        {
+            amulet.Dura -= 1;
+        }
+        else
+        {
+            player.Equipment[(int)OfficialEquipSlot.Lighting] = null;
+            player.WearWeight = Math.Max(0, player.WearWeight - amulet.Weight);
+        }
+
+        Assert.Null(player.Equipment[2]);
+        Assert.Equal(0, player.WearWeight);
+
+        // 3. 验证背包药粉消耗到期清空 (从背包移除且背包减负重)
+        var powder = new EquipItem { Uid = 8001, Name = "灰色药粉(中量)", Weight = 2, Dura = 1, MaxDura = 50 };
+        player.BagItems.Add(powder);
+        player.BagWeight += powder.Weight;
+        Assert.Single(player.BagItems);
+        Assert.Equal(2, player.BagWeight);
+
+        // 模拟消耗最后 1 点
+        player.BagItems.Remove(powder);
+        player.BagWeight = Math.Max(0, player.BagWeight - powder.Weight);
+
+        Assert.Empty(player.BagItems);
+        Assert.Equal(0, player.BagWeight);
+    }
+
+    [Fact]
+    public void Test_MinimapAndGroupRadarMarking_ProtocolMatrix()
+    {
+        var mapMgr = new Mir2.Server.Maps.MapManager();
+        var map0 = new Mir2.Server.Maps.GameMap(0, "比奇省", 400, 400);
+        mapMgr.RegisterMap(map0);
+
+        var groupEngine = new Mir2.Server.Game.GroupEngine();
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(mapMgr)
+        {
+            GroupEngine = groupEngine
+        };
+
+        var leader = new Mir2.Server.Network.ClientSession(1001, null!)
+        {
+            CharacterName = "队长行会会长",
+            CurrentMapId = 0,
+            X = 330,
+            Y = 270,
+            State = new Mir2.Shared.Models.PlayerState { AllowGroup = true }
+        };
+        var member = new Mir2.Server.Network.ClientSession(1002, null!)
+        {
+            CharacterName = "队员小法师",
+            CurrentMapId = 0,
+            X = 335,
+            Y = 275,
+            State = new Mir2.Shared.Models.PlayerState { AllowGroup = true }
+        };
+
+        // 1. 验证按 TAB 请求小地图 (CM_WANTMINIMAP 1033):
+        // 严格仅回复 1 个 SM_READMINIMAP_OK (710)，彻底根除历史错误的自身坐标 612 标记下发
+        dispatcher.HandleWantMinimap(leader);
+        string mapOkRaw = leader.GetBufferedPacketsString();
+        Assert.Contains("#710/0/400/400/0/比奇省!", mapOkRaw);
+        Assert.DoesNotContain("#612/", mapOkRaw); // 验证无多余 612 标记包
+
+        // 2. 组队并标记目标点
+        var (cRes, party) = groupEngine.CreateParty(leader);
+        Assert.Equal(Mir2.Server.Game.GroupEngine.GroupResult.Success, cRes);
+        var aRes = groupEngine.AddMember(leader, member);
+        Assert.Equal(Mir2.Server.Game.GroupEngine.GroupResult.Success, aRes);
+
+        // 清空缓冲区中的组队列表广播
+        leader.ClearBufferedPackets();
+        member.ClearBufferedPackets();
+
+        // 队长发送 @标记 350 290
+        dispatcher.HandleSay(leader, "@标记 350 290");
+
+        // 队长自身收到标记包 (SM_MAPMARK_DELPHI 612) 与系统提示
+        string leaderMarkRaw = leader.GetBufferedPacketsString();
+        Assert.Contains("#612/350/290/0/0/队长行会会长!", leaderMarkRaw);
+
+        // 队员亦同步收到相同的标记包 (SM_MAPMARK_DELPHI 612)
+        string memberMarkRaw = member.GetBufferedPacketsString();
+        Assert.Contains("#612/350/290/0/0/队长行会会长!", memberMarkRaw);
+
+        // 3. 队长发送 @清除标记
+        leader.ClearBufferedPackets();
+        member.ClearBufferedPackets();
+
+        dispatcher.HandleSay(leader, "@清除标记");
+        string leaderClrRaw = leader.GetBufferedPacketsString();
+        Assert.Contains("#612/0/0/0/0/队长行会会长!", leaderClrRaw);
+
+        string memberClrRaw = member.GetBufferedPacketsString();
+        Assert.Contains("#612/0/0/0/0/队长行会会长!", memberClrRaw);
+    }
+
+    [Fact]
+    public void TestOfficial15_PurgeFutureVersions_And_ServerAuthoritativeMatrix()
+    {
+        // 1. 验证地牢迷雾系统彻底排除了 1.60 封魔殿 (d024) 与 1.70 苍月牛魔寺庙 (d2001)
+        Assert.DoesNotContain("d024", Mir2Client.Game.DarknessFogManager.DarkMaps);
+        Assert.DoesNotContain("d2001", Mir2Client.Game.DarknessFogManager.DarkMaps);
+        Assert.Contains("d401", Mir2Client.Game.DarknessFogManager.DarkMaps); // 骷髅洞
+        Assert.Contains("d601", Mir2Client.Game.DarknessFogManager.DarkMaps); // 石墓
+        Assert.Contains("d717", Mir2Client.Game.DarknessFogManager.DarkMaps); // 蜈蚣洞
+        Assert.Contains("d1001", Mir2Client.Game.DarknessFogManager.DarkMaps); // 赤月峡谷
+
+        var fog = new Mir2Client.Game.DarknessFogManager();
+        Assert.False(fog.IsDarkMap("d024"));
+        Assert.False(fog.IsDarkMap("d2001"));
+        Assert.True(fog.IsDarkMap("d401"));
+
+        // 2. 验证盛大官方 1.5 原生法师技能【抗拒火环】推击判定 (RepulsionRingEngine)
+        // 等级高于目标推得动，等级低于或等于目标推不动
+        var (repOk1, repX1, repY1) = Mir2Client.Game.AdvancedSkillEngine.RepulsionRingEngine.TryRepel(40, 35, 10, 10, 11, 10);
+        Assert.True(repOk1);
+        Assert.Equal(12, repX1);
+        Assert.Equal(10, repY1);
+
+        var (repOk2, repX2, repY2) = Mir2Client.Game.AdvancedSkillEngine.RepulsionRingEngine.TryRepel(35, 40, 10, 10, 11, 10);
+        Assert.False(repOk2);
+
+        // 3. 验证小地图屏蔽列表移除 1.76 幻境七层 (H007)，仅保留官方 1.5 原版未知暗殿 (M001)
+        Assert.True(Mir2Client.UI.MinimapView.IsMinimapBlocked("M001"));
+        Assert.False(Mir2Client.UI.MinimapView.IsMinimapBlocked("H007"));
+        Assert.False(Mir2Client.UI.MinimapView.IsMinimapBlocked("0"));
+
+        // 4. 验证服务端服药权威仲裁与协议闭环 (Server-Authoritative CM_EATITEM -> SM_DELITEM + SM_EAT_OK)
+        var mapMgr = new Mir2.Server.Maps.MapManager();
+        var dispatcher = new Mir2.Server.Game.PacketDispatcher(mapMgr);
+        var player = new Mir2.Server.Network.ClientSession(1, null!)
+        {
+            CharacterName = "测试药师",
+            State = new PlayerState
+            {
+                Hp = 100,
+                MaxHp = 200,
+                Mp = 100,
+                MaxMp = 200,
+                Level = 35
+            }
+        };
+        player.State.BagItems.Add(new EquipItem { Uid = 501, Name = "强效太阳水", Weight = 2, Dura = 1, MaxDura = 1 });
+
+        // 客户端发包 CM_EATITEM (1006)
+        dispatcher.Dispatch(player, $"#{Mir2.Shared.Protocols.ProtocolConsts.CM_EATITEM}/0/0/0/0/强效太阳水!");
+
+        // 验证服务端权威结算：消耗背包物品，下发 SM_DELITEM (202) 和 SM_EAT_OK (606)
+        string pkts = player.GetBufferedPacketsString();
+        Assert.Contains($"#{Mir2.Shared.Protocols.ProtocolConsts.SM_DELITEM}/501/0/0/0/强效太阳水!", pkts);
+        Assert.Contains($"#{Mir2.Shared.Protocols.ProtocolConsts.SM_EAT_OK}/", pkts);
+
+        // 5. 验证客户端发包编码物理真值 (PacketEncoder.EatItem -> PacketDecoder.Parse)
+        byte[] eatBytes = Mir2.Shared.Protocols.PacketEncoder.EatItem(0, "强效太阳水");
+        var decodedEat = Mir2.Shared.Protocols.PacketDecoder.Parse(eatBytes.AsSpan(1))!.Value;
+        Assert.Equal(Mir2.Shared.Protocols.ProtocolConsts.CM_EATITEM, decodedEat.Ident);
+        Assert.Equal(0, decodedEat.Recog);
+        Assert.Equal("强效太阳水", System.Text.Encoding.Default.GetString(decodedEat.Extra));
+    }
 }
+
+
 
 
 

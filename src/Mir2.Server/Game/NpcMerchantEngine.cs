@@ -48,16 +48,39 @@ public sealed class NpcEntity
 public sealed class NpcMerchantEngine
 {
     private readonly ConcurrentDictionary<int, NpcEntity> _npcs = new();
+    private int _nextMerchantItemUid = 60000;
 
     public void RegisterNpc(NpcEntity npc)
     {
         _npcs[npc.Uid] = npc;
     }
 
+    public void RegisterNpc(int uid, string name, int mapId, int x, int y)
+    {
+        _npcs[uid] = new NpcEntity { Uid = uid, Name = name, MapId = mapId, X = x, Y = y };
+    }
+
     public NpcEntity? GetNpc(int npcUid)
     {
         _npcs.TryGetValue(npcUid, out var npc);
         return npc;
+    }
+
+    public void AddGoodsToNpc(int npcUid, MerchantGoods goods)
+    {
+        if (_npcs.TryGetValue(npcUid, out var npc))
+        {
+            npc.Goods.Add(goods);
+        }
+    }
+
+    public MerchantGoods? GetGoods(int npcUid, int goodsId)
+    {
+        if (_npcs.TryGetValue(npcUid, out var npc))
+        {
+            return npc.Goods.Find(g => g.GoodsId == goodsId);
+        }
+        return null;
     }
 
     public NpcEntity? FindNpcAt(int mapId, int x, int y)
@@ -109,12 +132,17 @@ public sealed class NpcMerchantEngine
     /// 商店购买物品结算 (CM_USERBUYITEM 1014)
     /// 包含金币、40格满仓、最大背包负重精算
     /// </summary>
-    public (bool success, string errorMsg, EquipItem? item) BuyItem(ClientSession session, int npcUid, int goodsId)
+    public (bool success, string errorMsg, EquipItem? item) BuyItem(ClientSession session, int npcUid, int goodsId, string? itemName = null)
     {
         if (session.State == null) return (false, "玩家状态异常", null);
         if (!_npcs.TryGetValue(npcUid, out var npc)) return (false, "NPC 不存在", null);
 
         var goods = npc.Goods.Find(g => g.GoodsId == goodsId);
+        if (goods == null && !string.IsNullOrWhiteSpace(itemName))
+        {
+            string sName = itemName.Trim();
+            goods = npc.Goods.Find(g => g.Name.Equals(sName, StringComparison.OrdinalIgnoreCase) || g.Name.Contains(sName));
+        }
         if (goods == null) return (false, "商店未售卖此物品", null);
 
         // 1. 金币检测
@@ -138,10 +166,10 @@ public sealed class NpcMerchantEngine
         // 扣除金币
         session.State.Gold -= goods.Price;
 
-        // 生成装备/物品入包
+        // 生成装备/物品入包 (盛大官方 1.5 规则: 每个入包物品赋予全局唯一 Uid)
         var equip = new EquipItem
         {
-            Uid = 60000 + goods.GoodsId,
+            Uid = System.Threading.Interlocked.Increment(ref _nextMerchantItemUid),
             Name = goods.Name,
             Weight = goods.Weight,
             Dura = goods.MaxDura,
@@ -165,31 +193,65 @@ public sealed class NpcMerchantEngine
         if (idx < 0) return (false, 0, string.Empty, "背包中不存在该物品");
 
         var item = session.State.BagItems[idx];
+
+        // 盛大官方 1.5 铁律: 出售实际回收金额严格等于事前估价计算 (CalculateSellPrice)
+        var (sellPrice, _) = CalculateSellPrice(session, itemUid);
+        if (sellPrice <= 0)
+        {
+            sellPrice = Math.Max(100, item.Weight * 20);
+        }
+
         session.State.BagItems.RemoveAt(idx);
         session.State.BagWeight = Math.Max(0, session.State.BagWeight - item.Weight);
-
-        // 官方估价机制: 原价半价回收 (基础回收 100 金币)
-        int sellPrice = Math.Max(100, item.Weight * 20);
         session.State.Gold = Math.Min(PlayerState.MaxGoldLimit, session.State.Gold + sellPrice);
 
         return (true, sellPrice, item.Name, string.Empty);
     }
 
     /// <summary>
-    /// 铁匠铺特殊修理 (CM_REPAIRSPECIAL 48)
+    /// 根据 itemUid 或槽位编号智能查找身上或背包中的装备
+    /// </summary>
+    public static EquipItem? FindEquipOrBagItem(ClientSession session, int slotOrUid)
+    {
+        if (session.State == null) return null;
+        if (slotOrUid >= 0 && slotOrUid < session.State.Equipment.Length)
+        {
+            var onBody = session.State.Equipment[slotOrUid];
+            if (onBody != null) return onBody;
+        }
+
+        for (int i = 0; i < session.State.Equipment.Length; i++)
+        {
+            var eq = session.State.Equipment[i];
+            if (eq != null && eq.Uid == slotOrUid) return eq;
+        }
+
+        for (int i = 0; i < session.State.BagItems.Count; i++)
+        {
+            var bagItem = session.State.BagItems[i];
+            if (bagItem != null && (bagItem.Uid == slotOrUid || i == slotOrUid))
+            {
+                return bagItem;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 铁匠铺特殊修理 (CM_REPAIRSPECIAL 48) - 智能支持身上或背包装备
     /// 0 损最大持久上限特修
     /// </summary>
-    public (bool success, int cost, string itemName, string errorMsg) SpecialRepairItem(ClientSession session, OfficialEquipSlot slot)
+    public (bool success, int cost, string itemName, string errorMsg) SpecialRepairItem(ClientSession session, int slotOrUid)
     {
         if (session.State == null) return (false, 0, string.Empty, "玩家状态异常");
 
-        var equip = session.State.Equipment[(int)slot];
-        if (equip == null) return (false, 0, string.Empty, "该槽位未穿戴装备");
+        var equip = FindEquipOrBagItem(session, slotOrUid);
+        if (equip == null) return (false, 0, string.Empty, "未找到待修理的装备");
 
         int duraLost = equip.MaxDura - equip.Dura;
         if (duraLost <= 0) return (false, 0, equip.Name, "装备持久完好，无需修理");
 
-        // 特修费用: 磨损量 * 3 倍金币 (0 损最大持久上限)
         int cost = duraLost * 3;
         if (session.State.Gold < cost)
         {
@@ -200,5 +262,75 @@ public sealed class NpcMerchantEngine
         equip.Dura = equip.MaxDura; // 0 损彻底回满！
 
         return (true, cost, equip.Name, string.Empty);
+    }
+
+    public (bool success, int cost, string itemName, string errorMsg) SpecialRepairItem(ClientSession session, OfficialEquipSlot slot)
+        => SpecialRepairItem(session, (int)slot);
+
+    /// <summary>
+    /// 铁匠铺普通修理 (CM_USERREPAIRITEM 47 / 1014) - 智能支持身上或背包装备
+    /// 官方物理规则: 费用低廉 (磨损量 * 1 金币)，但会永久损失最大持久上限 MaxDura (掉持久上限为损失量的 1/3，至少 1 点)
+    /// </summary>
+    public (bool success, int cost, string itemName, string errorMsg) NormalRepairItem(ClientSession session, int slotOrUid)
+    {
+        if (session.State == null) return (false, 0, string.Empty, "玩家状态异常");
+
+        var equip = FindEquipOrBagItem(session, slotOrUid);
+        if (equip == null) return (false, 0, string.Empty, "未找到待修理的装备");
+
+        int duraLost = equip.MaxDura - equip.Dura;
+        if (duraLost <= 0) return (false, 0, equip.Name, "装备持久完好，无需修理");
+
+        int cost = duraLost;
+        if (session.State.Gold < cost)
+        {
+            return (false, cost, equip.Name, "金币不足，无法进行普通修理！");
+        }
+
+        session.State.Gold -= cost;
+
+        // 官方持久衰减法则: 掉最大持久上限 (损失量的 1/3，至少 1 点)
+        int duraDec = Math.Max(1, duraLost / 3);
+        equip.MaxDura = Math.Max(1, equip.MaxDura - duraDec);
+        equip.Dura = equip.MaxDura; // 恢复至新的上限
+
+        return (true, cost, equip.Name, string.Empty);
+    }
+
+    public (bool success, int cost, string itemName, string errorMsg) NormalRepairItem(ClientSession session, OfficialEquipSlot slot)
+        => NormalRepairItem(session, (int)slot);
+
+    /// <summary>
+    /// 官方 sub_4A1F30 装备修理费用估算 (CM_QUERYREPAIRCOST 1024)
+    /// 估价公式: 普通修理 = duraLost，特修 = duraLost * 3
+    /// </summary>
+    public (int normalCost, int specialCost, string itemName) CalculateRepairCost(ClientSession session, int slotOrUid)
+    {
+        var equip = FindEquipOrBagItem(session, slotOrUid);
+        if (equip == null) return (0, 0, string.Empty);
+
+        int duraLost = Math.Max(0, equip.MaxDura - equip.Dura);
+        if (duraLost == 0 || equip.MaxDura <= 0) return (0, 0, equip.Name);
+
+        int normalCost = duraLost;
+        int specialCost = duraLost * 3;
+
+        return (normalCost, specialCost, equip.Name);
+    }
+
+    /// <summary>
+    /// 官方商店回收估价公式 (CM_QUERYSELLPRICE 1012)
+    /// 估价公式: (basePrice / 2) * Dura / MaxDura
+    /// </summary>
+    public (int sellPrice, string itemName) CalculateSellPrice(ClientSession session, int slotOrUid)
+    {
+        var equip = FindEquipOrBagItem(session, slotOrUid);
+        if (equip == null) return (0, string.Empty);
+
+        if (equip.MaxDura <= 0) return (10, equip.Name);
+
+        int basePrice = equip.Price > 0 ? equip.Price : 2000;
+        int sellPrice = Math.Max(1, (int)((long)(basePrice / 2) * Math.Max(1, equip.Dura) / equip.MaxDura));
+        return (sellPrice, equip.Name);
     }
 }

@@ -29,8 +29,14 @@ public partial class MessageBoxDialog : Control, IManagedWindow
     private Action<string>? _inputCallback;
     private Action? _confirmCallback;
     private bool _isInputMode = false;
+    private bool _isNumericMode = false;
+    private int _maxNumericValue = int.MaxValue;
+    private Action<int>? _numericCallback;
+    private int _lockoutSeconds = 0;
+    private float _lockoutTimer = 0f;
 
     public string WindowName => "MessageBoxDialog";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.ModalMessageBox;
     public new bool IsVisible
     {
         get => Visible;
@@ -202,8 +208,65 @@ public partial class MessageBoxDialog : Control, IManagedWindow
         Visible = true;
     }
 
+    public void ShowNumericInput(string prompt, int maxVal, int defaultVal = 100, Action<int>? onConfirm = null)
+    {
+        _isNumericMode = true;
+        _maxNumericValue = Math.Max(1, maxVal);
+        _numericCallback = onConfirm;
+        int initial = Math.Clamp(defaultVal, 1, _maxNumericValue);
+        ShowInput(prompt, initial.ToString(), (val) =>
+        {
+            if (int.TryParse(val.Trim(), out int res))
+            {
+                int clamped = Math.Clamp(res, 1, _maxNumericValue);
+                _numericCallback?.Invoke(clamped);
+            }
+        });
+        _txtInput?.SelectAll();
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 二级密码输错 3 次锁定状态倒计时 (IDA sub_487420)
+    /// </summary>
+    public void ShowLockout(int seconds)
+    {
+        _lockoutSeconds = seconds;
+        _lockoutTimer = 1.0f;
+        ShowMessage($"二级密码输入错误已达 3 次！账户已临时安全锁定，请等待 {_lockoutSeconds} 秒后再试...", hasCancel: false);
+        if (_btnOk != null) _btnOk.Disabled = true;
+    }
+
+    public override void _Process(double delta)
+    {
+        if (Visible && _lockoutSeconds > 0)
+        {
+            _lockoutTimer -= (float)delta;
+            if (_lockoutTimer <= 0f)
+            {
+                _lockoutTimer = 1.0f;
+                _lockoutSeconds--;
+                if (_lockoutSeconds > 0)
+                {
+                    if (_lblMsg != null)
+                    {
+                        _lblMsg.Text = $"二级密码输入错误已达 3 次！账户已临时安全锁定，请等待 {_lockoutSeconds} 秒后再试...";
+                    }
+                }
+                else
+                {
+                    if (_lblMsg != null)
+                    {
+                        _lblMsg.Text = "安全锁定已解除，请重新输入二级密码。";
+                    }
+                    if (_btnOk != null) _btnOk.Disabled = false;
+                }
+            }
+        }
+    }
+
     private void OnOkPressed()
     {
+        if (_lockoutSeconds > 0) return;
         Visible = false;
         if (_isInputMode)
         {
@@ -221,6 +284,7 @@ public partial class MessageBoxDialog : Control, IManagedWindow
 
     private void OnCancelPressed()
     {
+        if (_lockoutSeconds > 0) return;
         Visible = false;
         EmitSignal(SignalName.Cancelled);
     }

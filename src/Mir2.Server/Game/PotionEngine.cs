@@ -106,29 +106,44 @@ public static class PotionEngine
     /// </summary>
     public static (PotionResult result, PotionEffect? effect) ConsumePotion(PlayerState player, int bagSlot, string itemName = "")
     {
+        var (res, eff, _, _) = ConsumePotionEx(player, bagSlot, itemName);
+        return (res, eff);
+    }
+
+    /// <summary>
+    /// 使用/吃药扩展版本 (返回消耗的具体物品对象与背包槽位，供网络层下发 SM_DELITEM 物理清格)
+    /// </summary>
+    public static (PotionResult result, PotionEffect? effect, EquipItem? consumedItem, int consumedSlot) ConsumePotionEx(PlayerState player, int bagSlot, string itemName = "")
+    {
         if (player.Hp <= 0)
         {
             player.IncHealth = 0;
             player.IncSpell = 0;
-            return (PotionResult.Dead, null);
+            return (PotionResult.Dead, null, null, -1);
         }
 
         // 从背包中定位药水
         EquipItem? item = null;
+        int targetSlot = -1;
         if (bagSlot >= 0 && bagSlot < player.BagItems.Count)
         {
             item = player.BagItems[bagSlot];
+            targetSlot = bagSlot;
         }
         else if (!string.IsNullOrEmpty(itemName))
         {
-            item = player.BagItems.Find(i => i.Name == itemName);
+            targetSlot = player.BagItems.FindIndex(i => i.Name == itemName);
+            if (targetSlot >= 0)
+            {
+                item = player.BagItems[targetSlot];
+            }
         }
 
         string actualName = item?.Name ?? itemName;
         var effect = GetPotionEffect(actualName);
         if (effect == null)
         {
-            return (PotionResult.NotEdible, null);
+            return (PotionResult.NotEdible, null, null, -1);
         }
 
         // 背包中扣除该药水
@@ -164,7 +179,7 @@ public static class PotionEngine
             player.ClearPoison();
         }
 
-        return (PotionResult.Success, effect);
+        return (PotionResult.Success, effect, item, targetSlot);
     }
 
     /// <summary>
@@ -182,7 +197,7 @@ public static class PotionEngine
         int hpGain = 0;
         int mpGain = 0;
 
-        // 1. 转移生命血池
+        // 1. 转移生命血池 (盛大官方 1.5 物理真值: 满血顶药绝不清空血池，保留在蓄积池等待受击掉血时自动释放)
         if (player.IncHealth > 0 && player.Hp < player.MaxHp)
         {
             int step = Math.Min(player.IncHealth, transferRate);
@@ -192,13 +207,8 @@ public static class PotionEngine
             player.IncHealth -= step;
             hpGain = step;
         }
-        else if (player.Hp >= player.MaxHp)
-        {
-            // 满血则不再蓄积过量血池
-            player.IncHealth = 0;
-        }
 
-        // 2. 转移魔法蓝池
+        // 2. 转移魔法蓝池 (满魔顶药同样保留蓝池，等待施法耗蓝时释放)
         if (player.IncSpell > 0 && player.Mp < player.MaxMp)
         {
             int step = Math.Min(player.IncSpell, transferRate);
@@ -207,11 +217,6 @@ public static class PotionEngine
             player.Mp += step;
             player.IncSpell -= step;
             mpGain = step;
-        }
-        else if (player.Mp >= player.MaxMp)
-        {
-            // 满魔清空蓝池
-            player.IncSpell = 0;
         }
 
         return (hpGain, mpGain);

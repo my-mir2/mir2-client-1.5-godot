@@ -58,6 +58,23 @@ public static class WeightConstraintEngine
         return itemsTotalWeight + goldWeight;
     }
 
+    /// <summary>
+    /// 结合金币单人上限 (10,000,000) 与当前背包负重上限，计算角色当前最多可容纳增加的金币数
+    /// </summary>
+    public static int CalculateMaxGoldCanReceive(int currentGold, int currentBagWeight, int maxBagWeight)
+    {
+        if (currentGold >= 10_000_000) return 0;
+        int remainingBagWeight = maxBagWeight - currentBagWeight;
+        if (remainingBagWeight <= 0) return 0;
+
+        int goldRemainder = currentGold % GoldWeightUnit;
+        int goldSlack = goldRemainder == 0 ? 0 : (GoldWeightUnit - goldRemainder);
+        long maxGoldByWeight = (long)remainingBagWeight * GoldWeightUnit + goldSlack;
+
+        long maxAllowedTotal = Math.Min(10_000_000L, (long)currentGold + maxGoldByWeight);
+        return (int)Math.Max(0, maxAllowedTotal - currentGold);
+    }
+
     public static bool CanRun(int curBagWeight, int maxBagWeight)
     {
         if (maxBagWeight <= 0) return true;

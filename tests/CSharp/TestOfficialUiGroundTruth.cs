@@ -220,7 +220,7 @@ public class TestOfficialUiGroundTruth
     public void TestAttackModeAndDayNight_OfficialGroundTruth()
     {
         // 1. 协议号铁证 (IDA sub_467920 case 766 @ 0x468A2B & 快捷键 0x4964aa)
-        Assert.Equal(1019, ProtocolConsts.CM_CHANGEATTACKMODE);
+        Assert.Equal(1019, ProtocolConsts.CM_GROUPMODE);
         Assert.Equal(766, ProtocolConsts.SM_ATTACKMODECHANGED);
         Assert.Equal(766, Mir2Client.Net.ServerMessageRouter.SM_ATTACKMODECHANGED);
 
@@ -499,6 +499,200 @@ public class TestOfficialUiGroundTruth
         );
         Assert.True(pktLogon.Extra != null && pktLogon.Extra.Length >= 12);
         Assert.Equal(1, pktLogon.Extra[8]);
+    }
+
+    private sealed class MockWindow : IManagedWindow
+    {
+        public string WindowName { get; init; } = "";
+        public Official24DialogCompendium.DialogId DialogId { get; init; }
+        public bool IsVisible { get; set; } = false;
+        public int ZIndex { get; set; } = 0;
+        public (int x, int y, int width, int height) Bounds { get; init; }
+    }
+
+    [Fact]
+    public void TestOfficial24DialogCompendium_All24DialogsRegistered()
+    {
+        // 验证盛大官方 1.5 全量 24 个原生 Delphi TFrmDlg 窗体 100% 封闭覆盖
+        var allIds = (Official24DialogCompendium.DialogId[])Enum.GetValues(typeof(Official24DialogCompendium.DialogId));
+        Assert.Equal(24, allIds.Length);
+
+        foreach (var id in allIds)
+        {
+            var def = Official24DialogCompendium.Get(id);
+            Assert.NotNull(def);
+            Assert.Equal(id, def.Id);
+            Assert.False(string.IsNullOrWhiteSpace(def.ClassName), $"窗体 {id} 类名不得为空");
+            Assert.False(string.IsNullOrWhiteSpace(def.Title), $"窗体 {id} 标题不得为空");
+            Assert.True(def.Width > 0, $"窗体 {id} 宽度必须大于 0");
+            Assert.True(def.Height > 0, $"窗体 {id} 高度必须大于 0");
+            Assert.True(def.BaseFrame >= 0, $"窗体 {id} Prguse.wil 底板帧号必须非负");
+        }
+    }
+
+    [Fact]
+    public void TestOfficial24DialogCompendium_KeyFramesAndDimensionsTruth()
+    {
+        // 1. HUD 主底栏 (800x166 @ 0, 434, Prguse_0000)
+        var hud = Official24DialogCompendium.Get(Official24DialogCompendium.DialogId.HudBottom);
+        Assert.NotNull(hud);
+        Assert.Equal(800, hud.Width);
+        Assert.Equal(166, hud.Height);
+        Assert.Equal(0, hud.Left);
+        Assert.Equal(434, hud.Top);
+        Assert.Equal(0, hud.BaseFrame);
+
+        // 2. 装备面板 (232x325 @ 568, 0, Prguse_0060)
+        var equip = Official24DialogCompendium.Get(Official24DialogCompendium.DialogId.EquipPanel);
+        Assert.NotNull(equip);
+        Assert.Equal(232, equip.Width);
+        Assert.Equal(325, equip.Height);
+        Assert.Equal(568, equip.Left);
+        Assert.Equal(0, equip.Top);
+        Assert.Equal(60, equip.BaseFrame);
+
+        // 3. 技能魔法书 (232x325 @ 336, 0, Prguse_0070) - 停靠装备面板左侧
+        var skill = Official24DialogCompendium.Get(Official24DialogCompendium.DialogId.SkillBook);
+        Assert.NotNull(skill);
+        Assert.Equal(232, skill.Width);
+        Assert.Equal(325, skill.Height);
+        Assert.Equal(336, skill.Left);
+        Assert.Equal(0, skill.Top);
+        Assert.Equal(70, skill.BaseFrame);
+
+        // 4. 加点面板 (332x347 @ 234, 126, Prguse_0226)
+        var adjust = Official24DialogCompendium.Get(Official24DialogCompendium.DialogId.AdjustAbil);
+        Assert.NotNull(adjust);
+        Assert.Equal(332, adjust.Width);
+        Assert.Equal(347, adjust.Height);
+        Assert.Equal(234, adjust.Left);
+        Assert.Equal(126, adjust.Top);
+        Assert.Equal(226, adjust.BaseFrame);
+
+        // 5. 死亡复活 (452x179 @ 174, 150, Prguse_0360)
+        var death = Official24DialogCompendium.Get(Official24DialogCompendium.DialogId.DeathScreen);
+        Assert.NotNull(death);
+        Assert.Equal(452, death.Width);
+        Assert.Equal(179, death.Height);
+        Assert.Equal(174, death.Left);
+        Assert.Equal(150, death.Top);
+        Assert.Equal(360, death.BaseFrame);
+        Assert.True(death.IsModal, "死亡界面必须为模态");
+    }
+
+    [Fact]
+    public void TestWindowStackManager_MutexAndMovementClosure()
+    {
+        var mgr = new WindowStackManager();
+
+        var tradeWin = new MockWindow
+        {
+            WindowName = "Trade",
+            DialogId = Official24DialogCompendium.DialogId.TradePanel,
+            Bounds = (464, 0, 236, 335)
+        };
+        var storageWin = new MockWindow
+        {
+            WindowName = "Storage",
+            DialogId = Official24DialogCompendium.DialogId.StoragePanel,
+            Bounds = (260, 176, 416, 347)
+        };
+        var shopWin = new MockWindow
+        {
+            WindowName = "Shop",
+            DialogId = Official24DialogCompendium.DialogId.ShopPanel,
+            Bounds = (100, 100, 308, 205)
+        };
+        var equipWin = new MockWindow
+        {
+            WindowName = "Equip",
+            DialogId = Official24DialogCompendium.DialogId.EquipPanel,
+            Bounds = (568, 0, 232, 325)
+        };
+
+        // 1. 先打开仓库与商店
+        mgr.PushWindow(storageWin);
+        mgr.PushWindow(shopWin);
+        Assert.Equal(2, mgr.Count);
+        Assert.True(storageWin.IsVisible);
+        Assert.True(shopWin.IsVisible);
+
+        // 2. 开启交易窗体：由于官方 1.5 铁律 TradePanel 与 Storage/Shop/Repair 强互斥，必须自动弹出互斥窗体
+        mgr.PushWindow(tradeWin);
+        Assert.True(tradeWin.IsVisible);
+        Assert.False(storageWin.IsVisible);
+        Assert.False(shopWin.IsVisible);
+        Assert.Contains(tradeWin, mgr.Stack);
+        Assert.DoesNotContain(storageWin, mgr.Stack);
+        Assert.DoesNotContain(shopWin, mgr.Stack);
+
+        // 3. 打开装备面板 (不互斥)
+        mgr.PushWindow(equipWin);
+        Assert.Equal(2, mgr.Count);
+        Assert.True(equipWin.IsVisible);
+        Assert.True(tradeWin.IsVisible);
+
+        // 4. 角色移动步伐：自动关闭具有 ClosesOnMove 特性的窗体 (如 TradePanel)，而保留 EquipPanel
+        mgr.CloseWindowsOnMovement();
+        Assert.False(tradeWin.IsVisible);
+        Assert.True(equipWin.IsVisible);
+        Assert.Single(mgr.Stack);
+        Assert.Equal(equipWin, mgr.Stack[0]);
+
+        // 5. 鼠标防穿透判定：HUD 区域 (y >= 430) 与打开窗体区域
+        Assert.True(mgr.IsMouseOverUi(100, 450), "HUD 底栏必须拦截鼠标穿透");
+        Assert.True(mgr.IsMouseOverUi(600, 100), "装备面板内部必须拦截鼠标穿透");
+        Assert.False(mgr.IsMouseOverUi(200, 200), "未遮挡游戏视口必须放行鼠标点击");
+    }
+
+    [Fact]
+    public void TestOfficial24DialogCompendium_CompleteCoverageAndBoundsValidation()
+    {
+        // 验证盛大官方 1.5 全生命周期 24 个原生窗体封闭分母全量 100% 登记
+        var allIds = (Official24DialogCompendium.DialogId[])Enum.GetValues(typeof(Official24DialogCompendium.DialogId));
+        Assert.Equal(24, allIds.Length);
+
+        foreach (var id in allIds)
+        {
+            var def = Official24DialogCompendium.Get(id);
+            Assert.NotNull(def);
+            Assert.Equal(id, def.Id);
+            Assert.False(string.IsNullOrWhiteSpace(def.Title), $"窗体 {id} 必须具有官方中文名称");
+            Assert.False(string.IsNullOrWhiteSpace(def.ClassName), $"窗体 {id} 必须对应 Delphi 原生 TFrmDlg 类名");
+
+            // 尺寸与物理边界合法性 (盛大 1.5 原生 800x600 分辨率基准)
+            Assert.True(def.Width > 0 && def.Width <= 800, $"窗体 {id} 宽度必须在 1~800 之间");
+            Assert.True(def.Height > 0 && def.Height <= 600, $"窗体 {id} 高度必须在 1~600 之间");
+            Assert.True(def.Left >= 0 && def.Left + def.Width <= 800, $"窗体 {id} 水平排版不得溢出 800 像素视口");
+            Assert.True(def.Top >= 0 && def.Top + def.Height <= 600, $"窗体 {id} 垂直排版不得溢出 600 像素视口");
+        }
+
+        // 次级弹窗尺寸与母板内胆边界核销
+        // 行会主面板母板: 628x453
+        var guildDef = Official24DialogCompendium.Get(Official24DialogCompendium.DialogId.GuildPanel);
+        Assert.NotNull(guildDef);
+        Assert.Equal(628, guildDef.Width);
+        Assert.Equal(453, guildDef.Height);
+
+        // 1. 封号编辑弹窗: 352x250, 居中偏移 (138, 101)
+        Assert.Equal(352.0f, GuildEditRankDialog.PanelWidth);
+        Assert.Equal(250.0f, GuildEditRankDialog.PanelHeight);
+        Assert.True(138 + 352 <= guildDef.Width, "封号弹窗水平排版必须完全容纳于行会主面板内部");
+        Assert.True(101 + 250 <= guildDef.Height, "封号弹窗垂直排版必须完全容纳于行会主面板内部");
+
+        // 2. 公告编辑弹窗: 608x327, 居中偏移 (10, 63)
+        Assert.Equal(608.0f, GuildEditNoticeDialog.PanelWidth);
+        Assert.Equal(327.0f, GuildEditNoticeDialog.PanelHeight);
+        Assert.True(10 + 608 <= guildDef.Width, "公告弹窗水平排版必须完全容纳于行会主面板内部");
+        Assert.True(63 + 327 <= guildDef.Height, "公告弹窗垂直排版必须完全容纳于行会主面板内部");
+
+        // 3. 铁匠铺修理面板: 140x181
+        Assert.Equal(140.0f, RepairPanelView.PanelWidth);
+        Assert.Equal(181.0f, RepairPanelView.PanelHeight);
+
+        // 4. 死亡灰屏复活面板: 452x179, 全局居中 (174, 210)
+        Assert.Equal(452.0f, DeathScreenView.PanelWidth);
+        Assert.Equal(179.0f, DeathScreenView.PanelHeight);
     }
 }
 

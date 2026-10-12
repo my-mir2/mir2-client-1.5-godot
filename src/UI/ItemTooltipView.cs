@@ -59,18 +59,54 @@ public partial class ItemTooltipView : Control
         _panel.AddChild(_lblContent);
     }
 
+    public int CompareSlotIndex { get; private set; } = 0; // 盛大官方 1.5: 0=左槽位, 1=右槽位 (按 Alt 切换)
+
+    /// <summary>
+    /// 盛大官方 1.5 IDA sub_48C3C8: 极品追加属性天蓝色高亮 [color=#00ffff]
+    /// </summary>
+    public static string HighlightSuperAttributes(string desc)
+    {
+        if (string.IsNullOrEmpty(desc)) return string.Empty;
+        var lines = desc.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            if (line.Contains("(+") || line.Contains("极品") || line.Contains("幸运 +") || line.Contains("诅咒 +"))
+            {
+                int idx = line.IndexOf("(+");
+                if (idx >= 0)
+                {
+                    string basePart = line.Substring(0, idx);
+                    string plusPart = line.Substring(idx);
+                    lines[i] = $"{basePart}[color=#00ffff]{plusPart}[/color]";
+                }
+                else
+                {
+                    lines[i] = $"[color=#00ffff]{line}[/color]";
+                }
+            }
+        }
+        return string.Join("\n", lines);
+    }
+
+    public void ToggleCompareSlot()
+    {
+        CompareSlotIndex = 1 - CompareSlotIndex;
+    }
+
     public void ShowTooltip(string itemName, string desc, Vector2 globalMousePos)
     {
+        string highlightedDesc = HighlightSuperAttributes(desc);
         if (_lblContent != null)
         {
-            _lblContent.Text = $"[b][color=#ffff40]{itemName}[/color][/b]\n{desc}";
+            _lblContent.Text = $"[b][color=#ffff40]{itemName}[/color][/b]\n{highlightedDesc}";
         }
 
         // 计算文本行数以动态适配精确面板高度
         int lines = 1;
-        if (!string.IsNullOrEmpty(desc))
+        if (!string.IsNullOrEmpty(highlightedDesc))
         {
-            var split = desc.Split('\n');
+            var split = highlightedDesc.Split('\n');
             lines += split.Length;
         }
 
@@ -83,11 +119,14 @@ public partial class ItemTooltipView : Control
     }
 
     /// <summary>
-    /// 装备对比浮动提示框：展示新装备属性并与当前已穿戴同槽位装备对比
+    /// 装备对比浮动提示框：展示新装备属性并与当前已穿戴同槽位装备对比 (支持 Alt 键切换左右手镯/戒指)
     /// </summary>
     public void ShowComparisonTooltip(string currentEquipName, string currentDesc, string newEquipName, string newDesc, Vector2 globalMousePos)
     {
-        string fullText = $"[b][color=#ffff40]{newEquipName}[/color][/b] [color=#00ffff][对比][/color]\n{newDesc}\n[color=#808080]------------------------[/color]\n[color=#a0a0a0]已装备: [/color][b][color=#ffff40]{currentEquipName}[/color][/b]\n{currentDesc}";
+        string hCurrent = HighlightSuperAttributes(currentDesc);
+        string hNew = HighlightSuperAttributes(newDesc);
+        string slotTag = CompareSlotIndex == 0 ? "[对比-左]" : "[对比-右]";
+        string fullText = $"[b][color=#ffff40]{newEquipName}[/color][/b] [color=#00ffff]{slotTag}[/color]\n{hNew}\n[color=#808080]------------------------[/color]\n[color=#a0a0a0]已装备: [/color][b][color=#ffff40]{currentEquipName}[/color][/b]\n{hCurrent}";
         if (_lblContent != null)
         {
             _lblContent.Text = fullText;

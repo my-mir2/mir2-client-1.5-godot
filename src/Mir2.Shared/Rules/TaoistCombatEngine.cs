@@ -38,6 +38,7 @@ public static class TaoistCombatEngine
     /// </summary>
     public static bool CheckPoisonHit(int targetAntiPoison, Random? rnd = null)
     {
+        if (targetAntiPoison >= 100) return false; // 100% 抗毒属性必定完全豁免施毒术
         rnd ??= Random.Shared;
         int maxVal = Math.Max(0, targetAntiPoison) + 7;
         return rnd.Next(maxVal) <= 6;
@@ -99,11 +100,13 @@ public static class TaoistCombatEngine
             return (false, "未装备毒药包，无法施放施毒术！", false);
         }
 
-        // Shape: 1=绿毒(黄色毒粉), 2=红毒(灰色毒粉)
+        // 盛大官方 1.5 权威物品分类:
+        // 灰色药粉 (绿毒, 持续损血且封锁回复): Shape = 1 (或名称含"灰")
+        // 黄色药粉 (红毒, 受到伤害加深破防): Shape = 2 (或名称含"黄")
         int reqShape = (int)reqType;
         if (poisonBag.Shape != reqShape)
         {
-            string needed = reqType == PoisonType.Green ? "黄色毒粉(绿毒)" : "灰色毒粉(红毒)";
+            string needed = reqType == PoisonType.Green ? "灰色药粉(绿毒)" : "黄色药粉(红毒)";
             return (false, $"当前装备的毒药包类型不匹配，需要【{needed}】！", false);
         }
 

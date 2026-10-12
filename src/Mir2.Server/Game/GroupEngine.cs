@@ -58,8 +58,9 @@ public sealed class GroupEngine
     {
         if (session.State != null)
         {
-            // 组队模式复选框
-            session.State.IsStorageUnlocked = enable; // 复用或标志位
+            session.State.AllowGroup = enable;
+            session.EnqueuePacket(ProtocolConsts.SM_GROUP_MODE_CHANGED, enable ? 1 : 0, 0, 0, 0);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, enable ? "【组队】已开启允许组队模式。" : "【组队】已关闭允许组队模式。");
         }
     }
 
@@ -95,6 +96,11 @@ public sealed class GroupEngine
     {
         lock (_lock)
         {
+            if (target.State == null || !target.State.AllowGroup)
+            {
+                return GroupResult.TargetGroupModeDisabled;
+            }
+
             if (!_sessionToParty.TryGetValue(leader.SessionId, out var party))
             {
                 // 若队长尚未建组，则自动建立
@@ -187,6 +193,20 @@ public sealed class GroupEngine
     }
 
     /// <summary>
+    /// 检查两个 SessionId 是否处于同一个队伍中
+    /// </summary>
+    public bool IsInSameParty(int sessionId1, int sessionId2)
+    {
+        if (sessionId1 <= 0 || sessionId2 <= 0) return false;
+        if (sessionId1 == sessionId2) return true;
+        lock (_lock)
+        {
+            if (!_sessionToParty.TryGetValue(sessionId1, out var p1) || p1 == null) return false;
+            return p1.Members.Exists(m => m.SessionId == sessionId2);
+        }
+    }
+
+    /// <summary>
     /// 广播队伍全员名单串给全队 (SM_GROUPMEMBERS 667)
     /// </summary>
     public static void BroadcastPartyList(Party party)
@@ -211,12 +231,12 @@ public sealed class GroupEngine
         var result = new List<(ClientSession member, int expGained)>();
         if (monsterBaseExp <= 0) return result;
 
-        // 1. 筛选同地图且切比雪夫距离 <= 16 的同屏队员
+        // 1. 筛选同地图且切比雪夫距离 <= 16 的同屏存活队员
         var validMembers = new List<ClientSession>();
         for (int i = 0; i < party.Members.Count; i++)
         {
             var m = party.Members[i];
-            if (m.CurrentMapId == killer.CurrentMapId)
+            if (m.State != null && m.State.Hp > 0 && m.CurrentMapId == killer.CurrentMapId)
             {
                 int dx = Math.Abs(m.X - killer.X);
                 int dy = Math.Abs(m.Y - killer.Y);
@@ -249,6 +269,57 @@ public sealed class GroupEngine
         for (int i = 0; i < validMembers.Count; i++)
         {
             result.Add((validMembers[i], expPerPerson));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 组队同屏金币均分核心算法 (M2Server 0x4D2500)
+    /// 规则: 仅同地图且切比雪夫距离 <= 16 的同屏存活队员参与平分，余数优先分配给拾取者
+    /// </summary>
+    public static List<(ClientSession member, int goldGained)> DistributeGroupGold(
+        Party party,
+        ClientSession picker,
+        int totalGold)
+    {
+        var result = new List<(ClientSession member, int goldGained)>();
+        if (totalGold <= 0) return result;
+
+        var validMembers = new List<ClientSession>();
+        for (int i = 0; i < party.Members.Count; i++)
+        {
+            var m = party.Members[i];
+            if (m.State != null && m.State.Hp > 0 && m.CurrentMapId == picker.CurrentMapId)
+            {
+                int dx = Math.Abs(m.X - picker.X);
+                int dy = Math.Abs(m.Y - picker.Y);
+                if (Math.Max(dx, dy) <= MaxShareDistance)
+                {
+                    validMembers.Add(m);
+                }
+            }
+        }
+
+        if (validMembers.Count <= 1)
+        {
+            result.Add((picker, totalGold));
+            return result;
+        }
+
+        int count = validMembers.Count;
+        int sharePerMember = totalGold / count;
+        int remainder = totalGold % count;
+
+        for (int i = 0; i < count; i++)
+        {
+            var member = validMembers[i];
+            int gain = sharePerMember;
+            if (member.SessionId == picker.SessionId)
+            {
+                gain += remainder;
+            }
+            result.Add((member, gain));
         }
 
         return result;

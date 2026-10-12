@@ -149,4 +149,24 @@ public sealed class CombatPersistenceAndAntiHackEngine
         }
         return (fallbackX, fallbackY);
     }
+
+    // ==================== 4. 战法道全量进阶技能权威裁决接口 ====================
+
+    /// <summary>
+    /// 战士刺杀第二格无视防御裁决
+    /// </summary>
+    public int CalculateSwordQiDamage(int rawDc, int targetAc, int targetBuffAc, bool isSecondGrid) =>
+        Mir2.Shared.Rules.AdvancedCombatRuleEngine.SwordQiAuraPierceEngine.CalculateDamage(rawDc, targetAc, targetBuffAc, isSecondGrid);
+
+    /// <summary>
+    /// 烈火蓄力受到重创打断裁决
+    /// </summary>
+    public (bool fireChargeMaintained, string reason) CheckFireSwordDisruption(bool isCharged, int incomingDamage, int maxHp) =>
+        Mir2.Shared.Rules.AdvancedCombatRuleEngine.FireSwordDisruptEngine.CheckDisruption(isCharged, incomingDamage, maxHp);
+
+    /// <summary>
+    /// 诱惑之光对高阶 Boss 瘫痪定身裁决
+    /// </summary>
+    public (bool tameSuccess, bool paralysisTriggered, float duration) AttemptTameBoss(int monsterLevel, int mageLevel, int roll100) =>
+        Mir2.Shared.Rules.AdvancedCombatRuleEngine.TameParalysisEngine.AttemptTameBoss(monsterLevel, mageLevel, roll100);
 }

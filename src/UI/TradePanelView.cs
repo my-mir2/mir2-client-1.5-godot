@@ -59,6 +59,7 @@ public partial class TradePanelView : Control, IManagedWindow
     private Texture2D? _texConfirmPressed;
 
     public string WindowName => "TradePanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.TradePanel;
     public new bool IsVisible
     {
         get => Visible;

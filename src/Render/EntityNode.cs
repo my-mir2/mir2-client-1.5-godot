@@ -101,7 +101,6 @@ namespace Mir2Client.Render
         {
             if (_nameLabel == null) return;
 
-            // 盛大官方 1.5 随从名字格式: [主人名 的] 随从名 [(X级)]
             string displayName = EntityName;
             if (!string.IsNullOrEmpty(MasterName))
             {
@@ -285,9 +284,31 @@ namespace Mir2Client.Render
             UpdateFrameGraphic();
         }
 
+        private float _corpseRemainTimer = 60.0f; // 盛大官方 1.5 规则: 尸体存留 60 秒后老化腐烂沉入地底
+        public bool IsShinsuProne { get; private set; } = false; // 神兽趴下防御姿态
+        private float _shinsuIdleTimer = 0f;
+
+        public void TriggerMiss()
+        {
+            if (_damageLabel != null)
+            {
+                _damageLabel.Text = "MISS";
+                _damageLabel.Position = new Vector2(-40, -95);
+                _damageLabel.Visible = true;
+                _damageLabel.Modulate = new Color(0.2f, 1.0f, 0.4f, 1.0f); // 官方原版亮绿 MISS
+                _damageLabelTimer = 0.8f;
+            }
+        }
+
         public void TriggerStruck(int damage, int curHp)
         {
             Hp = curHp;
+            if (damage <= 0)
+            {
+                TriggerMiss();
+                return;
+            }
+
             PlayAction(ActionType.Struck, Direction, 0.3f);
             AudioManager.Instance?.PlaySoundId(2);
 
@@ -334,6 +355,40 @@ namespace Mir2Client.Render
         public override void _Process(double delta)
         {
             float dt = (float)delta;
+
+            // 盛大官方 1.5 规则: 尸体存留 60 秒后老化腐烂沉入地底消除
+            if (IsCorpse)
+            {
+                _corpseRemainTimer -= dt;
+                if (_corpseRemainTimer <= 2.0f && _corpseRemainTimer > 0f)
+                {
+                    Modulate = new Color(1, 1, 1, _corpseRemainTimer / 2.0f);
+                }
+                else if (_corpseRemainTimer <= 0f)
+                {
+                    Visible = false;
+                }
+                return;
+            }
+
+            // 盛大官方 1.5 IDA sub_496120: 神兽无目标待机 3 秒转为趴下姿态
+            if (EntityName.Contains("神兽"))
+            {
+                if (CurrentAction == ActionType.Stand)
+                {
+                    _shinsuIdleTimer += dt;
+                    if (_shinsuIdleTimer >= 3.0f)
+                    {
+                        IsShinsuProne = true;
+                    }
+                }
+                else
+                {
+                    _shinsuIdleTimer = 0f;
+                    IsShinsuProne = false;
+                }
+            }
+
             DeadReckoningEngine.Update(MovementState, dt);
             UpdatePosition();
 
@@ -447,28 +502,6 @@ namespace Mir2Client.Render
                 ActionType.Die => baseOffset + 144 + dir * 6 + Math.Min(_currentFrame, 5),
                 _ => baseOffset + dir * 4 + (_currentFrame % 4)
             };
-        }
-
-        /// <summary>
-        /// 盛大官方 1.5 怪物倒地挖肉机制 (IDA sub_478148 / ButcherCorpse)
-        /// 仅当为鸡、鹿等可挖肉动物且处于尸体状态时允许割肉
-        /// </summary>
-        public bool TryHarvestMeat(out string meatName, out int meatQuality)
-        {
-            meatName = string.Empty;
-            meatQuality = 0;
-            if (!IsCorpse) return false;
-
-            var monDef = OfficialMonsterCompendium.GetByName(EntityName) ?? OfficialMonsterCompendium.GetByAppr(Appr);
-            if (monDef == null || !monDef.CanButcherMeat) return false;
-
-            // 依据官方 Delphi 伪随机数计算肉质品质 (8~18)
-            meatQuality = OfficialClientRulesEngine.DelphiRandom.RandomRange(8, 18);
-            meatName = $"{EntityName}肉";
-
-            // 播放挖肉割刀音效
-            AudioManager.Instance?.PlaySoundId(40);
-            return true;
         }
     }
 }

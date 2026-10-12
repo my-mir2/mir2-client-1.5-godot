@@ -7,6 +7,8 @@ using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Network.HPSocket;
+using Mir2.Shared.Protocols.Modern;
 using Xunit;
 
 namespace Mir2Client.Tests;
@@ -78,17 +80,89 @@ public class TestOfficialM2_NpcMerchantMatrix
         Assert.Equal(3000, weapon.MaxDura);
     }
 
+    private static int GetRandomTestPort() => TestNetworkPortHelper.GetNextPort();
+
+    private static byte[] BuildPack(ushort msgId, string payloadStr = "", ushort seq = 0)
+    {
+        byte[] payloadBytes = string.IsNullOrEmpty(payloadStr) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(payloadStr);
+        byte[] packet = new byte[BinaryProtocol.HeaderSize + payloadBytes.Length];
+        var span = packet.AsSpan();
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[0..2], BinaryProtocol.DefaultMagic);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[2..4], msgId);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[4..6], (ushort)payloadBytes.Length);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(span[6..8], seq);
+        if (payloadBytes.Length > 0)
+        {
+            payloadBytes.CopyTo(packet, BinaryProtocol.HeaderSize);
+        }
+        return packet;
+    }
+
+    private static async Task SendPackAsync(System.Net.Sockets.NetworkStream stream, ushort msgId, string payloadStr = "")
+    {
+        byte[] packet = BuildPack(msgId, payloadStr);
+        await stream.WriteAsync(packet);
+        await stream.FlushAsync();
+    }
+
+    private static async Task<string> ReadUntilContainsPackAsync(System.Net.Sockets.NetworkStream stream, string target, int timeoutMs = 2500)
+    {
+        var decoder = new HpPackStreamDecoder();
+        var sb = new StringBuilder();
+        byte[] buf = new byte[4096];
+        long deadline = Environment.TickCount64 + timeoutMs;
+        while (Environment.TickCount64 < deadline)
+        {
+            if (stream.DataAvailable)
+            {
+                int n = await stream.ReadAsync(buf);
+                if (n > 0)
+                {
+                    decoder.FeedData(buf.AsSpan(0, n), (in BinaryProtocol.PacketHeader header, ReadOnlySpan<byte> payload) =>
+                    {
+                        int recog = 0, param = 0, tag = 0, series = 0;
+                        string extra = string.Empty;
+                        if (payload.Length >= 16)
+                        {
+                            recog = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[0..4]);
+                            param = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[4..8]);
+                            tag = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[8..12]);
+                            series = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[12..16]);
+                            if (payload.Length > 16)
+                            {
+                                extra = Encoding.UTF8.GetString(payload[16..]);
+                            }
+                        }
+                        else if (payload.Length > 0)
+                        {
+                            extra = Encoding.UTF8.GetString(payload);
+                        }
+                        string packSummary = $"#{header.MsgId}/{recog}/{param}/{tag}/{series}/{extra}!";
+                        sb.Append(packSummary);
+                        if (!string.IsNullOrEmpty(extra)) sb.Append(extra);
+                    });
+
+                    if (!string.IsNullOrEmpty(target) && sb.ToString().Contains(target))
+                        return sb.ToString();
+                }
+            }
+            await Task.Delay(10);
+        }
+        return sb.ToString();
+    }
+
     [Fact]
     public async Task TestE2E_NpcInteraction_BuyItem_And_SellItem_Cycle()
     {
-        int testPort = 17011;
+        int testPort = GetRandomTestPort();
         var mapManager = new MapManager();
         var npcEngine = new NpcMerchantEngine();
 
+        // 注册比奇城铁匠 NPC (Uid: 20002)
         var weaponShopNpc = new NpcEntity
         {
             Uid = 20002,
-            Name = "比奇铁匠",
+            Name = "铁匠",
             MapId = 0,
             X = 335,
             Y = 275
@@ -107,6 +181,7 @@ public class TestOfficialM2_NpcMerchantMatrix
         var dispatcher = new PacketDispatcher(mapManager, regenEngine: null, npcEngine: npcEngine);
         var gateway = new TcpGateway(testPort);
         gateway.PacketReceivedHandler = (session, pkt) => dispatcher.Dispatch(session, pkt);
+        gateway.BinaryPacketReceivedHandler = (session, header, payload) => dispatcher.DispatchBinary(session, header, payload);
         gateway.Start();
 
         var tickEngine = new GameWorldTick(gateway);
@@ -119,8 +194,7 @@ public class TestOfficialM2_NpcMerchantMatrix
             var stream = client.GetStream();
 
             // 1. 玩家进入游戏
-            await stream.WriteAsync(Encoding.UTF8.GetBytes("#103/购物新手/334/275!"));
-            await stream.FlushAsync();
+            await SendPackAsync(stream, 103, "购物新手/334/275");
 
             await Task.Delay(200);
 
@@ -135,34 +209,20 @@ public class TestOfficialM2_NpcMerchantMatrix
             while (stream.DataAvailable) _ = await stream.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 2. 客户端点击铁匠 NPC: CM_MERCHANTHOMEPAGE (1010)
-            byte[] clickPkt = Encoding.UTF8.GetBytes("#1010/20002!");
-            await stream.WriteAsync(clickPkt);
-            await stream.FlushAsync();
-
-            await Task.Delay(150);
+            await SendPackAsync(stream, 1010, "20002");
 
             // 必须收到 NPC 对话界面: SM_NPCDIALOG (54)
-            Assert.True(stream.DataAvailable);
-            byte[] buf1 = new byte[4096];
-            int len1 = await stream.ReadAsync(buf1, 0, buf1.Length);
-            string resp1 = Encoding.UTF8.GetString(buf1, 0, len1);
+            string resp1 = await ReadUntilContainsPackAsync(stream, $"#{ProtocolConsts.SM_NPCDIALOG}/", timeoutMs: 3000);
             Assert.Contains($"#{ProtocolConsts.SM_NPCDIALOG}/", resp1);
             Assert.Contains("欢迎来到铁匠铺", resp1);
 
             while (stream.DataAvailable) _ = await stream.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 3. 购买青铜剑 (GoodsId: 101, 价格 1200): CM_USERBUYITEM (1014)
-            byte[] buyPkt = Encoding.UTF8.GetBytes("#1014/20002/101!");
-            await stream.WriteAsync(buyPkt);
-            await stream.FlushAsync();
-
-            await Task.Delay(150);
+            await SendPackAsync(stream, 1014, "20002/101");
 
             // 必须收到购买成功 SM_BUY_OK_DELPHI (648)、金币扣减 SM_GOLDCHANGED_DELPHI (653)、入包 SM_ADDITEM (200)
-            Assert.True(stream.DataAvailable);
-            byte[] buf2 = new byte[4096];
-            int len2 = await stream.ReadAsync(buf2, 0, buf2.Length);
-            string resp2 = Encoding.UTF8.GetString(buf2, 0, len2);
+            string resp2 = await ReadUntilContainsPackAsync(stream, $"#{ProtocolConsts.SM_BUY_OK_DELPHI}/", timeoutMs: 3000);
             Assert.Contains($"#{ProtocolConsts.SM_BUY_OK_DELPHI}/", resp2);
             Assert.Contains($"#{ProtocolConsts.SM_GOLDCHANGED_DELPHI}/", resp2);
             Assert.Contains($"#{ProtocolConsts.SM_ADDITEM}/", resp2);
@@ -176,17 +236,10 @@ public class TestOfficialM2_NpcMerchantMatrix
             while (stream.DataAvailable) _ = await stream.ReadAsync(flushBuf, 0, flushBuf.Length);
 
             // 4. 将青铜剑出售给铁匠: CM_USERSELLITEM (1013)
-            byte[] sellPkt = Encoding.UTF8.GetBytes($"#1013/{sword.Uid}!");
-            await stream.WriteAsync(sellPkt);
-            await stream.FlushAsync();
-
-            await Task.Delay(150);
+            await SendPackAsync(stream, 1013, $"{sword.Uid}");
 
             // 必须收到出售成功 SM_SELL_OK_DELPHI (650) 与金币增加
-            Assert.True(stream.DataAvailable);
-            byte[] buf3 = new byte[4096];
-            int len3 = await stream.ReadAsync(buf3, 0, buf3.Length);
-            string resp3 = Encoding.UTF8.GetString(buf3, 0, len3);
+            string resp3 = await ReadUntilContainsPackAsync(stream, $"#{ProtocolConsts.SM_SELL_OK_DELPHI}/", timeoutMs: 3000);
             Assert.Contains($"#{ProtocolConsts.SM_SELL_OK_DELPHI}/", resp3);
             Assert.Contains($"#{ProtocolConsts.SM_GOLDCHANGED_DELPHI}/", resp3);
 

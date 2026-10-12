@@ -138,86 +138,86 @@ public static class Official24DialogCompendium
             MutexWindows = new[] { DialogId.TradePanel }
         });
 
-        // 11. 装备 9 槽位 (IDA 0x488AF4)
+        // 11. 装备 9 槽位 (IDA 0x488AF4 / 0x4844b0)
         Register(new DialogDef
         {
             Id = DialogId.EquipPanel, ClassName = "TFrmDlg_State", Title = "装备栏",
-            Left = 0, Top = 120, Width = 280, Height = 340, BaseFrame = 70,
-            CloseBtnFrame = 72, IsModal = false
+            Left = 568, Top = 0, Width = 232, Height = 325, BaseFrame = 60,
+            CloseBtnFrame = 62, IsModal = false
         });
 
-        // 12. 角色状态属性 (IDA 0x489400)
+        // 12. 角色状态属性 (IDA 0x489400 / 0x4844b0)
         Register(new DialogDef
         {
             Id = DialogId.StatusPanel, ClassName = "TFrmDlg_Status", Title = "状态属性",
-            Left = 0, Top = 120, Width = 280, Height = 340, BaseFrame = 80,
-            CloseBtnFrame = 82, IsModal = false
+            Left = 568, Top = 0, Width = 232, Height = 325, BaseFrame = 60,
+            CloseBtnFrame = 62, IsModal = false
         });
 
-        // 13. 技能魔法书 (IDA 0x489600)
+        // 13. 技能魔法书 (IDA 0x489600 / 0x484468)
         Register(new DialogDef
         {
             Id = DialogId.SkillBook, ClassName = "TFrmDlg_Mag", Title = "技能书",
-            Left = 476, Top = 120, Width = 324, Height = 390, BaseFrame = 90,
-            CloseBtnFrame = 92, IsModal = false
+            Left = 336, Top = 0, Width = 232, Height = 325, BaseFrame = 70,
+            CloseBtnFrame = 72, IsModal = false
         });
 
-        // 14. 加点面板 (IDA 0x489800)
+        // 14. 加点面板 (IDA 0x489800 / 0x485eeb)
         Register(new DialogDef
         {
             Id = DialogId.AdjustAbil, ClassName = "TFrmDlg_AdjustAbil", Title = "能力属性",
-            Left = 100, Top = 150, Width = 260, Height = 300, BaseFrame = 100,
-            CloseBtnFrame = 102, IsModal = false
+            Left = 234, Top = 126, Width = 332, Height = 347, BaseFrame = 226,
+            CloseBtnFrame = 228, IsModal = false
         });
 
         // 15. 快捷键设置 (IDA 0x489A00)
         Register(new DialogDef
         {
             Id = DialogId.KeyConfig, ClassName = "TFrmDlg_KeySelect", Title = "快捷键设定",
-            Left = 200, Top = 180, Width = 300, Height = 240, BaseFrame = 110,
-            CloseBtnFrame = 112, IsModal = false
+            Left = 212, Top = 210, Width = 376, Height = 179, BaseFrame = 140,
+            CloseBtnFrame = 142, IsModal = false
         });
 
-        // 16. 组队面板 (IDA 0x489C00)
+        // 16. 组队面板 (IDA 0x489C00 / 0x4855b2)
         Register(new DialogDef
         {
             Id = DialogId.GroupPanel, ClassName = "TFrmDlg_Group", Title = "编组",
-            Left = 100, Top = 100, Width = 300, Height = 360, BaseFrame = 120,
+            Left = 262, Top = 179, Width = 276, Height = 242, BaseFrame = 120,
             CloseBtnFrame = 122, IsModal = false
         });
 
-        // 17. 行会面板 (IDA 0x489E00)
+        // 17. 行会面板 (IDA 0x489E00 / 0x4930A0)
         Register(new DialogDef
         {
             Id = DialogId.GuildPanel, ClassName = "TFrmDlg_Guild", Title = "行会",
-            Left = 120, Top = 80, Width = 400, Height = 420, BaseFrame = 130,
-            CloseBtnFrame = 132, IsModal = false
+            Left = 86, Top = 73, Width = 628, Height = 453, BaseFrame = 180,
+            CloseBtnFrame = 182, IsModal = false
         });
 
-        // 18. 面对面交易面板 (IDA 0x48A000)
+        // 18. 面对面交易面板 (IDA 0x48A000 / 0x4915EC)
         Register(new DialogDef
         {
             Id = DialogId.TradePanel, ClassName = "TFrmDlg_Deal", Title = "交易",
-            Left = 200, Top = 120, Width = 380, Height = 320, BaseFrame = 140,
-            CloseBtnFrame = 142, IsModal = true, ClosesOnMove = true,
+            Left = 464, Top = 0, Width = 236, Height = 335, BaseFrame = 389,
+            CloseBtnFrame = 391, IsModal = true, ClosesOnMove = true,
             MutexWindows = new[] { DialogId.StoragePanel, DialogId.ShopPanel, DialogId.RepairPanel }
         });
 
-        // 19. 仓库保管箱 (IDA 0x48A200)
+        // 19. 仓库保管箱 (IDA 0x48A200 / 0x48E934)
         Register(new DialogDef
         {
             Id = DialogId.StoragePanel, ClassName = "TFrmDlg_Store", Title = "保管箱",
-            Left = 50, Top = 100, Width = 360, Height = 380, BaseFrame = 150,
-            CloseBtnFrame = 152, IsModal = false, ClosesOnMove = true,
+            Left = 260, Top = 176, Width = 416, Height = 347, BaseFrame = 392,
+            CloseBtnFrame = 394, IsModal = false, ClosesOnMove = true,
             MutexWindows = new[] { DialogId.TradePanel }
         });
 
-        // 20. 商店货架 (IDA 0x48A400)
+        // 20. 商店货架 (IDA 0x48A400 / 0x48F020)
         Register(new DialogDef
         {
             Id = DialogId.ShopPanel, ClassName = "TFrmDlg_Shop", Title = "买卖",
-            Left = 50, Top = 100, Width = 360, Height = 380, BaseFrame = 160,
-            CloseBtnFrame = 162, IsModal = false, ClosesOnMove = true,
+            Left = 50, Top = 100, Width = 308, Height = 205, BaseFrame = 392,
+            CloseBtnFrame = 394, IsModal = false, ClosesOnMove = true,
             MutexWindows = new[] { DialogId.TradePanel }
         });
 
@@ -225,32 +225,32 @@ public static class Official24DialogCompendium
         Register(new DialogDef
         {
             Id = DialogId.RepairPanel, ClassName = "TFrmDlg_Repair", Title = "修理",
-            Left = 50, Top = 100, Width = 360, Height = 380, BaseFrame = 170,
-            CloseBtnFrame = 172, IsModal = false, ClosesOnMove = true,
+            Left = 260, Top = 176, Width = 140, Height = 181, BaseFrame = 392,
+            CloseBtnFrame = 394, IsModal = false, ClosesOnMove = true,
             MutexWindows = new[] { DialogId.TradePanel }
         });
 
-        // 22. NPC 对话框 (IDA 0x48A800)
+        // 22. NPC 对话框 (IDA 0x48A800 / 0x487A6C)
         Register(new DialogDef
         {
             Id = DialogId.NpcDialog, ClassName = "TFrmDlg_NPC", Title = "对话",
-            Left = 220, Top = 80, Width = 360, Height = 400, BaseFrame = 180,
-            CloseBtnFrame = 182, IsModal = false, ClosesOnMove = true
+            Left = 192, Top = 212, Width = 416, Height = 176, BaseFrame = 220,
+            CloseBtnFrame = 222, IsModal = false, ClosesOnMove = true
         });
 
         // 23. 系统模态弹窗 (IDA 0x4877D0)
         Register(new DialogDef
         {
             Id = DialogId.ModalMessageBox, ClassName = "TFrmDlg_MsgBox", Title = "系统提示",
-            Left = 250, Top = 200, Width = 300, Height = 180, BaseFrame = 360,
+            Left = 174, Top = 150, Width = 452, Height = 179, BaseFrame = 360,
             CloseBtnFrame = 0, IsModal = true
         });
 
-        // 24. 死亡灰屏复活 (IDA 0x48AA00)
+        // 24. 死亡灰屏复活 (IDA 0x48AA00 / 0x486DF0)
         Register(new DialogDef
         {
-            Id = DialogId.DeathScreen, ClassName = "TFrmDlg_Death", Title = "角色死亡",
-            Left = 0, Top = 0, Width = 800, Height = 600, BaseFrame = 370,
+            Id = DialogId.DeathScreen, ClassName = "TFrmDlg_Death", Title = "死亡复活",
+            Left = 174, Top = 150, Width = 452, Height = 179, BaseFrame = 360,
             CloseBtnFrame = 0, IsModal = true
         });
     }

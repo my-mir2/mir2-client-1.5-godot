@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Rules;
 
 namespace Mir2.Server.Game;
 
@@ -66,6 +67,7 @@ public sealed class TradeEngine
     public const int AntiFastDealThresholdMs = 1000; // 官方 1000ms 防快速连点门限 (0x4DDCF5)
 
     private readonly ConcurrentDictionary<int, ActiveTradeContext> _tradesBySession = new();
+    public Persistence.WriteAheadLogEngine? WalEngine { get; set; }
 
     public ActiveTradeContext? GetTrade(int sessionId)
     {
@@ -104,8 +106,9 @@ public sealed class TradeEngine
 
     /// <summary>
     /// 放入交易物品 (CM_DEALADDITEM 1026)
+    /// 智能支持按 itemUid、背包槽位 (slot) 或物品名称检索放入
     /// </summary>
-    public (bool success, string errorMsg) AddItem(ClientSession session, int itemUid)
+    public (bool success, string errorMsg) AddItem(ClientSession session, int itemUidOrSlot, string? itemName = null)
     {
         var ctx = GetTrade(session.SessionId);
         if (ctx == null) return (false, "未处于交易中");
@@ -113,12 +116,27 @@ public sealed class TradeEngine
         var (me, partner, myItems, _, isA) = ctx.GetSides(session.SessionId);
         if (isA ? ctx.LockedA : ctx.LockedB) return (false, "交易已锁定，禁止添加物品");
 
-        int bagIdx = me.State!.BagItems.FindIndex(i => i.Uid == itemUid);
+        if (me.State == null) return (false, "玩家状态异常");
+
+        // 1. 优先按 Uid 查找
+        int bagIdx = me.State.BagItems.FindIndex(i => i.Uid == itemUidOrSlot);
+        // 2. 若未按 Uid 查到且 itemUidOrSlot 在合法槽位范围内 (0..Count-1)
+        if (bagIdx < 0 && itemUidOrSlot >= 0 && itemUidOrSlot < me.State.BagItems.Count)
+        {
+            bagIdx = itemUidOrSlot;
+        }
+        // 3. 若提供物品名称，按物品名查找
+        if (bagIdx < 0 && !string.IsNullOrWhiteSpace(itemName))
+        {
+            string searchName = itemName.Trim();
+            bagIdx = me.State.BagItems.FindIndex(i => i.Name.Equals(searchName, StringComparison.OrdinalIgnoreCase) || i.Name.Contains(searchName));
+        }
+
         if (bagIdx < 0) return (false, "背包中不存在该物品");
 
         var item = me.State.BagItems[bagIdx];
         me.State.BagItems.RemoveAt(bagIdx);
-        me.State.BagWeight = Math.Max(0, me.State.BagWeight - item.Weight);
+        me.State.RecalculateAuthoritativeWeights(me.State.Gold);
 
         myItems.Add(item);
         long now = Environment.TickCount64;
@@ -126,6 +144,7 @@ public sealed class TradeEngine
 
         // 己方确认: SM_DEALADDITEM_OK (675)
         me.EnqueuePacket(ProtocolConsts.SM_DEALADDITEM_OK, item.Uid, item.Weight, 0, 0, item.Name);
+        me.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, me.State.BagWeight, me.State.WearWeight, me.State.HandWeight, 0);
         // 对方同步: SM_DEALREMOTEADDITEM (682)
         partner.EnqueuePacket(ProtocolConsts.SM_DEALREMOTEADDITEM, item.Uid, item.Weight, 0, 0, item.Name);
 
@@ -134,8 +153,9 @@ public sealed class TradeEngine
 
     /// <summary>
     /// 取下交易物品 (CM_DEALDELITEM 1027)
+    /// 智能支持按 itemUid、交易栏索引或物品名称检索取下
     /// </summary>
-    public (bool success, string errorMsg) DelItem(ClientSession session, int itemUid)
+    public (bool success, string errorMsg) DelItem(ClientSession session, int itemUidOrIndex, string? itemName = null)
     {
         var ctx = GetTrade(session.SessionId);
         if (ctx == null) return (false, "未处于交易中");
@@ -143,20 +163,33 @@ public sealed class TradeEngine
         var (me, partner, myItems, _, isA) = ctx.GetSides(session.SessionId);
         if (isA ? ctx.LockedA : ctx.LockedB) return (false, "交易已锁定，禁止取下物品");
 
-        int idx = myItems.FindIndex(i => i.Uid == itemUid);
+        if (me.State == null) return (false, "玩家状态异常");
+
+        int idx = myItems.FindIndex(i => i.Uid == itemUidOrIndex);
+        if (idx < 0 && itemUidOrIndex >= 0 && itemUidOrIndex < myItems.Count)
+        {
+            idx = itemUidOrIndex;
+        }
+        if (idx < 0 && !string.IsNullOrWhiteSpace(itemName))
+        {
+            string searchName = itemName.Trim();
+            idx = myItems.FindIndex(i => i.Name.Equals(searchName, StringComparison.OrdinalIgnoreCase) || i.Name.Contains(searchName));
+        }
+
         if (idx < 0) return (false, "交易栏中无此物品");
 
         var item = myItems[idx];
         myItems.RemoveAt(idx);
 
-        me.State!.BagItems.Add(item);
-        me.State.BagWeight += item.Weight;
+        me.State.BagItems.Add(item);
+        me.State.RecalculateAuthoritativeWeights(me.State.Gold);
 
         long now = Environment.TickCount64;
         if (isA) ctx.LastChangeTickA = now; else ctx.LastChangeTickB = now;
 
         // 己方确认: SM_DEALDELITEM_OK (677)
         me.EnqueuePacket(ProtocolConsts.SM_DEALDELITEM_OK, item.Uid, 0, 0, 0, item.Name);
+        me.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, me.State.BagWeight, me.State.WearWeight, me.State.HandWeight, 0);
         // 对方同步: SM_DEALREMOTEDELITEM (683)
         partner.EnqueuePacket(ProtocolConsts.SM_DEALREMOTEDELITEM, item.Uid, 0, 0, 0, item.Name);
 
@@ -229,14 +262,20 @@ public sealed class TradeEngine
                 return (false, true, "一方背包空间不足");
             }
 
-            // ② 双方剩余负重 >= 对方物品总重量
+            // ② 双方剩余负重 >= 对方物品与金币净增总重量
             int weightFromB = 0; foreach (var it in ctx.ItemsB) weightFromB += it.Weight;
             int weightFromA = 0; foreach (var it in ctx.ItemsA) weightFromA += it.Weight;
 
-            if (ctx.PlayerA.State.BagWeight + weightFromB > ctx.PlayerA.State.MaxBagWeight ||
-                ctx.PlayerB.State.BagWeight + weightFromA > ctx.PlayerB.State.MaxBagWeight)
+            int newGoldA = ctx.PlayerA.State.Gold - ctx.GoldA + ctx.GoldB;
+            int newGoldB = ctx.PlayerB.State.Gold - ctx.GoldB + ctx.GoldA;
+
+            int goldDeltaWeightA = WeightConstraintEngine.CalcGoldWeight(newGoldA) - WeightConstraintEngine.CalcGoldWeight(ctx.PlayerA.State.Gold);
+            int goldDeltaWeightB = WeightConstraintEngine.CalcGoldWeight(newGoldB) - WeightConstraintEngine.CalcGoldWeight(ctx.PlayerB.State.Gold);
+
+            if (ctx.PlayerA.State.BagWeight + weightFromB + goldDeltaWeightA > ctx.PlayerA.State.MaxBagWeight ||
+                ctx.PlayerB.State.BagWeight + weightFromA + goldDeltaWeightB > ctx.PlayerB.State.MaxBagWeight)
             {
-                CancelTrade(session, "一方负重不足以承载交易物品！");
+                CancelTrade(session, "一方负重不足以承载交易物品或金币！");
                 return (false, true, "一方负重超限");
             }
 
@@ -250,20 +289,38 @@ public sealed class TradeEngine
 
             // ④ 全部检定通过，原子双向资产交割！
             // 移交金币
-            ctx.PlayerA.State.Gold = ctx.PlayerA.State.Gold - ctx.GoldA + ctx.GoldB;
-            ctx.PlayerB.State.Gold = ctx.PlayerB.State.Gold - ctx.GoldB + ctx.GoldA;
+            ctx.PlayerA.State.Gold = newGoldA;
+            ctx.PlayerB.State.Gold = newGoldB;
 
-            // 移交物品到对方背包
+            // 预写 WAL 物理事务日志 (ACID 防断电)
+            if (WalEngine != null)
+            {
+                foreach (var item in ctx.ItemsB)
+                {
+                    WalEngine.LogItemTrade(ctx.PlayerB.CharacterName, ctx.PlayerA.CharacterName, item.Id, item.Name, ctx.GoldB, syncToDisk: true);
+                }
+                foreach (var item in ctx.ItemsA)
+                {
+                    WalEngine.LogItemTrade(ctx.PlayerA.CharacterName, ctx.PlayerB.CharacterName, item.Id, item.Name, ctx.GoldA, syncToDisk: true);
+                }
+                WalEngine.CheckAndTriggerAutoCheckpoint();
+            }
+
+            // 移交物品到对方背包并向客户端下发入包封包 SM_ADDITEM (200)
             foreach (var item in ctx.ItemsB)
             {
                 ctx.PlayerA.State.BagItems.Add(item);
-                ctx.PlayerA.State.BagWeight += item.Weight;
+                ctx.PlayerA.EnqueuePacket(ProtocolConsts.SM_ADDITEM, item.Id, item.Weight, 0, 0, item.Name);
             }
             foreach (var item in ctx.ItemsA)
             {
                 ctx.PlayerB.State.BagItems.Add(item);
-                ctx.PlayerB.State.BagWeight += item.Weight;
+                ctx.PlayerB.EnqueuePacket(ProtocolConsts.SM_ADDITEM, item.Id, item.Weight, 0, 0, item.Name);
             }
+
+            // 权威重算并同步双方物理负重
+            ctx.PlayerA.State.RecalculateAuthoritativeWeights(ctx.PlayerA.State.Gold);
+            ctx.PlayerB.State.RecalculateAuthoritativeWeights(ctx.PlayerB.State.Gold);
 
             // 清理交易上下文
             _tradesBySession.TryRemove(ctx.PlayerA.SessionId, out _);
@@ -276,6 +333,10 @@ public sealed class TradeEngine
             // 刷新金币
             ctx.PlayerA.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, ctx.PlayerA.State.Gold, 0, 0, 0);
             ctx.PlayerB.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, ctx.PlayerB.State.Gold, 0, 0, 0);
+
+            // 同步物理负重
+            ctx.PlayerA.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, ctx.PlayerA.State.BagWeight, ctx.PlayerA.State.WearWeight, ctx.PlayerA.State.HandWeight, 0);
+            ctx.PlayerB.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, ctx.PlayerB.State.BagWeight, ctx.PlayerB.State.WearWeight, ctx.PlayerB.State.HandWeight, 0);
 
             return (complete: true, canceled: false, "Successful");
         }
@@ -293,23 +354,52 @@ public sealed class TradeEngine
             _tradesBySession.TryRemove(ctx.PlayerA.SessionId, out _);
             _tradesBySession.TryRemove(ctx.PlayerB.SessionId, out _);
 
-            // 原路退回 A 的物品
+            // 原路退回 A 的物品并同步背包与负重
             foreach (var item in ctx.ItemsA)
             {
                 ctx.PlayerA.State?.BagItems.Add(item);
-                if (ctx.PlayerA.State != null) ctx.PlayerA.State.BagWeight += item.Weight;
+                ctx.PlayerA.EnqueuePacket(ProtocolConsts.SM_ADDITEM, item.Id, item.Weight, 0, 0, item.Name);
+            }
+            if (ctx.PlayerA.State != null)
+            {
+                ctx.PlayerA.State.RecalculateAuthoritativeWeights(ctx.PlayerA.State.Gold);
+                ctx.PlayerA.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, ctx.PlayerA.State.BagWeight, ctx.PlayerA.State.WearWeight, ctx.PlayerA.State.HandWeight, 0);
             }
 
-            // 原路退回 B 的物品
+            // 原路退回 B 的物品并同步背包与负重
             foreach (var item in ctx.ItemsB)
             {
                 ctx.PlayerB.State?.BagItems.Add(item);
-                if (ctx.PlayerB.State != null) ctx.PlayerB.State.BagWeight += item.Weight;
+                ctx.PlayerB.EnqueuePacket(ProtocolConsts.SM_ADDITEM, item.Id, item.Weight, 0, 0, item.Name);
+            }
+            if (ctx.PlayerB.State != null)
+            {
+                ctx.PlayerB.State.RecalculateAuthoritativeWeights(ctx.PlayerB.State.Gold);
+                ctx.PlayerB.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, ctx.PlayerB.State.BagWeight, ctx.PlayerB.State.WearWeight, ctx.PlayerB.State.HandWeight, 0);
             }
 
             // 双方下发交易取消协议: SM_DEALCANCEL_DELPHI (681)
             ctx.PlayerA.EnqueuePacket(ProtocolConsts.SM_DEALCANCEL_DELPHI, 0, 0, 0, 0, reason);
             ctx.PlayerB.EnqueuePacket(ProtocolConsts.SM_DEALCANCEL_DELPHI, 0, 0, 0, 0, reason);
         }
+    }
+
+    /// <summary>
+    /// 检查交易双方空间距离，若发生位移偏离（超 1 格或换地图）自动熔断取消交易
+    /// 杜绝隔空交易外挂与骗物
+    /// </summary>
+    public bool CheckAndCancelIfMoved(ClientSession session)
+    {
+        var ctx = GetTrade(session.SessionId);
+        if (ctx == null) return false;
+
+        var (me, partner, _, _, _) = ctx.GetSides(session.SessionId);
+        int dist = Math.Max(Math.Abs(me.X - partner.X), Math.Abs(me.Y - partner.Y));
+        if (dist > 1 || me.CurrentMapId != partner.CurrentMapId)
+        {
+            CancelTrade(session, "双方距离过远，交易已自动取消");
+            return true;
+        }
+        return false;
     }
 }

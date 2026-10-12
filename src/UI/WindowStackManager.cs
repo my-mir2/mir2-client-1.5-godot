@@ -6,6 +6,7 @@ namespace Mir2Client.UI;
 public interface IManagedWindow
 {
     string WindowName { get; }
+    Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.LoginMain;
     bool IsVisible { get; set; }
     int ZIndex { get; set; }
     (int x, int y, int width, int height) Bounds { get; }
@@ -24,6 +25,21 @@ public sealed class WindowStackManager
     public void PushWindow(IManagedWindow win)
     {
         if (win == null) return;
+
+        // 依据官方 24 原生窗体大账本自动处理互斥窗体关闭
+        var def = Official24DialogCompendium.Get(win.DialogId);
+        if (def != null && def.MutexWindows.Length > 0)
+        {
+            for (int i = _stack.Count - 1; i >= 0; i--)
+            {
+                var existing = _stack[i];
+                if (Array.IndexOf(def.MutexWindows, existing.DialogId) >= 0)
+                {
+                    PopWindow(existing);
+                }
+            }
+        }
+
         _stack.Remove(win);
         _stack.Add(win);
         win.IsVisible = true;
@@ -91,14 +107,15 @@ public sealed class WindowStackManager
     }
 
     /// <summary>
-    /// 盛大官方 1.5 角色位移时自动关闭可中断窗体 (交易、仓库、商店、NPC 对话框)
+    /// 盛大官方 1.5 角色位移时自动关闭可中断窗体 (交易、仓库、商店、NPC 对话框等)
     /// </summary>
     public void CloseWindowsOnMovement()
     {
         for (int i = _stack.Count - 1; i >= 0; i--)
         {
             var win = _stack[i];
-            if (win.WindowName is "Trade" or "Storage" or "Shop" or "Repair" or "NpcDialog")
+            var def = Official24DialogCompendium.Get(win.DialogId);
+            if ((def != null && def.ClosesOnMove) || win.WindowName is "Trade" or "Storage" or "Shop" or "Repair" or "NpcDialog")
             {
                 PopWindow(win);
             }

@@ -60,6 +60,7 @@ public partial class ShopPanelView : Control, IManagedWindow
     public ShopMode CurrentMode => _currentMode;
 
     public string WindowName => "ShopPanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.ShopPanel;
     public new bool IsVisible
     {
         get => Visible;
@@ -259,7 +260,29 @@ public partial class ShopPanelView : Control, IManagedWindow
     {
         var hud = GetParent() as HudController;
         if (hud?.MessageBoxDialog != null) return hud.MessageBoxDialog;
-        return GetTree().Root.FindChild("MessageBoxDialog", true, false) as MessageBoxDialog;
+        return GetTree()?.Root.FindChild("MessageBoxDialog", true, false) as MessageBoxDialog;
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 商店出售物品 (DSellDlg / CM_USERSELLITEM)
+    /// </summary>
+    public void RequestSellItem(int bagSlot, string itemName)
+    {
+        var msgBox = GetOrFindMessageBox();
+        if (msgBox != null)
+        {
+            msgBox.ShowMessage(
+                $"【商店出售】\n\n确定要将背包物品 [{itemName}] 出售给商人吗？",
+                hasCancel: true,
+                onConfirm: () =>
+                {
+                    EmitSignal(SignalName.SellRequested, _npcUid, bagSlot);
+                });
+        }
+        else
+        {
+            EmitSignal(SignalName.SellRequested, _npcUid, bagSlot);
+        }
     }
 
     public void SetMode(ShopMode mode)
@@ -483,7 +506,24 @@ public partial class ShopPanelView : Control, IManagedWindow
             var panel = _itemRowPanels[p];
             bool selected = (curGlobalIdx == _selectedIndex);
 
-            panel.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+            if (selected)
+            {
+                // 盛大官方 1.5 IDA sub_48F020: 选中行渲染深红高亮矩形框 (0x800000)
+                var style = new StyleBoxFlat
+                {
+                    BgColor = new Color(0.5f, 0.0f, 0.0f, 0.45f),
+                    BorderWidthLeft = 1,
+                    BorderWidthTop = 1,
+                    BorderWidthRight = 1,
+                    BorderWidthBottom = 1,
+                    BorderColor = new Color(0.8f, 0.1f, 0.1f, 0.8f)
+                };
+                panel.AddThemeStyleboxOverride("panel", style);
+            }
+            else
+            {
+                panel.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+            }
 
             var nameLbl = panel.GetChildOrNull<Label>(0);
             if (nameLbl != null)

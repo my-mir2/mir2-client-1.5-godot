@@ -181,10 +181,12 @@ public sealed class SabukSiegeEngine
 
     /// <summary>
     /// 皇宫人员实时清算与临时占领判定 (IDA sub_4C9B80)
-    /// 规则:
+    /// 盛大官方 1.4/1.5 权威规则:
     /// 1. 扫描皇宫内所有存活玩家；
-    /// 2. 若存在守城方成员，攻击方无法夺取；
-    /// 3. 若守城方全无，且内部仅剩唯一一个攻击方行会的成员，则该行会成为临时占领者！
+    /// 2. 若皇宫内存在无行会散人，或存在多个不同行会玩家混战厮杀，皇宫处于争夺中，不可更迭占领者；
+    /// 3. 若皇宫内所有存活玩家皆属于同一参战行会（已注册攻城行会或守城行会），且不等于当前临时占领者，则该行会成为新的临时占领者！
+    ///    - 攻击方清除守城方独占皇宫 -> 触发攻击方临时占领；
+    ///    - 守城方组织反扑清剿所有攻击方重掌皇宫 -> 触发守城方成功夺回！
     /// </summary>
     public (bool occupied, string newOccupier) CheckPalaceOccupation(
         IEnumerable<(string characterName, string guildName, bool isAlive)> palacePlayers)
@@ -194,37 +196,42 @@ public sealed class SabukSiegeEngine
             return (false, TempOccupierGuild);
         }
 
-        bool hasCurrentDefender = false;
         string? dominantGuild = null;
-        bool multipleAttackingGuildsPresent = false;
+        bool hasConflict = false;
+        bool hasAnyAlive = false;
 
         foreach (var p in palacePlayers)
         {
-            if (!p.isAlive || string.IsNullOrWhiteSpace(p.guildName)) continue;
+            if (!p.isAlive) continue;
 
-            if (p.guildName.Equals(OwnerGuild, StringComparison.OrdinalIgnoreCase))
+            hasAnyAlive = true;
+
+            // 官方权威规则: 皇宫内存在无行会散人闲逛，直接破坏纯净占领条件
+            if (string.IsNullOrWhiteSpace(p.guildName))
             {
-                hasCurrentDefender = true;
-                break; // 只要皇宫里还有守城方活人，就不可被占领
+                hasConflict = true;
+                break;
             }
 
-            if (_attackingGuilds.Contains(p.guildName))
+            if (dominantGuild == null)
             {
-                if (dominantGuild == null)
-                {
-                    dominantGuild = p.guildName;
-                }
-                else if (!dominantGuild.Equals(p.guildName, StringComparison.OrdinalIgnoreCase))
-                {
-                    // 皇宫内存在多个不同攻城行会混战，尚无单一主导者
-                    multipleAttackingGuildsPresent = true;
-                }
+                dominantGuild = p.guildName;
+            }
+            else if (!dominantGuild.Equals(p.guildName, StringComparison.OrdinalIgnoreCase))
+            {
+                // 皇宫内存在多个不同行会混战厮杀
+                hasConflict = true;
+                break;
             }
         }
 
-        if (!hasCurrentDefender && !multipleAttackingGuildsPresent && dominantGuild != null)
+        // 仅当皇宫内有活人、无冲突、且该行会是合法参战方 (守城行会或已注册攻城行会)
+        if (hasAnyAlive && !hasConflict && !string.IsNullOrEmpty(dominantGuild))
         {
-            if (!dominantGuild.Equals(TempOccupierGuild, StringComparison.OrdinalIgnoreCase))
+            bool isEligible = dominantGuild.Equals(OwnerGuild, StringComparison.OrdinalIgnoreCase) ||
+                              _attackingGuilds.Contains(dominantGuild);
+
+            if (isEligible && !dominantGuild.Equals(TempOccupierGuild, StringComparison.OrdinalIgnoreCase))
             {
                 TempOccupierGuild = dominantGuild;
                 return (true, dominantGuild);
@@ -232,6 +239,47 @@ public sealed class SabukSiegeEngine
         }
 
         return (false, TempOccupierGuild);
+    }
+
+    // ==================== 4. 沙巴克城池金库与商业税收 ====================
+    public int SabukGold { get; set; } = 1_000_000; // 初始金库储备 100 万金币
+    public const int MaxSabukGold = 100_000_000;
+
+    /// <summary>
+    /// 城主提取沙巴克金库税金 (仅沙城主行会会长有权提取)
+    /// </summary>
+    public (bool success, int actualAmount, string message) WithdrawSabukGold(string guildName, bool isGuildLeader, int requestAmount)
+    {
+        if (string.IsNullOrWhiteSpace(OwnerGuild) || !OwnerGuild.Equals(guildName, StringComparison.OrdinalIgnoreCase))
+        {
+            return (false, 0, "你非沙巴克霸主行会成员，无权触碰城池金库！");
+        }
+        if (!isGuildLeader)
+        {
+            return (false, 0, "只有沙巴克行会掌门人（城主）方可提取城池商业税金！");
+        }
+        if (requestAmount <= 0)
+        {
+            return (false, 0, "提取金币数额必须大于 0！");
+        }
+        if (SabukGold <= 0)
+        {
+            return (false, 0, "沙巴克金库空空如也，暂无税金可提取！");
+        }
+
+        int withdraw = Math.Min(SabukGold, requestAmount);
+        SabukGold -= withdraw;
+        return (true, withdraw, $"成功提取沙巴克城池税金 {withdraw} 金币！金库剩余 {SabukGold} 金币！");
+    }
+
+    /// <summary>
+    /// 向沙巴克金库注入税收资金
+    /// </summary>
+    public void AddSabukTax(int amount)
+    {
+        if (amount <= 0) return;
+        long total = (long)SabukGold + amount;
+        SabukGold = (int)Math.Min((long)MaxSabukGold, total);
     }
 
     /// <summary>
@@ -247,6 +295,9 @@ public sealed class SabukSiegeEngine
         {
             OwnerGuild = TempOccupierGuild;
         }
+
+        // 战役胜利奖励 100 万金币注入沙城金库
+        AddSabukTax(1_000_000);
 
         return (OwnerGuild, changed);
     }

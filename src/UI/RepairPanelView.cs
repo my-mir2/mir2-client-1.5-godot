@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using Mir2Client.Audio;
 using Mir2Client.Utils;
 
 namespace Mir2Client.UI;
@@ -25,6 +26,7 @@ public partial class RepairPanelView : Control, IManagedWindow
     private Panel? _panel;
 
     public string WindowName => "RepairPanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.RepairPanel;
     public new bool IsVisible
     {
         get => Visible;
@@ -177,16 +179,16 @@ public partial class RepairPanelView : Control, IManagedWindow
         }
 
         // 盛大官方 1.5 铁匠铺特修二次确认弹窗 (IDA sub_486DF0 / ShowRepairConfirm)
-        var (newDura, newMaxDura, goldCost) = OfficialClientRulesEngine.DurabilityRules.PerformSpecialRepair(15, 25, 5000);
         var msgBox = GetOrFindMessageBox();
         if (msgBox != null)
         {
             msgBox.ShowMessage(
-                $"【铁匠铺特殊修理】\n\n装备: [{_targetItemName}]\n修理后持久: {newDura}/{newMaxDura}\n预计花费金币: {goldCost} 金币\n\n确定要进行特殊修理吗？",
+                $"【铁匠铺特殊修理】\n\n确定要对装备 [{_targetItemName}] 进行特殊修理吗？\n(特修将完全恢复装备持久度，不扣减持久上限)",
                 hasCancel: true,
                 onConfirm: () =>
                 {
                     Visible = false;
+                    // 注意：音效移至收到服务端 SM_REPAIROK 权威回执后播放，杜绝本地提前自嗨
                     EmitSignal(SignalName.RepairConfirmed, _targetBagSlot, true);
                 });
         }

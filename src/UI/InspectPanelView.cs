@@ -20,6 +20,7 @@ public partial class InspectPanelView : Control, IManagedWindow
     private Label? _lblTitle;
 
     public string WindowName => "InspectPanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.EquipPanel;
     public new bool IsVisible
     {
         get => Visible;
@@ -160,14 +161,14 @@ public partial class InspectPanelView : Control, IManagedWindow
 
         // 盛大官方 1.5 角色 9 大装备槽位 (IDA sub_481dd4 [0x483eb0..0x484180] & sub_48A9BC 官方实证)
         // 与自身装备面板完全一致，基于 InspectPanel (232x325) 原点 (0, 0) 的绝对局部坐标：
-        // 0:衣服, 1:武器, 2:勋章, 3:项链, 4:头盔, 5:右手镯, 6:左手镯, 7:右戒指, 8:左戒指
+        // 0:衣服, 1:武器, 2:照明/右持物(火把/蜡烛/护符/毒药/药粉), 3:项链, 4:头盔, 5:右手镯, 6:左手镯, 7:右戒指, 8:左戒指
         var slotDefs = new (int Slot, float X, float Y, float W, float H)[]
         {
             (1, 47, 80, 47, 87),    // 武器 (0x398, IDA 0x4840f6..0x484134: Left=47, Top=80, W=47, H=87)
             (0, 96, 122, 53, 112),  // 衣服 (0x39C, IDA 0x484142..0x484180: Left=96, Top=122, W=53, H=112)
             (4, 115, 93, 18, 18),   // 头盔 (0x3A0, IDA 0x483f2e..0x483f6c: Left=115, Top=93, W=18, H=18)
             (3, 168, 87, 34, 31),   // 项链 (0x380, IDA 0x483ee2..0x483f20: Left=168, Top=87, W=34, H=31)
-            (2, 168, 125, 34, 31),  // 勋章/右项链 (0x384, IDA 0x483f7a..0x483fb8: Left=168, Top=125, W=34, H=31)
+            (2, 168, 125, 34, 31),  // 照明/右持物 (0x384, IDA 0x483f7a..0x483fb8: Left=168, Top=125, W=34, H=31)
             (6, 42, 176, 34, 31),   // 左手镯 (0x388, IDA 0x483fc6..0x484004: Left=42, Top=176, W=34, H=31)
             (5, 168, 176, 34, 31),  // 右手镯 (0x38C, IDA 0x484012..0x484050: Left=168, Top=176, W=34, H=31)
             (8, 42, 215, 34, 31),   // 左戒指/符 (0x390, IDA 0x48405e..0x48409c: Left=42, Top=215, W=34, H=31)

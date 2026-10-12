@@ -11,7 +11,7 @@ namespace Mir2.Server.Game;
 /// 盛大官方 1.4/1.5 千里传音与全服红字喊话引擎 (WorldBroadcastEngine)
 /// 严格 1:1 对齐官方 M2Server 全服喇叭规则:
 /// 1. 道具消耗:
-///    - 消耗背包中 1 个【千里传音】或【狮子吼】号角
+///    - 消耗背包中 1 个官方 1.5 专属全服广播道具【千里传音】
 /// 2. 频控保护:
 ///    - 单个玩家两次全服传音间隔不得低于 5000ms (5 秒)，杜绝脚本刷屏爆服
 /// 3. 全网广播分发:
@@ -27,7 +27,7 @@ public sealed class WorldBroadcastEngine
     /// <summary>
     /// 触发一次全服千里传音
     /// </summary>
-    public (bool success, string broadcastText, string errorMessage) BroadcastMessage(
+    public (bool success, EquipItem? consumedItem, string broadcastText, string errorMessage) BroadcastMessage(
         ClientSession sender,
         string messageContent,
         IEnumerable<ClientSession> allActiveSessions,
@@ -35,7 +35,7 @@ public sealed class WorldBroadcastEngine
     {
         if (sender.State == null || string.IsNullOrWhiteSpace(messageContent))
         {
-            return (false, string.Empty, "传音内容不可为空。");
+            return (false, null, string.Empty, "传音内容不可为空。");
         }
 
         // 1. 检查频控冷却
@@ -44,17 +44,18 @@ public sealed class WorldBroadcastEngine
             if (nowMs - lastTime < CooldownMs)
             {
                 long remainSec = Math.Max(1, (CooldownMs - (nowMs - lastTime)) / 1000);
-                return (false, string.Empty, $"千里传音冷却中，请在 {remainSec} 秒后再发！");
+                return (false, null, string.Empty, $"千里传音冷却中，请在 {remainSec} 秒后再发！");
             }
         }
 
-        // 2. 检查并扣除道具
-        int itemIdx = sender.State.BagItems.FindIndex(i => i.Name.Contains(BroadcastItemName) || i.Name.Contains("狮子吼"));
+        // 2. 检查并扣除官方 1.5 原版全服广播道具【千里传音】
+        int itemIdx = sender.State.BagItems.FindIndex(i => i.Name.Contains(BroadcastItemName));
         if (itemIdx < 0)
         {
-            return (false, string.Empty, "背包中没有【千里传音】或【狮子吼】，无法向全服传音！");
+            return (false, null, string.Empty, "背包中没有【千里传音】，无法向全服传音！");
         }
 
+        var consumedItem = sender.State.BagItems[itemIdx];
         sender.State.BagItems.RemoveAt(itemIdx);
         _playerCooldowns[sender.CharacterName] = nowMs;
 
@@ -72,6 +73,6 @@ public sealed class WorldBroadcastEngine
             }
         }
 
-        return (true, broadcastText, string.Empty);
+        return (true, consumedItem, broadcastText, string.Empty);
     }
 }

@@ -618,6 +618,44 @@ namespace Mir2.Shared.Rules
                 };
             }
         }
+
+        /// <summary>
+        /// 盛大官方 1.5 原版 8 方向切比雪夫对齐与偏角映射算法实证 (M2Server sub_4B2C38 @ 0x4B2C38 ~ 0x4B2D6A)
+        /// 方向: 0=北(上), 1=东北, 2=东(右), 3=东南, 4=南(下), 5=西南, 6=西(左), 7=西北
+        /// </summary>
+        public static int EvaluateDirection(int srcX, int srcY, int dstX, int dstY)
+        {
+            int dx = 0;
+            if (srcX < dstX) dx = 1;
+            else if (srcX > dstX) dx = -1;
+
+            int dy = 0;
+            if (srcY < dstY) dy = 1;
+            else if (srcY > dstY) dy = -1;
+
+            // 官方近轴修正逻辑 (0x4b2c92 & 0x4b2ce0)
+            if (Math.Abs(srcY - dstY) > 2 && Math.Abs(srcX - dstX) <= 1)
+            {
+                dx = 0;
+            }
+            if (Math.Abs(srcX - dstX) > 2 && Math.Abs(srcY - dstY) <= 1)
+            {
+                dy = 0;
+            }
+
+            return (dx, dy) switch
+            {
+                (0, -1) => 0,  // 北(上)
+                (1, -1) => 1,  // 东北
+                (1, 0) => 2,   // 东(右)
+                (1, 1) => 3,   // 东南
+                (0, 1) => 4,   // 南(下)
+                (-1, 1) => 5,  // 西南
+                (-1, 0) => 6,  // 西(左)
+                (-1, -1) => 7, // 西北
+                _ => 4         // 默认南
+            };
+        }
     }
 }
 

@@ -28,24 +28,30 @@ public static class ItemStatHiddenEngine
     {
         public static int CalculateAttackPower(int minDc, int maxDc, int totalLuck, int totalCurse, Random rng)
         {
-            if (totalLuck >= 9) return maxDc; // 运 9 套刀刀发挥最大攻击
-            if (totalCurse >= 10) return minDc; // 诅 10 恒定发挥最小攻击
+            if (maxDc < minDc)
+            {
+                (minDc, maxDc) = (maxDc, minDc);
+            }
 
-            // 基础随机分布 + 幸运/诅咒加权
+            // 盛大官方 1.5 铁律: 幸运与诅咒为同轴正负代数相消 (Net Luck = Total Luck - Total Curse)
+            int netLuck = totalLuck - totalCurse;
+            if (netLuck >= 9) return maxDc; // 净运 9 套刀刀发挥最大攻击上限
+            if (netLuck <= -10) return minDc; // 净诅 10 恒定发挥最小攻击下限
+
+            if (netLuck > 0)
+            {
+                // 净幸运增加掷出最大攻击概率 (几率 netLuck / 10)
+                if (rng.Next(0, 10) < netLuck) return maxDc;
+            }
+            else if (netLuck < 0)
+            {
+                // 净诅咒增加掷出最小攻击概率 (几率 -netLuck / 10)
+                if (rng.Next(0, 10) < -netLuck) return minDc;
+            }
+
+            // 基础均匀随机分布
             int range = maxDc - minDc + 1;
-            int roll = rng.Next(0, range);
-
-            if (totalLuck > 0)
-            {
-                // 幸运增加掷出高攻击概率
-                if (rng.Next(0, 10) < totalLuck) return maxDc;
-            }
-            if (totalCurse > 0)
-            {
-                // 诅咒增加掷出低攻击概率
-                if (rng.Next(0, 10) < totalCurse) return minDc;
-            }
-            return minDc + roll;
+            return minDc + rng.Next(0, range);
         }
     }
 

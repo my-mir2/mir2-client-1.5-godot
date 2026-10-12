@@ -35,6 +35,12 @@ public sealed class GameWorldTick
         _gateway = gateway;
     }
 
+    public GameWorldTick(TcpGateway gateway, Game.PacketDispatcher dispatcher)
+    {
+        _gateway = gateway;
+        WorldUpdateHandler = (tick, dt) => dispatcher.UpdateWorldTick(tick, Environment.TickCount64);
+    }
+
     public void Start()
     {
         _isRunning = true;

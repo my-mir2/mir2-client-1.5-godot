@@ -85,7 +85,7 @@ public static class MonsterDropEngine
         RegisterDropRules("祖玛雕像", "1/1 金币\n1/5 强效金创药\n1/40 龙之戒指\n1/40 三眼手镯\n1/40 骑士手镯");
         RegisterDropRules("祖玛卫士", "1/1 金币\n1/4 强效金创药\n1/4 强效魔法药\n1/30 龙之戒指\n1/30 红宝石戒指\n1/100 裁决之杖\n1/100 骨玉权杖\n1/100 龙纹剑");
         RegisterDropRules("祖玛弓箭手", "1/2 金币\n1/6 强效金创药\n1/50 离别钩\n1/60 修罗");
-        RegisterDropRules("赤月恶魔", "1/1 金币\n1/1 强效太阳水\n1/2 疗伤药\n1/20 天尊头盔\n1/20 天尊项链\n1/20 天尊手镯\n1/20 天尊戒指\n1/30 圣战头盔\n1/30 圣战项链\n1/30 圣战手镯\n1/30 圣战戒指\n1/30 法神头盔\n1/30 法神项链\n1/30 法神手镯\n1/30 法神戒指\n1/50 天尊道袍\n1/50 圣战宝甲\n1/50 法神披风");
+        RegisterDropRules("赤月恶魔", "1/1 金币\n1/1 强效太阳水\n1/2 疗伤药\n1/5 祝福油\n1/20 天尊头盔\n1/20 天尊项链\n1/20 天尊手镯\n1/20 天尊戒指\n1/30 圣战头盔\n1/30 圣战项链\n1/30 圣战手镯\n1/30 圣战戒指\n1/30 法神头盔\n1/30 法神项链\n1/30 法神手镯\n1/30 法神戒指\n1/200 屠龙\n1/100 嗜魂法杖");
     }
 
     public static void RegisterDropRules(string monsterName, string rulesText)
@@ -198,6 +198,13 @@ public static class MonsterDropEngine
         {
             var equip = state.Equipment[slot];
             if (equip == null) continue;
+
+            // 盛大官方 1.5 权威规则：祈祷头盔死亡必定碎裂销毁 (不掉落到地表)
+            if (slot == (int)OfficialEquipSlot.Helmet && equip.Name.Contains("祈祷头盔"))
+            {
+                state.TakeOffItem((OfficialEquipSlot)slot);
+                continue;
+            }
 
             // 掉落几率命中
             if (rng.Next(equipDropRate) == 0)

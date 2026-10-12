@@ -131,6 +131,19 @@ namespace Mir2Client.Render
 
             var loader = _wilMagic ?? _wilMagic2;
 
+            // 盛大官方 1.5 技能视听资源安全校验与降级回退 (SkillResourceValidationTree)
+            var safeDesc = SkillResourceValidationTree.ResolveSafeDescriptor(
+                magicId,
+                (wilIdx, frame) => loader != null && loader.GetFrame(frame) != null,
+                sfxId => AudioManager.Instance != null,
+                out bool downgraded);
+
+            if (downgraded)
+            {
+                GD.Print($"[SkillResource] 技能 ID={magicId} 视效或音效缺失，安全降级至 {safeDesc.MagicId} ({safeDesc.Name})");
+                magicId = safeDesc.MagicId;
+            }
+
             switch (magicId)
             {
                 case 1: CreateProjectile(magicId, fromPos, toPos, 0, 10, 170, 10, loader); break;
@@ -156,11 +169,13 @@ namespace Mir2Client.Render
                 case 24: CreateImpact(magicId, toPos, 3920, 10, loader); break;
                 case 25: CreateImpact(magicId, fromPos, 3960, 10, loader); break;
                 case 26: CreateImpact(magicId, toPos, 170, 10, loader); break;
+                case 27: CreateImpact(magicId, fromPos, 0, 0, loader); break; // 野蛮冲撞
                 case 28: CreateImpact(magicId, toPos, 1620, 12, loader); break;
                 case 29: CreateImpact(magicId, toPos, 1790, 12, loader); break;
                 case 30: CreateImpact(magicId, toPos, 1650, 12, loader); break;
                 case 31: CreateImpact(magicId, fromPos, 3880, 8, loader); break;
                 case 32: CreateImpact(magicId, toPos, 1540, 12, loader); break;
+                case 33: CreateImpact(magicId, toPos, 1540, 12, loader); break; // 爆裂火焰/冰咆哮
                 default: CreateProjectile(magicId, fromPos, toPos, 0, 10, 170, 10, loader); break;
             }
         }
@@ -535,10 +550,10 @@ namespace Mir2Client.Render
                     if (def.SoundHit > 0) AudioManager.Instance?.PlaySoundId(def.SoundHit);
                     break;
 
-                case OfficialMagicCompendium.MagicCastType.DirectionalBeam: // 疾光电影 (MagicId 10) / 地狱火 (MagicId 8)
+                case OfficialMagicCompendium.MagicCastType.DirectionalBeam: // 疾光电影 (MagicId 23) / 地狱火 (MagicId 9)
                     var dir = (targetWorld - startWorld).Normalized();
                     if (dir.LengthSquared() < 0.001f) dir = new Vector2(1, 0);
-                    int beamSteps = magicId == 10 ? 12 : 5; // 疾光电影 12 格，地狱火 5 格
+                    int beamSteps = (magicId == 23 || magicId == 10) ? 8 : 5; // 官方 1.5 铁证：疾光电影 8 格穿透，地狱火 5 格
                     for (int step = 1; step <= beamSteps; step++)
                     {
                         var beamPos = startWorld + dir * (step * 40f);

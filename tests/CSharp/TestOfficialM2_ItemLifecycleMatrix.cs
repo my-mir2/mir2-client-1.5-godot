@@ -296,4 +296,53 @@ public class TestOfficialM2_ItemLifecycleMatrix
         int minDmg = killer.CalculateAttackDamageWithLuck(10, 30, mockRng);
         Assert.Equal(10, minDmg);
     }
+
+    [Fact]
+    public void Test_TakeOff_And_WearItem_SyncsWeight_And_AddItem()
+    {
+        var session = CreateMockSession(4001, "力士");
+        session.State!.Level = 10;
+        session.State.Job = 0; // 10 级战士基础背包负重: 50 + 10*10/3 = 83
+        session.State.RecalculateAttributes();
+        session.State.RecalculateAuthoritativeWeights(0);
+        int baseMaxBag = session.State.BaseMaxBagWeight; // 83
+
+        // 穿戴超负载戒指 (槽位 7: RingL)
+        var ring = new EquipItem { Uid = 8001, Name = "超负载戒指", Weight = 1 };
+        session.State.Equipment[(int)OfficialEquipSlot.RingL] = ring;
+        session.State.RecalculateAttributes();
+        session.State.RecalculateAuthoritativeWeights(0);
+        Assert.True(session.State.HasOverloadRing);
+        Assert.Equal(baseMaxBag * 2, session.State.MaxBagWeight); // 翻倍为 166
+
+        var dispatcher = new PacketDispatcher(new Mir2.Server.Maps.MapManager());
+
+        // 1. 卸下超负载戒指 (槽位 7: RingL, CM_TAKEOFFITEM 1004)
+        session.ClearBufferedPackets();
+        dispatcher.Dispatch(session, $"#{ProtocolConsts.CM_TAKEOFFITEM}/7/!");
+
+        // 验证卸下成功，戒指进入背包，负重上限恢复为基础上限 83
+        Assert.Null(session.State.Equipment[(int)OfficialEquipSlot.RingL]);
+        Assert.False(session.State.HasOverloadRing);
+        Assert.Equal(baseMaxBag, session.State.MaxBagWeight);
+        Assert.Contains(session.State.BagItems, it => it.Name == "超负载戒指");
+        Assert.True(session.HasBufferedPacket($"#{ProtocolConsts.SM_TAKEOFF_OK}/"));
+        Assert.True(session.HasBufferedPacket($"#{ProtocolConsts.SM_WEIGHTCHANGED}/"));
+
+        // 2. 用普通珊瑚戒指穿戴到槽位 7 (CM_WEARITEM 1003, 官方 1.5 规则需攻击力达 25 点)
+        session.State.MaxDc = 25;
+        var normalRing = new EquipItem { Uid = 8002, Name = "珊瑚戒指", Weight = 1 };
+        session.State.BagItems.Add(normalRing);
+        int bagIndex = session.State.BagItems.IndexOf(normalRing);
+
+        session.ClearBufferedPackets();
+        dispatcher.Dispatch(session, $"#{ProtocolConsts.CM_WEARITEM}/{bagIndex}/7/!");
+
+        // 验证穿戴成功，下发 SM_TAKEON_OK 与 SM_WEIGHTCHANGED
+        Assert.NotNull(session.State.Equipment[(int)OfficialEquipSlot.RingL]);
+        Assert.Equal("珊瑚戒指", session.State.Equipment[(int)OfficialEquipSlot.RingL]!.Name);
+        Assert.True(session.HasBufferedPacket($"#{ProtocolConsts.SM_TAKEON_OK}/"));
+        Assert.True(session.HasBufferedPacket($"#{ProtocolConsts.SM_WEIGHTCHANGED}/"));
+        Assert.True(session.HasBufferedPacket($"#{ProtocolConsts.SM_WEIGHTCHANGED}/"));
+    }
 }

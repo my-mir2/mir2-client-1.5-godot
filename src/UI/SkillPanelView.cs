@@ -23,6 +23,7 @@ public partial class SkillPanelView : Control, IManagedWindow
     private Panel? _panel;
 
     public string WindowName => "SkillPanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.SkillBook;
     public new bool IsVisible
     {
         get => Visible;
@@ -173,6 +174,7 @@ public partial class SkillPanelView : Control, IManagedWindow
         new(13, "灵魂火符", 23, "", 1, 420, 2500, "道士核心远程攻击符咒，消耗护身符与法力掷出爆破火符。")
     ];
 
+    // 盛大官方 1.5 35 级战士初始技能魔法书预载 (基本剑术、攻杀、刺杀、半月、烈火，避免空状态黑洞)
     private readonly List<SkillItemData> _skills = new(DefaultSkills);
     public IReadOnlyList<SkillItemData> Skills => _skills;
 

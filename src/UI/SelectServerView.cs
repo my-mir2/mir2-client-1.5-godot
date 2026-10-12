@@ -173,4 +173,16 @@ public partial class SelectServerView : Control
         }
         EmitSignal(SignalName.ServerSelected, index);
     }
+
+    /// <summary>
+    /// 设置选服界面提示文本
+    /// </summary>
+    public void SetStatusText(string text, Color? color = null)
+    {
+        if (_lblInfo != null)
+        {
+            _lblInfo.Text = text;
+            _lblInfo.AddThemeColorOverride("font_color", color ?? new Color(1.0f, 0.3f, 0.3f));
+        }
+    }
 }

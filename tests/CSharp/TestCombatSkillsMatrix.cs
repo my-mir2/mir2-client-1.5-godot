@@ -601,9 +601,9 @@ public class TestCombatSkillsMatrix
         router.OnPacket(logonPkt);
 
         Assert.Equal(8001, em.LocalPlayerUid);
-        var hero = em.Hero;
-        Assert.NotNull(hero);
-        Assert.Equal(50, hero.Hp);
+        var localPlayer = em.LocalPlayer;
+        Assert.NotNull(localPlayer);
+        Assert.Equal(50, localPlayer.Hp);
 
         // 2. 模拟 44 升级协议：Recog=28 代表角色升到 28 级
         var levelUpPkt = new ServerPacket(ProtocolConsts.SM_LEVELUP, 28, 0, 0, Array.Empty<byte>());
@@ -614,8 +614,8 @@ public class TestCombatSkillsMatrix
         router.OnPacket(hpPkt);
 
         // 断言主角实体数据模型是否与 53 封包 1:1 同步
-        Assert.Equal(120, hero.Hp);
-        Assert.Equal(150, hero.MaxHp);
+        Assert.Equal(120, localPlayer.Hp);
+        Assert.Equal(150, localPlayer.MaxHp);
     }
 
     [Fact]
@@ -969,26 +969,26 @@ public class TestCombatSkillsMatrix
         Assert.Equal(650, monster!.Hp);
         Assert.Equal(1000, monster.MaxHp);
 
-        var hero = em.Hero;
-        Assert.NotNull(hero);
-        Assert.Equal(300, hero!.Hp);
-        Assert.Equal(300, hero.MaxHp);
+        var localPlayer = em.LocalPlayer;
+        Assert.NotNull(localPlayer);
+        Assert.Equal(300, localPlayer!.Hp);
+        Assert.Equal(300, localPlayer.MaxHp);
 
         // 3. 模拟主角受击：下发 53 协议 (Recog=8001 主角UID, Param=180 当前HP, Tag=300 最大HP)
         var heroHpPkt = new ServerPacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, 8001, 180, 300, Array.Empty<byte>());
         router.OnPacket(heroHpPkt);
 
         // 验证：主角血量同步变更为 180/300，怪物血量不受影响
-        Assert.Equal(180, hero.Hp);
-        Assert.Equal(300, hero.MaxHp);
+        Assert.Equal(180, localPlayer.Hp);
+        Assert.Equal(300, localPlayer.MaxHp);
         Assert.Equal(650, monster.Hp);
 
         // 4. 模拟 ExtraStr 四元组文本格式同步 ("250/300/120/150")
         var heroTextHpPkt = new ServerPacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, 0, 0, 0, Encoding.UTF8.GetBytes("250/300/120/150"));
         router.OnPacket(heroTextHpPkt);
 
-        Assert.Equal(250, hero.Hp);
-        Assert.Equal(300, hero.MaxHp);
+        Assert.Equal(250, localPlayer.Hp);
+        Assert.Equal(300, localPlayer.MaxHp);
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 
 namespace Mir2.Shared.Rules;
@@ -20,11 +21,20 @@ public readonly record struct SkillMeta(
 /// </summary>
 public static class SkillFormulas
 {
-    private static readonly Dictionary<string, SkillMeta> SkillsByName = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Dictionary<short, SkillMeta> SkillsById = new();
+    private static readonly System.Collections.Frozen.FrozenDictionary<string, SkillMeta> SkillsByName;
+    private static readonly System.Collections.Frozen.FrozenDictionary<short, SkillMeta> SkillsById;
 
     static SkillFormulas()
     {
+        var byName = new Dictionary<string, SkillMeta>(StringComparer.OrdinalIgnoreCase);
+        var byId = new Dictionary<short, SkillMeta>();
+
+        void Register(SkillMeta meta)
+        {
+            byName[meta.Name] = meta;
+            byId[meta.Id] = meta;
+        }
+
         Register(new SkillMeta(1, "火球术", 6, 5, 1));
         Register(new SkillMeta(2, "治愈术", 20, 5, 2));
         Register(new SkillMeta(3, "基本剑术", 0, 0, 0));
@@ -57,12 +67,10 @@ public static class SkillFormulas
         Register(new SkillMeta(30, "召唤神兽", 32, 30, 2));
         Register(new SkillMeta(31, "魔法盾", 17, 30, 1));
         Register(new SkillMeta(32, "冰咆哮", 19, 40, 1));
-    }
+        Register(new SkillMeta(33, "爆裂火焰", 13, 20, 1));
 
-    private static void Register(SkillMeta meta)
-    {
-        SkillsByName[meta.Name] = meta;
-        SkillsById[meta.Id] = meta;
+        SkillsByName = byName.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+        SkillsById = byId.ToFrozenDictionary();
     }
 
     public static SkillMeta? GetSkill(string name) =>

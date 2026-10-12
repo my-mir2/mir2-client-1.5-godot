@@ -5,6 +5,7 @@ using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Rules;
+using Mir2.Shared.Protocols;
 
 namespace Mir2.Server.Game;
 
@@ -23,6 +24,7 @@ public sealed class MonsterSpawnRule
     public int MaxCount { get; init; }
     public int ActiveCount { get; set; }
     public int BaseHp { get; init; } = 100;
+    public int Level { get; init; } = 0;
 }
 
 /// <summary>
@@ -102,15 +104,18 @@ public sealed class MonsterInstance
 {
     public int Uid { get; init; }
     public string Name { get; set; } = string.Empty;
+    public int Level { get; set; } = 1;
     public int MapId { get; set; }
     public int X { get; set; }
     public int Y { get; set; }
     public byte Direction { get; set; }
     public int Hp { get; set; }
     public int MaxHp { get; set; }
-    public int Exp { get; set; } = 100;
+    public int Exp { get; set; } = 0;
     public int MasterSessionId { get; set; } = 0; // 所属主人 SessionId (道士神兽/法师宝宝)
     public bool IsMad { get; set; } = false;      // 祈祷大叛变发狂标志
+    public bool IsRevoltWarning { get; set; } = false; // 盛大官方 1.5 随从叛变前 60 秒预警标志
+    public long TamedTickMs { get; set; } = 0;    // 诱惑之光驯服时间戳 (用于超 6 小时叛变检测)
     public int SpawnRuleId { get; init; }
     public bool IsDead => Hp <= 0;
     public bool IsButchered { get; set; } // 盛大官方 1.5 尸体割肉标记 (已被割空则不可再次割肉)
@@ -120,6 +125,8 @@ public sealed class MonsterInstance
     public int ViewRange { get; set; } = 5; // 官方默认视野 5 格 (0x4B966C @ +484)
     public int AttackDamageMin { get; set; } = 6;
     public int AttackDamageMax { get; set; } = 14;
+    public int Defense { get; set; } = 0; // 盛大官方 1.5 怪物基础物防
+    public int Mac { get; set; } = 0;     // 盛大官方 1.5 怪物基础魔防
     public long NextActionTimeMs { get; set; }
     public int TargetSessionId { get; set; }
 
@@ -131,6 +138,44 @@ public sealed class MonsterInstance
     public long NextSpecialSkillTimeMs { get; set; } = 0; // 特殊技能冷却计时器
     public int SpawnedSubMonsterCount { get; set; } = 0; // 角蝇当前繁殖存活的小怪数
     public int ParentMonsterUid { get; set; } = 0; // 孵化出来的子怪记录母体 UID
+
+    // 官方 1.5 随从模式与指令 (Ctrl+A / @Rest)
+    public bool IsResting { get; set; } = false;
+
+    // 官方 1.5 困魔咒金光牢笼禁锢 (受外力打击立即破除)
+    public bool IsTrappedByHolyCurse { get; set; }
+    public long TrappedExpireMs { get; set; }
+
+    // 官方 1.5 道士心灵启示透视显血
+    public bool IsRevealed { get; set; }
+    public long RevealedExpireMs { get; set; }
+    public int RevealedBySessionId { get; set; }
+
+    // 官方 1.5 怪物中毒状态
+    public bool HasGreenPoison { get; set; }
+    public bool HasRedPoison { get; set; }
+    public long GreenPoisonExpireMs { get; set; }
+    public long RedPoisonExpireMs { get; set; }
+    public long LastPoisonTickMs { get; set; }
+    public int PoisonSc { get; set; }
+    public int PoisonerSessionId { get; set; } = 0;
+
+    public void ApplyPoison(TaoistCombatEngine.PoisonType type, int durationSec, int sc, long nowMs, int poisonerSessionId = 0)
+    {
+        if (poisonerSessionId > 0) PoisonerSessionId = poisonerSessionId;
+        if (type == TaoistCombatEngine.PoisonType.Green)
+        {
+            HasGreenPoison = true;
+            GreenPoisonExpireMs = nowMs + durationSec * 1000L;
+            LastPoisonTickMs = nowMs;
+            PoisonSc = sc;
+        }
+        else if (type == TaoistCombatEngine.PoisonType.Red)
+        {
+            HasRedPoison = true;
+            RedPoisonExpireMs = nowMs + durationSec * 1000L;
+        }
+    }
 }
 
 /// <summary>
@@ -153,6 +198,79 @@ public sealed class MonsterRegenEngine
     public IReadOnlyList<MonsterSpawnRule> Rules => _rules;
     public int TotalActiveMonsters => _monsters.Count;
     public int TotalActiveCorpses => _corpses.Count;
+    public IEnumerable<MonsterInstance> AllActiveMonsters => _monsters.Values;
+    public IEnumerable<MonsterInstance> ActiveMonsters => _monsters.Values;
+    public IEnumerable<MonsterInstance> AllMonsters => _monsters.Values;
+    public SafeZoneAndGuardEngine SafeZoneEngine { get; set; } = new();
+
+    public void AddMonster(MonsterInstance monster)
+    {
+        _monsters[monster.Uid] = monster;
+    }
+
+    public static int ResolveMonsterLevel(string monsterName, int baseHp, int ruleLevel = 0)
+    {
+        if (ruleLevel > 0) return ruleLevel;
+        if (string.IsNullOrWhiteSpace(monsterName)) return 1;
+
+        if (monsterName.Contains("赤月恶魔") || monsterName.Contains("Demon")) return 60;
+        if (monsterName.Contains("祖玛教主")) return 50;
+        if (monsterName.Contains("沃玛教主")) return 45;
+        if (monsterName.Contains("触龙神")) return 45;
+        if (monsterName.Contains("祖玛卫士")) return 40;
+        if (monsterName.Contains("祖玛雕像")) return 37;
+        if (monsterName.Contains("白野猪")) return 35;
+        if (monsterName.Contains("神兽")) return 35;
+        if (monsterName.Contains("邪恶钳虫")) return 32;
+        if (monsterName.Contains("虎卫")) return 30;
+        if (monsterName.Contains("黑野猪")) return 30;
+        if (monsterName.Contains("红野猪")) return 28;
+        if (monsterName.Contains("钳虫")) return 26;
+        if (monsterName.Contains("巨型多角虫")) return 25;
+        if (monsterName.Contains("黑色恶蛆")) return 24;
+        if (monsterName.Contains("变异骷髅")) return 19;
+        if (monsterName.Contains("尸王") || monsterName.Contains("僵尸")) return 18;
+        if (monsterName.Contains("骷髅")) return 15;
+        if (monsterName.Contains("蝎子")) return 12;
+        if (monsterName.Contains("森林雪人") || monsterName.Contains("食人花") || monsterName.Contains("毒蜘蛛")) return 10;
+        if (monsterName.Contains("半兽人")) return 9;
+        if (monsterName.Contains("钉耙猫")) return 6;
+        if (monsterName.Contains("多钩猫")) return 5;
+        if (monsterName.Contains("蛤蟆")) return 4;
+        if (monsterName.Contains("稻草人")) return 3;
+        if (monsterName.Contains("鹿")) return 2;
+        if (monsterName.Contains("鸡")) return 1;
+
+        if (baseHp >= 1000) return 35;
+        if (baseHp >= 500) return 25;
+        if (baseHp >= 200) return 18;
+        if (baseHp >= 100) return 10;
+        return Math.Max(1, baseHp / 10);
+    }
+
+    /// <summary>
+    /// 动态生成怪物实体并加入世界 (用于祖玛教主狂暴召唤等)
+    /// </summary>
+    public MonsterInstance SpawnMonsterDirect(int mapId, int x, int y, string monsterName, int baseHp = 500, int minDmg = 20, int maxDmg = 40)
+    {
+        int uid = 70000 + Random.Shared.Next(20000);
+        var monster = new MonsterInstance
+        {
+            Uid = uid,
+            MapId = mapId,
+            X = x,
+            Y = y,
+            Name = monsterName,
+            Level = ResolveMonsterLevel(monsterName, baseHp),
+            Hp = baseHp,
+            MaxHp = baseHp,
+            AttackDamageMin = minDmg,
+            AttackDamageMax = maxDmg,
+            CanMove = true
+        };
+        _monsters[uid] = monster;
+        return monster;
+    }
 
     public MonsterRegenEngine(MapManager mapManager)
     {
@@ -206,6 +324,7 @@ public sealed class MonsterRegenEngine
                         {
                             Uid = uid,
                             Name = rule.MonsterName,
+                            Level = ResolveMonsterLevel(rule.MonsterName, rule.BaseHp, rule.Level),
                             MapId = rule.MapId,
                             X = targetX,
                             Y = targetY,
@@ -213,10 +332,11 @@ public sealed class MonsterRegenEngine
                             Hp = rule.BaseHp,
                             MaxHp = rule.BaseHp,
                             SpawnRuleId = rule.RuleId,
-                            // 官方怪物特异初始化规则
-                            IsStoneForm = rule.MonsterName.Contains("祖玛") && !rule.MonsterName.Contains("教主"),
+                            // 官方怪物特异初始化规则 (祖玛全系含教主初始石化)
+                            IsStoneForm = rule.MonsterName.Contains("祖玛"),
                             CanMove = !rule.MonsterName.Contains("角蝇") && !rule.MonsterName.Contains("赤月恶魔") && !rule.MonsterName.Contains("Demon"),
                             SeeInvisibility = rule.MonsterName.Contains("赤月恶魔") || rule.MonsterName.Contains("教主") || rule.MonsterName.Contains("Demon")
+                                           || rule.MonsterName.Contains("蛾") || rule.MonsterName.Contains("月魔") || rule.MonsterName.Contains("角蝇")
                         };
 
                         _monsters[uid] = monster;
@@ -268,6 +388,27 @@ public sealed class MonsterRegenEngine
         return null;
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 彻底注销并清除怪物或随从实例 (如随从消散/断线回收，不留尸体，直接抹除)
+    /// </summary>
+    public bool RemoveMonster(int monsterUid)
+    {
+        bool removed = _monsters.TryRemove(monsterUid, out var m);
+        _corpses.TryRemove(monsterUid, out _);
+        if (removed && m != null)
+        {
+            lock (_rules)
+            {
+                var rule = _rules.Find(r => r.RuleId == m.SpawnRuleId);
+                if (rule != null && rule.ActiveCount > 0)
+                {
+                    rule.ActiveCount--;
+                }
+            }
+        }
+        return removed;
+    }
+
     public MonsterInstance? GetMonster(int monsterUid)
     {
         _monsters.TryGetValue(monsterUid, out var m);
@@ -281,9 +422,16 @@ public sealed class MonsterRegenEngine
         return null;
     }
 
+    public void AddCorpse(MonsterInstance corpse)
+    {
+        corpse.CorpseExpireTimeMs = Environment.TickCount64 + 150_000;
+        _corpses[corpse.Uid] = corpse;
+    }
+
     public MonsterInstance? FindCorpse(int monsterUid)
     {
         if (_corpses.TryGetValue(monsterUid, out var c)) return c;
+        if (_monsters.TryGetValue(monsterUid, out var m) && m.IsDead) return m;
         return null;
     }
 
@@ -374,7 +522,11 @@ public sealed class MonsterRegenEngine
         byte Direction,
         int TargetSessionId,
         int DamageDealt,
-        string Extra = ""
+        string Extra = "",
+        int MapId = 0,
+        bool ShieldBroken = false,
+        bool Revived = false,
+        bool Died = false
     );
 
     /// <summary>
@@ -436,7 +588,8 @@ public sealed class MonsterRegenEngine
                         monster.Uid, monster.Name, ActionType: 6,
                         monster.X, monster.Y, monster.Direction,
                         monster.ThreatTable.PrimaryTargetId, DamageDealt: 0,
-                        Extra: "破石苏醒"
+                        Extra: "破石苏醒",
+                        MapId: monster.MapId
                     ));
                 }
                 continue; // 石化状态本帧不执行后续行动
@@ -457,13 +610,19 @@ public sealed class MonsterRegenEngine
                         int dist = Math.Max(Math.Abs(p.X - monster.X), Math.Abs(p.Y - monster.Y));
                         if (dist <= 15) // 官方全屏 15 格地刺判定
                         {
-                            int spikeDmg = rng.NextRange(monster.AttackDamageMin, monster.AttackDamageMax);
-                            p.State.Hp = Math.Max(0, p.State.Hp - spikeDmg);
+                            if (SafeZoneEngine.IsInSafeZone(p.CurrentMapId, p.X, p.Y)) continue; // 安全区禁武防护
+                            int rawSpike = rng.NextRange(monster.AttackDamageMin, monster.AttackDamageMax);
+                            int spikeDmg = BossEncounterEngine.CalculateRedMoonDemonGroundSpikeDamage(rawSpike, p.State);
+                            var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = p.State.TakeCombatDamageFull(spikeDmg, now);
                             actions.Add(new MonsterAiActionResult(
                                 monster.Uid, monster.Name, ActionType: 4,
                                 monster.X, monster.Y, monster.Direction,
                                 p.SessionId, DamageDealt: spikeDmg,
-                                Extra: "全屏地刺"
+                                Extra: "全屏地刺",
+                                MapId: monster.MapId,
+                                ShieldBroken: shieldBroken,
+                                Revived: revived,
+                                Died: died
                             ));
                             attacked = true;
                         }
@@ -529,13 +688,55 @@ public sealed class MonsterRegenEngine
                                     monster.Uid, monster.Name, ActionType: 5,
                                     batX, batY, (byte)d,
                                     0, DamageDealt: 0,
-                                    Extra: "吐出小蝙蝠"
+                                    Extra: "吐出小蝙蝠",
+                                    MapId: monster.MapId
                                 ));
                                 break;
                             }
                         }
                         continue;
                     }
+                }
+            }
+
+            // ==================== 3.85 盛大官方 1.5 规则: 诱惑随从叛变前 60 秒野性骚动变色预警 ====================
+            if (monster.MasterSessionId > 0 && !monster.IsMad && !monster.IsRevoltWarning && monster.TamedTickMs > 0
+                && (now - monster.TamedTickMs >= 6 * 3600 * 1000L - 60 * 1000L)
+                && !monster.Name.Contains("神兽") && !monster.Name.Contains("变异骷髅"))
+            {
+                monster.IsRevoltWarning = true;
+                var master = nearbyPlayers.Find(p => p.SessionId == monster.MasterSessionId);
+                if (master != null)
+                {
+                    master.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【野性骚动】你的随从【{monster.Name}】眼神泛起凶光，似乎即将摆脱驯化（60秒内可能叛变）！");
+                }
+            }
+
+            // ==================== 3.9 盛大官方 1.5 规则: 诱惑之光驯服随从存活超 6 小时发狂叛变 (神兽与变异骷髅严格豁免) ====================
+            if (monster.MasterSessionId > 0 && !monster.IsMad && monster.TamedTickMs > 0 && (now - monster.TamedTickMs >= 6 * 3600 * 1000L)
+                && !monster.Name.Contains("神兽") && !monster.Name.Contains("变异骷髅"))
+            {
+                monster.IsMad = true;
+                int formerMasterId = monster.MasterSessionId;
+                monster.MasterSessionId = 0;
+                monster.AttackDamageMin = (int)(monster.AttackDamageMin * 1.5);
+                monster.AttackDamageMax = (int)(monster.AttackDamageMax * 1.5);
+                monster.ThreatTable.AddHate(formerMasterId, 100, isTaunt: true); // 优先反噬前主人
+
+                // 生成随从发狂叛变行为记录，供同屏广播红名并跨地图清除前主人 Pets 列表
+                actions.Add(new MonsterAiActionResult(
+                    monster.Uid, monster.Name, ActionType: 7, // 7: 随从发狂叛变
+                    monster.X, monster.Y, monster.Direction,
+                    formerMasterId, DamageDealt: 0,
+                    Extra: "随从叛变",
+                    MapId: monster.MapId
+                ));
+
+                var formerMaster = nearbyPlayers.Find(p => p.SessionId == formerMasterId);
+                if (formerMaster != null)
+                {
+                    formerMaster.Pets.RemoveAll(pet => pet.Uid == monster.Uid);
+                    formerMaster.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【随从叛变】你的随从【{monster.Name}】驯化时效已达上限(6小时)，失去理智陷入狂暴叛变！");
                 }
             }
 
@@ -585,6 +786,7 @@ public sealed class MonsterRegenEngine
                     var p = nearbyPlayers[i];
                     if (p.State == null || p.State.Hp <= 0) continue;
                     if (p.State.IsInvisible && !monster.SeeInvisibility) continue;
+                    if (monster.MasterSessionId > 0 && !monster.IsMad && p.SessionId == monster.MasterSessionId) continue; // 忠诚随从绝不主动攻击主人
 
                     int chebyshevDist = Math.Max(Math.Abs(p.X - monster.X), Math.Abs(p.Y - monster.Y));
                     if (chebyshevDist <= monster.ViewRange && chebyshevDist < closestDist)
@@ -612,77 +814,163 @@ public sealed class MonsterRegenEngine
                 if (monster.Name.Contains("毒蜘蛛") && dist >= 2 && dist <= 4 && now >= monster.NextSpecialSkillTimeMs)
                 {
                     monster.Direction = GetDirection(dx, dy);
-                    int poisonDmg = rng.NextRange(monster.AttackDamageMin, monster.AttackDamageMax);
-                    targetPlayer.State!.Hp = Math.Max(0, targetPlayer.State.Hp - poisonDmg);
 
-                    // 附加官方原版绿毒 (清空血池，每 2.5 秒扣血)
-                    targetPlayer.State.HasGreenPoison = true;
-                    targetPlayer.State.GreenPoisonExpireMs = now + 10_000;
-                    targetPlayer.State.GreenPoisonSc = 5;
-                    targetPlayer.State.IncHealth = 0;
-                    targetPlayer.State.StatusBits[0] = true;
+                    // 权威安全区与视线障碍双重仲裁 (杜绝穿墙喷毒与安全区伤人)
+                    if (!SafeZoneEngine.IsInSafeZone(targetPlayer.CurrentMapId, targetPlayer.X, targetPlayer.Y) &&
+                        map.CheckLineOfSight(monster.X, monster.Y, targetPlayer.X, targetPlayer.Y))
+                    {
+                        int rawPoison = rng.NextRange(monster.AttackDamageMin, monster.AttackDamageMax);
+                        int poisonDmg = OfficialClientRulesEngine.CombatMath.CalculateMagicDamage(rawPoison, rawPoison, targetPlayer.State!.Mac, 0, rng);
+                        var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = targetPlayer.State.TakeCombatDamageFull(poisonDmg, now);
 
-                    monster.NextSpecialSkillTimeMs = now + 2000;
-                    monster.NextActionTimeMs = now + 1200;
-                    actions.Add(new MonsterAiActionResult(
-                        monster.Uid, monster.Name, ActionType: 3,
-                        monster.X, monster.Y, monster.Direction,
-                        targetPlayer.SessionId, DamageDealt: poisonDmg,
-                        Extra: "毒液喷射"
-                    ));
+                        // 附加官方原版绿毒 (清空血池，每 2.5 秒扣血)
+                        targetPlayer.State.HasGreenPoison = true;
+                        targetPlayer.State.GreenPoisonExpireMs = now + 10_000;
+                        targetPlayer.State.GreenPoisonSc = 5;
+                        targetPlayer.State.IncHealth = 0;
+                        targetPlayer.State.StatusBits[0] = true;
+
+                        monster.NextSpecialSkillTimeMs = now + 2000;
+                        monster.NextActionTimeMs = now + 1200;
+                        actions.Add(new MonsterAiActionResult(
+                            monster.Uid, monster.Name, ActionType: 3,
+                            monster.X, monster.Y, monster.Direction,
+                            targetPlayer.SessionId, DamageDealt: poisonDmg,
+                            Extra: "毒液喷射",
+                            MapId: monster.MapId,
+                            ShieldBroken: shieldBroken,
+                            Revived: revived,
+                            Died: died
+                        ));
+                    }
+                    else
+                    {
+                        // 处于安全区或视线被石壁阻挡，无法喷射毒液，转入动作冷却
+                        monster.NextSpecialSkillTimeMs = now + 1000;
+                        monster.NextActionTimeMs = now + 800;
+                    }
                 }
                 // 6.2 邻接物理近战攻击
                 else if (dist == 1)
                 {
                     monster.Direction = GetDirection(dx, dy);
-                    int dmg = rng.NextRange(monster.AttackDamageMin, monster.AttackDamageMax);
-                    targetPlayer.State!.Hp = Math.Max(0, targetPlayer.State.Hp - dmg);
 
-                    // 契蛾 / 蝙蝠 / 洞蛆 15% 几率近战麻痹石化
-                    if ((monster.Name.Contains("契蛾") || monster.Name.Contains("洞蛆") || monster.Name.Contains("蝙蝠")) && rng.Next(100) < 15)
+                    // 安全区禁武防护
+                    if (!SafeZoneEngine.IsInSafeZone(targetPlayer.CurrentMapId, targetPlayer.X, targetPlayer.Y))
                     {
-                        targetPlayer.State.ParalyzeExpireMs = now + 3000; // 麻痹 3 秒
-                        targetPlayer.State.StatusBits[5] = true;
-                    }
+                        int rawDmg = rng.NextRange(monster.AttackDamageMin, monster.AttackDamageMax);
+                        int dmg = OfficialClientRulesEngine.CombatMath.CalculatePhysicalDamage(rawDmg, rawDmg, targetPlayer.State!.Ac, 0, rng);
+                        var (finalHp, finalMp, died, revived, absorbed, shieldBroken) = targetPlayer.State.TakeCombatDamageFull(dmg, now);
 
-                    monster.NextActionTimeMs = now + 1000;
-                    actions.Add(new MonsterAiActionResult(
-                        monster.Uid, monster.Name, ActionType: 1,
-                        monster.X, monster.Y, monster.Direction,
-                        targetPlayer.SessionId, DamageDealt: dmg
-                    ));
+                        // 楔蛾 / 契蛾 / 月魔蜘蛛 / 洞蛆 / 蝙蝠 15% 几率近战麻痹石化
+                        if ((monster.Name.Contains("楔蛾") || monster.Name.Contains("契蛾") || monster.Name.Contains("月魔") || monster.Name.Contains("洞蛆") || monster.Name.Contains("蝙蝠")) && rng.Next(100) < 15)
+                        {
+                            targetPlayer.State.ParalyzeExpireMs = now + 3000; // 麻痹 3 秒
+                            targetPlayer.State.StatusBits[5] = true;
+                        }
+
+                        monster.NextActionTimeMs = now + 1000;
+                        actions.Add(new MonsterAiActionResult(
+                            monster.Uid, monster.Name, ActionType: 1,
+                            monster.X, monster.Y, monster.Direction,
+                            targetPlayer.SessionId, DamageDealt: dmg,
+                            Extra: "",
+                            MapId: monster.MapId,
+                            ShieldBroken: shieldBroken,
+                            Revived: revived,
+                            Died: died
+                        ));
+                    }
+                    else
+                    {
+                        monster.NextActionTimeMs = now + 1000;
+                    }
                 }
                 // 6.3 追击移动寻路
                 else if (dist > 1 && monster.CanMove)
                 {
-                    var (nextX, nextY, nextDir, found) = ServerPathFinder.FindNextStep(
-                        map,
-                        monster.X,
-                        monster.Y,
-                        targetPlayer.X,
-                        targetPlayer.Y,
-                        (checkX, checkY) => IsTileOccupiedByOtherMonster(monster.MapId, checkX, checkY, monster.Uid),
-                        maxDepth: monster.ViewRange + 2
-                    );
-
-                    if (found && (nextX != monster.X || nextY != monster.Y))
+                    // 盛大官方 1.5: 随从处于休息状态时原地待命，严禁离位追击
+                    if (monster.MasterSessionId > 0 && !monster.IsMad && monster.IsResting)
                     {
-                        monster.Direction = nextDir;
-                        monster.X = nextX;
-                        monster.Y = nextY;
-                        monster.NextActionTimeMs = now + 800;
-                        actions.Add(new MonsterAiActionResult(
-                            monster.Uid, monster.Name, ActionType: 0,
-                            monster.X, monster.Y, monster.Direction,
-                            targetPlayer.SessionId, DamageDealt: 0
-                        ));
+                        monster.NextActionTimeMs = now + 1000;
+                    }
+                    else
+                    {
+                        var (nextX, nextY, nextDir, found) = ServerPathFinder.FindNextStep(
+                            map,
+                            monster.X,
+                            monster.Y,
+                            targetPlayer.X,
+                            targetPlayer.Y,
+                            (checkX, checkY) => IsTileOccupiedByOtherMonster(monster.MapId, checkX, checkY, monster.Uid),
+                            maxDepth: monster.ViewRange + 2
+                        );
+
+                        if (found && (nextX != monster.X || nextY != monster.Y))
+                        {
+                            monster.Direction = nextDir;
+                            monster.X = nextX;
+                            monster.Y = nextY;
+                            monster.NextActionTimeMs = now + GetMonsterStepIntervalMs(monster.Name);
+                            actions.Add(new MonsterAiActionResult(
+                                monster.Uid, monster.Name, ActionType: 0,
+                                monster.X, monster.Y, monster.Direction,
+                                targetPlayer.SessionId, DamageDealt: 0,
+                                Extra: "",
+                                MapId: monster.MapId
+                            ));
+                        }
                     }
                 }
             }
             else
             {
                 monster.TargetSessionId = 0;
-                // 7. 闲置漫步巡逻 (20% 几率随机朝 8 方向漫步一格)
+
+                // 盛大官方 1.5 随从闲置护卫逻辑:
+                // 1) 处于休息状态: 原地戒备待命，绝不漫步游荡
+                // 2) 处于跟随状态: 若距离主人超过 2 格，智能寻路靠近主人身侧 (1~2格)；已在身侧则保持护卫
+                if (monster.MasterSessionId > 0 && !monster.IsMad)
+                {
+                    if (!monster.IsResting && monster.CanMove)
+                    {
+                        var master = nearbyPlayers.Find(p => p.SessionId == monster.MasterSessionId);
+                        if (master != null)
+                        {
+                            int masterDist = Math.Max(Math.Abs(master.X - monster.X), Math.Abs(master.Y - monster.Y));
+                            if (masterDist > 2)
+                            {
+                                var (nextX, nextY, nextDir, found) = ServerPathFinder.FindNextStep(
+                                    map,
+                                    monster.X,
+                                    monster.Y,
+                                    master.X,
+                                    master.Y,
+                                    (checkX, checkY) => IsTileOccupiedByOtherMonster(monster.MapId, checkX, checkY, monster.Uid),
+                                    maxDepth: monster.ViewRange + 4
+                                );
+
+                                if (found && (nextX != monster.X || nextY != monster.Y))
+                                {
+                                    monster.Direction = nextDir;
+                                    monster.X = nextX;
+                                    monster.Y = nextY;
+                                    monster.NextActionTimeMs = now + 800;
+                                    actions.Add(new MonsterAiActionResult(
+                                        monster.Uid, monster.Name, ActionType: 0,
+                                        monster.X, monster.Y, monster.Direction,
+                                        TargetSessionId: 0, DamageDealt: 0,
+                                        Extra: "跟随主人",
+                                        MapId: monster.MapId
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    continue; // 随从处理完毕，直接跳过野生怪物漫步
+                }
+
+                // 7. 闲置漫步巡逻 (野生怪物 20% 几率随机朝 8 方向漫步一格)
                 if (monster.CanMove && rng.Next(5) == 0)
                 {
                     int randDir = rng.Next(8);
@@ -702,7 +990,9 @@ public sealed class MonsterRegenEngine
                         actions.Add(new MonsterAiActionResult(
                             monster.Uid, monster.Name, ActionType: 2,
                             monster.X, monster.Y, monster.Direction,
-                            TargetSessionId: 0, DamageDealt: 0
+                            TargetSessionId: 0, DamageDealt: 0,
+                            Extra: "",
+                            MapId: monster.MapId
                         ));
                     }
                 }
@@ -752,4 +1042,25 @@ public sealed class MonsterRegenEngine
         7 => (-1, -1),
         _ => (0, 0)
     };
+
+    /// <summary>
+    /// 盛大官方 1.5 怪物生态步进时钟 (IDA sub_4B966C):
+    /// 恶蛆/楔蛾 400ms 极速冲刺，野猪/蜘蛛 800ms 敏捷奔跑，僵尸/骷髅 1200ms 蹒跚慢走
+    /// </summary>
+    public static int GetMonsterStepIntervalMs(string monsterName)
+    {
+        if (monsterName.Contains("恶蛆") || monsterName.Contains("狂蛆") || monsterName.Contains("楔蛾") || monsterName.Contains("月魔"))
+        {
+            return 400; // 极速突进
+        }
+        if (monsterName.Contains("野猪") || monsterName.Contains("蜘蛛") || monsterName.Contains("虎卫") || monsterName.Contains("神兽"))
+        {
+            return 800; // 正常奔跑
+        }
+        if (monsterName.Contains("僵尸") || monsterName.Contains("骷髅") || monsterName.Contains("稻草人") || monsterName.Contains("蛤蟆"))
+        {
+            return 1200; // 蹒跚缓步
+        }
+        return 800;
+    }
 }

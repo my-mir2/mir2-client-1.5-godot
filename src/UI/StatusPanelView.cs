@@ -20,6 +20,7 @@ public partial class StatusPanelView : Control, IManagedWindow
     public static readonly Vector2 DefaultPos = new(568, 0);
 
     public string WindowName => "StatusPanelView";
+    public Official24DialogCompendium.DialogId DialogId => Official24DialogCompendium.DialogId.StatusPanel;
     public new bool IsVisible
     {
         get => Visible;

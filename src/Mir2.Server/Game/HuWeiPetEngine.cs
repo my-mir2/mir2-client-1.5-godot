@@ -49,6 +49,43 @@ public sealed class HuWeiPetEngine
             7 => "Blue",
             _ => "White"
         };
+
+        /// <summary>
+        /// 获取当前随从名字的显示颜色码 (官方 SM_CHANGENAMECOLOR 41 协议参数，IDA 0x46A157)
+        /// 0: 白色 (0级), 1: 黄色 (1~2级), 2: 红色 (3~4级), 3: 绿色 (5~6级), 4: 蓝色 (7级极品巅峰)
+        /// </summary>
+        public int NameColorCode => Level switch
+        {
+            0 => 0,
+            1 or 2 => 1,
+            3 or 4 => 2,
+            5 or 6 => 3,
+            7 => 4,
+            _ => 0
+        };
+    }
+
+    /// <summary>
+    /// 根据初始召唤技能等级 (0~3级) 初始化随从属性与生命上限
+    /// 盛大官方 1.5 铁律:
+    /// - 0级技能招0级宝宝 (白名)
+    /// - 1级技能招1级宝宝 (黄名，MaxHp * 1.35)
+    /// - 2级技能招2级宝宝 (黄名，MaxHp * 1.7)
+    /// - 3级技能招3级宝宝 (红名，MaxHp * 2.1)
+    /// </summary>
+    public static void InitializePetBySkillLevel(SlavePet pet, int skillLevel)
+    {
+        pet.Level = Math.Clamp(skillLevel, 0, 3);
+        if (pet.Level > 0)
+        {
+            float mult = 1.0f + pet.Level * 0.35f;
+            pet.MaxHp = (int)(pet.MaxHp * mult);
+            pet.Hp = pet.MaxHp;
+            pet.MinDc += pet.Level * 4;
+            pet.MaxDc += pet.Level * 8;
+            pet.Ac += pet.Level * 3;
+            pet.Mac += pet.Level * 2;
+        }
     }
 
     /// <summary>
@@ -156,10 +193,26 @@ public sealed class HuWeiPetEngine
     /// </summary>
     public static void SyncPetTeleportWithMaster(SlavePet pet, int targetMapId, int masterX, int masterY)
     {
+        SyncPetTeleportWithMaster(pet, null, targetMapId, masterX, masterY);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 铁律: 主人跨地图瞬移或组队天地合一拉扯时，同步随从 SlavePet 与世界实体 MonsterInstance 物理坐标与地图，彻底杜绝老地图幽灵怪残留
+    /// </summary>
+    public static void SyncPetTeleportWithMaster(SlavePet pet, MonsterInstance? monster, int targetMapId, int masterX, int masterY)
+    {
         if (pet.IsDead) return;
 
         pet.CurrentMapId = targetMapId;
         pet.X = masterX + 1; // 默认随侍在侧
         pet.Y = masterY;
+
+        if (monster != null)
+        {
+            monster.MapId = targetMapId;
+            monster.X = pet.X;
+            monster.Y = pet.Y;
+            monster.TargetSessionId = 0; // 传送后解除旧仇恨，优先护卫主人
+        }
     }
 }

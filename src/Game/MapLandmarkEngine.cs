@@ -52,22 +52,49 @@ public static class MapLandmarkEngine
         ["1"] = new()
         {
             new("沃玛寺庙入口", 80, 80, LandmarkType.Portal, "沃玛教主盘踞古刹"),
-            new("封魔谷入口", 10, 400, LandmarkType.Portal, "通往封魔矿区入口"),
-            new("白日门入口", 350, 20, LandmarkType.Portal, "道家圣地白日门通路")
+            new("白日门入口", 350, 20, LandmarkType.Portal, "道家圣地白日门通路 (官方 1.5 虎卫传说主线)")
         },
-        // 白日门 (11)
+        // 白日门 (11) - 盛大官方 1.5 虎卫传说核心地标
         ["11"] = new()
         {
-            new("白日门城", 180, 300, LandmarkType.TownCenter, "天尊驻留之道家主城"),
-            new("丛林迷宫入口", 350, 240, LandmarkType.Portal, "通往赤月峡谷之险径")
+            new("白日门城", 180, 300, LandmarkType.TownCenter, "天尊驻留之道家主城与虎卫堂"),
+            new("丛林迷宫入口", 350, 240, LandmarkType.Portal, "通往赤月峡谷之险径"),
+            new("天尊道观", 200, 280, LandmarkType.SecretArea, "白日门天尊门徒修行处与虎卫堂")
         },
-        // 封魔谷 (4)
-        ["4"] = new()
+        // 赤月峡谷 / 抉择之地 / 恶魔祭坛 (D10051 / D10052 / D1006) - 盛大官方 1.5 虎卫传说核心首领地标
+        ["D10051"] = new()
         {
-            new("封魔城", 240, 200, LandmarkType.TownCenter, "封魔要塞安全区"),
-            new("封魔矿区", 140, 80, LandmarkType.Portal, "封魔殿深层入口")
+            new("恶魔祭坛", 180, 50, LandmarkType.SecretArea, "双头金刚与双头血魔盘踞之恶魔祭坛")
+        },
+        ["D10052"] = new()
+        {
+            new("赤月魔穴", 18, 15, LandmarkType.SecretArea, "赤月恶魔地表血肉地毯与全屏地刺核心巢穴")
+        },
+        // 祖玛寺庙 (D505 / D515)
+        ["D505"] = new()
+        {
+            new("祖玛阁入口", 20, 20, LandmarkType.Portal, "通往五行八卦祖玛迷宫"),
+            new("祖玛五层大厅", 140, 140, LandmarkType.SecretArea, "极品祖玛卫士大锤刷新区")
+        },
+        // 石墓 (D705 / D716 / D717)
+        ["D705"] = new()
+        {
+            new("石墓阵入口", 28, 28, LandmarkType.Portal, "通往石墓迷宫"),
+            new("石墓五层大厅", 80, 80, LandmarkType.SecretArea, "极品白猪出没地")
+        },
+        ["D717"] = new()
+        {
+            new("尸王出洞点", 82, 26, LandmarkType.SecretArea, "石墓七层尸王爬出洞口"),
+            new("屠龙古墓", 40, 40, LandmarkType.SecretArea, "邪恶毒蛇与极品小白大爆区")
+        },
+        // 死亡山谷 / 蜈蚣洞 (D617)
+        ["D617"] = new()
+        {
+            new("触龙神巢穴", 50, 50, LandmarkType.SecretArea, "百足之虫触龙神盘踞之死亡棺材"),
+            new("生死之间通道", 15, 80, LandmarkType.Portal, "通往一线天要道")
         }
     };
+
 
     public static IReadOnlyList<Landmark> GetLandmarks(string mapIdOrName)
     {
@@ -80,7 +107,11 @@ public static class MapLandmarkEngine
         if (mapIdOrName.Contains("毒蛇")) return LandmarksByMap["2"];
         if (mapIdOrName.Contains("沃玛")) return LandmarksByMap["1"];
         if (mapIdOrName.Contains("白日门")) return LandmarksByMap["11"];
-        if (mapIdOrName.Contains("封魔")) return LandmarksByMap["4"];
+        if (mapIdOrName.Contains("赤月") || mapIdOrName.Contains("魔穴")) return LandmarksByMap["D10052"];
+        if (mapIdOrName.Contains("恶魔祭坛")) return LandmarksByMap["D10051"];
+        if (mapIdOrName.Contains("祖玛") && LandmarksByMap.TryGetValue("D505", out var zuma)) return zuma;
+        if ((mapIdOrName.Contains("石墓") || mapIdOrName.Contains("猪洞")) && LandmarksByMap.TryGetValue("D705", out var pig)) return pig;
+        if ((mapIdOrName.Contains("蜈蚣") || mapIdOrName.Contains("死亡山谷")) && LandmarksByMap.TryGetValue("D617", out var cent)) return cent;
 
         return Array.Empty<Landmark>();
     }

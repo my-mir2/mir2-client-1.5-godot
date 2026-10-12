@@ -341,7 +341,7 @@ public sealed class TestGuildTradeEncoderMatrix
         Assert.Equal((short)707, ProtocolConsts.SM_TAKEBACKITEM_FULL);
 
         // 2. 模拟 Rust bridge 真实下发的 704 Extra 格式: "name\tdura\tmaxDura\titemIndex\n"
-        string samplePayload = "屠龙\t35\t35\t100\r\n雷霆战甲(男)\t40\t40\t101\n圣战戒指\t5\t5\t102\n";
+        string samplePayload = "屠龙\t35\t35\t100\r\n战神盔甲(男)\t40\t40\t101\n圣战戒指\t5\t5\t102\n";
         var items = PacketDecoder.DecodeStorageItems(samplePayload);
         Assert.Equal(3, items.Count);
 
@@ -350,7 +350,7 @@ public sealed class TestGuildTradeEncoderMatrix
         Assert.Equal(35, items[0].MaxDura);
         Assert.Equal(100, items[0].ItemIndex);
 
-        Assert.Equal("雷霆战甲(男)", items[1].Name);
+        Assert.Equal("战神盔甲(男)", items[1].Name);
         Assert.Equal(40, items[1].Dura);
         Assert.Equal(40, items[1].MaxDura);
         Assert.Equal(101, items[1].ItemIndex);
@@ -418,7 +418,7 @@ public sealed class TestGuildTradeEncoderMatrix
         router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALADDITEM_OK, 0, 0, 0, Encoding.UTF8.GetBytes("屠龙")));
         router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALADDITEM_FAIL, 0, 0, 0, Encoding.UTF8.GetBytes("无法放入")));
         router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALLOCKED, 0, 0, 0, Array.Empty<byte>()));
-        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALREMOTEADDITEM, 1, 0, 0, Encoding.UTF8.GetBytes("开天")));
+        router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALREMOTEADDITEM, 1, 0, 0, Encoding.UTF8.GetBytes("裁决之杖")));
         router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALREMOTEDELITEM, 1, 0, 0, Array.Empty<byte>()));
         router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALCHGGOLD_OK, 100000, 0, 0, Array.Empty<byte>()));
         router.OnPacket(new ServerPacket(ProtocolConsts.SM_DEALREMOTECHGGOLD, 200000, 0, 0, Array.Empty<byte>()));

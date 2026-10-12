@@ -11,7 +11,7 @@ namespace Mir2Client.Game
     {
         public static readonly string[] DarkMaps = new[]
         {
-            "d401", "d402", "d717", "d601", "d024", "d1001", "d2001"
+            "d401", "d402", "d717", "d601", "d1001"
         };
 
         public const int BaseDarkRadius = 1;
