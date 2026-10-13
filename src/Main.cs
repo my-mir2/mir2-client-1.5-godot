@@ -336,12 +336,18 @@ public partial class Main : Node
         }
     }
 
+    private string? _lastDisconnectReason;
+
     private void OnNetworkDisconnected(string reason)
     {
         GD.PrintErr($"[Main] 与游戏服务器断开连接，原因: {reason}，当前阶段: {_currentPhase}");
         if (_currentSceneNode is UI.LoginView loginView)
         {
-            loginView.ShowMessageModal("与服务器断开连接！");
+            string showMsg = !string.IsNullOrEmpty(_lastDisconnectReason)
+                ? _lastDisconnectReason
+                : "与服务器断开连接！";
+            _lastDisconnectReason = null;
+            loginView.ShowMessageModal(showMsg);
         }
     }
 
@@ -359,6 +365,23 @@ public partial class Main : Node
     {
         switch (smCode)
         {
+            case ProtocolConsts.SM_OUTOFCONNECTION: // 50: 盛大官方 1.5 断线提示 (账号密码错误、锁定、被踢下线)
+            {
+                var parsed = DecodeServerPacket(smCode, data);
+                string text = parsed?.ExtraStr ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(text) && data != null && data.Length > 0)
+                {
+                    try { text = System.Text.Encoding.UTF8.GetString(data); } catch { }
+                }
+                if (string.IsNullOrWhiteSpace(text)) text = "账号或密码错误，请检查后重试！";
+                GD.Print($"[Main] 收到服务端错误提示 SM_50: {text}");
+                _lastDisconnectReason = text;
+                if (_currentSceneNode is UI.LoginView lv)
+                {
+                    lv.ShowMessageModal(text);
+                }
+                break;
+            }
             case ProtocolConsts.SM_STARTPLAY: // 20: 盛大官方 1.5 原版角色进入游戏世界确认 (IDA 0x468867)
             {
                 GD.Print($"[Main] 收到服务端进入游戏确认协议 SM_{smCode}，角色身份验证通过，进入游戏大世界！");

@@ -346,6 +346,7 @@ public sealed class ClientSession : IDisposable, INpcPlayerSession
                 {
                     if (_socket.Connected)
                     {
+                        FlushDirectUnsafe();
                         _socket.Shutdown(SocketShutdown.Both);
                     }
                     _socket.Close();
