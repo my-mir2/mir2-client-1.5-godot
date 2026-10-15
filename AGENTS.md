@@ -70,6 +70,56 @@
 3. **防退化测试熔断机制**：
    - 任何涉及 UI 坐标或渲染修改，必须在 `tests/CSharp/TestOfficialUiGroundTruth.cs` 中补充断言，并确保 100% 通过！一旦发生坐标偏差，CI 立即红牌熔断！
 
+## 7. Google Jules 云端自主开发与实证工作流 (Cloud Jules Autonomous Workflow)
+
+### 7.1 环境与依赖 (Linux VM Environment)
+- **.NET 10 / C#**：工程完全基于 .NET 10 SDK 构建与测试。
+- **radare2 (r2) 逆向工具链**：云端 Linux 容器内如需实时穿透官方二进制，可直接运行：
+  ```bash
+  sudo apt-get update && sudo apt-get install -y radare2
+  ```
+- **官方二进制路径**：`docs/official_binary/MIR_final_v3_p.exe` (745KB，PE32 格式，Delphi 编译)。
+
+### 7.2 关键真值资产索引 (无需外部 IDA，项目内直接全局检索)
+1. **24 个原生窗体与全部控件静态坐标**：
+   - 检索 `scratch/official_dfm_tree.json`，内含官方客户端全部窗体（`TFrmDlg`、`TFrmMain`）中每个按钮、输入框、标签、面板的原始 `Left`、`Top`、`Width`、`Height` 绝对数值。
+2. **协议物理映射与状态码**：
+   - 上行客户端协议全集：`docs/ida_evidence/cm-protocol-map-15.md`
+   - 下行服务端广播协议全集：`docs/ida_evidence/SM_truth_table.md`
+   - 对话框与窗体交互状态机：`docs/ida_evidence/dialog_truth_table.md`
+   - radare2 符号与 VMT 分析记录：`docs/ida_evidence/client-r2-refactor-findings.md`
+3. **物品、怪物与掉落数据库**：
+   - 官方怪物属性与切片表：`src/Mir2.Shared/Data/OfficialMonsterStats.g.cs`
+   - 官方物品与外观 Looks 映射：`src/Mir2.Shared/Data/OfficialStdItemsRegistry.cs`
+
+### 7.3 自动化构建与验证命令 (Zero-UI Verification)
+Jules 在云端无图形桌面环境下，必须且仅能通过以下命令行走完验证闭环：
+1. **编译构建**：
+   ```bash
+   dotnet build Mir2Client.sln
+   ```
+   *要求：0 警告 0 错误。*
+2. **单元与集成测试**：
+   ```bash
+   dotnet test tests/CSharp/Mir2Client.Tests.csproj --no-build
+   ```
+   *要求：100% 全部通过。*
+3. **真实无头机器人端到端验证套件 (Mir2.Bot)**：
+   ```bash
+   python tools/run_bot_suite.py
+   ```
+   *套件直接通过网络协议连接服务端，覆盖移动走位、打怪、掉落保护、装备穿脱、商店买卖、修理、组队分经验、死亡复活等 18 大真实业务场景。*
+
+### 7.4 当前已知未闭环缺陷与任务缺口清单 (Jules Actionable Backlog)
+1. **NPC 对话文本与商人名称中文化**：
+   - 目前部分 NPC 对话脚本与商人名字仍保留了欧洲版英文原文，需依据盛大官方 1.5 中文版对照替换。
+2. **断线重连与网络异常容灾**：
+   - 客户端与服务端的断线重连（`SM_RECONNECT` / 状态恢复）协议链路尚未完全走通。
+3. **行会与交易面板互锁安全校验**：
+   - 交易进行中打开行会/仓库存取物品时的并发死锁与状态互斥防护待强化。
+4. **长时间高并发压测与内存稳定性**：
+   - 针对 `PacketDispatcher.cs` 与网关进行千人并发模拟压测，确保内存零泄漏与消息队列无拥塞。
+
 
 
 
