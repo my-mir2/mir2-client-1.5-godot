@@ -57,25 +57,25 @@ public sealed class SabukTreasuryEngine
     /// </summary>
     public (bool success, int withdrawn, string message) WithdrawCastleGold(ClientSession session, int amount)
     {
-        if (session.State == null) return (false, 0, "玩家状态异常。");
+        if (session.State == null) return (false, 0, "状态异常。");
         if (!session.CharacterName.Equals(LordCharacterName, StringComparison.OrdinalIgnoreCase))
         {
-            return (false, 0, "只有沙巴克城主本人方可进入金库支取税收公款！");
+            return (false, 0, "只有城主才能支取金币。");
         }
 
-        if (amount <= 0) return (false, 0, "请输入有效的支取金额。");
+        if (amount <= 0) return (false, 0, "请输入有效的金额。");
 
         lock (_treasuryLock)
         {
             if (GoldTreasury < amount)
             {
-                return (false, 0, $"金库公款储备不足！当前仅存: {GoldTreasury} 金币。");
+                return (false, 0, "金币不足。");
             }
 
             int currentGold = session.State.Gold;
             if (currentGold >= PlayerState.MaxGoldLimit)
             {
-                return (false, 0, "你身上的金币已达到单人携带极限 (10,000,000)，无法继续支取！");
+                return (false, 0, "携带金币已达上限。");
             }
 
             int maxCanReceive = WeightConstraintEngine.CalculateMaxGoldCanReceive(
@@ -85,7 +85,7 @@ public sealed class SabukTreasuryEngine
 
             if (maxCanReceive <= 0)
             {
-                return (false, 0, "你的背包负重已满，无法承受更多金币重量！");
+                return (false, 0, "背包负重已满。");
             }
 
             int actualWithdraw = Math.Min(amount, maxCanReceive);
@@ -97,7 +97,7 @@ public sealed class SabukTreasuryEngine
             session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, 0, 0, 0);
             session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
 
-            return (true, actualWithdraw, $"成功从沙巴克金库支取了 {actualWithdraw} 金币！金库剩余: {GoldTreasury}。");
+            return (true, actualWithdraw, $"已取出 {actualWithdraw} 金币。");
         }
     }
 

@@ -63,7 +63,7 @@ public sealed class ActiveTradeContext
 public sealed class TradeEngine
 {
     public const int MaxGoldCap = 10_000_000; // 官方 1000 万金币上限 (0x989680)
-    public const int MaxBagCapacity = 46;     // 官方交易检定 46 格背包上限 (0x4DDD52)
+    public const int MaxBagCapacity = 40;     // 官方客户端 1:1 实际 40 格背包硬上限 (防止越界溢出)
     public const int AntiFastDealThresholdMs = 1000; // 官方 1000ms 防快速连点门限 (0x4DDCF5)
 
     private readonly ConcurrentDictionary<int, ActiveTradeContext> _tradesBySession = new();

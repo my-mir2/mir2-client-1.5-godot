@@ -1,0 +1,3750 @@
+{
+  "type": "TFrmDlg",
+  "name": "FrmDlg",
+  "props": {
+    "Left": 180,
+    "Top": 179,
+    "Width": 844,
+    "Height": 561,
+    "Caption": "FrmDlg",
+    "Color": "clBtnFace",
+    "Font.Charset": "ANSI_CHARSET",
+    "Font.Color": "clWindowText",
+    "Font.Height": -12,
+    "Font.Name": "Courier New",
+    "Font.Style": [],
+    "OldCreateOrder": false,
+    "OnCreate": "FormCreate",
+    "OnDestroy": "FormDestroy",
+    "PixelsPerInch": 96,
+    "TextHeight": 15
+  },
+  "children": [
+    {
+      "type": "TDWindow",
+      "name": "DBackground",
+      "props": {
+        "Left": 0,
+        "Top": 0,
+        "Width": 836,
+        "Height": 534,
+        "OnMouseDown": "DBackgroundMouseDown",
+        "OnBackgroundClick": "DBackgroundBackgroundClick",
+        "Caption": "DBackground",
+        "Visible": true,
+        "EnableFocus": false,
+        "Align": "alClient",
+        "ClickCount": "csNorm",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DStateWin",
+      "props": {
+        "Left": 504,
+        "Top": 92,
+        "Width": 161,
+        "Height": 173,
+        "OnDirectPaint": "DStateWinDirectPaint",
+        "OnMouseMove": "DStateWinMouseMove",
+        "OnClick": "DStateWinClick",
+        "Caption": "DStateWindow",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DItemBag",
+      "props": {
+        "Left": 208,
+        "Top": 136,
+        "Width": 125,
+        "Height": 115,
+        "OnDirectPaint": "DItemBagDirectPaint",
+        "Caption": "DItemBag",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DBottom",
+      "props": {
+        "Left": 12,
+        "Top": 416,
+        "Width": 381,
+        "Height": 97,
+        "OnDirectPaint": "DBottomDirectPaint",
+        "OnMouseDown": "DBottomMouseDown",
+        "OnInRealArea": "DBottomInRealArea",
+        "Caption": "DBottom",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMyState",
+      "props": {
+        "Left": 244,
+        "Top": 452,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DMyStateDirectPaint",
+        "OnClick": "DMyStateClick",
+        "Caption": "State",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csGlass",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMyBag",
+      "props": {
+        "Left": 280,
+        "Top": 440,
+        "Width": 25,
+        "Height": 25,
+        "OnDirectPaint": "DMyStateDirectPaint",
+        "OnClick": "DMyStateClick",
+        "Caption": "Bag",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csGlass",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMyMagic",
+      "props": {
+        "Left": 316,
+        "Top": 428,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DMyStateDirectPaint",
+        "OnClick": "DMyStateClick",
+        "Caption": "Magic",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csGlass",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DOption",
+      "props": {
+        "Left": 356,
+        "Top": 424,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DMyStateDirectPaint",
+        "OnClick": "DMyStateClick",
+        "Caption": "Option",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csGlass",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGold",
+      "props": {
+        "Left": 216,
+        "Top": 204,
+        "Width": 37,
+        "Height": 29,
+        "OnDirectPaint": "DGoldDirectPaint",
+        "OnClick": "DGoldClick",
+        "Caption": "Gold",
+        "DParent": "DItemBag",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPrevState",
+      "props": {
+        "Left": 508,
+        "Top": 184,
+        "Width": 29,
+        "Height": 33,
+        "OnDirectPaint": "DPrevStateDirectPaint",
+        "OnClick": "DPrevStateClick",
+        "Caption": "Prior",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csGlass",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DRepairItem",
+      "props": {
+        "Left": 260,
+        "Top": 208,
+        "Width": 37,
+        "Height": 25,
+        "OnDirectPaint": "DRepairItemDirectPaint",
+        "OnInRealArea": "DRepairItemInRealArea",
+        "Caption": "Repair",
+        "DParent": "DItemBag",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DCloseBag",
+      "props": {
+        "Left": 304,
+        "Top": 204,
+        "Width": 21,
+        "Height": 33,
+        "OnDirectPaint": "DCloseBagDirectPaint",
+        "OnClick": "DCloseBagClick",
+        "Caption": "Close",
+        "DParent": "DItemBag",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DCloseState",
+      "props": {
+        "Left": 508,
+        "Top": 100,
+        "Width": 29,
+        "Height": 33,
+        "OnDirectPaint": "DPrevStateDirectPaint",
+        "OnClick": "DCloseStateClick",
+        "Caption": "Close",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DLogIn",
+      "props": {
+        "Left": 11,
+        "Top": 8,
+        "Width": 136,
+        "Height": 109,
+        "Caption": "DLogIn",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DLoginNew",
+      "props": {
+        "Left": 20,
+        "Top": 88,
+        "Width": 33,
+        "Height": 21,
+        "OnDirectPaint": "DLoginNewDirectPaint",
+        "OnClick": "DLoginNewClick",
+        "Caption": "New",
+        "DParent": "DLogIn",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DLoginOk",
+      "props": {
+        "Left": 100,
+        "Top": 64,
+        "Width": 37,
+        "Height": 21,
+        "OnDirectPaint": "DLoginNewDirectPaint",
+        "OnClick": "DLoginOkClick",
+        "Caption": "OK",
+        "DParent": "DLogIn",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DNewAccount",
+      "props": {
+        "Left": 152,
+        "Top": 8,
+        "Width": 81,
+        "Height": 109,
+        "OnDirectPaint": "DNewAccountDirectPaint",
+        "Caption": "DNewAccount",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DNewAccountOk",
+      "props": {
+        "Left": 160,
+        "Top": 88,
+        "Width": 31,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DNewAccountOkClick",
+        "Caption": "Ok",
+        "DParent": "DNewAccount",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DLoginClose",
+      "props": {
+        "Left": 116,
+        "Top": 16,
+        "Width": 21,
+        "Height": 21,
+        "OnDirectPaint": "DLoginNewDirectPaint",
+        "OnClick": "DLoginCloseClick",
+        "Caption": "X",
+        "DParent": "DLogIn",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DNewAccountClose",
+      "props": {
+        "Left": 196,
+        "Top": 16,
+        "Width": 21,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DNewAccountCloseClick",
+        "Caption": "X",
+        "DParent": "DNewAccount",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DSelectChr",
+      "props": {
+        "Left": 12,
+        "Top": 124,
+        "Width": 189,
+        "Height": 181,
+        "Caption": "DSelectChr",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "Font.Charset": "HANGEUL_CHARSET",
+        "Font.Color": "clWindowText",
+        "Font.Height": -12,
+        "Font.Name": "奔覆眉",
+        "Font.Style": [],
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DscSelect1",
+      "props": {
+        "Left": 20,
+        "Top": 152,
+        "Width": 57,
+        "Height": 21,
+        "OnDirectPaint": "DscSelect1DirectPaint",
+        "OnClick": "DscSelect1Click",
+        "Caption": "DscSelect1",
+        "DParent": "DSelectChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DscSelect2",
+      "props": {
+        "Left": 20,
+        "Top": 224,
+        "Width": 61,
+        "Height": 21,
+        "OnDirectPaint": "DscSelect1DirectPaint",
+        "OnClick": "DscSelect1Click",
+        "Caption": "DscSelect2",
+        "DParent": "DSelectChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DscStart",
+      "props": {
+        "Left": 84,
+        "Top": 136,
+        "Width": 102,
+        "Height": 17,
+        "OnDirectPaint": "DscSelect1DirectPaint",
+        "OnClick": "DscSelect1Click",
+        "Caption": "DscStart",
+        "DParent": "DSelectChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DscNewChr",
+      "props": {
+        "Left": 84,
+        "Top": 156,
+        "Width": 106,
+        "Height": 17,
+        "OnDirectPaint": "DscSelect1DirectPaint",
+        "OnClick": "DscSelect1Click",
+        "Caption": "DscNewChr",
+        "DParent": "DSelectChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DscEraseChr",
+      "props": {
+        "Left": 84,
+        "Top": 180,
+        "Width": 106,
+        "Height": 17,
+        "OnDirectPaint": "DscSelect1DirectPaint",
+        "OnClick": "DscSelect1Click",
+        "Caption": "DscEraseChr",
+        "DParent": "DSelectChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DscCredits",
+      "props": {
+        "Left": 84,
+        "Top": 200,
+        "Width": 106,
+        "Height": 17,
+        "OnDirectPaint": "DscSelect1DirectPaint",
+        "OnClick": "DscSelect1Click",
+        "Caption": "DscCredits",
+        "DParent": "DSelectChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DscExit",
+      "props": {
+        "Left": 84,
+        "Top": 224,
+        "Width": 106,
+        "Height": 21,
+        "OnDirectPaint": "DscSelect1DirectPaint",
+        "OnClick": "DscSelect1Click",
+        "Caption": "DscExit",
+        "DParent": "DSelectChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DCreateChr",
+      "props": {
+        "Left": 368,
+        "Top": 8,
+        "Width": 129,
+        "Height": 189,
+        "Caption": "DCreateChr",
+        "DParent": "DSelectChr",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccWarrior",
+      "props": {
+        "Tag": 55,
+        "Left": 370,
+        "Top": 44,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "傈荤",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccWizzard",
+      "props": {
+        "Tag": 56,
+        "Left": 402,
+        "Top": 44,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "贱荤",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccMonk",
+      "props": {
+        "Tag": 57,
+        "Left": 434,
+        "Top": 44,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "档荤",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccReserved",
+      "props": {
+        "Left": 458,
+        "Top": 44,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "?",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccMale",
+      "props": {
+        "Tag": 58,
+        "Left": 386,
+        "Top": 76,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "巢",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccFemale",
+      "props": {
+        "Tag": 59,
+        "Left": 418,
+        "Top": 76,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "咯",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccLeftHair",
+      "props": {
+        "Left": 386,
+        "Top": 128,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "<-",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccRightHair",
+      "props": {
+        "Left": 426,
+        "Top": 128,
+        "Width": 29,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "->",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccOk",
+      "props": {
+        "Left": 394,
+        "Top": 160,
+        "Width": 57,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "O K",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DccClose",
+      "props": {
+        "Left": 470,
+        "Top": 16,
+        "Width": 21,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DccCloseClick",
+        "Caption": "X",
+        "DParent": "DCreateChr",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDGrid",
+      "name": "DItemGrid",
+      "props": {
+        "Left": 212,
+        "Top": 141,
+        "Width": 117,
+        "Height": 45,
+        "OnDblClick": "DItemGridDblClick",
+        "Caption": "DItemGrid",
+        "DParent": "DItemBag",
+        "Visible": true,
+        "EnableFocus": false,
+        "ColCount": 8,
+        "RowCount": 5,
+        "ColWidth": 36,
+        "RowHeight": 32,
+        "ViewTopLine": 0,
+        "OnGridSelect": "DItemGridGridSelect",
+        "OnGridMouseMove": "DItemGridGridMouseMove",
+        "OnGridPaint": "DItemGridGridPaint"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DLoginChgPw",
+      "props": {
+        "Left": 64,
+        "Top": 88,
+        "Width": 73,
+        "Height": 21,
+        "OnDirectPaint": "DLoginNewDirectPaint",
+        "OnClick": "DLoginChgPwClick",
+        "Caption": "DLoginChgPw",
+        "DParent": "DLogIn",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DMsgDlg",
+      "props": {
+        "Left": 12,
+        "Top": 312,
+        "Width": 189,
+        "Height": 89,
+        "OnDirectPaint": "DMsgDlgDirectPaint",
+        "OnKeyDown": "DMsgDlgKeyDown",
+        "Caption": "DMsgDlg",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": true,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMsgDlgOk",
+      "props": {
+        "Left": 28,
+        "Top": 328,
+        "Width": 69,
+        "Height": 24,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DMsgDlgOkClick",
+        "Caption": "DMsgDlgOk",
+        "DParent": "DMsgDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMsgDlgYes",
+      "props": {
+        "Left": 24,
+        "Top": 360,
+        "Width": 69,
+        "Height": 24,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DMsgDlgOkClick",
+        "Caption": "DMsgDlgYes",
+        "DParent": "DMsgDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMsgDlgCancel",
+      "props": {
+        "Left": 112,
+        "Top": 328,
+        "Width": 69,
+        "Height": 24,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DMsgDlgOkClick",
+        "Caption": "DMsgDlgCancel",
+        "DParent": "DMsgDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMsgDlgNo",
+      "props": {
+        "Left": 108,
+        "Top": 360,
+        "Width": 69,
+        "Height": 24,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DMsgDlgOkClick",
+        "Caption": "DMsgDlgNo",
+        "DParent": "DMsgDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DNextState",
+      "props": {
+        "Left": 508,
+        "Top": 220,
+        "Width": 29,
+        "Height": 33,
+        "OnDirectPaint": "DPrevStateDirectPaint",
+        "OnClick": "DNextStateClick",
+        "Caption": "Next",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csGlass",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSWNecklace",
+      "props": {
+        "Left": 600,
+        "Top": 108,
+        "Width": 29,
+        "Height": 29,
+        "OnDirectPaint": "DSWLightDirectPaint",
+        "OnMouseMove": "DSWWeaponMouseMove",
+        "OnClick": "DSWWeaponClick",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSWLight",
+      "props": {
+        "Left": 600,
+        "Top": 144,
+        "Width": 29,
+        "Height": 29,
+        "OnDirectPaint": "DSWLightDirectPaint",
+        "OnMouseMove": "DSWWeaponMouseMove",
+        "OnClick": "DSWWeaponClick",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSWArmRingR",
+      "props": {
+        "Left": 544,
+        "Top": 184,
+        "Width": 29,
+        "Height": 29,
+        "OnDirectPaint": "DSWLightDirectPaint",
+        "OnMouseMove": "DSWWeaponMouseMove",
+        "OnClick": "DSWWeaponClick",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSWArmRingL",
+      "props": {
+        "Left": 600,
+        "Top": 184,
+        "Width": 29,
+        "Height": 29,
+        "OnDirectPaint": "DSWLightDirectPaint",
+        "OnMouseMove": "DSWWeaponMouseMove",
+        "OnClick": "DSWWeaponClick",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSWRingR",
+      "props": {
+        "Left": 544,
+        "Top": 220,
+        "Width": 29,
+        "Height": 29,
+        "OnDirectPaint": "DSWLightDirectPaint",
+        "OnMouseMove": "DSWWeaponMouseMove",
+        "OnClick": "DSWWeaponClick",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSWRingL",
+      "props": {
+        "Left": 600,
+        "Top": 220,
+        "Width": 29,
+        "Height": 29,
+        "OnDirectPaint": "DSWLightDirectPaint",
+        "OnMouseMove": "DSWWeaponMouseMove",
+        "OnClick": "DSWWeaponClick",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSWWeapon",
+      "props": {
+        "Left": 544,
+        "Top": 128,
+        "Width": 25,
+        "Height": 41,
+        "OnMouseMove": "DSWWeaponMouseMove",
+        "OnClick": "DSWWeaponClick",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSWDress",
+      "props": {
+        "Left": 576,
+        "Top": 128,
+        "Width": 21,
+        "Height": 113,
+        "OnMouseMove": "DSWWeaponMouseMove",
+        "OnClick": "DSWWeaponClick",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSWHelmet",
+      "props": {
+        "Left": 568,
+        "Top": 96,
+        "Width": 29,
+        "Height": 29,
+        "OnMouseMove": "DSWWeaponMouseMove",
+        "OnClick": "DSWWeaponClick",
+        "DParent": "DStateWin",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBelt1",
+      "props": {
+        "Left": 20,
+        "Top": 420,
+        "Width": 33,
+        "Height": 25,
+        "OnDirectPaint": "DBelt1DirectPaint",
+        "OnMouseMove": "DBelt1MouseMove",
+        "OnDblClick": "DBelt1DblClick",
+        "OnClick": "DBelt1Click",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBelt2",
+      "props": {
+        "Tag": 1,
+        "Left": 56,
+        "Top": 420,
+        "Width": 33,
+        "Height": 25,
+        "OnDirectPaint": "DBelt1DirectPaint",
+        "OnMouseMove": "DBelt1MouseMove",
+        "OnDblClick": "DBelt1DblClick",
+        "OnClick": "DBelt1Click",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBelt3",
+      "props": {
+        "Tag": 2,
+        "Left": 92,
+        "Top": 420,
+        "Width": 33,
+        "Height": 25,
+        "OnDirectPaint": "DBelt1DirectPaint",
+        "OnMouseMove": "DBelt1MouseMove",
+        "OnDblClick": "DBelt1DblClick",
+        "OnClick": "DBelt1Click",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBelt4",
+      "props": {
+        "Tag": 3,
+        "Left": 128,
+        "Top": 420,
+        "Width": 33,
+        "Height": 25,
+        "OnDirectPaint": "DBelt1DirectPaint",
+        "OnMouseMove": "DBelt1MouseMove",
+        "OnDblClick": "DBelt1DblClick",
+        "OnClick": "DBelt1Click",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBelt5",
+      "props": {
+        "Tag": 4,
+        "Left": 164,
+        "Top": 420,
+        "Width": 33,
+        "Height": 25,
+        "OnDirectPaint": "DBelt1DirectPaint",
+        "OnMouseMove": "DBelt1MouseMove",
+        "OnDblClick": "DBelt1DblClick",
+        "OnClick": "DBelt1Click",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBelt6",
+      "props": {
+        "Tag": 5,
+        "Left": 200,
+        "Top": 420,
+        "Width": 33,
+        "Height": 25,
+        "OnDirectPaint": "DBelt1DirectPaint",
+        "OnMouseMove": "DBelt1MouseMove",
+        "OnDblClick": "DBelt1DblClick",
+        "OnClick": "DBelt1Click",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DChgPw",
+      "props": {
+        "Left": 504,
+        "Top": 8,
+        "Width": 161,
+        "Height": 81,
+        "Caption": "ChgPw",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DChgpwOk",
+      "props": {
+        "Left": 528,
+        "Top": 44,
+        "Width": 49,
+        "Height": 25,
+        "OnDirectPaint": "DPrevStateDirectPaint",
+        "OnClick": "DChgpwOkClick",
+        "Caption": "OK",
+        "DParent": "DChgPw",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DChgpwCancel",
+      "props": {
+        "Left": 588,
+        "Top": 44,
+        "Width": 49,
+        "Height": 25,
+        "OnDirectPaint": "DPrevStateDirectPaint",
+        "OnClick": "DChgpwOkClick",
+        "Caption": "Cancel",
+        "DParent": "DChgPw",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DMerchantDlg",
+      "props": {
+        "Left": 208,
+        "Top": 320,
+        "Width": 119,
+        "Height": 85,
+        "OnDirectPaint": "DMerchantDlgDirectPaint",
+        "OnMouseDown": "DMerchantDlgMouseDown",
+        "OnMouseUp": "DMerchantDlgMouseUp",
+        "OnClick": "DMerchantDlgClick",
+        "Caption": "惑牢措拳芒",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMerchantDlgClose",
+      "props": {
+        "Left": 296,
+        "Top": 324,
+        "Width": 21,
+        "Height": 17,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMerchantDlgCloseClick",
+        "Caption": "X",
+        "DParent": "DMerchantDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DMenuDlg",
+      "props": {
+        "Left": 344,
+        "Top": 320,
+        "Width": 153,
+        "Height": 89,
+        "OnDirectPaint": "DMenuDlgDirectPaint",
+        "OnMouseMove": "DMenuDlgMouseMove",
+        "OnClick": "DMenuDlgClick",
+        "Caption": "皋春芒",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMenuPrev",
+      "props": {
+        "Left": 348,
+        "Top": 380,
+        "Width": 25,
+        "Height": 24,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMenuPrevClick",
+        "Caption": "<-",
+        "DParent": "DMenuDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csGlass",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMenuNext",
+      "props": {
+        "Left": 376,
+        "Top": 380,
+        "Width": 25,
+        "Height": 24,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMenuNextClick",
+        "Caption": "->",
+        "DParent": "DMenuDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csGlass",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMenuBuy",
+      "props": {
+        "Left": 436,
+        "Top": 380,
+        "Width": 25,
+        "Height": 24,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMenuBuyClick",
+        "Caption": "Buy",
+        "DParent": "DMenuDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMenuClose",
+      "props": {
+        "Left": 476,
+        "Top": 324,
+        "Width": 17,
+        "Height": 25,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMenuCloseClick",
+        "Caption": "X",
+        "DParent": "DMenuDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DSellDlg",
+      "props": {
+        "Left": 208,
+        "Top": 256,
+        "Width": 121,
+        "Height": 61,
+        "OnDirectPaint": "DSellDlgDirectPaint",
+        "Caption": "迫扁芒",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSellDlgOk",
+      "props": {
+        "Left": 300,
+        "Top": 292,
+        "Width": 25,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DSellDlgOkClick",
+        "Caption": "OK",
+        "DParent": "DSellDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSellDlgClose",
+      "props": {
+        "Left": 300,
+        "Top": 260,
+        "Width": 25,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DSellDlgCloseClick",
+        "Caption": "X",
+        "DParent": "DSellDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSellDlgSpot",
+      "props": {
+        "Left": 216,
+        "Top": 272,
+        "Width": 41,
+        "Height": 37,
+        "OnDirectPaint": "DSellDlgSpotDirectPaint",
+        "OnMouseMove": "DSellDlgSpotMouseMove",
+        "OnClick": "DSellDlgSpotClick",
+        "DParent": "DSellDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DStMag1",
+      "props": {
+        "Left": 636,
+        "Top": 108,
+        "Width": 21,
+        "Height": 17,
+        "OnDirectPaint": "DStMag1DirectPaint",
+        "OnClick": "DStMag1Click",
+        "DParent": "DStateWin",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DStMag2",
+      "props": {
+        "Tag": 1,
+        "Left": 636,
+        "Top": 129,
+        "Width": 21,
+        "Height": 17,
+        "OnDirectPaint": "DStMag1DirectPaint",
+        "OnClick": "DStMag1Click",
+        "DParent": "DStateWin",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DStMag3",
+      "props": {
+        "Tag": 2,
+        "Left": 636,
+        "Top": 150,
+        "Width": 21,
+        "Height": 17,
+        "OnDirectPaint": "DStMag1DirectPaint",
+        "OnClick": "DStMag1Click",
+        "DParent": "DStateWin",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DStMag4",
+      "props": {
+        "Tag": 3,
+        "Left": 636,
+        "Top": 171,
+        "Width": 21,
+        "Height": 17,
+        "OnDirectPaint": "DStMag1DirectPaint",
+        "OnClick": "DStMag1Click",
+        "DParent": "DStateWin",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DStMag5",
+      "props": {
+        "Tag": 4,
+        "Left": 636,
+        "Top": 192,
+        "Width": 21,
+        "Height": 17,
+        "OnDirectPaint": "DStMag1DirectPaint",
+        "OnClick": "DStMag1Click",
+        "DParent": "DStateWin",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DKeySelDlg",
+      "props": {
+        "Left": 672,
+        "Top": 8,
+        "Width": 145,
+        "Height": 109,
+        "OnDirectPaint": "DKeySelDlgDirectPaint",
+        "Caption": "虐 汲沥芒",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsIcon",
+      "props": {
+        "Left": 688,
+        "Top": 16,
+        "Width": 25,
+        "Height": 25,
+        "OnDirectPaint": "DKsIconDirectPaint",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsF1",
+      "props": {
+        "Left": 676,
+        "Top": 44,
+        "Width": 25,
+        "Height": 18,
+        "OnDirectPaint": "DKsF1DirectPaint",
+        "OnClick": "DKsF1Click",
+        "Caption": "F1",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsF2",
+      "props": {
+        "Left": 704,
+        "Top": 44,
+        "Width": 25,
+        "Height": 18,
+        "OnDirectPaint": "DKsF1DirectPaint",
+        "OnClick": "DKsF1Click",
+        "Caption": "F2",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsF3",
+      "props": {
+        "Left": 732,
+        "Top": 44,
+        "Width": 25,
+        "Height": 18,
+        "OnDirectPaint": "DKsF1DirectPaint",
+        "OnClick": "DKsF1Click",
+        "Caption": "F3",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsF4",
+      "props": {
+        "Left": 760,
+        "Top": 44,
+        "Width": 25,
+        "Height": 18,
+        "OnDirectPaint": "DKsF1DirectPaint",
+        "OnClick": "DKsF1Click",
+        "Caption": "F4",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsNone",
+      "props": {
+        "Left": 788,
+        "Top": 44,
+        "Width": 25,
+        "Height": 18,
+        "OnDirectPaint": "DKsF1DirectPaint",
+        "OnClick": "DKsF1Click",
+        "Caption": "N",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsOk",
+      "props": {
+        "Left": 716,
+        "Top": 88,
+        "Width": 57,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DKsOkClick",
+        "Caption": "OK",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBotGroup",
+      "props": {
+        "Left": 92,
+        "Top": 452,
+        "Width": 18,
+        "Height": 17,
+        "OnDirectPaint": "DBotGroupDirectPaint",
+        "OnClick": "DBotGroupClick",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBotTrade",
+      "props": {
+        "Left": 44,
+        "Top": 452,
+        "Width": 18,
+        "Height": 17,
+        "OnDirectPaint": "DBotGroupDirectPaint",
+        "OnClick": "DBotTradeClick",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBotMiniMap",
+      "props": {
+        "Left": 20,
+        "Top": 452,
+        "Width": 18,
+        "Height": 17,
+        "OnDirectPaint": "DBotGroupDirectPaint",
+        "OnClick": "DBotMiniMapClick",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DGroupDlg",
+      "props": {
+        "Left": 672,
+        "Top": 124,
+        "Width": 149,
+        "Height": 93,
+        "OnDirectPaint": "DGroupDlgDirectPaint",
+        "Caption": "GroupDlg",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGrpAllowGroup",
+      "props": {
+        "Left": 676,
+        "Top": 128,
+        "Width": 80,
+        "Height": 21,
+        "OnDirectPaint": "DGrpAllowGroupDirectPaint",
+        "OnClick": "DGrpAllowGroupClick",
+        "Caption": "Allow Group",
+        "DParent": "DGroupDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGrpDlgClose",
+      "props": {
+        "Left": 800,
+        "Top": 128,
+        "Width": 17,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DGrpDlgCloseClick",
+        "Caption": "X",
+        "DParent": "DGroupDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGrpCreate",
+      "props": {
+        "Left": 676,
+        "Top": 188,
+        "Width": 45,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DGrpCreateClick",
+        "Caption": "Create",
+        "DParent": "DGroupDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGrpAddMem",
+      "props": {
+        "Left": 724,
+        "Top": 188,
+        "Width": 45,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DGrpAddMemClick",
+        "Caption": "AddMem",
+        "DParent": "DGroupDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGrpDelMem",
+      "props": {
+        "Left": 772,
+        "Top": 188,
+        "Width": 45,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DGrpDelMemClick",
+        "Caption": "DelMem",
+        "DParent": "DGroupDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBotLogout",
+      "props": {
+        "Left": 180,
+        "Top": 452,
+        "Width": 18,
+        "Height": 17,
+        "OnDirectPaint": "DBotGroupDirectPaint",
+        "OnClick": "DBotLogoutClick",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBotExit",
+      "props": {
+        "Left": 204,
+        "Top": 452,
+        "Width": 18,
+        "Height": 17,
+        "OnDirectPaint": "DBotGroupDirectPaint",
+        "OnClick": "DBotExitClick",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBotGuild",
+      "props": {
+        "Left": 68,
+        "Top": 452,
+        "Width": 18,
+        "Height": 17,
+        "OnDirectPaint": "DBotGroupDirectPaint",
+        "OnClick": "DBotGuildClick",
+        "DParent": "DBottom",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DStPageUp",
+      "props": {
+        "Tag": 3,
+        "Left": 636,
+        "Top": 219,
+        "Width": 21,
+        "Height": 14,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DStPageUpClick",
+        "DParent": "DStateWin",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DStPageDown",
+      "props": {
+        "Tag": 4,
+        "Left": 636,
+        "Top": 236,
+        "Width": 21,
+        "Height": 14,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DStPageUpClick",
+        "DParent": "DStateWin",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DDealRemoteDlg",
+      "props": {
+        "Left": 336,
+        "Top": 200,
+        "Width": 63,
+        "Height": 81,
+        "OnDirectPaint": "DDealRemoteDlgDirectPaint",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DDealDlg",
+      "props": {
+        "Left": 400,
+        "Top": 200,
+        "Width": 97,
+        "Height": 81,
+        "OnDirectPaint": "DDealDlgDirectPaint",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDGrid",
+      "name": "DDRGrid",
+      "props": {
+        "Left": 344,
+        "Top": 208,
+        "Width": 49,
+        "Height": 33,
+        "DParent": "DDealRemoteDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ColCount": 5,
+        "RowCount": 2,
+        "ColWidth": 36,
+        "RowHeight": 32,
+        "ViewTopLine": 0,
+        "OnGridMouseMove": "DDRGridGridMouseMove",
+        "OnGridPaint": "DDRGridGridPaint"
+      },
+      "children": []
+    },
+    {
+      "type": "TDGrid",
+      "name": "DDGrid",
+      "props": {
+        "Left": 408,
+        "Top": 208,
+        "Width": 81,
+        "Height": 33,
+        "DParent": "DDealDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ColCount": 5,
+        "RowCount": 2,
+        "ColWidth": 36,
+        "RowHeight": 32,
+        "ViewTopLine": 0,
+        "OnGridSelect": "DDGridGridSelect",
+        "OnGridMouseMove": "DDGridGridMouseMove",
+        "OnGridPaint": "DDGridGridPaint"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DDealOk",
+      "props": {
+        "Left": 432,
+        "Top": 256,
+        "Width": 33,
+        "Height": 17,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DDealOkClick",
+        "DParent": "DDealDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DDealClose",
+      "props": {
+        "Left": 472,
+        "Top": 256,
+        "Width": 17,
+        "Height": 17,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DDealCloseClick",
+        "DParent": "DDealDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DDGold",
+      "props": {
+        "Left": 404,
+        "Top": 252,
+        "Width": 25,
+        "Height": 25,
+        "OnClick": "DDGoldClick",
+        "DParent": "DDealDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DDRGold",
+      "props": {
+        "Left": 340,
+        "Top": 252,
+        "Width": 25,
+        "Height": 25,
+        "DParent": "DDealRemoteDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DSelServerDlg",
+      "props": {
+        "Left": 240,
+        "Top": 8,
+        "Width": 121,
+        "Height": 124,
+        "OnDirectPaint": "DSelServerDlgDirectPaint",
+        "Caption": "DSelServer",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSSrvClose",
+      "props": {
+        "Left": 342,
+        "Top": 16,
+        "Width": 15,
+        "Height": 18,
+        "OnDirectPaint": "DLoginNewDirectPaint",
+        "OnClick": "DSSrvCloseClick",
+        "Caption": "X",
+        "DParent": "DSelServerDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer1",
+      "props": {
+        "Left": 248,
+        "Top": 16,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer2",
+      "props": {
+        "Tag": 1,
+        "Left": 248,
+        "Top": 27,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DUserState1",
+      "props": {
+        "Left": 400,
+        "Top": 416,
+        "Width": 97,
+        "Height": 97,
+        "OnDirectPaint": "DUserState1DirectPaint",
+        "OnMouseMove": "DUserState1MouseMove",
+        "OnMouseDown": "DUserState1MouseDown",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DCloseUS1",
+      "props": {
+        "Left": 404,
+        "Top": 420,
+        "Width": 18,
+        "Height": 18,
+        "OnDirectPaint": "DPrevStateDirectPaint",
+        "OnClick": "DCloseUS1Click",
+        "Caption": "Close",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DWeaponUS1",
+      "props": {
+        "Left": 424,
+        "Top": 440,
+        "Width": 14,
+        "Height": 26,
+        "OnMouseMove": "DWeaponUS1MouseMove",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DHelmetUS1",
+      "props": {
+        "Left": 446,
+        "Top": 423,
+        "Width": 18,
+        "Height": 14,
+        "OnMouseMove": "DWeaponUS1MouseMove",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DNecklaceUS1",
+      "props": {
+        "Left": 472,
+        "Top": 428,
+        "Width": 18,
+        "Height": 14,
+        "OnDirectPaint": "DNecklaceUS1DirectPaint",
+        "OnMouseMove": "DWeaponUS1MouseMove",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DDressUS1",
+      "props": {
+        "Left": 447,
+        "Top": 440,
+        "Width": 17,
+        "Height": 49,
+        "OnMouseMove": "DWeaponUS1MouseMove",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DLightUS1",
+      "props": {
+        "Left": 472,
+        "Top": 448,
+        "Width": 18,
+        "Height": 14,
+        "OnDirectPaint": "DNecklaceUS1DirectPaint",
+        "OnMouseMove": "DWeaponUS1MouseMove",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DArmringRUS1",
+      "props": {
+        "Left": 424,
+        "Top": 472,
+        "Width": 18,
+        "Height": 14,
+        "OnDirectPaint": "DNecklaceUS1DirectPaint",
+        "OnMouseMove": "DWeaponUS1MouseMove",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DRingRUS1",
+      "props": {
+        "Left": 424,
+        "Top": 492,
+        "Width": 18,
+        "Height": 14,
+        "OnDirectPaint": "DNecklaceUS1DirectPaint",
+        "OnMouseMove": "DWeaponUS1MouseMove",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DArmringLUS1",
+      "props": {
+        "Left": 472,
+        "Top": 472,
+        "Width": 18,
+        "Height": 14,
+        "OnDirectPaint": "DNecklaceUS1DirectPaint",
+        "OnMouseMove": "DWeaponUS1MouseMove",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DRingLUS1",
+      "props": {
+        "Left": 472,
+        "Top": 492,
+        "Width": 18,
+        "Height": 14,
+        "OnDirectPaint": "DNecklaceUS1DirectPaint",
+        "OnMouseMove": "DWeaponUS1MouseMove",
+        "DParent": "DUserState1",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNone"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer3",
+      "props": {
+        "Tag": 2,
+        "Left": 248,
+        "Top": 38,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer4",
+      "props": {
+        "Tag": 3,
+        "Left": 248,
+        "Top": 50,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DGuildDlg",
+      "props": {
+        "Left": 504,
+        "Top": 272,
+        "Width": 313,
+        "Height": 89,
+        "OnDirectPaint": "DGuildDlgDirectPaint",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDHome",
+      "props": {
+        "Left": 520,
+        "Top": 312,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DGDHomeClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDList",
+      "props": {
+        "Left": 520,
+        "Top": 336,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DGDListClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDChat",
+      "props": {
+        "Left": 568,
+        "Top": 336,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DGDChatClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDAddMem",
+      "props": {
+        "Left": 616,
+        "Top": 312,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DGDAddMemClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDDelMem",
+      "props": {
+        "Left": 616,
+        "Top": 336,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DGDDelMemClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDEditNotice",
+      "props": {
+        "Left": 664,
+        "Top": 312,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DGDEditNoticeClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDEditGrade",
+      "props": {
+        "Left": 664,
+        "Top": 336,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DGDEditGradeClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDAlly",
+      "props": {
+        "Left": 712,
+        "Top": 312,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DGDAllyClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDBreakAlly",
+      "props": {
+        "Left": 712,
+        "Top": 336,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DGDBreakAllyClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDWar",
+      "props": {
+        "Left": 768,
+        "Top": 312,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDCancelWar",
+      "props": {
+        "Left": 768,
+        "Top": 336,
+        "Width": 41,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDUp",
+      "props": {
+        "Left": 712,
+        "Top": 276,
+        "Width": 25,
+        "Height": 25,
+        "OnDirectPaint": "DPrevStateDirectPaint",
+        "OnClick": "DGDUpClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDDown",
+      "props": {
+        "Left": 744,
+        "Top": 276,
+        "Width": 25,
+        "Height": 25,
+        "OnDirectPaint": "DPrevStateDirectPaint",
+        "OnClick": "DGDDownClick",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGDClose",
+      "props": {
+        "Left": 792,
+        "Top": 276,
+        "Width": 17,
+        "Height": 17,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DGDCloseClick",
+        "Caption": "x",
+        "DParent": "DGuildDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DGuildEditNotice",
+      "props": {
+        "Left": 504,
+        "Top": 368,
+        "Width": 129,
+        "Height": 49,
+        "OnDirectPaint": "DGuildEditNoticeDirectPaint",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": true,
+        "ClickCount": "csNone",
+        "Floating": false
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGEClose",
+      "props": {
+        "Left": 608,
+        "Top": 376,
+        "Width": 17,
+        "Height": 17,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DGECloseClick",
+        "Caption": "x",
+        "DParent": "DGuildEditNotice",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DGEOk",
+      "props": {
+        "Left": 568,
+        "Top": 392,
+        "Width": 33,
+        "Height": 17,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DGEOkClick",
+        "Caption": "OK",
+        "DParent": "DGuildEditNotice",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer5",
+      "props": {
+        "Tag": 4,
+        "Left": 248,
+        "Top": 61,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer6",
+      "props": {
+        "Tag": 5,
+        "Left": 248,
+        "Top": 72,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DNewAccountCancel",
+      "props": {
+        "Left": 192,
+        "Top": 88,
+        "Width": 31,
+        "Height": 21,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DNewAccountCloseClick",
+        "Caption": "Cancel",
+        "DParent": "DNewAccount",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDWindow",
+      "name": "DAdjustAbility",
+      "props": {
+        "Left": 504,
+        "Top": 424,
+        "Width": 129,
+        "Height": 89,
+        "OnDirectPaint": "DAdjustAbilityDirectPaint",
+        "OnMouseMove": "DAdjustAbilityMouseMove",
+        "DParent": "DBackground",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNone",
+        "Floating": true
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPlusDC",
+      "props": {
+        "Left": 528,
+        "Top": 432,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DPlusDCClick",
+        "Caption": "+",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPlusMC",
+      "props": {
+        "Left": 512,
+        "Top": 440,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DPlusDCClick",
+        "Caption": "+",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPlusSC",
+      "props": {
+        "Left": 528,
+        "Top": 448,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DPlusDCClick",
+        "Caption": "+",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPlusAC",
+      "props": {
+        "Left": 512,
+        "Top": 456,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DPlusDCClick",
+        "Caption": "+",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPlusMAC",
+      "props": {
+        "Left": 528,
+        "Top": 464,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DPlusDCClick",
+        "Caption": "+",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPlusHP",
+      "props": {
+        "Left": 512,
+        "Top": 472,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DPlusDCClick",
+        "Caption": "+",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPlusMP",
+      "props": {
+        "Left": 528,
+        "Top": 480,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DPlusDCClick",
+        "Caption": "+",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPlusHit",
+      "props": {
+        "Left": 512,
+        "Top": 488,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DPlusDCClick",
+        "Caption": "+",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DPlusSpeed",
+      "props": {
+        "Left": 528,
+        "Top": 496,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DPlusDCClick",
+        "Caption": "+",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMinusDC",
+      "props": {
+        "Left": 576,
+        "Top": 432,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMinusDCClick",
+        "Caption": "-",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMinusMC",
+      "props": {
+        "Left": 560,
+        "Top": 440,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMinusDCClick",
+        "Caption": "-",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMinusSC",
+      "props": {
+        "Left": 576,
+        "Top": 448,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMinusDCClick",
+        "Caption": "-",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMinusAC",
+      "props": {
+        "Left": 560,
+        "Top": 456,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMinusDCClick",
+        "Caption": "-",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMinusMAC",
+      "props": {
+        "Left": 576,
+        "Top": 464,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMinusDCClick",
+        "Caption": "-",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMinusMP",
+      "props": {
+        "Left": 576,
+        "Top": 480,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMinusDCClick",
+        "Caption": "-",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMinusHP",
+      "props": {
+        "Left": 560,
+        "Top": 472,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMinusDCClick",
+        "Caption": "-",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMinusHit",
+      "props": {
+        "Left": 560,
+        "Top": 488,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMinusDCClick",
+        "Caption": "-",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DMinusSpeed",
+      "props": {
+        "Left": 576,
+        "Top": 496,
+        "Width": 18,
+        "Height": 12,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DMinusDCClick",
+        "Caption": "-",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DAdjustAbilClose",
+      "props": {
+        "Left": 608,
+        "Top": 432,
+        "Width": 17,
+        "Height": 17,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DAdjustAbilCloseClick",
+        "Caption": "x",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csGlass",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DAdjustAbilOk",
+      "props": {
+        "Left": 603,
+        "Top": 480,
+        "Width": 26,
+        "Height": 17,
+        "OnDirectPaint": "DccCloseDirectPaint",
+        "OnClick": "DAdjustAbilOkClick",
+        "Caption": "OK",
+        "DParent": "DAdjustAbility",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DBotPlusAbil",
+      "props": {
+        "Left": 116,
+        "Top": 452,
+        "Width": 18,
+        "Height": 17,
+        "OnDirectPaint": "DBotPlusAbilDirectPaint",
+        "OnClick": "DBotPlusAbilClick",
+        "DParent": "DBottom",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csNorm",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsF5",
+      "props": {
+        "Left": 676,
+        "Top": 66,
+        "Width": 25,
+        "Height": 18,
+        "OnDirectPaint": "DKsF1DirectPaint",
+        "OnClick": "DKsF1Click",
+        "Caption": "F5",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsF6",
+      "props": {
+        "Left": 704,
+        "Top": 66,
+        "Width": 25,
+        "Height": 18,
+        "OnDirectPaint": "DKsF1DirectPaint",
+        "OnClick": "DKsF1Click",
+        "Caption": "F6",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsF7",
+      "props": {
+        "Left": 732,
+        "Top": 66,
+        "Width": 25,
+        "Height": 18,
+        "OnDirectPaint": "DKsF1DirectPaint",
+        "OnClick": "DKsF1Click",
+        "Caption": "F7",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DKsF8",
+      "props": {
+        "Left": 760,
+        "Top": 66,
+        "Width": 25,
+        "Height": 18,
+        "OnDirectPaint": "DKsF1DirectPaint",
+        "OnClick": "DKsF1Click",
+        "Caption": "F8",
+        "DParent": "DKeySelDlg",
+        "Visible": true,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DEngServer1",
+      "props": {
+        "Left": 320,
+        "Top": 112,
+        "Width": 33,
+        "Height": 17,
+        "OnDirectPaint": "DMsgDlgOkDirectPaint",
+        "OnClick": "DEngServer1Click",
+        "Caption": "s1",
+        "DParent": "DSelServerDlg",
+        "Visible": true,
+        "EnableFocus": true,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer8",
+      "props": {
+        "Tag": 7,
+        "Left": 248,
+        "Top": 94,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer7",
+      "props": {
+        "Tag": 6,
+        "Left": 248,
+        "Top": 83,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer9",
+      "props": {
+        "Tag": 8,
+        "Left": 272,
+        "Top": 16,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer10",
+      "props": {
+        "Tag": 9,
+        "Left": 272,
+        "Top": 27,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer11",
+      "props": {
+        "Tag": 10,
+        "Left": 272,
+        "Top": 38,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer12",
+      "props": {
+        "Tag": 11,
+        "Left": 272,
+        "Top": 50,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer13",
+      "props": {
+        "Tag": 12,
+        "Left": 272,
+        "Top": 61,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer14",
+      "props": {
+        "Tag": 13,
+        "Left": 272,
+        "Top": 72,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer15",
+      "props": {
+        "Tag": 14,
+        "Left": 272,
+        "Top": 83,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer16",
+      "props": {
+        "Tag": 15,
+        "Left": 272,
+        "Top": 94,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer17",
+      "props": {
+        "Tag": 16,
+        "Left": 304,
+        "Top": 16,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer18",
+      "props": {
+        "Tag": 17,
+        "Left": 304,
+        "Top": 27,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer19",
+      "props": {
+        "Tag": 18,
+        "Left": 304,
+        "Top": 38,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer20",
+      "props": {
+        "Tag": 19,
+        "Left": 304,
+        "Top": 50,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer21",
+      "props": {
+        "Tag": 20,
+        "Left": 304,
+        "Top": 61,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer22",
+      "props": {
+        "Tag": 21,
+        "Left": 304,
+        "Top": 72,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer23",
+      "props": {
+        "Tag": 22,
+        "Left": 304,
+        "Top": 83,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer24",
+      "props": {
+        "Tag": 23,
+        "Left": 304,
+        "Top": 94,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer25",
+      "props": {
+        "Tag": 24,
+        "Left": 256,
+        "Top": 109,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer26",
+      "props": {
+        "Tag": 25,
+        "Left": 256,
+        "Top": 120,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer27",
+      "props": {
+        "Tag": 26,
+        "Left": 288,
+        "Top": 107,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    },
+    {
+      "type": "TDButton",
+      "name": "DSServer28",
+      "props": {
+        "Tag": 27,
+        "Left": 288,
+        "Top": 118,
+        "Width": 40,
+        "Height": 11,
+        "OnDirectPaint": "DSServer1DirectPaint",
+        "OnClick": "DSServer1Click",
+        "Caption": "OK",
+        "DParent": "DSelServerDlg",
+        "Visible": false,
+        "EnableFocus": false,
+        "ClickCount": "csStone",
+        "OnClickSound": "DLoginNewClickSound"
+      },
+      "children": []
+    }
+  ]
+}

@@ -29,6 +29,7 @@ public sealed class NpcEntity
     public int MapId { get; init; }
     public int X { get; init; }
     public int Y { get; init; }
+    public int Appr { get; init; } = 0;
 
     // 官方脚本页面字典: 键为 "@main", "@buy", "@sell", "@s_repair" 等
     public Dictionary<string, string> ScriptPages { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -53,11 +54,24 @@ public sealed class NpcMerchantEngine
     public void RegisterNpc(NpcEntity npc)
     {
         _npcs[npc.Uid] = npc;
+        EnsureDefaultGoods(npc);
     }
 
     public void RegisterNpc(int uid, string name, int mapId, int x, int y)
     {
-        _npcs[uid] = new NpcEntity { Uid = uid, Name = name, MapId = mapId, X = x, Y = y };
+        var npc = new NpcEntity { Uid = uid, Name = name, MapId = mapId, X = x, Y = y };
+        _npcs[uid] = npc;
+        EnsureDefaultGoods(npc);
+    }
+
+    private void EnsureDefaultGoods(NpcEntity npc)
+    {
+        if (npc.Goods.Count == 0 && (npc.Name.Contains("屠夫") || npc.Name.Contains("肉")))
+        {
+            npc.Goods.Add(new MerchantGoods { GoodsId = 1, Name = "鸡肉", Price = 100, Weight = 1, MaxDura = 10 });
+            npc.Goods.Add(new MerchantGoods { GoodsId = 2, Name = "肉", Price = 220, Weight = 2, MaxDura = 15 });
+            npc.Goods.Add(new MerchantGoods { GoodsId = 3, Name = "优质肉", Price = 450, Weight = 2, MaxDura = 20 });
+        }
     }
 
     public NpcEntity? GetNpc(int npcUid)
@@ -95,6 +109,19 @@ public sealed class NpcMerchantEngine
         }
         return null;
     }
+
+    public IEnumerable<NpcEntity> AllNpcs => _npcs.Values;
+
+    public NpcEntity? FindNpcByName(string name)
+    {
+        foreach (var kvp in _npcs)
+        {
+            if (string.Equals(kvp.Value.Name, name, StringComparison.OrdinalIgnoreCase))
+                return kvp.Value;
+        }
+        return null;
+    }
+
 
     /// <summary>
     /// 处理点击 NPC 打开对话框主页 (CM_MERCHANTHOMEPAGE 1010 -> SM_NPCDIALOG 54)
@@ -185,14 +212,19 @@ public sealed class NpcMerchantEngine
     /// 商店出售回收结算 (CM_USERSELLITEM 1013)
     /// 官方半价回收折算
     /// </summary>
-    public (bool success, int goldEarned, string itemName, string errorMsg) SellItem(ClientSession session, int itemUid)
+    public (bool success, int goldEarned, string itemName, string errorMsg) SellItem(ClientSession session, int itemUidOrSlot)
     {
         if (session.State == null) return (false, 0, string.Empty, "玩家状态异常");
 
-        int idx = session.State.BagItems.FindIndex(i => i.Uid == itemUid);
+        int idx = session.State.BagItems.FindIndex(i => i.Uid == itemUidOrSlot);
+        if (idx < 0 && itemUidOrSlot >= 0 && itemUidOrSlot < session.State.BagItems.Count)
+        {
+            idx = itemUidOrSlot;
+        }
         if (idx < 0) return (false, 0, string.Empty, "背包中不存在该物品");
 
         var item = session.State.BagItems[idx];
+        int itemUid = item.Uid;
 
         // 盛大官方 1.5 铁律: 出售实际回收金额严格等于事前估价计算 (CalculateSellPrice)
         var (sellPrice, _) = CalculateSellPrice(session, itemUid);
@@ -279,7 +311,11 @@ public sealed class NpcMerchantEngine
         if (equip == null) return (false, 0, string.Empty, "未找到待修理的装备");
 
         int duraLost = equip.MaxDura - equip.Dura;
-        if (duraLost <= 0) return (false, 0, equip.Name, "装备持久完好，无需修理");
+        if (duraLost <= 0)
+        {
+            // 盛大原版铁匠铺交互: 装备持久完好时直接返回原持久与当前金币，确认修理成功且扣费 0
+            return (true, 0, equip.Name, string.Empty);
+        }
 
         int cost = duraLost;
         if (session.State.Gold < cost)

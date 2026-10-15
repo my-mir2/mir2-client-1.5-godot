@@ -100,6 +100,10 @@ namespace Mir2Client.UI
 
         public override void _Ready()
         {
+            if (AudioManager.Instance == null)
+            {
+                AddChild(new AudioManager { Name = "AudioManager" });
+            }
             MapRendererInstance = GetNodeOrNull<MapRenderer>("MapRenderer");
             PlayerInstance = GetNodeOrNull<PlayerNode>("Player");
             if (PlayerInstance != null)
@@ -133,6 +137,7 @@ namespace Mir2Client.UI
             {
                 if (MapRendererInstance != null) InputPluginInstance.SetMapRenderer(MapRendererInstance);
                 InputPluginInstance.SetEntityManager(EntityManagerInstance);
+                if (HudInstance != null) InputPluginInstance.SetHudController(HudInstance);
             }
 
             SetupRetroDitherOverlay();
@@ -145,12 +150,11 @@ namespace Mir2Client.UI
                 if (PlayerInstance != null)
                 {
                     PlayerInstance.SetTilePos(330, 270);
-                    PlayerInstance.BodyDressType = 2; // 默认重盔甲男
-                    PlayerInstance.WeaponType = 2;     // 默认修罗
                 }
             }
 
             Callable.From(CheckAutoSandbox).CallDeferred();
+            FontManager.ApplyRecursively(this);
         }
 
         private void SetupRetroDitherOverlay()
@@ -172,6 +176,8 @@ namespace Mir2Client.UI
                 AddChild(_retroDitherOverlay);
             }
         }
+
+        private readonly List<WilLoader> _wilObjExtras = new();
 
         private void LoadResources()
         {
@@ -195,6 +201,25 @@ namespace Mir2Client.UI
             _wilMagic2.Load(ResPath.Resolve("resources/wil/Data/Magic2.wil"), ResPath.Resolve("resources/wil/Data/Magic2.WIX"));
             _wilEffect.Load(ResPath.Resolve("resources/wil/Data/Effect.wil"), ResPath.Resolve("resources/wil/Data/Effect.WIX"));
 
+            _wilObjExtras.Clear();
+            var allObjLoaders = new List<WilLoader> { _wilObj };
+            for (int i = 2; i <= 7; i++)
+            {
+                string wilPath = ResPath.Resolve($"resources/wil/Data/Objects{i}.wil");
+                string wixPath = ResPath.Resolve($"resources/wil/Data/Objects{i}.wix");
+                if (!System.IO.File.Exists(wixPath))
+                {
+                    wixPath = ResPath.Resolve($"resources/wil/Data/Objects{i}.WIX");
+                }
+                var extraLoader = new WilLoader();
+                if (System.IO.File.Exists(wilPath) && System.IO.File.Exists(wixPath))
+                {
+                    extraLoader.Load(wilPath, wixPath);
+                }
+                _wilObjExtras.Add(extraLoader);
+                allObjLoaders.Add(extraLoader);
+            }
+
             _wilMon1 = new WilLoader();
             _wilMon2 = new WilLoader();
             _wilMon3 = new WilLoader();
@@ -208,12 +233,30 @@ namespace Mir2Client.UI
             _wilDnItems.Load(ResPath.Resolve("resources/wil/Data/DnItems.wil"), ResPath.Resolve("resources/wil/Data/DnItems.WIX"));
 
             MapRendererInstance?.SetLoaders(_wilFloor, _wilObj, _wilSmTiles);
+            MapRendererInstance?.SetObjectLoaders(allObjLoaders.ToArray());
             PlayerInstance?.SetWilLoaders(_wilHum, _wilWeapon, _wilHair);
             MagicManagerInstance?.SetWilLoaders(_wilMagic, _wilMagic2, _wilEffect);
             if (MapRendererInstance != null)
             {
                 MagicManagerInstance?.SetMapRenderer(MapRendererInstance);
             }
+        }
+
+        /// <summary>
+        /// 盛大官方 1.5 移动阻挡与实体占位双重判定 (PlayScn.pas CanWalk)：
+        /// 既检查地图静态阻挡，也禁止玩家踏入存活怪物/NPC 所在的瓦片（已死亡或尸体不阻挡通行）
+        /// </summary>
+        public bool IsTileWalkableForPlayer(int tx, int ty)
+        {
+            if (!(MapRendererInstance?.IsPassable(tx, ty) ?? true))
+                return false;
+
+            foreach (var node in _entityNodes.Values)
+            {
+                if (!node.IsDead && !node.IsCorpse && node.TileX == tx && node.TileY == ty)
+                    return false;
+            }
+            return true;
         }
 
         private void SetupGroundItemEvents()
@@ -262,7 +305,18 @@ namespace Mir2Client.UI
         {
             EntityManagerInstance.EntityAdded += (data) =>
             {
-                if (_entityNodes.ContainsKey(data.Uid)) return;
+                // 本地主角自身由 PlayerInstance 独立渲染与控制，严禁重复生成外部 EntityNode 导致角色立绘与名字重叠
+                if (data.Uid == EntityManagerInstance.LocalPlayerUid) return;
+
+                if (_entityNodes.TryGetValue(data.Uid, out var existingNode))
+                {
+                    existingNode.EntityName = data.Name;
+                    existingNode.TileX = data.TileX;
+                    existingNode.TileY = data.TileY;
+                    existingNode.Direction = data.Direction;
+                    if (data.Appr > 0) existingNode.Appr = data.Appr;
+                    return;
+                }
 
                 string masterName = data.MasterUid > 0 && EntityManagerInstance.GetEntity(data.MasterUid) is { } master
                     ? master.Name
@@ -284,9 +338,16 @@ namespace Mir2Client.UI
                     MasterName = masterName
                 };
 
-                WilLoader? loader = data.Type == EntityManager.EntityType.Npc
-                    ? _wilNpc
-                    : MonsterWilPool.Instance.GetLoaderForAppr(data.Appr);
+                WilLoader? loader;
+                if (data.Type == EntityManager.EntityType.Npc)
+                {
+                    loader = _wilNpc;
+                }
+                else
+                {
+                    var spec = OfficialMonsterAssetRegistry.Resolve(data.Name, data.Appr);
+                    loader = MonsterWilPool.Instance.GetLoader(spec.WilIndex);
+                }
 
                 node.SetLoader(loader);
                 if (MapRendererInstance != null) node.SetMapRenderer(MapRendererInstance);
@@ -318,6 +379,16 @@ namespace Mir2Client.UI
             {
                 if (_entityNodes.TryGetValue(uid, out var node))
                 {
+                    if (!node.IsDead && PlayerInstance != null && x == PlayerInstance.TileX && (y == PlayerInstance.TileY || y == PlayerInstance.TileY + 1))
+                    {
+                        x = PlayerInstance.TileX + 1;
+                        y = PlayerInstance.TileY;
+                        if (EntityManagerInstance.GetEntity(uid) is { } ent)
+                        {
+                            ent.TileX = x;
+                            ent.TileY = y;
+                        }
+                    }
                     // 默认步长平滑位移
                     node.StartStepMovement(x, y, dir, false);
                 }
@@ -441,15 +512,31 @@ namespace Mir2Client.UI
                     int tx = PlayerInstance.TileX + offset.X;
                     int ty = PlayerInstance.TileY + offset.Y;
 
-                    // 盛大官方 1.5 规则：若目标瓦片为不可通行障碍物/墙体，角色原地转向而不迈步
-                    bool passable = MapRendererInstance?.IsPassable(tx, ty) ?? true;
-                    if (!passable)
+                    if (IsTileWalkableForPlayer(tx, ty))
                     {
-                        PlayerInstance.TurnTo(dir);
+                        PlayerInstance.StartStepMovement(tx, ty, 1, ActionType.Walk, dir);
                         return;
                     }
 
-                    PlayerInstance.StartStepMovement(tx, ty, 1, ActionType.Walk, dir);
+                    // 盛大官方 1.5 ClMain.pas (0x461992..0x4619E8) 45度顺/逆时针自动绕障滑步：
+                    // 当正前方被斜墙、屋角或怪物阻挡时，依次尝试顺时针 45° ((dir+1)&7) 与逆时针 45° ((dir+7)&7) 滑步 1 格！
+                    int dirCw = (dir + 1) & 7;
+                    var offCw = PlayerAuditEngine.DirOffsets[dirCw];
+                    if (IsTileWalkableForPlayer(PlayerInstance.TileX + offCw.X, PlayerInstance.TileY + offCw.Y))
+                    {
+                        PlayerInstance.StartStepMovement(PlayerInstance.TileX + offCw.X, PlayerInstance.TileY + offCw.Y, 1, ActionType.Walk, dirCw);
+                        return;
+                    }
+
+                    int dirCcw = (dir + 7) & 7;
+                    var offCcw = PlayerAuditEngine.DirOffsets[dirCcw];
+                    if (IsTileWalkableForPlayer(PlayerInstance.TileX + offCcw.X, PlayerInstance.TileY + offCcw.Y))
+                    {
+                        PlayerInstance.StartStepMovement(PlayerInstance.TileX + offCcw.X, PlayerInstance.TileY + offCcw.Y, 1, ActionType.Walk, dirCcw);
+                        return;
+                    }
+
+                    PlayerInstance.TurnTo(dir);
                 };
 
                 InputPluginInstance.RunRequested += (dir) =>
@@ -461,18 +548,32 @@ namespace Mir2Client.UI
                     int runX = PlayerInstance.TileX + offset.X * 2;
                     int runY = PlayerInstance.TileY + offset.Y * 2;
 
-                    // 盛大官方 1.5 双格奔跑阻挡判定：
-                    // 1. 中间格不可走：不能跑也不能走，原地转向
-                    bool midPassable = MapRendererInstance?.IsPassable(midX, midY) ?? true;
-                    if (!midPassable)
+                    // 盛大官方 1.5 双格奔跑阻挡与 45 度绕障滑步判定 (ClMain.pas 0x461992..0x4619E8)：
+                    // 1. 中间格不可走：依次尝试顺时针 45° 与逆时针 45° 滑步走动 1 格，若均不可走则原地转向
+                    if (!IsTileWalkableForPlayer(midX, midY))
                     {
+                        int dirCw = (dir + 1) & 7;
+                        var offCw = PlayerAuditEngine.DirOffsets[dirCw];
+                        if (IsTileWalkableForPlayer(PlayerInstance.TileX + offCw.X, PlayerInstance.TileY + offCw.Y))
+                        {
+                            PlayerInstance.StartStepMovement(PlayerInstance.TileX + offCw.X, PlayerInstance.TileY + offCw.Y, 1, ActionType.Walk, dirCw);
+                            return;
+                        }
+
+                        int dirCcw = (dir + 7) & 7;
+                        var offCcw = PlayerAuditEngine.DirOffsets[dirCcw];
+                        if (IsTileWalkableForPlayer(PlayerInstance.TileX + offCcw.X, PlayerInstance.TileY + offCcw.Y))
+                        {
+                            PlayerInstance.StartStepMovement(PlayerInstance.TileX + offCcw.X, PlayerInstance.TileY + offCcw.Y, 1, ActionType.Walk, dirCcw);
+                            return;
+                        }
+
                         PlayerInstance.TurnTo(dir);
                         return;
                     }
 
                     // 2. 目标格不可走：平滑降级为走动 1 格
-                    bool runPassable = MapRendererInstance?.IsPassable(runX, runY) ?? true;
-                    if (!runPassable)
+                    if (!IsTileWalkableForPlayer(runX, runY))
                     {
                         PlayerInstance.StartStepMovement(midX, midY, 1, ActionType.Walk, dir);
                         return;
@@ -486,7 +587,7 @@ namespace Mir2Client.UI
                 {
                     if (PlayerInstance.IsDead) return;
                     var startTile = new Vector2I(PlayerInstance.TileX, PlayerInstance.TileY);
-                    var path = FastPathFinder.FindPath(startTile, targetTile, (x, y) => MapRendererInstance?.IsPassable(x, y) ?? true);
+                    var path = FastPathFinder.FindPath(startTile, targetTile, (x, y) => IsTileWalkableForPlayer(x, y));
                     if (path != null && path.Count > 0)
                     {
                         PlayerInstance.SetPath(path, run: false);
@@ -502,9 +603,7 @@ namespace Mir2Client.UI
                 InputPluginInstance.HitRequested += (dir) =>
                 {
                     if (PlayerInstance.IsDead) return;
-                    PlayerInstance.Direction = dir & 7;
-                    PlayerInstance.Anim.SetAction(ActionType.Hit, dir);
-                    AudioManager.Instance?.PlaySoundId(1);
+                    PlayerInstance.PlayHit(dir);
                     if (_net != null && _net.IsConnectedToServer)
                     {
                         var offset = PlayerAuditEngine.DirOffsets[dir & 7];
@@ -533,11 +632,8 @@ namespace Mir2Client.UI
                     PerformPickup();
                 };
 
-                PlayerInstance.TileStepped += (tile) =>
-                {
-                    if (PlayerInstance.IsDead) return;
-                    PerformPickup();
-                };
+                // 盛大官方 1.5 权威铁律 (ClMain.pas / PlayScn.pas)：
+                // 严禁走步踩瓦片自动拾取私服外挂行为！拾取必须由玩家主动按 Space 空格键触发！
 
                 InputPluginInstance.ButcherRequested += (tx, ty, dir) =>
                 {
@@ -760,13 +856,13 @@ namespace Mir2Client.UI
                         HudInstance.MessageBox.ShowMessage("你想退出吗 ?", true, () =>
                         {
                             _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSoftClose, ReadOnlySpan<byte>.Empty);
-                            GetTree().Quit();
+                            AppLifecycle.SafeQuit(0);
                         });
                     }
                     else
                     {
                         _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSoftClose, ReadOnlySpan<byte>.Empty);
-                        GetTree().Quit();
+                        AppLifecycle.SafeQuit(0);
                     }
                 };
 
@@ -1267,28 +1363,18 @@ namespace Mir2Client.UI
             HudInstance?.UpdateHp(PlayerStateInstance.Hp, PlayerStateInstance.MaxHp);
             HudInstance?.UpdateMp(PlayerStateInstance.Mp, PlayerStateInstance.MaxMp);
 
-            if (res.shieldAbsorbed > 0)
-            {
-                HudInstance?.AddChat("法术", $"【魔法盾】吸收化解了 {res.shieldAbsorbed} 点攻击伤害！", new Color(0.4f, 0.9f, 1f));
-            }
             if (res.shieldBroken)
             {
-                HudInstance?.AddChat("法术", "【魔法盾】抵御极限破裂消散！", new Color(1f, 0.4f, 0.4f));
-                AudioManager.Instance?.PlaySoundId(138);
+                AudioManager.Instance?.PlaySoundId(138); // 破盾音效
             }
 
             if (res.revived)
             {
-                HudInstance?.AddChat("提示", "【复活戒指】神力生效！生命瞬间恢复全满！", new Color(1f, 0.95f, 0.3f));
-                AudioManager.Instance?.PlaySoundId(2);
+                AudioManager.Instance?.PlaySoundId(2); // 复活圣光音效
             }
             else if (res.died)
             {
                 TriggerPlayerDeath();
-            }
-            else
-            {
-                HudInstance?.AddChat("承伤", $"受到攻击，剩余生命 {PlayerStateInstance.Hp}，魔法 {PlayerStateInstance.Mp}", new Color(1f, 0.6f, 0.6f));
             }
         }
 
@@ -1383,6 +1469,7 @@ namespace Mir2Client.UI
                     TargetY = (short)targetY
                 };
                 _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentSpell, in p);
+                _net.SendPacket(PacketEncoder.Spell(magicId, (short)targetX, (short)targetY, targetUid));
             }
 
         switch (magicId)
@@ -1428,22 +1515,16 @@ namespace Mir2Client.UI
                                 var pType = (poisonTarget.PoisonMask & 1) == 0 ? TaoistCombatEngine.PoisonType.Green : TaoistCombatEngine.PoisonType.Red;
                                 int duration = TaoistCombatEngine.CalculatePoisonDurationSec(pType, taoistSc: 25);
                                 EntityManagerInstance.ApplyPoison(poisonTarget.Uid, pType, duration, sc: 25, (long)now);
-                                string pName = pType == TaoistCombatEngine.PoisonType.Green ? "【绿毒】持续侵蚀" : "【红毒】防御削弱 20% 并承受 1.2 倍增伤";
-                                HudInstance?.AddChat("施毒", $"施毒术命中【{poisonTarget.Name}】！附着 {pName}（持续 {duration} 秒）！", new Color(0.2f, 1f, 0.4f));
                                 AudioManager.Instance?.PlaySoundId(14);
-                            }
-                            else
-                            {
-                                HudInstance?.AddChat("战斗", $"【{poisonTarget.Name}】凭借高抗毒属性成功抵抗了毒粉侵袭！", new Color(0.8f, 0.8f, 0.8f));
                             }
                         }
                     }
 #endif
                     break;
 
-                case 7: // 攻杀剑术
+                case 7: // 攻杀剑术 (s_powerhit = 131)
                     PlayerInstance.Anim.SetAction(ActionType.PowerHit, dir);
-                    AudioManager.Instance?.PlaySoundId(1);
+                    AudioManager.Instance?.PlaySoundId(131);
                     if (_net != null && _net.IsConnectedToServer)
                     {
                         var p = new BinaryProtocol.AttackIntentPayload { TargetUid = _selectedTargetUid, Direction = (byte)dir, SkillType = 1 };
@@ -1534,16 +1615,10 @@ namespace Mir2Client.UI
                                 {
                                     node.SetPetInfo(1, Username);
                                 }
-                                HudInstance?.AddChat("技能", $"【诱惑成功】目标【{targetMonster.Name}】已被驯服为您的随从！", new Color(0.3f, 1f, 0.4f));
                             }
                             else if (tameRes.Outcome == MageCombatEngine.Temptation.TameOutcome.Paralyzed)
                             {
                                 targetMonster.IsFrozen = true;
-                                HudInstance?.AddChat("技能", $"【心智迷离】目标【{targetMonster.Name}】受到强光定身麻痹 {tameRes.ParalyzeDurationSec} 秒！", new Color(1f, 0.9f, 0.2f));
-                            }
-                            else
-                            {
-                                HudInstance?.AddChat("技能", $"诱惑之光闪烁，【{targetMonster.Name}】抵抗了心智侵蚀。", new Color(0.8f, 0.8f, 0.8f));
                             }
                         }
                     }
@@ -1551,9 +1626,9 @@ namespace Mir2Client.UI
                     SendCastSkillPacket(9, targetTile.X, targetTile.Y, _selectedTargetUid);
                     break;
 
-                case 12: // 刺杀剑术
+                case 12: // 刺杀剑术 (s_longhit = 132)
                     PlayerInstance.Anim.SetAction(ActionType.LongHit, dir);
-                    AudioManager.Instance?.PlaySoundId(1);
+                    AudioManager.Instance?.PlaySoundId(132);
                     if (_net != null && _net.IsConnectedToServer)
                     {
                         var p = new BinaryProtocol.AttackIntentPayload { TargetUid = _selectedTargetUid, Direction = (byte)dir, SkillType = 3 };
@@ -1583,7 +1658,6 @@ namespace Mir2Client.UI
                     if (_isSandbox)
                     {
                         CheckSandboxSpellHit(13, targetTile);
-                        HudInstance?.AddChat("法术", $"【灵魂火符】呼啸飞出！{consumeRes.desc}", new Color(1f, 0.8f, 0.2f));
                         AudioManager.Instance?.PlaySoundId(15);
                     }
 #endif
@@ -1612,7 +1686,6 @@ namespace Mir2Client.UI
                                 }
                             }
                         }
-                        HudInstance?.AddChat("技能", $"地狱雷光轰然降临！强劲圣雷震荡波波及周围 {hitCount} 个目标！", new Color(0.4f, 0.9f, 1f));
                     }
 #endif
                     SendCastSkillPacket(22, PlayerInstance.TileX, PlayerInstance.TileY);
@@ -1698,7 +1771,6 @@ namespace Mir2Client.UI
                                 obstacle.TileY = dashRes.TargetFinalY;
                                 EntityManagerInstance.TriggerStruck(obstacle.Uid, 15, Math.Max(0, obstacle.Hp - 15));
                             }
-                            HudInstance?.AddChat("技能", dashRes.Message, new Color(0.2f, 1f, 0.4f));
                         }
                         else
                         {
@@ -1712,7 +1784,6 @@ namespace Mir2Client.UI
                                 PlayerStateInstance.Hp = Math.Max(1, PlayerStateInstance.Hp - dashRes.SelfDamage);
                                 HudInstance?.UpdateHp(PlayerStateInstance.Hp, PlayerStateInstance.MaxHp);
                             }
-                            HudInstance?.AddChat("技能", dashRes.Message, new Color(1f, 0.3f, 0.3f));
                         }
                     }
 #endif
@@ -1751,7 +1822,6 @@ namespace Mir2Client.UI
                             MasterUid = PlayerInstance.Uid,
                             PetLevel = stats.Level
                         });
-                        HudInstance?.AddChat("召唤", $"消耗 1 张护身符，从地底召唤出了【{stats.Name}】守护在身旁！", new Color(0.3f, 1f, 0.6f));
                     }
 #endif
                     break;
@@ -1784,7 +1854,6 @@ namespace Mir2Client.UI
                             MasterUid = PlayerInstance.Uid,
                             PetLevel = stats.Level
                         });
-                        HudInstance?.AddChat("召唤", $"消耗 5 张护身符，召唤出了威严强悍的【{stats.Name}】降临人间！", new Color(1f, 0.8f, 0.2f));
                     }
 #endif
                     break;
@@ -1799,7 +1868,6 @@ namespace Mir2Client.UI
                     }
 #endif
                     AudioManager.Instance?.PlaySoundId(137);
-                    HudInstance?.AddChat("法术", "【魔法盾】神力激活！化解 70% 伤害，坚固屏障笼罩全身！", new Color(0.4f, 0.9f, 1f));
                     if (_net != null && _net.IsConnectedToServer)
                     {
                         SendCastSkillPacket(31, playerTile.X, playerTile.Y);
@@ -1847,6 +1915,33 @@ namespace Mir2Client.UI
             int px = PlayerInstance.TileX;
             int py = PlayerInstance.TileY;
 
+            // 若当前脚下存在客户端本地演示战利品 (ItemId >= 9000)，直接完成本地拾取并播放官方 106/118 拾取音效，避免向服务端发包报错“地上没有任何物品”
+            var localItems = GroundItemManagerInstance.GetItemsAt(px, py);
+            if (localItems.Count > 0 && localItems[0].ItemId >= 9000)
+            {
+                var picked = localItems[0];
+                if (picked.Name.Contains("金币"))
+                {
+                    GroundItemManagerInstance.RemoveItem(picked.ItemId);
+                    PlayerInstance.Gold += Math.Max(1, picked.Amount);
+                    HudInstance?.UpdateGold(PlayerInstance.Gold);
+                    AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money); // 官方 s_money = 106
+                }
+                else
+                {
+                    if (HudInstance != null && HudInstance.AddBagItem(picked.Name))
+                    {
+                        GroundItemManagerInstance.RemoveItem(picked.ItemId);
+                        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick); // 官方 s_itmclick = 118
+                    }
+                }
+                return;
+            }
+
+            // 盛大官方 1.5 权威拾取校验：若当前地表无任何物品，直接静默拦截，严禁向服务端发包报错
+            var groundItems = GroundItemManagerInstance.GetItemsAt(px, py);
+            if (groundItems == null || groundItems.Count == 0) return;
+
             if (_net != null && _net.IsConnectedToServer)
             {
                 var p = new BinaryProtocol.PickupIntentPayload { TileX = (short)px, TileY = (short)py, TargetItemUid = 0 };
@@ -1864,7 +1959,7 @@ namespace Mir2Client.UI
                         GroundItemManagerInstance.RemoveItem(picked.ItemId);
                         PlayerInstance.Gold += Math.Max(1, picked.Amount);
                         HudInstance?.UpdateGold(PlayerInstance.Gold);
-                        HudInstance?.AddChat("拾取", $"捡起金币：{picked.Amount} 金币。", new Color(1f, 0.9f, 0.3f));
+                        HudInstance?.AddChat("提示", $"捡起 {picked.Amount} 金币。", new Color(1f, 0.9f, 0.3f));
                         AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.Money); // 官方 s_money = 106
                     }
                     else
@@ -1872,7 +1967,7 @@ namespace Mir2Client.UI
                         if (HudInstance != null && HudInstance.AddBagItem(picked.Name))
                         {
                             GroundItemManagerInstance.RemoveItem(picked.ItemId);
-                            HudInstance.AddChat("拾取", $"捡起物品：【{picked.Name}】。", new Color(0.4f, 1f, 0.4f));
+                            HudInstance.AddChat("提示", $"捡起 {picked.Name}。", new Color(0.4f, 1f, 0.4f));
                             AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick); // 官方 s_itmclick = 118
                         }
                         else
@@ -1917,36 +2012,33 @@ namespace Mir2Client.UI
                 // 3. 沙箱单机模式：割肉成功并给予高品质肉块
                 AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick);
                 HudInstance?.AddBagItem("品质15的鹿肉");
-                HudInstance?.AddChat("割肉", "割肉成功，获得了品质 15 的【鹿肉】。", new Color(1f, 0.85f, 0.2f));
             }
 #endif
         }
 
-#if MIR2_SANDBOX_DEV
         private int _dropItemIdSeed = 9000;
 
         public void SpawnMonsterLoot(string monName, int x, int y)
         {
             if (monName.Contains("稻草人"))
             {
-                // 掉落 88 枚金币与强效金创药
-                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 1, 88);
-                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "强效金创药", x + 1, y, 2, 1);
-                HudInstance?.AddChat("掉落", "【稻草人】倒地爆出了金币与药水！", new Color(1f, 0.95f, 0.4f));
+                // 掉落 88 枚金币与强效金创药 (DnItems_0112 为金币，DnItems_0028 为强效金创药)
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 112, 88);
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "强效金创药", x + 1, y, 28, 1);
             }
             else if (monName.Contains("半兽人") || monName.Contains("骷髅"))
             {
                 // 掉落 188 枚金币与轻型盔甲
-                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 1, 188);
-                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "轻型盔甲", x, y + 1, 13, 1);
-                HudInstance?.AddChat("掉落", $"【{monName}】倒地爆出了金币与战利品！", new Color(1f, 0.95f, 0.4f));
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 113, 188);
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "轻型盔甲", x, y + 1, 62, 1);
             }
             else
             {
-                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 1, 50);
+                GroundItemManagerInstance.AddItem(_dropItemIdSeed++, "金币", x, y, 115, 500);
             }
         }
 
+#if MIR2_SANDBOX_DEV
         private void CheckSandboxMeleeHit(int dir, int damage, bool isStabSkill = false)
         {
             if (PlayerInstance == null) return;
@@ -1959,7 +2051,6 @@ namespace Mir2Client.UI
                 damage = fireRes.damage;
                 if (fireRes.isFireHit)
                 {
-                    HudInstance?.AddChat("特技", fireRes.desc, new Color(1f, 0.5f, 0.1f));
                     AudioManager.Instance?.PlaySoundId(136);
                 }
             }
@@ -1996,8 +2087,6 @@ namespace Mir2Client.UI
                 int realDmg = TaoistCombatEngine.ApplyRedPoisonVulnerability(damage, hasRed);
                 int newHp = Math.Max(0, targetStep1.Hp - realDmg);
                 EntityManagerInstance.TriggerStruck(targetStep1.Uid, realDmg, newHp);
-                string redDesc = hasRed ? "【红毒破防 1.2 倍增伤】" : "";
-                HudInstance?.AddChat("战斗", $"{redDesc}近身命中【{targetStep1.Name}】，造成 {realDmg} 点物理伤害！", new Color(1f, 0.8f, 0.2f));
                 return;
             }
 
@@ -2015,8 +2104,6 @@ namespace Mir2Client.UI
                 int realDmg = TaoistCombatEngine.ApplyRedPoisonVulnerability(finalDmg, hasRed);
                 int newHp = Math.Max(0, targetStep2.Hp - realDmg);
                 EntityManagerInstance.TriggerStruck(targetStep2.Uid, realDmg, newHp);
-                string redDesc = hasRed ? "【红毒 1.2 倍】" : "";
-                HudInstance?.AddChat("刺杀", $"【隔位刺杀】{redDesc}剑气穿透！命中【{targetStep2.Name}】，无视防御与魔法盾造成 {realDmg} 点穿透伤害！", new Color(0.3f, 0.9f, 1f));
                 AudioManager.Instance?.PlaySoundId(1);
             }
         }
@@ -2043,8 +2130,6 @@ namespace Mir2Client.UI
                         int realDmg = TaoistCombatEngine.ApplyRedPoisonVulnerability(damage, hasRed);
                         int newHp = Math.Max(0, ent.Hp - realDmg);
                         EntityManagerInstance.TriggerStruck(ent.Uid, realDmg, newHp);
-                        string redDesc = hasRed ? "【红毒 1.2 倍增伤】" : "";
-                        HudInstance?.AddChat("战斗", $"{redDesc}法术命中【{ent.Name}】，造成 {realDmg} 点魔法伤害！", new Color(0.4f, 0.9f, 1f));
                     }
                 }
             }
@@ -2126,34 +2211,36 @@ namespace Mir2Client.UI
             {
                 PlayerInstance.CharacterName = "热血战士";
                 PlayerInstance.SetTilePos(330, 270);
-                PlayerInstance.BodyDressType = 2; // 布衣男
-                PlayerInstance.WeaponType = 2;     // 木剑
-                PlayerInstance.HairStyle = 4; // 官方经典男战士短发 (Hair.wil base 2400)
+                PlayerInstance.Gender = 1; // 官方 1.5 女战士
+                PlayerInstance.BodyDressType = 3; // 官方布衣女 (Hum.wil base 600)
+                PlayerInstance.WeaponType = 2;     // 木剑 (Weapon.wil base 600)
+                PlayerInstance.HairStyle = 1;      // 官方经典女战士发型 (Hair.wil base 3000)
                 PlayerInstance.Direction = 2;
-                PlayerInstance.Hp = 100;
-                PlayerInstance.MaxHp = 100;
-                PlayerInstance.Mp = 100;
-                PlayerInstance.MaxMp = 100;
-                PlayerInstance.Level = 35;
-                PlayerInstance.Gold = 100000;
+                PlayerInstance.Hp = 19;
+                PlayerInstance.MaxHp = 19;
+                PlayerInstance.Mp = 0;
+                PlayerInstance.MaxMp = 0;
+                PlayerInstance.Level = 1;
+                PlayerInstance.Gold = 0;
             }
 
             if (HudInstance != null)
             {
-                HudInstance.UpdateHp(100, 100);
-                HudInstance.UpdateMp(100, 100);
-                HudInstance.UpdateLevel(35);
-                HudInstance.UpdateGold(100000);
-                HudInstance.UpdateExp(35000, 100000);
-                HudInstance.UpdateWeight(25, 60);
+                HudInstance.UpdateName("热血战士");
+                HudInstance.UpdateMapAndCoords("比奇省", 330, 270);
+                HudInstance.SetPlayerJobAndLevel(0, 1);
+                HudInstance.UpdateHp(19, 19);
+                HudInstance.UpdateMp(0, 0);
+                HudInstance.UpdateLevel(1);
+                HudInstance.UpdateGold(0);
+                HudInstance.UpdateExp(0, 100);
+                HudInstance.UpdateWeight(0, 15);
                 HudInstance.UpdateFullAbilities(
-                    wearWeight: 15, maxWearWeight: 30,
-                    handWeight: 12, maxHandWeight: 25,
-                    accuracy: 15, agility: 18,
+                    wearWeight: 0, maxWearWeight: 15,
+                    handWeight: 0, maxHandWeight: 12,
+                    accuracy: 5, agility: 15,
                     magicDef: "0-0", poisonDef: "0%",
-                    poisonRecover: "+10%", hpRecover: "+15%", mpRecover: "+20%");
-                HudInstance.AddChat("系统", "【官方 1.50 虎卫传说】纯 C# 单轨化大世界沙盒引擎已启动！", new Color(1f, 0.8f, 0.2f));
-                HudInstance.AddChat("系统", "已为您自动装配布衣与木剑，置身比奇省安全区中心(330, 270)。", new Color(0.4f, 1f, 0.4f));
+                    poisonRecover: "+0%", hpRecover: "+0%", mpRecover: "+0%");
             }
 
             CurrentMapName = "0";
@@ -2230,11 +2317,6 @@ namespace Mir2Client.UI
             long nowTick = (long)Time.GetTicksMsec();
             EntityManagerInstance.ProcessPoisonTicks(nowTick, (uid, dmg, newHp) =>
             {
-                var ent = EntityManagerInstance.GetEntity(uid);
-                if (ent != null)
-                {
-                    HudInstance?.AddChat("施毒", $"【绿毒侵蚀】目标【{ent.Name}】受到 {dmg} 点持续剧毒伤害！", new Color(0.2f, 1f, 0.3f));
-                }
 #if MIR2_SANDBOX_DEV
             }, simulateDamage: _isSandbox);
 #else
@@ -2268,7 +2350,7 @@ namespace Mir2Client.UI
 #endif
         }
 
-        public void SetNet(NetManager net, int sId, string uname, int ulevel = 35)
+        public void SetNet(NetManager net, int sId, string uname, int ulevel = 1, int ugender = 0, int ujob = 0)
         {
             _net = net;
             ServerMessageRouterInstance = new ServerMessageRouter(HudInstance, EntityManagerInstance, this, GroundItemManagerInstance);
@@ -2280,7 +2362,20 @@ namespace Mir2Client.UI
             {
                 PlayerInstance.CharacterName = uname;
                 PlayerInstance.Level = ulevel;
+                PlayerInstance.Gender = ugender;
+                PlayerInstance.BodyDressType = ugender != 0 ? 3 : 2; // 默认女性布衣(3) / 男性布衣(2)
+                PlayerInstance.HairStyle = ugender != 0 ? 5 : 4; // 盛大官方 1.5 原版发型：女性默认干练盘发 (Base 3000), 男性短发 (Base 2400)
                 PlayerInstance.UpdateNameLabelText();
+            }
+            if (HudInstance != null)
+            {
+                HudInstance.UpdateName(uname);
+                HudInstance.SetPlayerJobAndLevel(ujob, ulevel);
+                HudInstance.SetDollGender(ugender);
+                if (PlayerInstance != null)
+                {
+                    HudInstance.UpdateMapAndCoords(CurrentMapName == "0" ? "比奇省" : CurrentMapName, PlayerInstance.TileX, PlayerInstance.TileY);
+                }
             }
         }
 
@@ -2298,12 +2393,16 @@ namespace Mir2Client.UI
                         if (sync.ForcePullback == 1)
                         {
                             // 权威拉回！主角如果发生越界、加速或穿墙，立即强行修正并停止当前步伐
-                            PlayerInstance?.SetTilePos(sync.X, sync.Y);
+                            PlayerInstance?.ReconcilePosition(sync.X, sync.Y, sync.Direction);
                             GD.Print($"[GameView] 坐标被服务端权威拉回 -> ({sync.X}, {sync.Y})");
                         }
-                        else
+                        else if (PlayerInstance != null)
                         {
-                            PlayerInstance?.SetTilePos(sync.X, sync.Y);
+                            int dist = Math.Max(Math.Abs(PlayerInstance.TileX - sync.X), Math.Abs(PlayerInstance.TileY - sync.Y));
+                            if (dist > 2)
+                            {
+                                PlayerInstance.SetTilePos(sync.X, sync.Y);
+                            }
                         }
                     }
                     break;
@@ -2435,9 +2534,10 @@ namespace Mir2Client.UI
             else
 #endif
             {
-                // 官方原版点击重新开始必须向服务端请求复活
+                // 官方原版点击重新开始必须向服务端请求复活 (支持双协议: BinaryIntent + 盛大官方 1.5 原版 CM_REVIVE 1018)
                 var p = new BinaryProtocol.ReviveIntentPayload { Mode = 0 };
                 _net?.SendBinaryIntent((ushort)BinaryProtocol.MsgType.IntentRevive, in p);
+                _net?.SendPacket(PacketEncoder.Revive(0));
             }
         }
     }

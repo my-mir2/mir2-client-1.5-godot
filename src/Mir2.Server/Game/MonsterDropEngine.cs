@@ -93,6 +93,30 @@ public static class MonsterDropEngine
         _defaultDropRules[monsterName] = ParseMonItemRules(rulesText);
     }
 
+    private static Dictionary<string, List<MonItemRule>>? _runtimeByKey;
+
+    /// <summary>数据库 official_mon_drop 是否已装载 (装载后掉落完全以数据库为准，不再回落内置表)。</summary>
+    public static bool HasRuntimeTable => _runtimeByKey != null;
+
+    /// <summary>用数据库 MonItems 掉落表整体替换运行时掉落规则，键为官方怪物英文键 (不区分大小写)。</summary>
+    public static void ReplaceRuntimeDropRules(IDictionary<string, List<MonItemRule>> byKey)
+    {
+        var d = new Dictionary<string, List<MonItemRule>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in byKey) d[kv.Key] = kv.Value;
+        _runtimeByKey = d;
+    }
+
+    /// <summary>按官方怪物键检索掉落；运行时表已装载则严格以其为准，否则回退到按名称的内置表 (仅单元测试路径)。</summary>
+    public static IReadOnlyList<MonItemRule> GetDropRulesFor(string officialKey, string monsterName)
+    {
+        if (_runtimeByKey != null)
+        {
+            return !string.IsNullOrEmpty(officialKey) && _runtimeByKey.TryGetValue(officialKey, out var r)
+                ? r : Array.Empty<MonItemRule>();
+        }
+        return GetMonsterDropRules(monsterName);
+    }
+
     public static IReadOnlyList<MonItemRule> GetMonsterDropRules(string monsterName)
     {
         if (_defaultDropRules.TryGetValue(monsterName, out var rules))
@@ -180,14 +204,31 @@ public static class MonsterDropEngine
         var dropped = new List<DroppedItem>();
         bool isRedName = state.IsRedName; // PK >= 200
 
-        // 1. 爆背包物品 (0x4BB44C): 白名 1/3 几率，红名 100% 必爆
-        for (int i = state.BagItems.Count - 1; i >= 0; i--)
+        // 1. 爆背包物品 (Delphi ObjPlay.ScatterBagItems 0x4BB44C):
+        // 红名 (PK >= 200) 彻底大爆背包中所有物品；
+        // 白名/普通玩家仅有 1/10 几率随机掉落 1 件物品 (Random(10) == 0)，严禁遍历清空！
+        if (state.BagItems.Count > 0)
         {
-            var item = state.BagItems[i];
-            if (isRedName || rng.Next(3) == 0)
+            if (isRedName)
             {
-                dropped.Add(new DroppedItem(item.Uid, item.Name, i, FromEquipment: false));
-                state.BagItems.RemoveAt(i);
+                // 红名惩罚：清空背包全部散落
+                for (int i = state.BagItems.Count - 1; i >= 0; i--)
+                {
+                    var item = state.BagItems[i];
+                    dropped.Add(new DroppedItem(item.Uid, item.Name, i, FromEquipment: false));
+                    state.BagItems.RemoveAt(i);
+                }
+            }
+            else
+            {
+                // 白名保护：1/10 几率随机掉落 1 件物品
+                if (rng.Next(10) == 0)
+                {
+                    int dropIndex = rng.Next(state.BagItems.Count);
+                    var item = state.BagItems[dropIndex];
+                    dropped.Add(new DroppedItem(item.Uid, item.Name, dropIndex, FromEquipment: false));
+                    state.BagItems.RemoveAt(dropIndex);
+                }
             }
         }
 

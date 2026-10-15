@@ -84,12 +84,12 @@ public sealed class WindowStackManager
     }
 
     /// <summary>
-    /// 物理鼠标防穿透判定 (底栏 y >= 430 以及所有可见窗口包围盒)
+    /// 物理鼠标防穿透判定 (底栏 y >= 349 以及所有可见窗口包围盒)
     /// </summary>
     public bool IsMouseOverUi(int mouseX, int mouseY)
     {
-        // 官方 HUD 底栏严格占据 y >= 430
-        if (mouseY >= 430) return true;
+        // 盛大官方 1.5 HUD 底栏严格占据 y >= 349 (包含血球魔球、快捷药水与功能按键)
+        if (mouseY >= 349) return true;
 
         for (int i = 0; i < _stack.Count; i++)
         {

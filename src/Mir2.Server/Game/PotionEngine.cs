@@ -46,10 +46,10 @@ public static class PotionEngine
 
         var name = itemName.Trim();
 
-        // 1. 瞬回药剂
+        // 1. 瞬回药剂 (官方 StdItems.DB Shape=1)
         if (name.Contains("强效太阳水"))
         {
-            return new PotionEffect(InstantHp: 50, InstantMp: 50, ContinuousHp: 0, ContinuousMp: 0);
+            return new PotionEffect(InstantHp: 50, InstantMp: 80, ContinuousHp: 0, ContinuousMp: 0);
         }
         if (name.Contains("太阳水"))
         {
@@ -57,39 +57,39 @@ public static class PotionEngine
         }
         if (name.Contains("万年雪霜"))
         {
-            return new PotionEffect(InstantHp: 80, InstantMp: 120, ContinuousHp: 0, ContinuousMp: 0);
+            return new PotionEffect(InstantHp: 100, InstantMp: 100, ContinuousHp: 0, ContinuousMp: 0);
         }
         if (name.Contains("疗伤药"))
         {
-            return new PotionEffect(InstantHp: 130, InstantMp: 130, ContinuousHp: 0, ContinuousMp: 0);
+            return new PotionEffect(InstantHp: 150, InstantMp: 150, ContinuousHp: 0, ContinuousMp: 0);
         }
 
-        // 2. 持续回复药剂 - 金创药 (生命)
+        // 2. 持续回复药剂 - 金创药 (生命, 官方 StdItems.DB Shape=0)
         if (name.Contains("强效金创药"))
         {
             return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 90, ContinuousMp: 0);
         }
         if (name.Contains("中量金创药") || name.Contains("金创药(中量)"))
         {
-            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 60, ContinuousMp: 0);
+            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 50, ContinuousMp: 0);
         }
         if (name.Contains("金创药"))
         {
-            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 30, ContinuousMp: 0);
+            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 25, ContinuousMp: 0);
         }
 
-        // 3. 持续回复药剂 - 魔法药 (魔法)
+        // 3. 持续回复药剂 - 魔法药 (魔法, 官方 StdItems.DB Shape=0)
         if (name.Contains("强效魔法药"))
         {
-            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 0, ContinuousMp: 90);
+            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 0, ContinuousMp: 150);
         }
         if (name.Contains("中量魔法药") || name.Contains("魔法药(中量)"))
         {
-            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 0, ContinuousMp: 60);
+            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 0, ContinuousMp: 80);
         }
         if (name.Contains("魔法药"))
         {
-            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 0, ContinuousMp: 30);
+            return new PotionEffect(InstantHp: 0, InstantMp: 0, ContinuousHp: 0, ContinuousMp: 35);
         }
 
         // 4. 特殊解毒药剂与神水 (IDA 0x4B7100 / sub_4C7720)

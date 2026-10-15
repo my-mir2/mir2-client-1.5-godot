@@ -6,6 +6,7 @@
 using System;
 using Godot;
 using Mir2Client.Render;
+using Mir2Client.UI;
 
 namespace Mir2Client.Game
 {
@@ -53,15 +54,20 @@ namespace Mir2Client.Game
         private Node? _gameNode;
         private MapRenderer? _mapRenderer;
         private EntityManager? _entityManager;
+        private HudController? _hudController;
+        private ulong _lastContinuousAttackTick = 0;
 
         private ulong _lastRightRunMs = 0;
-        // 盛大官方 1.5 奔跑动作步频对齐 (单次奔跑动画为 0.50s，采样周期设为 480ms 确保步频平滑且绝不发生时序倒挂)
-        public const ulong RightRunIntervalMs = 480;
+        // 盛大官方 1.5 奔跑动作步频对齐 (单次奔跑 6 帧为 0.54s，采样周期设为 540ms 确保步步踏实绝不抢步抽搐)
+        public const ulong RightRunIntervalMs = 600;
+        // IDA sub_4CB7F8 @ 0x4CB833：攻速基准 900 - 60 * HitSpeed (HitSpeed=0 时 900ms)，低于此值服务端丢弃并计超速
+        public const ulong AttackIntervalMs = 900;
 
         public void SetMapRenderer(MapRenderer mr) => _mapRenderer = mr;
         public void SetEntityManager(EntityManager em) => _entityManager = em;
         public void SetPlayer(Node2D p) => _playerNode = p;
         public void SetGame(Node g) => _gameNode = g;
+        public void SetHudController(HudController hud) => _hudController = hud;
 
         public override void _Ready()
         {
@@ -117,15 +123,17 @@ namespace Mir2Client.Game
 
         private bool IsCursorOverUi(Vector2 mousePos)
         {
-            if (_gameNode != null)
+            if (_hudController != null)
             {
-                var hud = _gameNode.Get("hud").AsGodotObject();
-                if (hud != null && hud.HasMethod("is_mouse_over_ui"))
-                {
-                    return hud.Call("is_mouse_over_ui", mousePos).AsBool();
-                }
+                return _hudController.IsMouseOverUi(mousePos);
             }
-            return false;
+            if (_gameNode is GameView gv && gv.HudInstance != null)
+            {
+                _hudController = gv.HudInstance;
+                return _hudController.IsMouseOverUi(mousePos);
+            }
+            // 物理防线：盛大官方 1.5 原版 DFM DBottom 真实位置 Top=416，未绑定 HUD 时保守防穿透，放行大世界地面
+            return mousePos.Y >= 416;
         }
 
         public override void _Process(double delta)
@@ -162,12 +170,49 @@ namespace Mir2Client.Game
                 return;
             }
 
-            // 2. 盛大官方 1.5 左键长按连续走动 (Walk)
+            // 2. 盛大官方 1.5 左键长按 (若指着活体怪物则出刀挥砍/追击，否则连续走动)
             if (Input.IsMouseButtonPressed(MouseButton.Left))
             {
                 // 功能键组合优先 (Shift 强制攻击, Ctrl 刺杀, Alt 挖肉)，不触发走动
                 if (!Input.IsKeyPressed(Key.Shift) && !Input.IsKeyPressed(Key.Ctrl) && !Input.IsKeyPressed(Key.Alt))
                 {
+                    var targetTile = _mapRenderer != null ? _mapRenderer.ScreenToTile(mousePos) : new Vector2I(-1, -1);
+                    var ent = FindEntityUnderCursor(mousePos, targetTile);
+                    if (ent != null && ent.Type == EntityManager.EntityType.Monster && !ent.IsDead)
+                    {
+                        int pTileX = _playerNode.Get("tile_x").AsInt32();
+                        int pTileY = _playerNode.Get("tile_y").AsInt32();
+                        int cdist = Math.Max(Math.Abs(ent.TileX - pTileX), Math.Abs(ent.TileY - pTileY));
+                        if (cdist <= 1)
+                        {
+                            ulong nowTick = Time.GetTicksMsec();
+                            if (nowTick >= _lastContinuousAttackTick + AttackIntervalMs)
+                            {
+                                _lastContinuousAttackTick = nowTick;
+                                int attackDir = cdist > 0
+                                    ? CalcDirection(new Vector2(ent.TileX - pTileX, ent.TileY - pTileY))
+                                    : CalcDirection(mousePos - playerPos);
+                                EmitSignal(SignalName.TargetSelected, ent.Uid);
+                                EmitSignal(SignalName.HitRequested, attackDir);
+                            }
+                            // 权威铁律：只要光标悬停在相邻存活怪物上，无论是否在挥刀冷却中，绝不降级为走动！直接阻断！
+                            return;
+                        }
+                        else
+                        {
+                            // 远处怪物：官方 1.5 规则，向怪物方向走动逼近
+                            EmitSignal(SignalName.NavigateRequested, new Vector2I(ent.TileX, ent.TileY));
+                            return;
+                        }
+                    }
+
+                    // 若指着 NPC 或其他玩家，直接阻断走动
+                    if (ent != null && (ent.Type == EntityManager.EntityType.Npc || ent.Type == EntityManager.EntityType.Player))
+                    {
+                        return;
+                    }
+
+                    // 真正指向空地，才触发连续走动
                     EmitSignal(SignalName.WalkRequested, dir);
                 }
             }
@@ -271,7 +316,14 @@ namespace Mir2Client.Game
                 ? Math.Max(Math.Abs(targetTile.X - playerTile.X), Math.Abs(targetTile.Y - playerTile.Y))
                 : 999;
 
-            // 0. Alt + 点击：官方割肉/屠宰 (对齐 Delphi ClMain.pas:2890 ssAlt in Shift -> SendButchAnimal)
+            // 0. Shift 官方强制原地物理攻击 (对齐 Delphi ClMain.pas:2890 ssShift in Shift -> SendHit)
+            if (Input.IsKeyPressed(Key.Shift))
+            {
+                EmitSignal(SignalName.HitRequested, dir);
+                return;
+            }
+
+            // 1. Alt + 点击：官方割肉/屠宰 (对齐 Delphi ClMain.pas:2890 ssAlt in Shift -> SendButchAnimal)
             if (Input.IsKeyPressed(Key.Alt))
             {
                 EmitSignal(SignalName.ButcherRequested, targetTile.X, targetTile.Y, dir);
@@ -279,19 +331,37 @@ namespace Mir2Client.Game
             }
 
             // 实体点击判定 (NPC 对话 / 玩家选中与查名 / 怪物锁定与普攻)
-            if (targetTile.X >= 0 && _entityManager != null)
+            if (_entityManager != null)
             {
-                var ent = _entityManager.GetEntityAt(targetTile.X, targetTile.Y);
+                var ent = FindEntityUnderCursor(screenPos, targetTile);
                 if (ent != null)
                 {
+                    targetTile = new Vector2I(ent.TileX, ent.TileY);
+                    chebyshev = Math.Max(Math.Abs(targetTile.X - playerTile.X), Math.Abs(targetTile.Y - playerTile.Y));
+                    if (chebyshev > 0)
+                    {
+                        dir = CalcDirection(new Vector2(targetTile.X - pTileX, targetTile.Y - pTileY));
+                    }
+                    else
+                    {
+                        dir = CalcDirection(screenPos - playerScreen);
+                    }
+
                     bool isShift = Input.IsKeyPressed(Key.Shift);
                     EmitSignal(SignalName.TargetSelected, ent.Uid);
                     EmitSignal(SignalName.EntityInteracted, ent.Uid, (int)ent.Type, targetTile.X, targetTile.Y, isShift);
 
-                    // 若为相邻活体怪物且未按 Ctrl，自动发起近战攻击
-                    if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead && chebyshev <= 1 && !Input.IsKeyPressed(Key.Ctrl))
+                    // 若为相邻活体怪物 (chebyshev <= 1, 包含同格重合)，自动发起近战攻击并阻断后续任何地面判定
+                    if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead && chebyshev <= 1)
                     {
+                        _lastContinuousAttackTick = Time.GetTicksMsec();
                         EmitSignal(SignalName.HitRequested, dir);
+                        return;
+                    }
+                    // 若为远处活体怪物 (chebyshev > 1)，自动触发走向该怪物
+                    if (ent.Type == EntityManager.EntityType.Monster && !ent.IsDead && chebyshev > 1)
+                    {
+                        EmitSignal(SignalName.NavigateRequested, targetTile);
                         return;
                     }
                     // 若为 NPC 或其他玩家，直接返回阻断向其脚下寻路跑动
@@ -302,30 +372,8 @@ namespace Mir2Client.Game
                 }
             }
 
-            // 1. Shift 原地攻击
-            if (Input.IsKeyPressed(Key.Shift))
-            {
-                EmitSignal(SignalName.HitRequested, dir);
-                return;
-            }
-
-            // 2. Ctrl 刺杀/重击
-            if (Input.IsKeyPressed(Key.Ctrl))
-            {
-                EmitSignal(SignalName.PowerHitRequested, dir);
-                return;
-            }
-
-            // 3. 点击自身脚下拾取
-            if (targetTile == playerTile)
-            {
-                EmitSignal(SignalName.PickupRequested);
-                return;
-            }
-
-            // 4. 盛大官方 1.5 空地走动逻辑：
-            // 若点击近邻格 (Chebyshev 距离 <= 1)，直接迈步 1 格走动
-            // 若点击远处有效瓦片 (Chebyshev 距离 > 1)，触发连续寻路走向目标点 (NavigateRequested)
+            // 2. 盛大官方 1.5 空地走动逻辑 (彻底移除 targetTile == playerTile 拾取毒丸)：
+            // 官方拾取铁律：走动踩在物品上方或 Space 空格键触发！
             if (targetTile.X >= 0)
             {
                 if (chebyshev <= 1)
@@ -349,6 +397,78 @@ namespace Mir2Client.Game
                     EmitSignal(SignalName.WalkRequested, dir);
                 }
             }
+        }
+
+        /// <summary>
+        /// 盛大官方 1.5 指针聚焦实体拾取 (FocusCret, 严格对齐 IDA sub_4614A0 / GetActorAt)
+        /// 1. 排除本地主角自身防误选
+        /// 2. 存活怪物具有最高绝对优先权
+        /// 3. 包围盒依据官方 2.5D 切片覆盖 (X: ±45px, Y: -115px..+20px)
+        /// 4. 2.5D 深度优先：TileY 越大（越靠前）越优先命中
+        /// 5. 瓦片回退拾取
+        /// </summary>
+        public EntityManager.EntityData? FindEntityUnderCursor(Vector2 screenPos, Vector2I targetTile)
+        {
+            if (_entityManager == null) return null;
+
+            int localUid = _entityManager.LocalPlayerUid;
+            if (localUid == 0 && _playerNode is PlayerNode pnl)
+            {
+                localUid = pnl.Uid;
+            }
+
+            EntityManager.EntityData? bestCandidate = null;
+            int bestTileY = int.MinValue;
+            float bestDistSq = float.MaxValue;
+
+            if (_mapRenderer != null)
+            {
+                foreach (var candidate in _entityManager.AllEntities)
+                {
+                    if (candidate.Uid == localUid || (candidate.Type == EntityManager.EntityType.Player && candidate.Uid == localUid))
+                        continue;
+
+                    var entCenter = _mapRenderer.WorldToScreen(new Vector2(candidate.TileX * 48 + 24, candidate.TileY * 32 + 16));
+                    // 覆盖官方 1.5 怪物完整切片像素范围 (宽 90px, 高 135px)
+                    var bbox = new Rect2(entCenter.X - 45, entCenter.Y - 115, 90, 135);
+                    bool isHitBbox = bbox.HasPoint(screenPos);
+                    bool isHitTile = (targetTile.X >= 0 && candidate.TileX == targetTile.X && candidate.TileY == targetTile.Y);
+                    if (isHitBbox || isHitTile)
+                    {
+                        bool isLivingMonster = candidate.Type == EntityManager.EntityType.Monster && !candidate.IsDead;
+                        bool bestIsLivingMonster = bestCandidate != null && bestCandidate.Type == EntityManager.EntityType.Monster && !bestCandidate.IsDead;
+
+                        if (isLivingMonster && !bestIsLivingMonster)
+                        {
+                            bestCandidate = candidate;
+                            bestTileY = candidate.TileY;
+                            bestDistSq = screenPos.DistanceSquaredTo(entCenter);
+                        }
+                        else if (isLivingMonster == bestIsLivingMonster)
+                        {
+                            // 深度越靠前 (TileY 越大) 优先，若相同则取距离指针最近者
+                            if (candidate.TileY > bestTileY || (candidate.TileY == bestTileY && screenPos.DistanceSquaredTo(entCenter) < bestDistSq))
+                            {
+                                bestCandidate = candidate;
+                                bestTileY = candidate.TileY;
+                                bestDistSq = screenPos.DistanceSquaredTo(entCenter);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 瓦片回退拾取
+            if (bestCandidate == null && targetTile.X >= 0)
+            {
+                var tileEnt = _entityManager.GetEntityAt(targetTile.X, targetTile.Y);
+                if (tileEnt != null && tileEnt.Uid != localUid)
+                {
+                    bestCandidate = tileEnt;
+                }
+            }
+
+            return bestCandidate;
         }
 
         private void OnRightClick(Vector2 screenPos)

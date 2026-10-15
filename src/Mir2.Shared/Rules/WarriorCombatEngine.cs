@@ -12,10 +12,22 @@ namespace Mir2.Shared.Rules;
 public static class WarriorCombatEngine
 {
     // ==================== 1. 烈火剑法 (FireHit, MagicId = 26) ====================
-    // 对齐 Rust combat.rs：DEFAULT_COOLDOWN 200 ticks=10s，LIFESPAN 400 ticks=20s（@20TPS）。
+    // 对齐 Rust combat.rs 与 Delphi sub_4BFD50/sub_4C1EF4:
     public const int FireHitReadyDurationMs = 20000; // 蓄力持续 20 秒
     public const int FireHitCooldownMs = 10000;      // 技能 CD 10 秒
-    public const double FireHitDamageMultiplier = 2.6; // 满级 260% 物理伤害爆发
+    public const double FireHitDamageMultiplier = 2.6; // 3级满级 260% 物理伤害爆发
+
+    /// <summary>
+    /// 盛大官方 1.5 烈火剑法等级伤害公式 (Delphi sub_4BFD50 @ 0x4BFF67 与 sub_4C1EF4 @ 0x4C1FE1 权威实证)
+    /// m_nHitDouble = 4 * sl + 4 (0级: 1.4x, 1级: 1.8x, 2级: 2.2x, 3级: 2.6x)
+    /// </summary>
+    public static int CalculateFireHitDamage(int baseDamage, int skillLevel)
+    {
+        int sl = Math.Clamp(skillLevel, 0, 3);
+        int hitDouble = 4 * sl + 4;
+        int bonus = (int)Math.Round((baseDamage / 100.0) * (hitDouble * 10.0));
+        return baseDamage + bonus;
+    }
 
     public sealed class FireHitTracker
     {
@@ -41,9 +53,9 @@ public static class WarriorCombatEngine
         }
 
         /// <summary>
-        /// 物理出刀结算，若处于蓄力期且未超时，打出 260% 烈火爆发
+        /// 物理出刀结算，若处于蓄力期且未超时，按官方技能等级打出烈火爆发
         /// </summary>
-        public (bool isFireHit, int damage, string desc) ConsumeOnHit(int baseDamage, long nowTick)
+        public (bool isFireHit, int damage, string desc) ConsumeOnHit(int baseDamage, long nowTick, int skillLevel = 3)
         {
             if (!IsReady)
             {
@@ -54,8 +66,9 @@ public static class WarriorCombatEngine
             if (nowTick - ReadyStartTime <= FireHitReadyDurationMs)
             {
                 IsReady = false;
-                int fireDmg = (int)Math.Round(baseDamage * FireHitDamageMultiplier);
-                return (true, fireDmg, "烈火剑法爆发！打出 2.6 倍烈焰烈火斩！");
+                int fireDmg = CalculateFireHitDamage(baseDamage, skillLevel);
+                double ratio = 1.0 + (4 * Math.Clamp(skillLevel, 0, 3) + 4) * 0.1;
+                return (true, fireDmg, $"烈火剑法爆发！打出 {ratio:0.1} 倍烈焰烈火斩！");
             }
 
             // 蓄力超时火焰熄灭

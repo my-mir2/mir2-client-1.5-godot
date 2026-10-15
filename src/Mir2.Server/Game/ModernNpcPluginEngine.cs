@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using Mir2.Server.Network;
 using Mir2.Shared.Models;
 using Mir2.Shared.Plugins;
 using Mir2.Shared.Protocols;
+using Mir2.Shared.Rules;
 
 namespace Mir2.Server.Game;
 
@@ -50,6 +52,7 @@ public sealed class ModernNpcPluginEngine
         RegisterPlugin(new SkillBookSynthesizerNpcBehavior());
         RegisterPlugin(new NewbieGuideNpcBehavior());
         RegisterPlugin(new RedBloodSwordNpcBehavior());
+        RegisterPlugin(new ButcherNpcBehavior());
     }
 
     public void RegisterPlugin(INpcBehavior plugin)
@@ -494,7 +497,7 @@ public sealed class ModernNpcPluginEngine
         public int NpcId => 107;
         public string NpcName => "武器升级大师";
 
-        public sealed record UpgradeRecord(EquipItem Weapon, long FinishTickMs, int UpgradeType);
+        public sealed record UpgradeRecord(EquipItem Weapon, long FinishTickMs, int ResultCode, int DuraChange);
         public static readonly ConcurrentDictionary<int, UpgradeRecord> OngoingUpgrades = new();
 
         public void OnInteract(NpcDialogContext ctx)
@@ -509,20 +512,20 @@ public sealed class ModernNpcPluginEngine
                         long now = Environment.TickCount64;
                         if (now >= rec.FinishTickMs)
                         {
-                            ctx.DialogText = $"你的【{rec.Weapon.Name}】已经修炼完成！请取回武器并在实战中试刀见证成果！";
+                            ctx.DialogText = "你的武器已经炼制好了，快拿去试试身手吧！";
                             ctx.AddLink("取回修炼好的武器", "@retrieve_weapon");
                         }
                         else
                         {
                             long remainingSec = Math.Max(1, (rec.FinishTickMs - now) / 1000);
-                            ctx.DialogText = $"武器仍在三昧真火中淬炼，尚需 {remainingSec} 秒方可出炉，切勿心急！";
+                            ctx.DialogText = $"还在炼制中，尚需等待 {remainingSec} 秒方可出炉，请稍后再来。";
                         }
                     }
                     else
                     {
-                        ctx.DialogText = "老夫掌握上古神兵锻造秘术。需投入黑铁矿石（总纯度决定持久）与首饰（属性决定成败）！";
-                        ctx.AddLink("开始修炼武器 (放入当前手持武器)", "@start_upgrade");
-                        ctx.AddLink("打听升级秘诀", "@upgrade_tips");
+                        ctx.DialogText = "我可以帮你炼制武器。但是需要黑铁矿石和首饰，并且需要一些时间，一小时后再来取。";
+                        ctx.AddLink("修炼武器 (放入当前手持武器)", "@start_upgrade");
+                        ctx.AddLink("询问有关炼制武器的说明", "@upgrade_tips");
                         ctx.AddLink("离开", "@close");
                     }
                     break;
@@ -531,42 +534,102 @@ public sealed class ModernNpcPluginEngine
                     var weapon = ctx.Session.State.Equipment[(int)OfficialEquipSlot.Weapon];
                     if (weapon == null)
                     {
-                        ctx.DialogText = "你手中空空如也，请先装备上想要升级的武器！";
+                        ctx.DialogText = "你必须先将需要炼制的武器握在手中。";
+                        return;
+                    }
+                    if (weapon.UpgradeCount >= 7)
+                    {
+                        ctx.DialogText = "这把武器已经升过7次了，不能再升了。";
                         return;
                     }
 
-                    // 官方权威机制：武器投入熔炉必须从手持槽位卸下收缴，淬炼期间不可使用
+                    var oreItems = ctx.Session.State.BagItems.Where(i => i.Name.Contains("黑铁矿")).ToList();
+                    if (oreItems.Count == 0)
+                    {
+                        ctx.DialogText = "炼制武器需要纯度合乎要求的黑铁矿石。";
+                        return;
+                    }
+
+                    var accItems = ctx.Session.State.BagItems.Where(i =>
+                        (i.Shape >= 19 && i.Shape <= 26) ||
+                        i.Name.Contains("项链") || i.Name.Contains("手镯") || i.Name.Contains("戒指")).ToList();
+                    if (accItems.Count == 0)
+                    {
+                        ctx.DialogText = "炼制武器还需要首饰。";
+                        return;
+                    }
+
+                    var ores = new List<WeaponUpgradeEngine.BlackIronOre>();
+                    foreach (var item in oreItems)
+                    {
+                        int purity = item.Shape > 0 ? item.Shape : (item.Dura > 0 ? item.Dura : 1);
+                        ores.Add(new WeaponUpgradeEngine.BlackIronOre(purity));
+                        ctx.Session.State.BagItems.Remove(item);
+                    }
+
+                    var accessories = new List<WeaponUpgradeEngine.AccessoryInfo>();
+                    foreach (var item in accItems)
+                    {
+                        accessories.Add(new WeaponUpgradeEngine.AccessoryInfo(item.Shape, item.MaxDc, item.MaxMc, item.MaxSc));
+                        ctx.Session.State.BagItems.Remove(item);
+                    }
+
+                    var upgradeParams = WeaponUpgradeEngine.CalcWeaponUpgradeParams(ores, accessories, Random.Shared.Next(0, 100));
+                    int rollDura = Random.Shared.Next(0, 10);
+                    int duraChange = WeaponUpgradeEngine.CalcWeaponDuraChange(upgradeParams.DuraFactor, rollDura);
+
+                    int luck = Math.Max(0, weapon.Luck);
+                    int pkVal = ctx.Session.State.PkPoints;
+                    int rate = WeaponUpgradeEngine.CalcWeaponUpgradeRate(luck, weapon.UpgradeCount, upgradeParams.StatVal, pkVal);
+
+                    int roll100 = Random.Shared.Next(0, 100);
+                    int roll30 = Random.Shared.Next(0, 30);
+                    int roll200 = Random.Shared.Next(0, 200);
+                    int resultCode = WeaponUpgradeEngine.DetermineUpgradeResultCode(rate, roll100, roll30, roll200, upgradeParams.StatType);
+
+                    // 卸下手持武器放入保管
                     ctx.Session.State.Equipment[(int)OfficialEquipSlot.Weapon] = null;
                     ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
+                    ctx.Session.State.RecalculateAttributes();
 
-                    // 启动升级状态机 (模拟淬火 1 秒完成供即时测试)
-                    OngoingUpgrades[ctx.Session.SessionId] = new UpgradeRecord(weapon, Environment.TickCount64 + 1000, 0);
-                    ctx.DialogText = $"【{weapon.Name}】已被老夫收缴并投入熔炉！淬炼期间请勿催促，稍后即可前来取回。";
+                    OngoingUpgrades[ctx.Session.SessionId] = new UpgradeRecord(weapon, Environment.TickCount64 + 3600_000, resultCode, duraChange);
+                    ctx.DialogText = "已经开始炼制了。一小时后再来取吧。";
                     break;
 
                 case "@retrieve_weapon":
+                    if (!OngoingUpgrades.TryGetValue(ctx.Session.SessionId, out var finishedRec))
+                    {
+                        ctx.DialogText = "你没有存放在我这里的武器。";
+                        return;
+                    }
+                    if (Environment.TickCount64 < finishedRec.FinishTickMs)
+                    {
+                        ctx.DialogText = "还在炼制中，请稍后再来。";
+                        return;
+                    }
                     if (ctx.Session.State.BagItems.Count >= 40)
                     {
-                        ctx.DialogText = "你的背包已满，无法容纳出炉的武器！请先清理背包！";
+                        ctx.DialogText = "你的包裹已经放不下了，请先整理包裹。";
                         return;
                     }
 
-                    if (OngoingUpgrades.TryRemove(ctx.Session.SessionId, out var finishedRec))
+                    OngoingUpgrades.TryRemove(ctx.Session.SessionId, out _);
+                    var upgradedWeapon = finishedRec.Weapon;
+                    upgradedWeapon.UpgradeState = (byte)finishedRec.ResultCode; // 权威结果码 (1 为碎刀，10..12 为DC，20..22 为MC，30..32 为SC)
+                    if (finishedRec.DuraChange != 0)
                     {
-                        var upgradedWeapon = finishedRec.Weapon;
-                        upgradedWeapon.UpgradeState = 1;       // 标记已开光待试刀
-                        ctx.Session.State.TrialSlashCount = 1; // 激活角色试刀状态
-
-                        // 官方权威机制：取回武器放入背包
-                        ctx.Session.State.BagItems.Add(upgradedWeapon);
-                        ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
-
-                        ctx.DialogText = $"已取回【{upgradedWeapon.Name}】并放入背包！请装备后立刻找怪物或对手开刀，生死由命，成败在天！";
+                        upgradedWeapon.MaxDura = Math.Max(1000, upgradedWeapon.MaxDura + finishedRec.DuraChange);
+                        upgradedWeapon.Dura = Math.Min(upgradedWeapon.Dura, upgradedWeapon.MaxDura);
                     }
+                    ctx.Session.State.TrialSlashCount = 1;
+                    ctx.Session.State.BagItems.Add(upgradedWeapon);
+                    ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
+
+                    ctx.DialogText = "你的武器已经炼制好了，快拿去试试身手吧！";
                     break;
 
                 case "@upgrade_tips":
-                    ctx.DialogText = "黑铁矿石总纯度达到 60 以上可保武器持久不降甚至增加；首饰的上限攻魔道属性越高，成神几率越高！最高可升 7 点！";
+                    ctx.DialogText = "炼制武器需要纯度合乎要求的黑铁矿石，纯度越高武器持久越不容易下降；首饰的属性决定了武器可能增加的属性类型与成功概率。每把武器最多只能成功修炼7次。";
                     ctx.AddLink("返回", "@main");
                     break;
 
@@ -594,7 +657,7 @@ public sealed class ModernNpcPluginEngine
             switch (ctx.SelectedAction.ToLowerInvariant())
             {
                 case "@main":
-                    ctx.DialogText = "欲问鼎沙巴克尊位，唯有用铁与血来铸就！行会掌门人可向我提交攻城申请！";
+                    ctx.DialogText = "你想攻打沙巴克城吗？要想攻打沙巴克城，必须先递交祖玛头像。你想申请攻城战吗？";
                     ctx.AddLink("提交祖玛头像与攻城费 (需要 1 祖玛头像 + 1,000,000 金币)", "@apply_siege");
                     ctx.AddLink("查询当前攻城排期", "@check_schedule");
                     ctx.AddLink("离开", "@close");
@@ -603,7 +666,7 @@ public sealed class ModernNpcPluginEngine
                 case "@apply_siege":
                     if (ctx.Session.State.GuildRank != 1)
                     {
-                        ctx.DialogText = "只有行会的一号掌门人方有权宣战攻城！";
+                        ctx.DialogText = "只有行会掌门人才能申请攻城战。";
                         return;
                     }
 
@@ -611,16 +674,16 @@ public sealed class ModernNpcPluginEngine
                     {
                         ctx.Session.State.Gold -= 1000000;
                         ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
-                        ctx.DialogText = "攻城申请已被接纳！攻城战将于 3 天后 20:00 准时打响，号令天下英雄决战沙城！";
+                        ctx.DialogText = "已接受并批准你的攻城申请，攻城战将于 3 天后 20:00 开始。";
                     }
                     else
                     {
-                        ctx.DialogText = "攻城申请需支付 1,000,000 战备金币，你的金币不足！";
+                        ctx.DialogText = "申请攻城战需要支付 1,000,000 金币，你的金币不足。";
                     }
                     break;
 
                 case "@check_schedule":
-                    ctx.DialogText = "本周攻城大战排期已定，全服英雄豪杰皆在厉兵秣马！";
+                    ctx.DialogText = "当前攻城战时间安排：三天后 20:00 - 22:00。";
                     ctx.AddLink("返回", "@main");
                     break;
 
@@ -916,4 +979,47 @@ public sealed class ModernNpcPluginEngine
             }
         }
     }
+
+    /// <summary>
+    /// 13. 比奇/银杏村/盟重肉店屠夫行为树 (买肉、高价回收肉类、初入江湖割肉指引)
+    /// </summary>
+    public sealed class ButcherNpcBehavior : INpcBehavior
+    {
+        public int NpcId => 113;
+        public string NpcName => "屠夫";
+
+        public void OnInteract(NpcDialogContext ctx)
+        {
+            if (ctx.Session.State == null) return;
+
+            switch (ctx.SelectedAction.ToLowerInvariant())
+            {
+                case "@main":
+                    ctx.DialogText = "嘿！客官，刚宰杀的鸡肉和新鲜鹿肉，肉质紧实肥美！割下品质好的肉拿来卖我，价格包你满意！";
+                    ctx.AddLink("购买肉品", "@buy");
+                    ctx.AddLink("卖新鲜肉", "@sell");
+                    ctx.AddLink("打听如何割肉", "@how_to_butcher");
+                    ctx.AddLink("离开", "@close");
+                    break;
+
+                case "@buy":
+                    ctx.DialogText = "挑选你中意的肉品吧。烹饪或喂养宠物都是绝佳上选！\\ \\<返回/@main>";
+                    break;
+
+                case "@sell":
+                    ctx.DialogText = "把你包裹里割下的肉拿出来吧，品质越纯，换得的金币越多！\\ \\<返回/@main>";
+                    break;
+
+                case "@how_to_butcher":
+                    ctx.DialogText = "击杀鹿或者鸡之后，站在尸体旁边按住键盘 【Alt】 键，再用鼠标左键点击尸体，就能割下新鲜肉块！\\ \\<返回/@main>";
+                    break;
+
+                case "@close":
+                default:
+                    ctx.CloseWindow = true;
+                    break;
+            }
+        }
+    }
 }
+

@@ -19,9 +19,9 @@ namespace Mir2Client.Render
         public const int ViewportW = 800;
         public const int ViewportH = 600;
 
-        public const int BufferTilesYUp = 18;
-        public const int BufferTilesYDown = 4;
-        public const int BufferTilesX = 4;
+        public const int BufferTilesYUp = 24;
+        public const int BufferTilesYDown = 8;
+        public const int BufferTilesX = 16;
 
         private WilLoader? _wilFloor;
         private WilLoader? _wilSmTiles;
@@ -200,7 +200,7 @@ namespace Mir2Client.Render
                 Light = light,
                 AniFrame = aniFrame,
                 AniTick = aniTick,
-                Passable = (floorRaw & 0x8000) == 0
+                Passable = (floorRaw & 0x8000) == 0 && (objRaw & 0x8000) == 0
             };
         }
 
@@ -257,7 +257,7 @@ namespace Mir2Client.Render
                 {
                     Centered = false,
                     Visible = false,
-                    ZIndex = -10,
+                    ZIndex = -2000,
                     ZAsRelative = false
                 };
                 AddChild(sp);
@@ -267,7 +267,7 @@ namespace Mir2Client.Render
                 {
                     Centered = false,
                     Visible = false,
-                    ZIndex = -9,
+                    ZIndex = -1900,
                     ZAsRelative = false
                 };
                 AddChild(sm);
@@ -277,7 +277,7 @@ namespace Mir2Client.Render
                 {
                     Centered = false,
                     Visible = false,
-                    ZIndex = -5,
+                    ZIndex = -1800,
                     ZAsRelative = false
                 };
                 AddChild(so);
@@ -306,8 +306,8 @@ namespace Mir2Client.Render
 
                     int tx = startTx + col;
                     int ty = startTy + row;
-                    int sx = tx * TileW - (int)_camX;
-                    int sy = ty * TileH - (int)_camY;
+                    float sx = tx * TileW - _camX;
+                    float sy = ty * TileH - _camY;
 
                     var sp = _floorSprites[poolIdx];
                     var sm = _smtileSprites[poolIdx];
@@ -324,15 +324,36 @@ namespace Mir2Client.Render
 
                     var cell = GetCell(tx, ty);
 
-                    // 1. 地面层 (Tiles.wil: 96x64 大地砖)
-                    if ((tx % 2 == 0) && (ty % 2 == 0) && _wilFloor != null && cell.FloorIdx >= 0)
+                    // 1. 地面层 (Tiles.wil: 96x64 大地砖，盛大官方 1.5 严格对齐 2x2 格，支持块内有效帧回退)
+                    if ((tx % 2 == 0) && (ty % 2 == 0) && _wilFloor != null)
                     {
-                        var tex = _wilFloor.GetFrame(cell.FloorIdx);
-                        if (tex != null)
+                        int drawFloor = cell.FloorIdx;
+                        if (drawFloor < 0)
                         {
-                            sp.Texture = tex;
-                            sp.Position = new Vector2(sx, sy);
-                            sp.Visible = true;
+                            int f1 = GetCell(tx + 1, ty).FloorIdx;
+                            if (f1 >= 0) drawFloor = f1;
+                            else
+                            {
+                                int f2 = GetCell(tx, ty + 1).FloorIdx;
+                                if (f2 >= 0) drawFloor = f2;
+                                else
+                                {
+                                    int f3 = GetCell(tx + 1, ty + 1).FloorIdx;
+                                    if (f3 >= 0) drawFloor = f3;
+                                }
+                            }
+                        }
+
+                        if (drawFloor >= 0)
+                        {
+                            var tex = _wilFloor.GetFrame(drawFloor);
+                            if (tex != null)
+                            {
+                                sp.Texture = tex;
+                                sp.Position = new Vector2(sx, sy);
+                                sp.Visible = true;
+                            }
+                            else sp.Visible = false;
                         }
                         else sp.Visible = false;
                     }
@@ -352,27 +373,24 @@ namespace Mir2Client.Render
                     }
                     else sm.Visible = false;
 
-                    // 3. 物件层 (Objects1~7.wil: y = sy + 32 - h)
+                    // 3. 物件层 (Objects1~7.wil: 普通物件 y = sy + 32 - h; 混合光晕 AniFrame & 0x80 != 0 使用 sx + px - 2, sy + py - 68)
                     if (cell.ObjIdx >= 0)
                     {
                         int drawObjIdx = cell.ObjIdx;
+                        bool isBlend = (cell.AniFrame & 0x80) != 0 || (cell.FileIdx == 0 && cell.ObjIdx is >= 2723 and <= 2729);
                         int aniCount = cell.AniFrame & 0x7F;
                         if (aniCount > 0)
                         {
-                            // 官方 Delphi 动画时序 (IDA sub_44D6CC)：AniTick 定义每帧停留间隔 (单位约 50ms)，默认 166ms (6 FPS)
-                            float tickInterval = cell.AniTick > 0 ? (cell.AniTick * 0.05f) : 0.166f;
+                            // 官方 Delphi 动画时序 (IDA 0x470D80)：AniTick 定义每帧停留倍率，默认 150ms
+                            float tickInterval = cell.AniTick > 0 ? (0.15f * (1 + cell.AniTick)) : 0.15f;
                             int animOffset = ((int)(_animTime / tickInterval)) % aniCount;
                             drawObjIdx += animOffset;
                         }
 
                         WilLoader? targetWil = null;
-                        if (cell.FileIdx == 0)
+                        if (cell.FileIdx >= 0 && cell.FileIdx < _wilObjs.Count)
                         {
-                            targetWil = _wilObj;
-                        }
-                        else if (cell.FileIdx > 0 && (cell.FileIdx - 1) < _wilObjs.Count)
-                        {
-                            targetWil = _wilObjs[cell.FileIdx - 1];
+                            targetWil = _wilObjs[cell.FileIdx];
                         }
                         else
                         {
@@ -385,42 +403,34 @@ namespace Mir2Client.Render
                             so.Texture = tex2;
                             int objW = tex2.GetWidth();
                             int objH = tex2.GetHeight();
-                            var objPos = new Vector2(sx, sy + 32 - objH);
+                            Vector2 objPos;
+
+                            // 盛大官方 1.5 逆向实证 (PlayScn.pas 0x470D49..0x470F9F)：
+                            // 1. 凡 (AniFrame & 0x80) != 0 的混合发光物件 (如灯柱光晕 Objects_2723..2729)，
+                            //    调用 GetObjectImage 读取 WIL 帧头偏移 (px, py)，绘制在 (sx + px - 2, sy + py - 68) (0x470F25: sub eax, 0x44; 0x470F66: sub edx, 2)
+                            // 2. 普通物件绘制在 (sx, sy + 32 - objH)，矮于或等于 1 格 (objH <= 32) 在底层 (ZIndex = -1800)，高于 1 格按 ty 排序
+                            if (isBlend)
+                            {
+                                var anchor = targetWil?.GetAnchor(drawObjIdx) ?? Vector2I.Zero;
+                                if (anchor == Vector2I.Zero && cell.FileIdx == 0 && drawObjIdx is >= 2723 and <= 2729)
+                                {
+                                    anchor = new Vector2I(-51, -113);
+                                }
+                                objPos = new Vector2(sx + anchor.X - 2, sy + anchor.Y - 68);
+                                so.Material = _additiveMaterial;
+                                so.ZIndex = Math.Clamp(ty * 2 + 1, 1, 3501);
+                            }
+                            else
+                            {
+                                objPos = new Vector2(sx, sy + 32 - objH);
+                                so.Material = null;
+                                so.ZIndex = objH > 32 ? Math.Clamp(ty * 2 - 1, 1, 3500) : -1800;
+                            }
+
                             so.Position = objPos;
                             so.Visible = true;
 
-                            // 盛大官方 1.5 逆向实证：对安全区光照 (Light > 0) 或光源光晕贴图 (如 2723/2724) 使用加法混合 (BlendMode.Add)
-                            // 消除黑色边缘与黑底倒置感，呈现原汁原味的半透明金色安全区光圈
-                            bool isLightHalo = (cell.Light > 0) || (cell.FileIdx == 0 && cell.ObjIdx is >= 2723 and <= 2724);
-                            if (isLightHalo)
-                            {
-                                so.Material = _additiveMaterial;
-                                so.ZIndex = -4; // 光照覆盖在地表上方
-                            }
-                            else
-                            {
-                                so.Material = null;
-                                so.ZIndex = -5;
-                            }
-
-                            if (objH > 32 && _playerTileX >= 0)
-                            {
-                                float playerSx = _playerTileX * TileW - (int)_camX + 24;
-                                float playerSy = _playerTileY * TileH - (int)_camY + 16;
-                                var objRect = new Rect2(objPos.X, objPos.Y, objW, MathF.Max(1.0f, (float)(objH - 10)));
-                                if (objRect.HasPoint(new Vector2(playerSx, playerSy)))
-                                {
-                                    so.Modulate = new Color(1f, 1f, 1f, 0.5f);
-                                }
-                                else
-                                {
-                                    so.Modulate = new Color(1f, 1f, 1f, 1.0f);
-                                }
-                            }
-                            else
-                            {
-                                so.Modulate = new Color(1f, 1f, 1f, 1.0f);
-                            }
+                            so.Modulate = new Color(1f, 1f, 1f, 1.0f);
                         }
                         else so.Visible = false;
                     }

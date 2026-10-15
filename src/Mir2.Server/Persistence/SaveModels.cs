@@ -59,8 +59,8 @@ public sealed class PlayerSaveData
     public int MaxMp { get; set; } = 100;
 
     public int MapId { get; set; } = 0; // 比奇省
-    public int MapX { get; set; } = 330;
-    public int MapY { get; set; } = 270;
+    public int MapX { get; set; } = 288;
+    public int MapY { get; set; } = 615;
     public byte Direction { get; set; }
 
     public int Gold { get; set; }

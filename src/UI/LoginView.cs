@@ -414,7 +414,7 @@ public partial class LoginView : Control
     private void OnCloseClicked()
     {
         GD.Print("[LoginView] 点击退出客户端");
-        GetTree().Quit();
+        AppLifecycle.SafeQuit(0);
     }
 
 #if MIR2_SANDBOX_DEV
@@ -424,6 +424,14 @@ public partial class LoginView : Control
         EmitSignal(SignalName.LoginRequested, "127.0.0.1", 7100, "sandbox_player", "123456");
     }
 #endif
+
+    public void SetUsername(string username)
+    {
+        if (_txtUsername != null)
+        {
+            _txtUsername.Text = username;
+        }
+    }
 
     private void OnSubmitRegister()
     {
@@ -445,8 +453,6 @@ public partial class LoginView : Control
 
         GD.Print($"[LoginView] 提交官方注册新账号: {u}");
         EmitSignal(SignalName.RegisterRequested, u, p1);
-        SwitchSubState(0);
-        ShowMessageModal($"账号 {u} 注册申请已提交，请登录！");
     }
 
     private void OnSubmitChangePassword()
@@ -468,10 +474,8 @@ public partial class LoginView : Control
         }
 
         string acc = _txtAccount?.Text?.Trim() ?? string.Empty;
-        GD.Print($"[LoginView] 提交修改密码请求成功: account={acc}");
+        GD.Print($"[LoginView] 提交修改密码请求: account={acc}");
         EmitSignal(SignalName.ChangePasswordRequested, acc, oldP, newP1);
-        SwitchSubState(0);
-        ShowMessageModal("密码修改申请已提交！");
     }
 }
 

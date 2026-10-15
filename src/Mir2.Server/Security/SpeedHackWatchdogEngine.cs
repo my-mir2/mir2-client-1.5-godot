@@ -29,10 +29,10 @@ public sealed class SpeedHackWatchdogEngine
     }
 
     private readonly ConcurrentDictionary<int, ClientClockProfile> _profiles = new();
-    public double MaxSpeedRatioTolerance { get; set; } = 1.25; // 允许最多 25% 的网络偶发突发抖动
-    public int MaxActionsPerWindow { get; set; } = 12;         // 3 秒内最多允许 12 次高频动作（移动/出刀）
+    public double MaxSpeedRatioTolerance { get; set; } = 1.35; // 允许最多 35% 的网络偶发突发抖动
+    public int MaxActionsPerWindow { get; set; } = 15;         // 3 秒内最多允许 15 次操作（充分包容 300ms 连续奔跑中的合理转向，严密拦截连发外挂）
     public long WindowDurationMs { get; set; } = 3000;         // 统计窗口 3 秒
-    public long DefaultPenaltyMs { get; set; } = 1200;         // 抓到加速强制冰冻硬直 1.2 秒
+    public long DefaultPenaltyMs { get; set; } = 800;          // 抓到加速强制冰冻硬直 0.8 秒
 
     /// <summary>
     /// 当客户端发起移动、攻击、施法等核心逻辑操作时调用此方法核验

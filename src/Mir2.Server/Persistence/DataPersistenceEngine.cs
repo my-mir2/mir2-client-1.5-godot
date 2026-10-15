@@ -132,8 +132,8 @@ public sealed class DataPersistenceEngine
     public PlayerState? LoadPlayer(string playerName, out int mapId, out int mapX, out int mapY)
     {
         mapId = 0;
-        mapX = 330;
-        mapY = 270;
+        mapX = 288;
+        mapY = 615;
 
         if (string.IsNullOrWhiteSpace(playerName)) return null;
 

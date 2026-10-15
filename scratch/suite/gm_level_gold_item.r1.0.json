@@ -1,0 +1,49 @@
+{
+  "kills": 0,
+  "seconds": 6.2454711,
+  "rollbacks": 0,
+  "level": 30,
+  "hp": 419,
+  "maxHp": 419,
+  "dead": false,
+  "finalMap": "0",
+  "x": 330,
+  "y": 270,
+  "gold": 5000,
+  "exp": 0,
+  "maxExp": 2000000,
+  "problems": [],
+  "gm": [
+    "level 30 => GM: 等级=30 HP=419/419",
+    "gold 5000 => GM: 金币=5000",
+    "item 金创药(小量) 2 => GM: 发放 (HP)DrugSmall x2"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4426919,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 30,
+      "AtSec": 6.2406809,
+      "Kills": 0,
+      "MaxExp": 2000000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130",
+    "(HP)DrugSmall\t1\t1\t398",
+    "(HP)DrugSmall\t1\t1\t398"
+  ],
+  "fights": []
+}

@@ -57,13 +57,6 @@ public partial class SlotButton : Button
             {
                 _iconRect.Texture = value;
                 _iconRect.Visible = value != null;
-                Vector2 targetSize = Size.X > 0 && Size.Y > 0 ? Size : (CustomMinimumSize.X > 0 ? CustomMinimumSize : new Vector2(32, 32));
-                _iconRect.Position = Vector2.Zero;
-                _iconRect.Size = targetSize;
-                _iconRect.OffsetLeft = 0;
-                _iconRect.OffsetTop = 0;
-                _iconRect.OffsetRight = 0;
-                _iconRect.OffsetBottom = 0;
             }
         }
     }
@@ -78,7 +71,6 @@ public partial class SlotButton : Button
         // 呈现出原汁原味"物品比格子略大"的经典视觉表现。故 ClipContents 必须为 false。
         ClipContents = false;
 
-        Vector2 initialSize = Size.X > 0 && Size.Y > 0 ? Size : (CustomMinimumSize.X > 0 ? CustomMinimumSize : new Vector2(32, 32));
         _iconRect = new TextureRect
         {
             Name = "__SlotIcon__",
@@ -88,9 +80,7 @@ public partial class SlotButton : Button
             // 官方 1.5 铁证 (IDA sub_48E458): 原生 1:1 像素居中拷贝，大物品自然溢出，绝不拉伸与剪裁！
             StretchMode = TextureRect.StretchModeEnum.KeepCentered,
             ClipContents = false,
-            ExpandMode = TextureRect.ExpandModeEnum.KeepSize,
-            Position = Vector2.Zero,
-            Size = initialSize
+            ExpandMode = TextureRect.ExpandModeEnum.KeepSize
         };
         AddChild(_iconRect);
         _iconRect.SetAnchorsPreset(LayoutPreset.FullRect);
@@ -98,19 +88,6 @@ public partial class SlotButton : Button
         _iconRect.OffsetTop = 0;
         _iconRect.OffsetRight = 0;
         _iconRect.OffsetBottom = 0;
-
-        Resized += () =>
-        {
-            if (_iconRect != null && Size.X > 0 && Size.Y > 0)
-            {
-                _iconRect.Position = Vector2.Zero;
-                _iconRect.Size = Size;
-                _iconRect.OffsetLeft = 0;
-                _iconRect.OffsetTop = 0;
-                _iconRect.OffsetRight = 0;
-                _iconRect.OffsetBottom = 0;
-            }
-        };
 
         // 官方低持久危急红色闪烁边框
         _lowDuraBorder = new ColorRect

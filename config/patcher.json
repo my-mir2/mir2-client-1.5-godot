@@ -1,0 +1,17 @@
+{
+  "version": "1.5.0.1",
+  "client_binary": "Mir2Client.exe",
+  "update_url": "http://127.0.0.1:8080/patch/",
+  "notice": "热血传奇 1.5 虎卫传说官方客户端更新已就绪",
+  "required_files": [
+    {
+      "path": "Mir2Client.exe",
+      "sha256": "auto_generated_on_build",
+      "required": true
+    },
+    {
+      "path": "config/server.ini",
+      "required": true
+    }
+  ]
+}

@@ -250,6 +250,15 @@ public partial class TradePanelView : Control, IManagedWindow
                 Flat = true,
                 Icon = null
             };
+            int currentIdx = i;
+            slot.Pressed += () =>
+            {
+                if (_isMyLocked) return;
+                if (!string.IsNullOrEmpty(_myItems[currentIdx]))
+                {
+                    EmitSignal(SignalName.DelDealItemRequested, currentIdx);
+                }
+            };
             _mySlots[i] = slot;
             myGrid.AddChild(slot);
         }

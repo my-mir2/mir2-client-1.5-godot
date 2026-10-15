@@ -57,7 +57,7 @@ public static class RevelationSkillEngine
             ExpireTimeMs = nowMs + (durationSec * 1000L)
         };
 
-        return (true, info, $"心灵启示透视成功！【{targetMonster.Name}】生命值: {targetMonster.Hp}/{targetMonster.MaxHp}，透视持续 {durationSec} 秒！");
+        return (true, info, $"心灵启示: {targetMonster.Name} 生命值 {targetMonster.Hp}/{targetMonster.MaxHp}");
     }
 
     /// <summary>
@@ -91,6 +91,6 @@ public static class RevelationSkillEngine
             ExpireTimeMs = nowMs + (durationSec * 1000L)
         };
 
-        return (true, info, $"心灵启示透视成功！玩家【{targetPlayer.Name}】生命值: {targetPlayer.Hp}/{targetPlayer.MaxHp}，透视持续 {durationSec} 秒！");
+        return (true, info, $"心灵启示: {targetPlayer.Name} 生命值 {targetPlayer.Hp}/{targetPlayer.MaxHp}");
     }
 }

@@ -22,8 +22,17 @@ public static class MiningEngine
 {
     public static bool IsMiningMap(int mapId)
     {
-        // 官方典型矿区地图编号: 1 (比奇矿区), 2 (矿区废桥/东部等)
-        return mapId == 1 || mapId == 2;
+        // 官方矿区地图编号: 1 (比奇矿区), 2 (矿区废桥/东部等), 15 (封魔矿区)
+        return mapId == 1 || mapId == 2 || mapId == 15;
+    }
+
+    public static bool IsMiningMap(string? mapName)
+    {
+        if (string.IsNullOrWhiteSpace(mapName)) return false;
+        // 盛大官方 1.5 权威矿区地图编号前缀: D021~D024 (比奇矿区各层), D401 (封魔矿区), 矿区
+        return mapName.StartsWith("D02", StringComparison.OrdinalIgnoreCase) ||
+               mapName.StartsWith("D401", StringComparison.OrdinalIgnoreCase) ||
+               mapName.Contains("矿区");
     }
 
     public static bool IsPickaxe(EquipItem? weapon)
@@ -50,20 +59,20 @@ public static class MiningEngine
         var result = new MineResult();
         if (state == null)
         {
-            result.Message = "角色状态异常。";
+            result.Message = "状态异常。";
             return result;
         }
 
         if (!IsMiningMap(mapId))
         {
-            result.Message = "这里不是矿区，无法开采矿石！";
+            result.Message = "这里不是矿区，无法挖矿。";
             return result;
         }
 
         var weapon = state.Equipment[(int)OfficialEquipSlot.Weapon];
         if (!IsPickaxe(weapon))
         {
-            result.Message = "你手中没有装备鹤嘴锄，无法挖矿！";
+            result.Message = "没有装备鹤嘴锄，无法挖矿。";
             return result;
         }
 
@@ -73,7 +82,7 @@ public static class MiningEngine
         if (weapon.Dura <= 0)
         {
             result.PickaxeBroken = true;
-            result.Message = "你的鹤嘴锄已经彻底折断损坏，无法继续挖矿！";
+            result.Message = "鹤嘴锄已损坏，无法继续挖矿。";
             return result;
         }
 
@@ -87,7 +96,7 @@ public static class MiningEngine
             if (weapon.Dura == 0)
             {
                 result.PickaxeBroken = true;
-                result.Message = "铛！你的鹤嘴锄在坚硬的岩层中折断了！";
+                result.Message = "鹤嘴锄损坏了。";
                 return result;
             }
         }
@@ -97,7 +106,7 @@ public static class MiningEngine
         {
             if (state.BagItems.Count >= 40)
             {
-                result.Message = "你挖到了矿石，但背包已满装不下了！";
+                result.Message = "背包已满。";
                 return result;
             }
 
@@ -136,12 +145,13 @@ public static class MiningEngine
             // 盛大官方 1.5 铁律：背包负重严格限制，超重无法将矿石放入包裹
             if (state.BagWeight + oreWeight > state.MaxBagWeight)
             {
-                result.Message = "你挖到了矿石，但太重了拿不动！";
+                result.Message = "太重了拿不动，负重已满。";
                 return result;
             }
 
             var ore = new EquipItem
             {
+                Uid = rng.Next(100000, 999999),
                 Name = oreName,
                 Shape = purity, // Shape 字段记录纯度
                 Weight = oreWeight,
@@ -153,11 +163,11 @@ public static class MiningEngine
             state.BagWeight += oreWeight;
             result.Success = true;
             result.MinedOre = ore;
-            result.Message = $"铛！一声脆响，你从岩壁中挖出了一块【{oreName}】(纯度: {purity})！";
+            result.Message = $"获得了 {oreName}(纯度 {purity})。";
             return result;
         }
 
-        result.Message = "你挥汗如雨地敲击岩壁，只敲下一堆碎石。";
+        result.Message = string.Empty; // 官方原版未挖到时不产生文本刷屏
         return result;
     }
 }

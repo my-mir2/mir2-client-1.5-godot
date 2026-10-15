@@ -274,7 +274,7 @@ public static class ItemLifecycleEngine
         var weapon = session.State.Equipment[(int)OfficialEquipSlot.Weapon];
         if (weapon == null)
         {
-            return (false, "你手中未握持武器，无法使用祝福油！", null, -1);
+            return (false, "你必须把武器拿在手上。", null, -1);
         }
 
         // 2. 校验并扣除背包祝福油与负重
@@ -300,23 +300,23 @@ public static class ItemLifecycleEngine
             weapon.Curse = res.NewCurse;
             weapon.Luck = res.NewLuck;
             session.State.RecalculateAttributes();
-            return (false, "一股不祥的灰雾笼罩了刀身！武器被诅咒了！", oilItem, oilSlot);
+            return (false, "你的武器被加了诅咒。", oilItem, oilSlot);
         }
         else if (res.CurseCleared)
         {
             weapon.Curse = res.NewCurse;
             session.State.RecalculateAttributes();
-            return (true, "神圣的油香驱散了刀身上的邪气！武器诅咒被净化了！", oilItem, oilSlot);
+            return (true, "你的武器被加了祝福。", oilItem, oilSlot);
         }
         else if (res.Success)
         {
             weapon.Luck = res.NewLuck;
             session.State.RecalculateAttributes();
-            return (true, $"圣光闪耀！武器被祝福了！当前幸运: +{weapon.Luck}！", oilItem, oilSlot);
+            return (true, "你的武器被加了祝福。", oilItem, oilSlot);
         }
         else
         {
-            return (true, "药油渗透进刀纹，刀身毫无变化。", oilItem, oilSlot);
+            return (true, "你的武器没有任何变化。", oilItem, oilSlot);
         }
     }
 

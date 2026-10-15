@@ -17,7 +17,7 @@ namespace Mir2.Server.Game;
 /// 盛大官方 1.5 原版网络封包路由与分发中心 (M2 PacketDispatcher)
 /// 严格 1:1 处理官方 CM_ 上行协议，并驱动服务端物理世界与九宫格 AOI 广播
 /// </summary>
-public sealed class PacketDispatcher
+public sealed partial class PacketDispatcher
 {
     private readonly MapManager _mapManager;
     private readonly System.Threading.Lock _ninePatchLock = new();
@@ -57,6 +57,17 @@ public sealed class PacketDispatcher
     {
         _mapManager = mapManager;
         RegenEngine = regenEngine;
+        if (RegenEngine != null)
+        {
+            RegenEngine.MonsterSpawned += mon =>
+            {
+                var map = _mapManager.GetMap(mon.MapId) ?? _mapManager.GetMap(0);
+                if (map != null)
+                {
+                    BroadcastToCoords(map, mon.X, mon.Y, 220, mon.Uid, mon.X, mon.Y, mon.Direction, $"{mon.Name}\t{mon.X}\t{mon.Y}\t{mon.Direction}\t{mon.Appr}");
+                }
+            };
+        }
         if (npcEngine != null) NpcEngine = npcEngine;
         if (tradeEngine != null) TradeEngine = tradeEngine;
         if (groupEngine != null) GroupEngine = groupEngine;
@@ -159,6 +170,14 @@ public sealed class PacketDispatcher
 
             case ProtocolConsts.CM_LOGIN: // 2 账号密码登录
                 HandleLogin(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_NEWACCOUNT: // 2002 账号注册
+                HandleNewAccount(session, remaining);
+                break;
+
+            case ProtocolConsts.CM_UPDATEACCOUNT: // 2003 修改密码
+                HandleChangePassword(session, remaining);
                 break;
 
             case ProtocolConsts.CM_QUERYCHRINFO: // 119 查询角色列表
@@ -426,6 +445,7 @@ public sealed class PacketDispatcher
                     int slash = remaining.IndexOf('/');
                     var valSpan = slash >= 0 ? remaining[..slash] : remaining;
                     session.State.BoThrusting = valSpan.Length > 0 && valSpan[0] == '1';
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, session.State.BoThrusting ? "打开刺杀剑术" : "关闭刺杀剑术");
                 }
                 break;
 
@@ -435,6 +455,7 @@ public sealed class PacketDispatcher
                     int slash = remaining.IndexOf('/');
                     var valSpan = slash >= 0 ? remaining[..slash] : remaining;
                     session.State.BoHalfMoon = valSpan.Length > 0 && valSpan[0] == '1';
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, session.State.BoHalfMoon ? "打开半月弯刀" : "关闭半月弯刀");
                 }
                 break;
 
@@ -489,6 +510,121 @@ public sealed class PacketDispatcher
 
     // 登录暴力破解防护字典: 账号 -> (失败次数, 锁定截止时间戳)
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (int FailCount, long LockUntilMs)> _loginAttempts = new(StringComparer.OrdinalIgnoreCase);
+
+    // 内存账号备用存储 (支持离线单测): 账号 -> 密码
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _memoryAccounts = new(StringComparer.OrdinalIgnoreCase);
+
+    // 内存角色备用存储 (支持离线单测): 账号 -> 角色元组列表
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, List<(string CharName, int Job, int Sex, int Level)>> _memoryCharacters = new(StringComparer.OrdinalIgnoreCase);
+
+    private void HandleNewAccount(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        int slash = payload.IndexOf('/');
+        string account = slash > 0 ? payload[..slash].ToString().Trim() : payload.ToString().Trim();
+        string password = slash > 0 ? payload[(slash + 1)..].ToString().Trim() : "123456";
+        HandleNewAccountInternal(session, account, password);
+    }
+
+    private unsafe void HandleBinaryCreateAccount(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < sizeof(BinaryProtocol.CreateAccountPayload)) return;
+        fixed (byte* p = payload)
+        {
+            var intent = *(BinaryProtocol.CreateAccountPayload*)p;
+            var (account, password) = intent.Read();
+            HandleNewAccountInternal(session, account, password);
+        }
+    }
+
+    private void HandleNewAccountInternal(ClientSession session, string account, string password)
+    {
+        if (string.IsNullOrWhiteSpace(account) || string.IsNullOrWhiteSpace(password))
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_NEWID_FAIL, -1, 0, 0, 0, "账号或密码不能为空！");
+            return;
+        }
+
+        if (account.Length > 12)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_NEWID_FAIL, -1, 0, 0, 0, "账号长度不能超过12位！");
+            return;
+        }
+
+        bool success = false;
+        if (PgPersistenceEngine != null)
+        {
+            success = PgPersistenceEngine.RegisterAccount(account, password);
+        }
+        else
+        {
+            success = _memoryAccounts.TryAdd(account, password);
+        }
+
+        if (success)
+        {
+            ServerLogger.Audit("REGISTER_SUCCESS", account, "", $"新玩家账号 {account} 注册成功");
+            session.EnqueuePacket(ProtocolConsts.SM_NEWID_SUCCESS, 1, 0, 0, 0, account);
+        }
+        else
+        {
+            ServerLogger.Audit("REGISTER_FAILED", account, "", $"账号 {account} 已被占用，注册失败");
+            session.EnqueuePacket(ProtocolConsts.SM_NEWID_FAIL, -2, 0, 0, 0, "该账号已存在，请更换账号名称！");
+        }
+    }
+
+    private void HandleChangePassword(ClientSession session, ReadOnlySpan<char> payload)
+    {
+        var parts = payload.ToString().Split('/', StringSplitOptions.RemoveEmptyEntries);
+        string account = parts.Length > 0 ? parts[0].Trim() : string.Empty;
+        string oldPass = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+        string newPass = parts.Length > 2 ? parts[2].Trim() : string.Empty;
+        HandleChangePasswordInternal(session, account, oldPass, newPass);
+    }
+
+    private unsafe void HandleBinaryChangePassword(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < sizeof(BinaryProtocol.ChangePasswordPayload)) return;
+        fixed (byte* p = payload)
+        {
+            var intent = *(BinaryProtocol.ChangePasswordPayload*)p;
+            var (account, oldPass, newPass) = intent.Read();
+            HandleChangePasswordInternal(session, account, oldPass, newPass);
+        }
+    }
+
+    private void HandleChangePasswordInternal(ClientSession session, string account, string oldPassword, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(account) || string.IsNullOrWhiteSpace(oldPassword) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_CHANGEPASS_FAIL, -1, 0, 0, 0, "账号和密码不能为空！");
+            return;
+        }
+
+        bool success = false;
+        if (PgPersistenceEngine != null)
+        {
+            success = PgPersistenceEngine.ChangePassword(account, oldPassword, newPassword);
+        }
+        else
+        {
+            if (_memoryAccounts.TryGetValue(account, out var currentPwd) && currentPwd == oldPassword)
+            {
+                _memoryAccounts[account] = newPassword;
+                success = true;
+            }
+        }
+
+        if (success)
+        {
+            ServerLogger.Audit("CHGPWD_SUCCESS", account, "", $"账号 {account} 修改密码成功");
+            session.EnqueuePacket(ProtocolConsts.SM_CHANGEPASS_OK, 1, 0, 0, 0, "密码修改成功！");
+        }
+        else
+        {
+            ServerLogger.Audit("CHGPWD_FAILED", account, "", $"账号 {account} 原密码错误或不存在");
+            session.EnqueuePacket(ProtocolConsts.SM_CHANGEPASS_FAIL, -2, 0, 0, 0, "原密码错误或账号不存在！");
+        }
+    }
 
     private void HandleLogin(ClientSession session, ReadOnlySpan<char> payload)
     {
@@ -572,24 +708,51 @@ public sealed class PacketDispatcher
         session.AccountName = account;
         ServerLogger.Audit("LOGIN_SUCCESS", account, "", $"账号 {account} 登录成功，通知客户端");
 
-        // 双向回执兼容: 发送官方 SM_PASSOK (500) 与 SM_LOGINSUCCESS (530)
-        session.EnqueuePacket(ProtocolConsts.SM_PASSOK, session.SessionId, 0, 0, 0, account);
+        // 盛大官方 1.5 权威登录成功回执: SM_LOGINSUCCESS (530)
         session.EnqueuePacket(ProtocolConsts.SM_LOGINSUCCESS, session.SessionId, 0, 0, 0, account);
     }
 
-    private void HandleQueryCharInfo(ClientSession session)
+    public void HandleQueryCharInfo(ClientSession session)
     {
-        // 默认模拟返回 1 个 1.5 原版角色: 战士, 等级 35, 男
-        string charInfo = $"{session.AccountName}_战神/0/35/0/0/0";
-        session.EnqueuePacket(ProtocolConsts.SM_QUERYCHAR_OK, 1, 0, 0, 0, charInfo);
-        session.EnqueuePacket(ProtocolConsts.SM_CHARLIST_DELPHI, 1, 0, 0, 0, charInfo);
+        string account = session.AccountName;
+        if (string.IsNullOrWhiteSpace(account))
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_QUERYCHAR_FAIL, 0, 0, 0, 0, "未认证账号");
+            return;
+        }
+
+        List<(string CharName, int Job, int Sex, int Level)> charList;
+        if (PgPersistenceEngine != null)
+        {
+            charList = PgPersistenceEngine.GetCharactersByAccount(account);
+        }
+        else
+        {
+            // 官方 1.5：新账号查角返回 0 个角色，严禁凭空赠送任何角色
+            if (!_memoryCharacters.TryGetValue(account, out charList!))
+            {
+                charList = new List<(string CharName, int Job, int Sex, int Level)>();
+                _memoryCharacters[account] = charList;
+            }
+        }
+
+        var sb = new StringBuilder();
+        foreach (var c in charList)
+        {
+            // 盛大官方 1.5 格式: Name\tJob\tLevel\tGender\t0\t0
+            sb.Append($"{c.CharName}\t{c.Job}\t{c.Level}\t{c.Sex}\t0\t0\r\n");
+        }
+        string payload = sb.ToString();
+
+        // 盛大官方 1.5 权威查角回执: SM_QUERYCHAR_OK (523)
+        session.EnqueuePacket(ProtocolConsts.SM_QUERYCHAR_OK, charList.Count, 0, 0, 0, payload);
     }
 
     private void HandleSelectChar(ClientSession session, ReadOnlySpan<char> payload)
     {
         string name = payload.ToString();
-        int spawnX = 330;
-        int spawnY = 270;
+        int spawnX = 288;
+        int spawnY = 615;
 
         int slash1 = payload.IndexOf('/');
         if (slash1 > 0)
@@ -640,43 +803,34 @@ public sealed class PacketDispatcher
 
         session.State ??= new PlayerState();
 
-        // 默认初始化 35 级战士属性与经验/负重数值
-        if (session.State.Level <= 1)
+        // 官方 1.5 新角色初始生命魔法与属性规范
+        if (session.State.MaxHp <= 0)
         {
-            session.State.Level = 35;
-            session.State.Hp = 520;
-            session.State.MaxHp = 520;
-            session.State.Mp = 100;
-            session.State.MaxMp = 100;
-            session.State.Exp = 650000;
-            session.State.BagWeight = 0;
-            session.State.WearWeight = 23;
-            session.State.HandWeight = 20;
-            if (name.Contains("auto_tester") || name.Contains("战神") || session.AccountName.Contains("tester"))
-            {
-                session.State.Gold = 88888;
-            }
-            else
-            {
-                session.State.Gold = 0;
-            }
+            session.State.MaxHp = session.State.Job switch { 0 => 19, 1 => 16, _ => 17 };
+            session.State.Hp = session.State.MaxHp;
+        }
+        if (session.State.MaxMp <= 0)
+        {
+            session.State.MaxMp = session.State.Job switch { 0 => 11, 1 => 17, _ => 13 };
+            session.State.Mp = session.State.MaxMp;
         }
 
-        // 默认战士装备：重盔甲(男)、修罗斧
+        // 官方 1.5 默认新手初始装备：布衣(男/女)、木剑
         if (session.State.Equipment[0] == null)
         {
+            bool isFemale = session.State.Sex != 0;
             session.State.Equipment[0] = new EquipItem
             {
                 Uid = 1,
-                Name = "重盔甲(男)",
-                Shape = 2,
-                Weight = 23,
-                Dura = 25,
-                MaxDura = 25,
-                Ac = 4,
-                MaxAc = 7,
-                Mac = 2,
-                MaxMac = 3
+                Name = isFemale ? "布衣(女)" : "布衣(男)",
+                Shape = 1,
+                Weight = 5,
+                Dura = 5,
+                MaxDura = 5,
+                Ac = 0,
+                MaxAc = 1,
+                Mac = 0,
+                MaxMac = 1
             };
         }
         if (session.State.Equipment[1] == null)
@@ -684,14 +838,24 @@ public sealed class PacketDispatcher
             session.State.Equipment[1] = new EquipItem
             {
                 Uid = 2,
-                Name = "修罗",
-                Shape = 2,
-                Weight = 20,
-                Dura = 25,
-                MaxDura = 25,
-                Dc = 0,
-                MaxDc = 20
+                Name = "木剑",
+                Shape = 1,
+                Weight = 7,
+                Dura = 4,
+                MaxDura = 4,
+                Dc = 1,
+                MaxDc = 2
             };
+        }
+
+        // 官方 1.5 默认新手背包消耗品：金创药(小量)*2, 魔法药(小量)*2, 蜡烛*1
+        if (session.State.BagItems.Count == 0)
+        {
+            session.State.BagItems.Add(new EquipItem { Uid = 10, Name = "金创药(小量)", Weight = 1, Dura = 1 });
+            session.State.BagItems.Add(new EquipItem { Uid = 11, Name = "金创药(小量)", Weight = 1, Dura = 1 });
+            session.State.BagItems.Add(new EquipItem { Uid = 12, Name = "魔法药(小量)", Weight = 1, Dura = 1 });
+            session.State.BagItems.Add(new EquipItem { Uid = 13, Name = "蜡烛", Weight = 1, Dura = 1 });
+            session.State.BagWeight = 4;
         }
 
         var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
@@ -699,21 +863,39 @@ public sealed class PacketDispatcher
         // 1. 注册到当前地图 AOI 空间九宫格
         map.Aoi.Enter(session, session.X, session.Y);
 
-        // 2. 下发官方进入游戏核心响应: SM_LOGON_DELPHI (50) 与 SM_STARTPLAY (20)
+        // 2. 下发官方进入游戏核心确认: SM_STARTPLAY (20) 触发客户端转场
         session.EnqueuePacket(ProtocolConsts.SM_STARTPLAY, session.SessionId, session.X, session.Y, 0, session.CharacterName);
+
+        // 3. 下发大世界全量登场握手封包集
+        SendWorldEntryPackets(session);
+
+        // 4. 在九宫格内向其他玩家广播该玩家登场生成: SM_SENDUSERSTATE (250)
+        BroadcastToNinePatch(session, ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, session.X, session.Y, 0, session.CharacterName, includeSelf: false);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 原版大世界登场握手封包全集下发
+    /// 在角色选定进入以及客户端大世界视图挂载就绪 (IntentLoginNoticeOk) 时双向下发，
+    /// 确保地图、坐标、血球、经验条、负重、装备、包裹、昼夜光照 100% 物理对齐点亮。
+    /// </summary>
+    public void SendWorldEntryPackets(ClientSession session)
+    {
+        if (session.State == null) return;
+        var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+
+        // 1. 坐标与地图初始化
         session.EnqueuePacket(ProtocolConsts.SM_LOGON_DELPHI, session.SessionId, session.X, session.Y, 0, session.CharacterName);
+        session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, map.MapId, session.X, session.Y, 0, NewMapExtra(map));
 
-        // 3. 下发地图切换: SM_NEWMAP_DELPHI (521) / 比奇省 0, 坐标 (330, 270)
-        session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, map.MapId, session.X, session.Y, 0, map.Name);
-
-        // 4. 下发自身属性面板与能力: SM_MYSTATUS (708), SM_EXPERIENCE (45), SM_WEIGHTCHANGED (622), SM_HEALTHSPELLCHANGED (53), SM_SENDUSERSTATE (52)
+        // 2. 生命魔法/体态/经验/负重
         session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
         session.EnqueuePacket(ProtocolConsts.SM_EXPERIENCE, (int)session.State.Exp, (int)session.State.MaxExp, 0, 0, "");
-        session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.WearWeight, session.State.HandWeight, session.State.MaxWearWeight, 0, $"{session.State.BagWeight}\t{session.State.MaxBagWeight}\t{session.State.WearWeight}\t{session.State.MaxWearWeight}\t{session.State.HandWeight}\t{session.State.MaxHandWeight}");
-        session.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, session.SessionId, session.State.Hp, session.State.MaxHp, 0, $"{session.State.Hp}/{session.State.MaxHp}/{session.State.Mp}/{session.State.MaxMp}");
-        session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.State.Gold, 0, 0, 0, $"{session.CharacterName}/{session.State.Level}/{session.State.Job}/{session.State.Sex}|{session.State.Ac}/{session.State.Mac}/{session.State.Dc}/{session.State.Mc}/{session.State.Sc}");
+        session.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, session.State.Hp, session.State.Mp, session.State.MaxHp, session.State.MaxMp);
 
-        // 5. 下发 9 槽位装备: SM_EQUIPINFO (621)
+        // 3. 四维属性、等级、职业、金币 (SM_SENDUSERSTATE 52)
+        session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.State.Gold, 0, 0, 0, $"{session.CharacterName}/{session.State.Level}/{session.State.Job}/{session.State.Sex}|{session.State.Ac}-{session.State.MaxAc}/{session.State.Mac}-{session.State.MaxMac}/{session.State.Dc}-{session.State.MaxDc}/{session.State.Mc}-{session.State.MaxMc}/{session.State.Sc}-{session.State.MaxSc}/{session.State.Hit}/{session.State.Speed}");
+
+        // 4. 下发 9 槽位装备: SM_EQUIPINFO (621)
         var eqParts = new List<string>();
         for (int i = 0; i < 9; i++)
         {
@@ -725,12 +907,33 @@ public sealed class PacketDispatcher
         }
         session.EnqueuePacket(ProtocolConsts.SM_EQUIPINFO, 0, 0, 0, 0, string.Join(",", eqParts));
 
-        // 6. 下发基础四维能力: SM_ABILITY (648)
-        SendAbility(session);
+        // 5. 下发背包物品 (SM_BAGITEMS 重置 + SM_ADDITEM 逐项添加)
+        session.EnqueuePacket(ProtocolConsts.SM_BAGITEMS, 0, 0, 0, 0);
+        for (int i = 0; i < session.State.BagItems.Count && i < 40; i++)
+        {
+            var it = session.State.BagItems[i];
+            if (it != null)
+            {
+                int looks = it.Looks > 0 ? it.Looks : Mir2.Shared.Data.OfficialStdItemsRegistry.ResolveLooks(it.Name, 1);
+                session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, it.Uid, i, it.Weight, 0, $"{it.Name}\t{it.Dura}\t{it.MaxDura}\t{looks}");
+            }
+        }
 
-        // 7. 在九宫格内向其他玩家广播该玩家登场生成: SM_SENDUSERSTATE (250)
-        BroadcastToNinePatch(session, ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, session.X, session.Y, 0, session.CharacterName, includeSelf: false);
+        // 6. 昼夜自然光照 (SM_CHANGELIGHT 46)
+        session.EnqueuePacket(ProtocolConsts.SM_CHANGELIGHT, 0, 0, 10, 0);
+
+        // 7. 官方原版欢迎系统公告 (SM_SYSMSG_DELPHI 驱动聊天窗口显示)
+        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "欢迎来到热血传奇！");
+
+        // 8~10. 同步视野内的 NPC / 怪物 / 其他玩家
+        SendNearbyEntities(session, map);
+
+        // 11. 立即冲刷发送
+        session.Flush();
     }
+
+    /// <summary>SM_NEWMAP 的字符串参数：数据库世界为 "官方地图号|地图名"，客户端据此定位 .map 文件；夹具地图仍为地图名。</summary>
+    private static string NewMapExtra(GameMap m) => string.IsNullOrEmpty(m.OfficialId) ? m.Name : $"{m.OfficialId}|{m.Name}";
 
     private void HandleTurn(ClientSession session, ReadOnlySpan<char> payload)
     {
@@ -748,7 +951,7 @@ public sealed class PacketDispatcher
         if (session.State != null && session.State.IsParalyzed)
         {
             session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, session.X, session.Y, session.Direction, session.CharacterName);
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【石化】你处于麻痹状态，无法移动！");
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你处于麻痹状态，无法移动。");
             return;
         }
 
@@ -816,20 +1019,23 @@ public sealed class PacketDispatcher
             {
                 session.PenaltyFrozenUntilMs = nowMs + 1200;
                 session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, oldX, oldY, dir, session.CharacterName);
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【安全防御】检测到系统时钟异常或操作过载，已实施制动拉回！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你的动作太快了。");
                 return;
             }
 
             if (session.LastMoveTimeMs > 0)
             {
-                var (isSpeedHack, shouldRollback) = EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(nowMs, session.LastMoveTimeMs);
+                int fastMoves = session.ConsecutiveFastMoves;
+                var (isSpeedHack, shouldRollback) = EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(nowMs, session.LastMoveTimeMs, ref fastMoves);
+                session.ConsecutiveFastMoves = fastMoves;
                 if (isSpeedHack && shouldRollback)
                 {
-                    // 移动过快判定外挂拉回
+                    // 连续多次超速判定外挂，实施制动拉回
                     session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, oldX, oldY, dir, session.CharacterName);
                     return;
                 }
             }
+
             session.LastMoveTimeMs = nowMs;
 
             // 更新实体坐标
@@ -839,16 +1045,14 @@ public sealed class PacketDispatcher
 
             if (session.State != null && session.State.BreakSpellInvisibility())
             {
-                string actReason = isRun ? "奔跑" : "迈步";
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【潜行打破】你因【{actReason}】退出了隐身匿踪状态！");
                 BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 18, "破除隐身", includeSelf: true);
                 uint mask = session.State.GetCurrentStatusMask(nowMs);
                 session.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0);
                 BroadcastToNinePatch(session, ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0, session.CharacterName, includeSelf: false);
             }
 
-            // 更新九宫格 AOI 空间分区
-            map.Aoi.UpdatePosition(session, oldX, oldY, newX, newY, out _, out _);
+            // 更新九宫格 AOI 空间分区并在跨 Zone 时执行双向差分广播 (消除幽灵残影)
+            UpdateAoiPositionWithTransition(map, session, oldX, oldY, newX, newY);
 
             // 广播移动数据帧: 行走 SM_OBJECTWALK (241) / 跑步 SM_OBJECTRUN (240)
             short smCode = isRun ? ProtocolConsts.SM_OBJECTRUN : ProtocolConsts.SM_OBJECTWALK;
@@ -895,7 +1099,7 @@ public sealed class PacketDispatcher
 
         if (session.State != null && session.State.IsParalyzed)
         {
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【石化】你处于麻痹状态，无法攻击！");
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你处于麻痹状态，无法攻击。");
             return;
         }
 
@@ -912,12 +1116,12 @@ public sealed class PacketDispatcher
             if (SpeedWatchdog.VerifyActionAndDetectSpeedHack(session.SessionId, nowMs, nowMs, out _))
             {
                 session.PenaltyFrozenUntilMs = nowMs + 1200;
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【安全防御】检测到攻击时钟加速，强制施加出刀僵直！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "出刀太快了。");
                 return;
             }
 
             // 攻击速度校验 (间隔必须 >= 680ms)
-            if (session.LastAttackTimeMs > 0 && !EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(nowMs, session.LastAttackTimeMs))
+            if (session.LastAttackTimeMs > 0 && !EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(nowMs, session.LastAttackTimeMs, session.State?.AttackSpeed ?? 0))
             {
                 return; // 挥刀过快拦截
             }
@@ -932,7 +1136,6 @@ public sealed class PacketDispatcher
 
             if (session.State != null && session.State.BreakSpellInvisibility())
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【隐身术】因挥刀攻击破除了隐身匿踪！");
                 BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 18, "破除隐身", includeSelf: true);
                 uint mask = session.State.GetCurrentStatusMask(nowMs);
                 session.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0);
@@ -971,7 +1174,7 @@ public sealed class PacketDispatcher
                 var (deducted, broken) = ItemLifecycleEngine.DeductWeaponDurabilityOnAttack(session.State, Random.Shared);
                 if (broken)
                 {
-                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【折断】你的武器耐久耗尽折断！无法发挥威力！");
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你的武器损坏了。");
                 }
             }
 
@@ -1012,7 +1215,8 @@ public sealed class PacketDispatcher
                             var flankM = RegenEngine.FindMonsterAt(session.CurrentMapId, tx, ty);
                             if (flankM != null && !flankM.IsDead)
                             {
-                                int flankDmg = WarriorCombatEngine.HalfMoon.CalculateDamage(halfMoonBaseDmg, isMainTarget: false, skillLevel: 3);
+                                int halfMoonLvl = session.State.GetSkillLevel(25); // 官方 1.5 半月弯刀 MagicId = 25
+                                int flankDmg = WarriorCombatEngine.HalfMoon.CalculateDamage(halfMoonBaseDmg, isMainTarget: false, skillLevel: halfMoonLvl);
                                 flankM.Hp = Math.Max(0, flankM.Hp - flankDmg);
                                 BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, flankM.Uid, flankM.X, flankM.Y, flankDmg, flankM.Name, includeSelf: true);
                                 if (flankM.IsDead)
@@ -1084,46 +1288,7 @@ public sealed class PacketDispatcher
                     // 死亡倒地动画广播: SM_DEATH_ACTION_DELPHI (28)
                     if (died)
                     {
-                        bool wasWhiteName = !defender.State.IsRedName && !defender.State.IsYellowName;
-                        bool isFreePk = SabukEngine.IsFreePkBattle(
-                            session.CurrentMapId,
-                            GuildEngine.GetPlayerGuild(session.CharacterName),
-                            GuildEngine.GetPlayerGuild(defender.CharacterName));
-
-                        if (!isFreePk)
-                        {
-                            session.State?.AddPkMurder();
-
-                            // 恶意击杀白名加深武器诅咒 (IDA 0x4C1EF4)
-                            if (wasWhiteName && session.State != null)
-                            {
-                                bool cursed = ItemLifecycleEngine.CheckWeaponCurseOnMurder(session.State, Random.Shared);
-                                if (cursed)
-                                {
-                                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你滥杀无辜，手中的武器被一层怨气缠绕，诅咒加深！");
-                                }
-                            }
-                        }
-
-                        BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
-
-                        // 官方死亡爆装与爆背包结算 (IDA 0x4BB44C / 0x4BB6C8)
-                        var dropped = MonsterDropEngine.ExecuteDeathDrop(defender.State, OfficialClientRulesEngine.DelphiRandom.Shared);
-                        for (int d = 0; d < dropped.Count; d++)
-                        {
-                            var drop = dropped[d];
-                            hitMap.AddGroundItem(new GroundItemEntity
-                            {
-                                Uid = drop.ItemUid,
-                                Name = drop.ItemName,
-                                X = defender.X,
-                                Y = defender.Y,
-                                OwnerSessionId = session.SessionId, // 杀手独享 80 秒拾取保护权 (IDA 0x4C5CB0)
-                                DropTickMs = nowMs,
-                                Weight = 1
-                            });
-                            BroadcastToNinePatch(defender, ProtocolConsts.SM_GROUNDITEM, drop.ItemUid, defender.X, defender.Y, 0, drop.ItemName, includeSelf: true);
-                        }
+                        AuthoritativeExecutePlayerDeath(defender, session, hitMap, nowMs);
                     }
                 }
             }
@@ -1156,7 +1321,6 @@ public sealed class PacketDispatcher
                             monster.TrappedExpireMs = 0;
                             monster.NextActionTimeMs = nowMs;
                             monster.TargetSessionId = session.SessionId;
-                            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【困魔咒】怪物受到攻击，金光禁锢消散！");
                         }
 
                         if (isFireHit)
@@ -1198,7 +1362,7 @@ public sealed class PacketDispatcher
         if (session.State == null || session.State.Hp <= 0 || session.State.IsDead) return;
         if (session.State.IsParalyzed)
         {
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【石化】你处于麻痹状态，无法施法！");
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你处于麻痹状态，无法施法。");
             return;
         }
 
@@ -1244,14 +1408,14 @@ public sealed class PacketDispatcher
             }
             if (magicId == 2 && session.State.Job != 2 && !session.State.HasHealingRing)
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你未佩戴防御戒指，无法运转神圣力量施展治愈术");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你无法使用这个魔法。");
                 return;
             }
 
-            // 抗拒火环 (MagicId = 8) 安全区神圣保护拦截
+            // 抗拒火环 (MagicId = 8) 安全区拦截
             if (magicId == 8 && SafeZoneEngine.IsInSafeZone(session.CurrentMapId, session.X, session.Y))
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "安全区内受神圣法则护佑，无法施展抗拒火环推挤生灵");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "在安全区内不能推开他人。");
                 return;
             }
 
@@ -1341,6 +1505,7 @@ public sealed class PacketDispatcher
         }
 
         string msgStr = text.ToString();
+        if (GmEnabled && msgStr.StartsWith("@gm ", StringComparison.OrdinalIgnoreCase)) { HandleGmCommand(session, msgStr[4..].Trim()); return; }
         if (msgStr.StartsWith("@ReloadPlugin", StringComparison.OrdinalIgnoreCase))
         {
             ModernNpcEngine.HotReloadPlugins();
@@ -1348,6 +1513,49 @@ public sealed class PacketDispatcher
             return;
         }
 
+
+        // 行会聊天 (以 '!~' 或 '/!~' 开头)
+        if (msgStr.StartsWith("!~") || msgStr.StartsWith("/!~"))
+        {
+            string guildMsg = msgStr.StartsWith("/!~") ? msgStr[3..] : msgStr[2..];
+            string guildName = GuildEngine.GetPlayerGuild(session.CharacterName) ?? "";
+            var guild = GuildEngine.GetGuild(guildName);
+            if (guild == null)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你尚未加入任何行会！");
+                return;
+            }
+            string formatted = $"[行会] {session.CharacterName}: {guildMsg}";
+            foreach (var active in ActiveSessions.Values)
+            {
+                if (active.SessionId != session.SessionId && guild.Members.Contains(active.CharacterName))
+                {
+                    active.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, formatted);
+                }
+            }
+            return;
+        }
+
+        // 组队聊天 (以 '!!' 或 '/!!' 开头)
+        if (msgStr.StartsWith("!!") || msgStr.StartsWith("/!!"))
+        {
+            string groupMsg = msgStr.StartsWith("/!!") ? msgStr[3..] : msgStr[2..];
+            var party = GroupEngine.GetParty(session.SessionId);
+            if (party == null || party.Members.Count <= 1)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你当前不在队伍中或队伍无其他成员！");
+                return;
+            }
+            string formatted = $"[组队] {session.CharacterName}: {groupMsg}";
+            foreach (var member in party.Members)
+            {
+                if (member.SessionId != session.SessionId)
+                {
+                    member.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, formatted);
+                }
+            }
+            return;
+        }
 
         // 全服喊话 / 千里传音 (以 '!' 或 '/!' 开头)
         if (msgStr.StartsWith("!") || msgStr.StartsWith("/!"))
@@ -1454,7 +1662,7 @@ public sealed class PacketDispatcher
                     foreach (var member in party.Members)
                     {
                         member.EnqueuePacket(ProtocolConsts.SM_MAPMARK_DELPHI, mx, my, 0, 0, session.CharacterName);
-                        member.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"队长【{session.CharacterName}】在地图标记了坐标 ({mx}, {my})");
+                        member.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"队长 {session.CharacterName} 标记了坐标 ({mx}, {my})");
                     }
                 }
                 else
@@ -1473,7 +1681,7 @@ public sealed class PacketDispatcher
                 foreach (var member in party.Members)
                 {
                     member.EnqueuePacket(ProtocolConsts.SM_MAPMARK_DELPHI, 0, 0, 0, 0, session.CharacterName);
-                    member.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"队长【{session.CharacterName}】清除了地图标记");
+                    member.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"队长 {session.CharacterName} 清除了标记");
                 }
             }
             else
@@ -1493,7 +1701,7 @@ public sealed class PacketDispatcher
                 session.State.Gold -= 30000;
                 GuildWarEngine.DeclareWar(myGuild, targetGuild, Environment.TickCount64);
                 session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, 0, 0, 0);
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【行会战】行会【{myGuild}】正式向【{targetGuild}】宣战！3小时内交火免除PK惩罚！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{myGuild} 向 {targetGuild} 宣战。");
             }
             return;
         }
@@ -1525,7 +1733,7 @@ public sealed class PacketDispatcher
             if (session.State == null) return;
             if (session.CurrentMapId == SabukSiegeEngine.SabukPalaceMapId)
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "沙巴克皇宫受禁空结界封锁，无法使用空间瞬移！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "此地图无法使用传送戒指。");
                 return;
             }
             var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
@@ -1535,16 +1743,16 @@ public sealed class PacketDispatcher
             {
                 if (TradeEngine != null && TradeEngine.GetTrade(session.SessionId) != null)
                 {
-                    TradeEngine.CancelTrade(session, "因瞬间传送位移，交易中断！");
+                    TradeEngine.CancelTrade(session, "传送位移导致交易取消。");
                 }
                 int oldX = session.X;
                 int oldY = session.Y;
                 session.X = res.targetX;
                 session.Y = res.targetY;
-                map.Aoi.UpdatePosition(session, oldX, oldY, session.X, session.Y, out _, out _);
+                UpdateAoiPositionWithTransition(map, session, oldX, oldY, session.X, session.Y);
                 SendPositionPullback(session, session.X, session.Y, session.Direction);
                 BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTRUN, session.SessionId, session.X, session.Y, session.Direction, session.CharacterName, includeSelf: false);
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【传送戒指】瞬移至 ({session.X}, {session.Y}) 成功！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"瞬移至 ({session.X}, {session.Y}) 成功！");
             }
             else
             {
@@ -1560,7 +1768,7 @@ public sealed class PacketDispatcher
             var party = GroupEngine?.GetParty(session.SessionId);
             if (party == null || party.LeaderSessionId != session.SessionId)
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "只有队伍队长可以使用天地合一！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "只有队长才能使用组队召唤。");
                 return;
             }
 
@@ -1575,7 +1783,7 @@ public sealed class PacketDispatcher
             if (session.State != null)
             {
                 session.State.AllowGroupRecall = false;
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你已设置【拒绝天地合一】召唤！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你已拒绝组队召唤。");
             }
             return;
         }
@@ -1585,7 +1793,7 @@ public sealed class PacketDispatcher
             if (session.State != null)
             {
                 session.State.AllowGroupRecall = true;
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你已设置【允许天地合一】召唤！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你已允许组队召唤。");
             }
             return;
         }
@@ -1650,11 +1858,11 @@ public sealed class PacketDispatcher
                 {
                     var map = _mapManager.GetMap(target.CurrentMapId);
                     string mapName = map?.Name ?? $"地图{target.CurrentMapId}";
-                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【探测项链】探查到【{target.CharacterName}】当前位于【{mapName}】坐标 ({target.X}, {target.Y})");
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{target.CharacterName}当前位于{mapName}({target.X}:{target.Y})");
                 }
                 else
                 {
-                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【探测项链】探查失败：目标角色【{targetName}】未在线或不存在！");
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{targetName}探查失败：目标不在线或不存在。");
                 }
             }
             return;
@@ -1738,7 +1946,8 @@ public sealed class PacketDispatcher
             var newMap = _mapManager.GetMap(targetMapId) ?? _mapManager.DefaultMap;
             newMap.Aoi.Enter(session, respawnX, respawnY);
 
-            session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, targetMapId, respawnX, respawnY, 0, newMap.Name ?? (targetMapId == 3 ? "盟重省" : "比奇省"));
+            session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, targetMapId, respawnX, respawnY, 0, string.IsNullOrEmpty(newMap.OfficialId) ? (newMap.Name ?? (targetMapId == 3 ? "盟重省" : "比奇省")) : NewMapExtra(newMap));
+            RegenEngine?.PopulateMapNow(newMap.MapId); SendNearbyEntities(session, newMap); // 换图后下发新视野
             session.EnqueuePacket(ProtocolConsts.SM_REVIVE, session.SessionId, respawnX, respawnY, 0, session.CharacterName);
             session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
             session.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, session.State.Hp, session.State.Mp, session.State.MaxHp, session.State.MaxMp);
@@ -1748,7 +1957,7 @@ public sealed class PacketDispatcher
         {
             session.X = respawnX;
             session.Y = respawnY;
-            map.Aoi.UpdatePosition(session, oldX, oldY, respawnX, respawnY, out _, out _);
+            UpdateAoiPositionWithTransition(map, session, oldX, oldY, respawnX, respawnY);
             session.EnqueuePacket(ProtocolConsts.SM_REVIVE, session.SessionId, respawnX, respawnY, 0, session.CharacterName);
             session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
             session.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, session.State.Hp, session.State.Mp, session.State.MaxHp, session.State.MaxMp);
@@ -1841,7 +2050,7 @@ public sealed class PacketDispatcher
                         member.State.Gold += gain;
                         member.State.RecalculateAuthoritativeWeights(member.State.Gold);
                         member.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, member.State.Gold, 0, 0, 0);
-                        member.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【组队】拾取金币分配获得 {gain} 金币");
+                        member.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"组队分配获得金币 {gain}");
                     }
                 }
             }
@@ -1907,6 +2116,99 @@ public sealed class PacketDispatcher
         });
     }
 
+    /// <summary>
+    /// 当玩家在同一地图移动并跨越 AOI Zone 时，执行权威视野差分双向同步 (Appear / Disappear)
+    /// 彻底消除跨边界幽灵残影与黑天鹅漏包
+    /// </summary>
+    private void SynchronizeAoiZoneTransition(GameMap map, ClientSession session, List<int>? enteredZones, List<int>? leftZones)
+    {
+        if (map == null || session == null) return;
+
+        // 1. 离开视野的 Zone：双向发送 SM_ENTITYDISAPPEAR
+        if (leftZones != null && leftZones.Count > 0)
+        {
+            foreach (int zoneIdx in leftZones)
+            {
+                map.Aoi.ForEachInZone(zoneIdx, other =>
+                {
+                    if (other != session && other.IsConnected)
+                    {
+                        other.EnqueuePacket(ProtocolConsts.SM_ENTITYDISAPPEAR, session.SessionId, session.X, session.Y, 0, session.CharacterName);
+                        session.EnqueuePacket(ProtocolConsts.SM_ENTITYDISAPPEAR, other.SessionId, other.X, other.Y, 0, other.CharacterName);
+
+                        if (session.Pets != null && session.Pets.Count > 0)
+                        {
+                            foreach (var pet in session.Pets)
+                            {
+                                other.EnqueuePacket(ProtocolConsts.SM_ENTITYDISAPPEAR, pet.Uid, pet.X, pet.Y, 0, pet.Name);
+                            }
+                        }
+                        if (other.Pets != null && other.Pets.Count > 0)
+                        {
+                            foreach (var pet in other.Pets)
+                            {
+                                session.EnqueuePacket(ProtocolConsts.SM_ENTITYDISAPPEAR, pet.Uid, pet.X, pet.Y, 0, pet.Name);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // 2. 新进入视野的 Zone：双向发送 SM_ENTITYAPPEAR
+        if (enteredZones != null && enteredZones.Count > 0)
+        {
+            foreach (int zoneIdx in enteredZones)
+            {
+                map.Aoi.ForEachInZone(zoneIdx, other =>
+                {
+                    if (other != session && other.IsConnected)
+                    {
+                        other.EnqueuePacket(ProtocolConsts.SM_ENTITYAPPEAR, session.SessionId, session.X, session.Y, session.Direction, session.CharacterName);
+                        session.EnqueuePacket(ProtocolConsts.SM_ENTITYAPPEAR, other.SessionId, other.X, other.Y, other.Direction, other.CharacterName);
+
+                        if (session.Pets != null && session.Pets.Count > 0)
+                        {
+                            foreach (var pet in session.Pets)
+                            {
+                                other.EnqueuePacket(ProtocolConsts.SM_ENTITYAPPEAR, pet.Uid, pet.X, pet.Y, 0, pet.Name);
+                            }
+                        }
+                        if (other.Pets != null && other.Pets.Count > 0)
+                        {
+                            foreach (var pet in other.Pets)
+                            {
+                                session.EnqueuePacket(ProtocolConsts.SM_ENTITYAPPEAR, pet.Uid, pet.X, pet.Y, 0, pet.Name);
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (RegenEngine != null)
+            {
+                foreach (var mon in RegenEngine.AllActiveMonsters)
+                {
+                    if (mon.MapId == map.MapId && mon.Hp > 0 && Math.Abs(mon.X - session.X) <= 20 && Math.Abs(mon.Y - session.Y) <= 20)
+                    {
+                        session.EnqueuePacket(220, mon.Uid, mon.X, mon.Y, mon.Direction, $"{mon.Name}\t{mon.X}\t{mon.Y}\t{mon.Direction}\t{mon.Appr}");
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 更新 AOI 坐标并在跨 Zone 时自动触发视野差分补偿
+    /// </summary>
+    private void UpdateAoiPositionWithTransition(GameMap map, ClientSession session, int oldX, int oldY, int newX, int newY)
+    {
+        if (map.Aoi.UpdatePosition(session, oldX, oldY, newX, newY, out var enteredZones, out var leftZones))
+        {
+            SynchronizeAoiZoneTransition(map, session, enteredZones, leftZones);
+        }
+    }
+
 
     /// <summary>
     /// 驱动一次怪物 AI 行为并在九宫格内向玩家广播其动作 (移动/近战/巡逻)
@@ -1959,6 +2261,18 @@ public sealed class PacketDispatcher
                         }
                     }
                 }
+
+                // 被怪物打死：执行死亡流程 (广播倒地、随从解散、爆装等)，此前 act.Died 无人消费
+                if (act.Died)
+                {
+                    ClientSession? victim = ActiveSessions.TryGetValue(act.TargetSessionId, out var vs) ? vs : GetAllGlobalSessions().FirstOrDefault(s => s.SessionId == act.TargetSessionId);
+                    if (victim?.State != null)
+                    {
+                        var victimMap = _mapManager.GetMap(victim.CurrentMapId) ?? map;
+                        AuthoritativeExecutePlayerDeath(victim, null, victimMap, Environment.TickCount64);
+                        victim.Flush();
+                    }
+                }
             }
             else if (act.ActionType == 7)
             {
@@ -1976,7 +2290,7 @@ public sealed class PacketDispatcher
                 if (master != null)
                 {
                     master.Pets.RemoveAll(p => p.Uid == act.MonsterUid);
-                    master.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【随从叛变】你的随从【{act.MonsterName}】驯化时效已达上限(6小时)，失去理智陷入狂暴叛变！");
+                    master.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"你的随从 {act.MonsterName} 叛变了。");
                 }
             }
         }
@@ -2007,13 +2321,15 @@ public sealed class PacketDispatcher
                 if (npc != null)
                 {
                     int dist = Math.Max(Math.Abs(npc.X - session.X), Math.Abs(npc.Y - session.Y));
-                    if (session.CurrentMapId != npc.MapId || dist > 2)
+                    // 盛大官方 1.5 铁律: 书店、药店、肉店老板等 NPC 位于柜台内，允许最大 4 格切比雪夫距离隔柜台对话
+                    if (session.CurrentMapId != npc.MapId || dist > 4)
                     {
                         session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "距离太远，无法与该目标对话！");
                         return;
                     }
                 }
             }
+            session.ActiveNpcUid = npcUid;
 
             if (ModernNpcEngine.HasPlugin(npcUid))
             {
@@ -2074,8 +2390,9 @@ public sealed class PacketDispatcher
                             pet.Y = targetY;
                         }
 
-                        string mapName = newMap.Name ?? (targetMapId == 3 ? "盟重省" : (targetMapId == 0 ? "比奇省" : "未知"));
+                        string mapName = string.IsNullOrEmpty(newMap.OfficialId) ? (newMap.Name ?? (targetMapId == 3 ? "盟重省" : (targetMapId == 0 ? "比奇省" : "未知"))) : NewMapExtra(newMap);
                         session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, targetMapId, targetX, targetY, 0, mapName);
+            RegenEngine?.PopulateMapNow(newMap.MapId); SendNearbyEntities(session, newMap); // 换图后下发新视野
                         if (!string.IsNullOrEmpty(ctx.TeleportMessage))
                         {
                             session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, ctx.TeleportMessage);
@@ -2085,6 +2402,26 @@ public sealed class PacketDispatcher
                     {
                         session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
                     }
+
+                    // 盛大官方 1.5 铁律: 若选定 @buy 或包含 buy/买，下发商人在售货品清单 SM_MERCHANT_ITEM (645)
+                    string lowLabel = label.ToLowerInvariant();
+                    if (NpcEngine != null && (lowLabel == "@buy" || lowLabel.Contains("buy") || lowLabel.Contains("买")))
+                    {
+                        var npcObj = NpcEngine.GetNpc(npcUid);
+                        if (npcObj != null && npcObj.Goods.Count > 0)
+                        {
+                            var sbGoods = new StringBuilder();
+                            foreach (var g in npcObj.Goods)
+                            {
+                                sbGoods.Append($"{g.Name}\t{g.Price}\t{g.Weight}\t{g.MaxDura}\r\n");
+                            }
+                            session.EnqueuePacket(ProtocolConsts.SM_MERCHANT_ITEM, npcUid, 0, 0, 0, sbGoods.ToString());
+                        }
+                    }
+                    else if (NpcEngine != null && (lowLabel == "@sell" || lowLabel.Contains("sell") || lowLabel.Contains("卖")))
+                    {
+                        session.EnqueuePacket(ProtocolConsts.SM_MERCHANT_SELL_LIST, npcUid, 0, 0, 0, string.Empty);
+                    }
                     return;
                 }
             }
@@ -2093,40 +2430,79 @@ public sealed class PacketDispatcher
             {
                 string script = NpcEngine.SelectScriptOption(npcUid, label);
                 session.EnqueuePacket(ProtocolConsts.SM_NPCDIALOG, npcUid, 0, 0, 0, script);
+
+                string lowLabel = label.ToLowerInvariant();
+                if (lowLabel == "@buy" || lowLabel.Contains("buy") || lowLabel.Contains("买"))
+                {
+                    var npcObj = NpcEngine.GetNpc(npcUid);
+                    if (npcObj != null && npcObj.Goods.Count > 0)
+                    {
+                        var sbGoods = new StringBuilder();
+                        foreach (var g in npcObj.Goods)
+                        {
+                            sbGoods.Append($"{g.Name}\t{g.Price}\t{g.Weight}\t{g.MaxDura}\r\n");
+                        }
+                        session.EnqueuePacket(ProtocolConsts.SM_MERCHANT_ITEM, npcUid, 0, 0, 0, sbGoods.ToString());
+                    }
+                }
+                else if (lowLabel == "@sell" || lowLabel.Contains("sell") || lowLabel.Contains("卖"))
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_MERCHANT_SELL_LIST, npcUid, 0, 0, 0, string.Empty);
+                }
             }
         }
     }
 
     private void HandleBuyItem(ClientSession session, ReadOnlySpan<char> payload)
     {
-        // 格式: npcUid/goodsId 或 goodsId/count/0/0/name (CM_USERBUYITEM 1014)
+        // 格式: npcUid/goodsId 或 goodsId/count/0/0/name 或 npcUid/goodsName 或 goodsName (CM_USERBUYITEM 1014)
         if (NpcEngine == null || session.State == null) return;
-        int slash = payload.IndexOf('/');
-        if (slash < 0) return;
-
+        var trimmed = payload.TrimEnd('!').TrimEnd('/');
         int npcUid = session.ActiveNpcUid;
         int goodsId = -1;
+        string? reqName = null;
 
-        if (int.TryParse(payload[..slash], out int firstVal))
+        int slash = trimmed.IndexOf('/');
+        if (slash >= 0)
         {
-            if (session.ActiveNpcUid > 0 && NpcEngine.GetGoods(session.ActiveNpcUid, firstVal) != null)
+            var firstPart = trimmed[..slash];
+            var secondPart = trimmed[(slash + 1)..];
+
+            if (int.TryParse(firstPart, out int firstVal))
             {
-                goodsId = firstVal;
-            }
-            else if (int.TryParse(payload[(slash + 1)..], out int secondVal))
-            {
-                npcUid = firstVal;
-                goodsId = secondVal;
+                if (firstVal >= 100000) // 第一个参数是 npcUid
+                {
+                    npcUid = firstVal;
+                    session.ActiveNpcUid = npcUid;
+                    if (int.TryParse(secondPart, out int secondVal))
+                        goodsId = secondVal;
+                    else
+                        reqName = secondPart.ToString();
+                }
+                else
+                {
+                    goodsId = firstVal;
+                    int lastSlash = trimmed.LastIndexOf('/');
+                    if (lastSlash > slash)
+                        reqName = trimmed[(lastSlash + 1)..].ToString();
+                }
             }
             else
             {
-                goodsId = firstVal;
+                reqName = firstPart.ToString();
             }
         }
-
-        if (npcUid > 0 && goodsId > 0)
+        else
         {
-            var (success, errorMsg, item) = NpcEngine.BuyItem(session, npcUid, goodsId);
+            if (int.TryParse(trimmed, out int val))
+                goodsId = val;
+            else
+                reqName = trimmed.ToString();
+        }
+
+        if (npcUid > 0 && (goodsId > 0 || !string.IsNullOrWhiteSpace(reqName)))
+        {
+            var (success, errorMsg, item) = NpcEngine.BuyItem(session, npcUid, goodsId, reqName);
             if (success && item != null)
             {
                 // 1. 下发官方购买成功: SM_BUY_OK_DELPHI (648)
@@ -2366,7 +2742,7 @@ public sealed class PacketDispatcher
         switch (res)
         {
             case StorageEngine.StorageResult.Success when item != null:
-                session.EnqueuePacket(ProtocolConsts.SM_SAVEITEM_OK, item.Id, 0, 0, 0, item.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_SAVEITEM_OK, item.Id, slot >= 0 ? slot : 0, 0, 0, item.Name);
                 session.EnqueuePacket(ProtocolConsts.SM_DELITEM, item.Id, slot >= 0 ? slot : 0, 0, 0, item.Name);
                 session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
                 break;
@@ -2400,7 +2776,7 @@ public sealed class PacketDispatcher
         switch (res)
         {
             case StorageEngine.StorageResult.Success when item != null:
-                session.EnqueuePacket(ProtocolConsts.SM_TAKEBACKITEM_OK, item.Id, 0, 0, 0, item.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_TAKEBACKITEM_OK, item.Id, storageSlot, 0, 0, item.Name);
                 session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, item.Id, 0, 0, 0, item.Name);
                 session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
                 break;
@@ -2554,6 +2930,13 @@ public sealed class PacketDispatcher
         // 药包解包判定 (如: 强效太阳水包, 超级金创药包, 超级魔法药包)
         if (targetItem != null && targetItem.Name.EndsWith("包"))
         {
+            // 官方真值: 药包解开为 6 瓶单品，原占 1 格，净占 5 格。背包超过 35 格则无法容纳 6 瓶单品
+            if (session.State.BagItems.Count + 5 > 40)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "背包没有足够的空间。");
+                return;
+            }
+
             var bundle = targetItem;
             string singleName = bundle.Name[..^1];
             int singleWeight = bundle.Name.Contains("强效太阳水") ? 2 : Math.Max(1, bundle.Weight / 5);
@@ -2609,7 +2992,8 @@ public sealed class PacketDispatcher
             targetMap.Aoi.Enter(session, 330, 270);
             BroadcastToNinePatch(session, ProtocolConsts.SM_ENTITYAPPEAR, session.SessionId, 330, 270, session.Direction, session.CharacterName, includeSelf: false);
 
-            session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, 0, 330, 270, 0, targetMap.Name ?? "比奇省");
+            session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, 0, 330, 270, 0, string.IsNullOrEmpty(targetMap.OfficialId) ? (targetMap.Name ?? "比奇省") : NewMapExtra(targetMap));
+            RegenEngine?.PopulateMapNow(targetMap.MapId); SendNearbyEntities(session, targetMap); // 换图后下发新视野
             session.EnqueuePacket(ProtocolConsts.SM_EAT_OK, 0, 0, 0, 0);
             return;
         }
@@ -2773,12 +3157,12 @@ public sealed class PacketDispatcher
             var res = GroupEngine.AddMember(session, target);
             if (res == GroupEngine.GroupResult.Success)
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【组队】{target.CharacterName} 加入了队伍！");
-                target.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【组队】你加入了【{session.CharacterName}】的队伍！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{target.CharacterName} 加入队伍。");
+                target.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"你加入了 {session.CharacterName} 的队伍。");
             }
             else if (res == GroupEngine.GroupResult.TargetGroupModeDisabled)
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【组队】{target.CharacterName} 已关闭组队模式，拒绝加入！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{target.CharacterName} 拒绝组队。");
             }
         }
     }
@@ -2847,7 +3231,7 @@ public sealed class PacketDispatcher
 
     private void HandleGuildUpdateNotice(ClientSession session, ReadOnlySpan<char> payload)
     {
-        string notice = ExtractTrailingName(payload);
+        string notice = payload.ToString().TrimEnd('!');
         var res = GuildEngine.UpdateNotice(session, notice);
         if (res == GuildEngine.GuildResult.Success)
         {
@@ -2897,34 +3281,34 @@ public sealed class PacketDispatcher
             var targetSession = ActiveSessions.Values.FirstOrDefault(s => s.CharacterName.Equals(targetName, StringComparison.OrdinalIgnoreCase));
             if (targetSession != null)
             {
+                string guildName = GuildEngine.GetPlayerGuild(targetName) ?? "无";
                 targetSession.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"掌门人已将你的行会封号调整为【{newRank}】");
-                targetSession.EnqueuePacket(ProtocolConsts.SM_GUILDNAME_DELPHI, targetSession.SessionId, 0, 0, 0, $"{targetName}/{newRank}");
+                targetSession.EnqueuePacket(ProtocolConsts.SM_GUILDNAME_DELPHI, targetSession.SessionId, 0, 0, 0, $"{guildName}/{newRank}");
+                BroadcastToNinePatch(targetSession, ProtocolConsts.SM_GUILDNAME_DELPHI, targetSession.SessionId, targetSession.X, targetSession.Y, 0, $"{guildName}/{newRank}", includeSelf: false);
             }
         }
         else
         {
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "调整行会封号失败");
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "修改封号失败。");
         }
     }
 
     private void HandleMineHit(ClientSession session, ReadOnlySpan<char> payload)
     {
-        // 挥镐挖矿判定 (CM_BIGHIT 3015)
-        if (session.State == null) return;
+        // 挥镐挖矿判定 (CM_BIGHIT 3015，官方 sub_4CB7F8)
+        if (session.State == null || session.State.IsDead || session.State.IsParalyzed) return;
 
         // 1. 检查当前地图是否为矿区
         var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
-        if (session.CurrentMapId == 0 || (!map.Name.Contains("矿") && !map.Name.Contains("洞穴")))
+        if (!MiningEngine.IsMiningMap(session.CurrentMapId) && !MiningEngine.IsMiningMap(map.Name))
         {
             session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "这里不是矿区，无法开采矿石！");
             return;
         }
 
-        // 2. 检查武器是否手持鹤嘴锄/矿镐
+        // 2. 检查武器是否手持鹤嘴锄
         var weapon = session.State.Equipment[(int)OfficialEquipSlot.Weapon];
-        bool hasPickaxe = weapon != null && (weapon.Name.Contains("锄") || weapon.Name.Contains("镐"));
-
-        if (!hasPickaxe)
+        if (!MiningEngine.IsPickaxe(weapon))
         {
             session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你手中未装备鹤嘴锄，无法挖矿！");
             return;
@@ -2933,28 +3317,32 @@ public sealed class PacketDispatcher
         // 3. 向周围九宫格旁观者广播挥镐动作 SM_OBJECTHIT
         BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTHIT, session.SessionId, session.X, session.Y, session.Direction, session.CharacterName, includeSelf: false);
 
-        // 1/3 概率挖出品质 1~20 的矿石
-        if (Random.Shared.Next(3) == 0)
-        {
-            int purity = Random.Shared.Next(1, 21);
-            string oreName = purity >= 15 ? $"黑铁矿石(纯度{purity})" : $"金矿(纯度{purity})";
-            var ore = new EquipItem
-            {
-                Uid = Random.Shared.Next(100000, 999999),
-                Name = oreName,
-                Weight = 5,
-                Dura = purity * 1000,
-                MaxDura = purity * 1000
-            };
+        // 4. 调用盛大官方权威挖矿引擎执行结算
+        var digResult = MiningEngine.DigOnce(session.State, session.CurrentMapId, Random.Shared);
 
-            if (session.State.BagItems.Count < 40 && session.State.BagWeight + ore.Weight <= session.State.MaxBagWeight)
-            {
-                session.State.BagItems.Add(ore);
-                session.State.BagWeight += ore.Weight;
-                session.EnqueuePacket(ProtocolConsts.SM_MINERESULT, ore.Uid, purity, 0, 0, ore.Name);
-                session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, ore.Uid, 0, 0, 0, ore.Name);
-                session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
-            }
+        if (digResult.PickaxeBroken)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "鹤嘴锄损坏了。");
+            session.EnqueuePacket(ProtocolConsts.SM_DURACHANGE_REC, (int)OfficialEquipSlot.Weapon, digResult.PickaxeDura, digResult.PickaxeMaxDura, 0);
+            return;
+        }
+
+        if (digResult.PickaxeWorn)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_DURACHANGE_REC, (int)OfficialEquipSlot.Weapon, digResult.PickaxeDura, digResult.PickaxeMaxDura, 0);
+        }
+
+        if (digResult.Success && digResult.MinedOre != null)
+        {
+            var ore = digResult.MinedOre;
+            session.EnqueuePacket(ProtocolConsts.SM_MINERESULT, ore.Uid, ore.Shape, 0, 0, ore.Name);
+            session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, ore.Uid, 0, 0, 0, ore.Name);
+            session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, digResult.Message);
+        }
+        else if (!string.IsNullOrEmpty(digResult.Message))
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, digResult.Message);
         }
     }
 
@@ -2973,15 +3361,125 @@ public sealed class PacketDispatcher
 
     private void HandleNewChar(ClientSession session, ReadOnlySpan<char> payload)
     {
-        // CM_NEWCHAR (104) 格式: Name\tJob\tGender
-        string chrName = payload.ToString();
-        session.EnqueuePacket(ProtocolConsts.SM_NEWID_SUCCESS, session.SessionId, 0, 0, 0, chrName);
+        // CM_NEWCHAR 格式: Name\tJob\tGender
+        var parts = payload.ToString().Split(new[] { '\t', '/' }, StringSplitOptions.RemoveEmptyEntries);
+        string chrName = parts.Length > 0 ? parts[0].Trim() : string.Empty;
+        int job = parts.Length > 1 && int.TryParse(parts[1], out int j) ? j : 0;
+        int sex = parts.Length > 2 && int.TryParse(parts[2], out int s) ? s : 0;
+        HandleNewCharInternal(session, chrName, job, sex);
+    }
+
+    private void HandleNewCharInternal(ClientSession session, string charName, int job, int sex, int hair = 1)
+    {
+        string account = session.AccountName;
+        if (string.IsNullOrWhiteSpace(account))
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_NEWCHAR_FAIL_DELPHI, 4, 0, 0, 0);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(charName) || charName.Length > 14)
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_NEWCHAR_FAIL_DELPHI, 4, 0, 0, 0);
+            return;
+        }
+
+        bool success = false;
+        int errCode = 0;
+        if (PgPersistenceEngine != null)
+        {
+            (success, errCode) = PgPersistenceEngine.CreateCharacter(account, charName, job, sex, hair);
+        }
+        else
+        {
+            if (!_memoryCharacters.TryGetValue(account, out var list))
+            {
+                list = new List<(string, int, int, int)>();
+                _memoryCharacters[account] = list;
+            }
+            if (list.Count >= 2)
+            {
+                errCode = 3; // 满2人
+            }
+            else if (list.Any(c => string.Equals(c.CharName, charName, StringComparison.OrdinalIgnoreCase)))
+            {
+                errCode = 2; // 重名
+            }
+            else
+            {
+                list.Add((charName, job, sex, 1));
+                success = true;
+            }
+        }
+
+        if (success)
+        {
+            ServerLogger.Audit("CREATE_CHAR_SUCCESS", account, charName, $"成功创建新角色: {charName}, 职业={job}, 性别={sex}");
+            session.EnqueuePacket(ProtocolConsts.SM_NEWCHR_SUCCESS, session.SessionId, 0, 0, 0, charName);
+        }
+        else
+        {
+            ServerLogger.Audit("CREATE_CHAR_FAILED", account, charName, $"创角失败: 错误码={errCode}");
+            session.EnqueuePacket(ProtocolConsts.SM_NEWCHAR_FAIL_DELPHI, errCode, 0, 0, 0);
+        }
     }
 
     private void HandleDelChar(ClientSession session, ReadOnlySpan<char> payload)
     {
-        // CM_DELCHAR (105)
-        session.EnqueuePacket(ProtocolConsts.SM_DELCHAR_SUCCESS_DELPHI, session.SessionId, 0, 0, 0);
+        // CM_DELCHAR 格式: 角色名 或 索引
+        string target = payload.ToString().Trim();
+        HandleDelCharInternal(session, target);
+    }
+
+    private void HandleDelCharInternal(ClientSession session, string target)
+    {
+        string account = session.AccountName;
+        if (string.IsNullOrWhiteSpace(account))
+        {
+            session.EnqueuePacket(ProtocolConsts.SM_DELCHAR_FAIL_DELPHI, 0, 0, 0, 0);
+            return;
+        }
+
+        bool success = false;
+        if (PgPersistenceEngine != null)
+        {
+            if (int.TryParse(target, out int idx))
+            {
+                var chars = PgPersistenceEngine.GetCharactersByAccount(account);
+                if (idx >= 0 && idx < chars.Count)
+                {
+                    target = chars[idx].CharName;
+                }
+            }
+            success = PgPersistenceEngine.DeleteCharacter(account, target);
+        }
+        else
+        {
+            if (_memoryCharacters.TryGetValue(account, out var list))
+            {
+                if (int.TryParse(target, out int idx) && idx >= 0 && idx < list.Count)
+                {
+                    list.RemoveAt(idx);
+                    success = true;
+                }
+                else
+                {
+                    int removed = list.RemoveAll(c => string.Equals(c.CharName, target, StringComparison.OrdinalIgnoreCase));
+                    success = removed > 0;
+                }
+            }
+        }
+
+        if (success)
+        {
+            ServerLogger.Audit("DEL_CHAR_SUCCESS", account, target, $"成功删除角色: {target}");
+            session.EnqueuePacket(ProtocolConsts.SM_DELCHR_SUCCESS, session.SessionId, 0, 0, 0);
+        }
+        else
+        {
+            ServerLogger.Audit("DEL_CHAR_FAILED", account, target, $"删角失败: {target}");
+            session.EnqueuePacket(ProtocolConsts.SM_DELCHAR_FAIL_DELPHI, 0, 0, 0, 0);
+        }
     }
 
     private void HandleLogout(ClientSession session)
@@ -3001,7 +3499,7 @@ public sealed class PacketDispatcher
     /// <summary>
     /// 处理现代高吞吐紧凑二进制封包 (Direct-Blit 零分配，全权威状态机驱动)
     /// </summary>
-    public void DispatchBinary(ClientSession session, in BinaryProtocol.PacketHeader header, ReadOnlySpan<byte> payload)
+    public unsafe void DispatchBinary(ClientSession session, in BinaryProtocol.PacketHeader header, ReadOnlySpan<byte> payload)
     {
         switch ((BinaryProtocol.MsgType)header.MsgId)
         {
@@ -3041,6 +3539,165 @@ public sealed class PacketDispatcher
                 HandleBinaryShopSellIntent(session, payload);
                 break;
 
+            case BinaryProtocol.MsgType.IntentClickNpc:
+                HandleBinaryClickNpc(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentNpcSelect:
+                HandleBinaryNpcSelect(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentShopBuy:
+                HandleBinaryShopBuyIntent(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentRepair:
+            case BinaryProtocol.MsgType.IntentSpecialRepair:
+                HandleBinaryRepairIntent(session, (BinaryProtocol.MsgType)header.MsgId, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentTrade:
+                HandleBinaryTradeIntent(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentStorageDeposit:
+                if (payload.Length >= 8)
+                {
+                    var dep = BinaryProtocol.StorageDepositIntentPayload.Read(payload);
+                    HandleStorageDeposit(session, $"{dep.BagSlot}");
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentStorageWithdraw:
+                if (payload.Length >= 4)
+                {
+                    var wit = BinaryProtocol.StorageWithdrawIntentPayload.Read(payload);
+                    HandleStorageWithdraw(session, $"{wit.StorageSlot}");
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentStorageDepositGold:
+                if (payload.Length >= 4)
+                {
+                    var goldDep = BinaryProtocol.StorageDepositGoldIntentPayload.Read(payload);
+                    HandleStorageSaveGold(session, $"{goldDep.GoldAmount}");
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentStorageWithdrawGold:
+                if (payload.Length >= 4)
+                {
+                    var goldWit = BinaryProtocol.StorageWithdrawGoldIntentPayload.Read(payload);
+                    HandleStorageTakeGold(session, $"{goldWit.GoldAmount}");
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentStoragePassword:
+                if (payload.Length >= sizeof(BinaryProtocol.StoragePasswordIntentPayload))
+                {
+                    fixed (byte* p = payload)
+                    {
+                        var pwd = *(BinaryProtocol.StoragePasswordIntentPayload*)p;
+                        HandleStoragePassword(session, pwd.ReadPassword());
+                    }
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentGroupAction:
+                HandleBinaryGroupAction(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentGuildAction:
+                HandleBinaryGuildAction(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.IntentSay:
+                HandleSay(session, Encoding.UTF8.GetString(payload));
+                break;
+
+            case BinaryProtocol.MsgType.IntentWhisper:
+                if (payload.Length >= sizeof(BinaryProtocol.WhisperIntentPayload))
+                {
+                    fixed (byte* p = payload)
+                    {
+                        var whisper = *(BinaryProtocol.WhisperIntentPayload*)p;
+                        string target = whisper.ReadTargetName();
+                        string msg = whisper.ReadMessage();
+                        HandleSay(session, $"/{target} {msg}");
+                    }
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentAdjustBonus:
+                if (payload.Length >= 1)
+                {
+                    var bonus = BinaryProtocol.AdjustBonusIntentPayload.Read(payload);
+                    HandleAdjustBonusPacket(session, $"{bonus.BonusType}");
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentMagicKey:
+                if (payload.Length >= 3 && session.State != null)
+                {
+                    var mk = BinaryProtocol.MagicKeyIntentPayload.Read(payload);
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"快捷键设置已更新");
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentWantMinimap:
+                HandleWantMinimap(session);
+                break;
+
+            case BinaryProtocol.MsgType.IntentAttackMode:
+                if (payload.Length >= 1 && session.State != null)
+                {
+                    var mode = BinaryProtocol.AttackModeIntentPayload.Read(payload);
+                    session.State.AttackMode = mode.Mode;
+                    string modeName = mode.Mode switch {
+                        0 => "全保模式",
+                        1 => "和平模式",
+                        2 => "组队模式",
+                        3 => "行会模式",
+                        4 => "善恶模式",
+                        _ => "全体攻击"
+                    };
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"攻击模式已切换为：{modeName}");
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentToggleSkill:
+                if (payload.Length >= 2 && session.State != null)
+                {
+                    var toggle = BinaryProtocol.ToggleSkillIntentPayload.Read(payload);
+                    if (toggle.SkillType == 0) session.State.BoThrusting = toggle.Enabled == 1;
+                    else if (toggle.SkillType == 1) session.State.BoHalfMoon = toggle.Enabled == 1;
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentRevive:
+                HandleRevive(session, ReadOnlySpan<char>.Empty);
+                break;
+
+            case BinaryProtocol.MsgType.IntentButch:
+                if (payload.Length >= 8)
+                {
+                    var butch = BinaryProtocol.ButchIntentPayload.Read(payload);
+                    HandleButchItemPacket(session, $"{butch.TargetUid}");
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentQueryUser:
+                if (payload.Length >= 4)
+                {
+                    var query = BinaryProtocol.QueryUserIntentPayload.Read(payload);
+                    DispatchIdent(session, 82, $"{query.TargetUid}");
+                }
+                break;
+
+            case BinaryProtocol.MsgType.IntentSoftClose:
+                HandleLogout(session);
+                break;
+
             case BinaryProtocol.MsgType.IntentEquipItem:
                 HandleBinaryEquipItemIntent(session, payload);
                 break;
@@ -3055,6 +3712,14 @@ public sealed class PacketDispatcher
 
             case BinaryProtocol.MsgType.IntentDropItem:
                 HandleBinaryDropItemIntent(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.CreateAccountRequest:
+                HandleBinaryCreateAccount(session, payload);
+                break;
+
+            case BinaryProtocol.MsgType.ChangePasswordRequest:
+                HandleBinaryChangePassword(session, payload);
                 break;
 
             case BinaryProtocol.MsgType.LoginRequest:
@@ -3082,7 +3747,7 @@ public sealed class PacketDispatcher
                 break;
 
             case BinaryProtocol.MsgType.IntentLoginNoticeOk:
-                session.EnqueuePacket(ProtocolConsts.SM_STARTPLAY, 0, 0, 0, 0);
+                // 客户端大世界视口已挂载就绪 ACK，无需重复下发全量登场包避免聊天与状态双重刷屏
                 break;
 
             case BinaryProtocol.MsgType.Heartbeat:
@@ -3131,8 +3796,7 @@ public sealed class PacketDispatcher
             {
                 charName = $"{session.AccountName}_新角色";
             }
-            session.EnqueuePacket(ProtocolConsts.SM_NEWID_SUCCESS, session.SessionId, 0, 0, 0, charName);
-            HandleQueryCharInfo(session);
+            HandleNewCharInternal(session, charName, intent.Job, intent.Gender, intent.Hair);
         }
     }
 
@@ -3142,8 +3806,7 @@ public sealed class PacketDispatcher
         fixed (byte* p = payload)
         {
             var intent = *(BinaryProtocol.DeleteCharIntentPayload*)p;
-            session.EnqueuePacket(ProtocolConsts.SM_DELCHAR_DELPHI, session.SessionId, 0, 0, 0);
-            HandleQueryCharInfo(session);
+            HandleDelCharInternal(session, intent.CharIndex.ToString());
         }
     }
 
@@ -3152,13 +3815,18 @@ public sealed class PacketDispatcher
         if (payload.Length < 5 || session.State == null || session.State.Hp <= 0 || session.State.IsDead) return;
         var equip = BinaryProtocol.EquipItemIntentPayload.Read(payload);
         int bagSlot = session.State.BagItems.FindIndex(i => i.Uid == equip.ItemUid);
+        if (bagSlot < 0 && equip.ItemUid >= 0 && equip.ItemUid < session.State.BagItems.Count)
+        {
+            bagSlot = equip.ItemUid;
+        }
         if (bagSlot >= 0 && equip.TargetSlot < 9)
         {
             byte equipSlot = equip.TargetSlot;
             bool success = HandleWearItem(session, bagSlot, (OfficialEquipSlot)equipSlot);
             if (success)
             {
-                session.EnqueuePacket(ProtocolConsts.SM_TAKEON_OK, session.SessionId, equipSlot, 0, 0);
+                var wornEquip = session.State.Equipment[equipSlot];
+                session.EnqueuePacket(ProtocolConsts.SM_TAKEON_OK, session.SessionId, equipSlot, 0, 0, wornEquip?.Name ?? string.Empty);
                 session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
                 SendAbility(session);
             }
@@ -3203,6 +3871,9 @@ public sealed class PacketDispatcher
         session.State.RecalculateAttributes();
 
         session.EnqueuePacket(ProtocolConsts.SM_TAKEOFF_OK, session.SessionId, slot, 0, 0);
+        int bagIdx = session.State.BagItems.Count - 1;
+        int looks = equip.Looks > 0 ? equip.Looks : Mir2.Shared.Data.OfficialStdItemsRegistry.ResolveLooks(equip.Name, 1);
+        session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, equip.Uid, bagIdx, equip.Weight, 0, $"{equip.Name}\t{equip.Dura}\t{equip.MaxDura}\t{looks}");
         session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
         SendAbility(session);
     }
@@ -3243,27 +3914,40 @@ public sealed class PacketDispatcher
         if (slot >= 0 && slot < session.State.BagItems.Count)
         {
             var item = session.State.BagItems[slot];
-            if (item.Uid == drop.ItemUid)
+            if (drop.ItemUid == 0 || item.Uid == drop.ItemUid)
             {
+                var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+                if (map.GetGroundItemsAt(session.X, session.Y).Count >= 8)
+                {
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "地面上物品堆叠已满，无法丢弃！");
+                    return;
+                }
+
                 session.State.BagItems.RemoveAt(slot);
                 session.State.BagWeight = Math.Max(0, session.State.BagWeight - item.Weight);
                 session.State.RecalculateAuthoritativeWeights(session.State.Gold);
+                session.State.RecalculateAttributes();
 
-                var map = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
                 var groundItem = new GroundItemEntity
                 {
-                    Uid = item.Uid,
+                    Uid = System.Threading.Interlocked.Increment(ref _nextGroundItemUid),
                     Name = item.Name,
                     Count = 1,
                     IsGold = false,
                     X = session.X,
                     Y = session.Y,
-                    DropTickMs = Environment.TickCount64
+                    OwnerSessionId = 0,
+                    DropTickMs = Environment.TickCount64,
+                    Weight = item.Weight
                 };
                 map.AddGroundItem(groundItem);
 
+                // 1. 广播地表显示物品: SM_ITEMSHOW (625)
+                BroadcastToNinePatch(session, ProtocolConsts.SM_ITEMSHOW, groundItem.Uid, session.X, session.Y, item.Shape, groundItem.Name, includeSelf: true);
+                // 2. 下发客户端背包物理移除确认: SM_DELITEM (202)
+                session.EnqueuePacket(ProtocolConsts.SM_DELITEM, item.Uid, slot, 0, 0, item.Name);
                 session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
-                BroadcastToNinePatch(session, ProtocolConsts.SM_ITEMSHOW, groundItem.Uid, groundItem.X, groundItem.Y, 0, groundItem.Name, includeSelf: true);
+                SendAbility(session);
             }
         }
     }
@@ -3311,16 +3995,154 @@ public sealed class PacketDispatcher
 
     public void HandleBinaryShopSellIntent(ClientSession session, ReadOnlySpan<byte> payload)
     {
-        if (payload.Length < 8 || session.State == null) return;
+        if (payload.Length < 8 || session.State == null || session.State.Hp <= 0 || session.State.IsDead) return;
         var sell = BinaryProtocol.ShopSellIntentPayload.Read(payload);
         int itemUid = sell.ItemUid;
-        var item = session.State.BagItems.Find(i => i.Uid == itemUid);
-        if (item != null)
+
+        if (NpcEngine != null)
         {
-            session.State.BagItems.Remove(item);
-            session.State.BagWeight = Math.Max(0, session.State.BagWeight - item.Weight);
-            int sellPrice = Math.Max(100, item.Dura * 50 + item.Weight * 20);
-            session.State.Gold += sellPrice;
+            var (success, goldEarned, itemName, errorMsg) = NpcEngine.SellItem(session, itemUid);
+            if (success)
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SELL_OK_DELPHI, itemUid, goldEarned, 0, 0, itemName);
+                session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, 0, 0, 0);
+                session.EnqueuePacket(ProtocolConsts.SM_DELITEM, itemUid, 0, 0, 0, itemName);
+                session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+            }
+            else
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SELL_FAIL_DELPHI, itemUid, 0, 0, 0, errorMsg);
+            }
+        }
+        else
+        {
+            var item = session.State.BagItems.Find(i => i.Uid == itemUid);
+            if (item != null)
+            {
+                session.State.BagItems.Remove(item);
+                session.State.BagWeight = Math.Max(0, session.State.BagWeight - item.Weight);
+                int sellPrice = Math.Max(100, item.Dura * 50 + item.Weight * 20);
+                session.State.Gold += sellPrice;
+                session.EnqueuePacket(ProtocolConsts.SM_SELL_OK_DELPHI, itemUid, sellPrice, 0, 0, item.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_GOLDCHANGED_DELPHI, session.State.Gold, 0, 0, 0);
+                session.EnqueuePacket(ProtocolConsts.SM_DELITEM, item.Uid, 0, 0, 0, item.Name);
+                session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
+            }
+        }
+    }
+
+    public void HandleBinaryShopBuyIntent(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 12 || session.State == null || session.State.Hp <= 0 || session.State.IsDead) return;
+        var buy = BinaryProtocol.ShopBuyIntentPayload.Read(payload);
+        int npcUid = buy.NpcUid > 0 ? buy.NpcUid : session.ActiveNpcUid;
+        if (npcUid > 0)
+        {
+            HandleBuyItem(session, $"{npcUid}/{buy.GoodsIndex}");
+        }
+    }
+
+    private void HandleBinaryClickNpc(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        string npcTarget = Encoding.UTF8.GetString(payload).Trim();
+        int npcUid = -1;
+        if (int.TryParse(npcTarget, out int parsedUid))
+        {
+            npcUid = parsedUid;
+        }
+        else if (NpcEngine != null)
+        {
+            foreach (var n in NpcEngine.AllNpcs)
+            {
+                if (string.Equals(n.Name, npcTarget, StringComparison.OrdinalIgnoreCase))
+                {
+                    npcUid = n.Uid;
+                    break;
+                }
+            }
+        }
+        if (npcUid > 0)
+        {
+            session.ActiveNpcUid = npcUid;
+            HandleNpcHomePage(session, $"{npcUid}");
+        }
+    }
+
+    private void HandleBinaryNpcSelect(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        var (npcUid, label) = BinaryProtocol.NpcSelectIntentPayload.Read(payload);
+        if (npcUid <= 0 && session.ActiveNpcUid > 0) npcUid = session.ActiveNpcUid;
+        if (npcUid > 0)
+        {
+            HandleNpcSelect(session, $"{npcUid}/{label}");
+        }
+    }
+
+    private void HandleBinaryRepairIntent(ClientSession session, BinaryProtocol.MsgType type, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 9) return;
+        var repair = BinaryProtocol.RepairIntentPayload.Read(payload);
+        bool isSpecial = type == BinaryProtocol.MsgType.IntentSpecialRepair || repair.IsSpecial == 1;
+        HandleRepairItem(session, $"{repair.ItemUid}", isSpecial);
+    }
+
+    private void HandleBinaryTradeIntent(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length < 13) return;
+        var trade = BinaryProtocol.TradeIntentPayload.Read(payload);
+        switch (trade.Action)
+        {
+            case 0: HandleDealTry(session, $"{trade.TargetSessionId}"); break;
+            case 1: HandleDealAddItem(session, $"{trade.ItemUid}"); break;
+            case 2: HandleDealDelItem(session, $"{trade.ItemUid}"); break;
+            case 3: HandleDealChgGold(session, $"{trade.Gold}"); break;
+            case 4: HandleDealEnd(session); break;
+            case 5: HandleDealCancel(session); break;
+        }
+    }
+
+    private void HandleBinaryGroupAction(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        var (grpAct, target) = BinaryProtocol.GroupActionIntentPayload.Read(payload);
+        switch (grpAct)
+        {
+            case 0: HandleCreateGroup(session, target); break;
+            case 1: HandleAddGroupMember(session, target); break;
+            case 2: HandleDelGroupMember(session, target); break;
+            case 3: HandleGroupMode(session, target); break;
+        }
+    }
+
+    private void HandleBinaryGuildAction(ClientSession session, ReadOnlySpan<byte> payload)
+    {
+        var (guildAct, p1, p2) = BinaryProtocol.GuildActionIntentPayload.Read(payload);
+        switch (guildAct)
+        {
+            case 0:
+            case 1:
+                HandleOpenGuild(session);
+                break;
+            case 2: HandleGuildAddMember(session, p1); break;
+            case 3: HandleGuildKickMember(session, p1); break;
+            case 4: HandleGuildAllyRequest(session, p1); break;
+            case 5: HandleGuildBreakAlly(session, p1); break;
+            case 6: HandleGuildUpdateNotice(session, p1); break;
+            case 7: HandleGuildUpdateRank(session, $"{p1}/{p2}"); break;
+            case 8:
+                if (GuildWarEngine != null && !string.IsNullOrEmpty(p1))
+                {
+                    string myGuild = GuildEngine.GetPlayerGuild(session.CharacterName) ?? "战神殿";
+                    GuildWarEngine.DeclareWar(myGuild, p1, Environment.TickCount64);
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{myGuild} 向 {p1} 宣战。");
+                }
+                break;
+            case 9:
+                if (GuildWarEngine != null && !string.IsNullOrEmpty(p1))
+                {
+                    string myGuild = GuildEngine.GetPlayerGuild(session.CharacterName) ?? "战神殿";
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{myGuild} 与 {p1} 停止行会战。");
+                }
+                break;
         }
     }
 
@@ -3376,11 +4198,13 @@ public sealed class PacketDispatcher
             return;
         }
 
-        // 3. 移速反加速外挂校验 (基于真实服务器物理时间戳)
+        // 3. 移速反加速外挂校验 (基于真实服务器物理时间戳与连续违规容差)
         long nowMs = Environment.TickCount64;
         if (session.LastMoveTimeMs > 0)
         {
-            var (isSpeedHack, shouldRollback) = EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(nowMs, session.LastMoveTimeMs);
+            int fastMoves = session.ConsecutiveFastMoves;
+            var (isSpeedHack, shouldRollback) = EconomySecurityEngine.SpeedHackDetectorEngine.CheckMovePacket(nowMs, session.LastMoveTimeMs, ref fastMoves);
+            session.ConsecutiveFastMoves = fastMoves;
             if (isSpeedHack && shouldRollback)
             {
                 SendPositionPullback(session, oldX, oldY, session.Direction);
@@ -3394,8 +4218,16 @@ public sealed class PacketDispatcher
         session.Y = newY;
         session.Direction = dir;
 
-        // 5. 更新九宫格 AOI 空间分区
-        map.Aoi.UpdatePosition(session, oldX, oldY, newX, newY, out _, out _);
+        // 4.1 盛大官方跳点传送权威检测 (Passage Trigger)
+        var passage = _mapManager.FindPassage(session.CurrentMapId, newX, newY);
+        if (passage != null)
+        {
+            TriggerMapPassage(session, passage);
+            return;
+        }
+
+        // 5. 更新九宫格 AOI 空间分区并在跨 Zone 时执行双向差分广播
+        UpdateAoiPositionWithTransition(map, session, oldX, oldY, newX, newY);
 
         // 6. 千人同屏九宫格 LOD 广播实体移动 (仅 6 字节二进制帧)
         Span<byte> syncSpan = stackalloc byte[6];
@@ -3419,7 +4251,7 @@ public sealed class PacketDispatcher
         var attack = BinaryProtocol.AttackIntentPayload.Read(payload);
 
         long nowMs = Environment.TickCount64;
-        if (session.LastAttackTimeMs > 0 && !EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(nowMs, session.LastAttackTimeMs))
+        if (session.LastAttackTimeMs > 0 && !EconomySecurityEngine.AttackSpeedValidatorEngine.IsAttackValid(nowMs, session.LastAttackTimeMs, session.State?.AttackSpeed ?? 0))
         {
             return; // 挥刀过快拦截
         }
@@ -3473,9 +4305,67 @@ public sealed class PacketDispatcher
 
                 if (died)
                 {
-                    session.State?.AddPkMurder();
-                    OnPlayerDied(defender);
-                    BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
+                    AuthoritativeExecutePlayerDeath(defender, session, map, nowMs);
+                }
+            }
+        }
+        else if (RegenEngine != null && session.State != null)
+        {
+            var (dx, dy) = MonsterRegenEngine.GetDirOffset(attack.Direction);
+            int targetX = session.X + dx;
+            int targetY = session.Y + dy;
+
+            var monster = (attack.TargetUid > 0 ? RegenEngine.FindMonsterByUid(attack.TargetUid) : null)
+                          ?? RegenEngine.FindMonsterAt(session.CurrentMapId, targetX, targetY);
+            if (monster != null && !monster.IsDead)
+            {
+                int dist = Math.Max(Math.Abs(monster.X - session.X), Math.Abs(monster.Y - session.Y));
+                var (rawDmg, hit, isFireHit, died) = ResolveAuthoritativeMonsterPhysicalCombat(session, monster, dist, nowMs);
+                if (hit && rawDmg > 0)
+                {
+                    monster.ThreatTable.AddHate(session.SessionId, rawDmg, isTaunt: false);
+                    if (monster.IsStoneForm) monster.IsStoneForm = false;
+                    if (monster.NextActionTimeMs > nowMs + 1000)
+                    {
+                        monster.NextActionTimeMs = nowMs + 500;
+                        monster.TargetSessionId = session.SessionId;
+                    }
+                    if (monster.IsTrappedByHolyCurse)
+                    {
+                        monster.IsTrappedByHolyCurse = false;
+                        monster.TrappedExpireMs = 0;
+                        monster.NextActionTimeMs = nowMs;
+                        monster.TargetSessionId = session.SessionId;
+                        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "困魔咒破除了。");
+                    }
+
+                    if (isFireHit)
+                    {
+                        var (tFire, _, mFire, _) = SkillTrainEngine.TrainSkill(session.State, 26, 1);
+                        if (tFire && mFire != null)
+                        {
+                            session.EnqueuePacket(ProtocolConsts.SM_UPDATEUSERMAGIC, mFire.MagicId, mFire.Level, mFire.Key, mFire.CurTrain);
+                        }
+                    }
+                    else if (attack.SkillType == 1 || dist == 2)
+                    {
+                        var (tStab, _, mStab, _) = SkillTrainEngine.TrainSkill(session.State, 12, 1);
+                        if (tStab && mStab != null)
+                        {
+                            session.EnqueuePacket(ProtocolConsts.SM_UPDATEUSERMAGIC, mStab.MagicId, mStab.Level, mStab.Key, mStab.CurTrain);
+                        }
+                    }
+
+                    // 广播怪物后仰动画: SM_OBJECTSTRUCK (244)
+                    BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, monster.Uid, monster.X, monster.Y, rawDmg, monster.Name, includeSelf: true);
+
+                    // 怪物死亡判定与经验分配
+                    if (died)
+                    {
+                        RegenEngine.OnMonsterDied(monster.Uid);
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, monster.Uid, monster.X, monster.Y, 0, monster.Name, includeSelf: true);
+                        OnMonsterKilledByPlayer(session, monster);
+                    }
                 }
             }
         }
@@ -3532,52 +4422,24 @@ public sealed class PacketDispatcher
     {
         if (payload.Length < 4) return;
         int itemUid = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[0..4]);
+        int bagSlot = payload.Length >= 8 ? System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[4..8]) : -1;
 
-        if (session.State == null) return;
-        for (int i = 0; i < session.State.BagItems.Count; i++)
+        if (session.State == null || session.State.Hp <= 0 || session.State.IsDead) return;
+
+        int targetIdx = -1;
+        if (itemUid > 0)
         {
-            var item = session.State.BagItems[i];
-            if (item.Uid == itemUid)
-            {
-                session.State.BagItems.RemoveAt(i);
-                session.State.BagWeight = Math.Max(0, session.State.BagWeight - item.Weight);
-                session.EnqueuePacket(ProtocolConsts.SM_DELITEM, item.Uid, i, 0, 0, item.Name);
-                session.EnqueuePacket(ProtocolConsts.SM_EAT_OK, 0, 0, 0, 0);
+            targetIdx = session.State.BagItems.FindIndex(it => it.Uid == itemUid);
+        }
+        if (targetIdx < 0 && bagSlot >= 0 && bagSlot < session.State.BagItems.Count)
+        {
+            targetIdx = bagSlot;
+        }
 
-                if (item.Name.Contains("解毒"))
-                {
-                    session.State.ClearPoison();
-                    SendAbility(session);
-                }
-
-                if (item.Name.Contains("强效太阳水"))
-                {
-                    session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + 50);
-                    session.State.Mp = Math.Min(session.State.MaxMp, session.State.Mp + 50);
-                }
-                else if (item.Name.Contains("太阳水"))
-                {
-                    session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + 30);
-                    session.State.Mp = Math.Min(session.State.MaxMp, session.State.Mp + 30);
-                }
-                else
-                {
-                    session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + 50);
-                    session.State.Mp = Math.Min(session.State.MaxMp, session.State.Mp + 30);
-                }
-
-                // 下发权威血蓝同步
-                Span<byte> hpSpan = stackalloc byte[8];
-                new BinaryProtocol.HealthSyncPayload
-                {
-                    Hp = (short)session.State.Hp,
-                    Mp = (short)session.State.Mp,
-                    MaxHp = (short)session.State.MaxHp,
-                    MaxMp = (short)session.State.MaxMp
-                }.Write(hpSpan);
-                session.EnqueueBinaryPacket((ushort)BinaryProtocol.MsgType.BroadcastHealthSync, hpSpan);
-                break;
-            }
+        if (targetIdx >= 0 && targetIdx < session.State.BagItems.Count)
+        {
+            var item = session.State.BagItems[targetIdx];
+            HandleEatItem(session, $"{targetIdx}/{item.Name}");
         }
     }
 
@@ -3747,7 +4609,9 @@ public sealed class PacketDispatcher
             }
         }
 
-        int rollSpeed = OfficialClientRulesEngine.DelphiRandom.Shared.Next(16);
+        // IDA sub_4C1EF4 @ 0x4C2180: RandInt(目标敏捷) >= 攻击者准确 判定 Miss；无官方属性的怪物沿用旧常数 16
+        int monsterAgility = monster.HasOfficialStats && monster.Agility > 0 ? monster.Agility : 16;
+        int rollSpeed = OfficialClientRulesEngine.DelphiRandom.Shared.Next(monsterAgility);
         bool hit = rollSpeed < attacker.State.Hit;
         if (!hit) return (0, false, false, false);
 
@@ -3807,7 +4671,6 @@ public sealed class PacketDispatcher
         {
             if (session.State.BreakSpellInvisibility())
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【隐身术】因施放法术破除了隐身匿踪！");
                 BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 18, "破除隐身", includeSelf: true);
                 uint mask = session.State.GetCurrentStatusMask(nowMs);
                 session.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0);
@@ -3836,7 +4699,9 @@ public sealed class PacketDispatcher
         // 3. 魔法盾 (MagicId = 31)
         if (magicId == 31)
         {
+            session.State.Mp = Math.Max(0, session.State.Mp - 30);
             session.State.ActivateMagicShield(3, 30);
+            session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
             return;
         }
 
@@ -3845,7 +4710,7 @@ public sealed class PacketDispatcher
         {
             if (SafeZoneEngine != null && SafeZoneEngine.IsInSafeZone(session.CurrentMapId, session.X, session.Y))
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "安全区内受神圣法则护佑，无法施展抗拒火环推挤生灵");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "在安全区内不能推开他人。");
                 return;
             }
 
@@ -3903,7 +4768,7 @@ public sealed class PacketDispatcher
                         targetPlayer.Y = pr.FinalY;
                         targetPlayer.State.ParalyzeExpireMs = nowMs + 1000;
                         targetPlayer.State.StatusBits[5] = true;
-                        map.Aoi.UpdatePosition(targetPlayer, oldX, oldY, pr.FinalX, pr.FinalY, out _, out _);
+                        UpdateAoiPositionWithTransition(map, targetPlayer, oldX, oldY, pr.FinalX, pr.FinalY);
                         SendPositionPullback(targetPlayer, pr.FinalX, pr.FinalY, targetPlayer.Direction);
                         BroadcastToNinePatch(targetPlayer, ProtocolConsts.SM_OBJECTRUN, targetPlayer.SessionId, pr.FinalX, pr.FinalY, targetPlayer.Direction, targetPlayer.CharacterName, includeSelf: true);
                     }
@@ -3984,7 +4849,7 @@ public sealed class PacketDispatcher
 
             if (grayPowder == null && yellowPowder == null)
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "缺少施毒药粉，施法失败！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你没有带毒药。");
                 return;
             }
 
@@ -4132,7 +4997,8 @@ public sealed class PacketDispatcher
         // 7. 治愈术 (MagicId = 2 或 7) 与 群体治愈术 (MagicId = 29)
         if (magicId == 2 || magicId == 7 || magicId == 29)
         {
-            int heal = TaoistCombatEngine.MassHeal.CalculateHealAmount(sc: Math.Max(15, session.State.Sc), skillLevel: 3);
+            int healSkillLvl = session.State.GetSkillLevel(magicId);
+            int heal = TaoistCombatEngine.MassHeal.CalculateHealAmount(sc: Math.Max(0, session.State.Sc), skillLevel: healSkillLvl);
             if (magicId == 29)
             {
                 // 3x3 范围群体治愈
@@ -4214,7 +5080,6 @@ public sealed class PacketDispatcher
                     {
                         p.State.GhostShieldExpireMs = nowMs + 60_000;
                         p.State.RecalculateAttributes();
-                        p.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【幽灵盾】获得神圣魔法防御提升光环！");
                         BroadcastToNinePatch(p, ProtocolConsts.SM_SPELLEFFECT_DELPHI, p.SessionId, p.X, p.Y, 14, "幽灵盾", includeSelf: true);
                     }
                 }
@@ -4235,7 +5100,6 @@ public sealed class PacketDispatcher
                     {
                         p.State.HolyArmorExpireMs = nowMs + 60_000;
                         p.State.RecalculateAttributes();
-                        p.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【神圣战甲术】获得物理神圣装甲提升光环！");
                         BroadcastToNinePatch(p, ProtocolConsts.SM_SPELLEFFECT_DELPHI, p.SessionId, p.X, p.Y, 15, "神圣战甲术", includeSelf: true);
                     }
                 }
@@ -4261,7 +5125,6 @@ public sealed class PacketDispatcher
                     }
                 }
             }
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【困魔咒】已成功禁锢目标！");
             BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, targetX, targetY, 16, "困魔咒", includeSelf: true);
             return;
         }
@@ -4285,7 +5148,6 @@ public sealed class PacketDispatcher
                             uint m = p.State.GetCurrentStatusMask(nowMs);
                             p.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, p.SessionId, (int)m, 0, 0);
                             BroadcastToNinePatch(p, ProtocolConsts.SM_CHANGENAMECOLOR, p.SessionId, (int)m, 0, 0, p.CharacterName, includeSelf: false);
-                            p.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【集体隐身术】已进入隐身匿踪状态！");
                         }
                     }
                 }
@@ -4298,7 +5160,6 @@ public sealed class PacketDispatcher
                 uint mask = session.State.GetCurrentStatusMask(nowMs);
                 session.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0);
                 BroadcastToNinePatch(session, ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0, session.CharacterName, includeSelf: false);
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【隐身术】已进入隐身匿踪状态！");
             }
 
             if (RegenEngine != null)
@@ -4330,11 +5191,18 @@ public sealed class PacketDispatcher
                         oldM.Hp = 0;
                         RegenEngine.OnMonsterDied(oldM.Uid);
                         BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, oldM.Uid, oldM.X, oldM.Y, 0, oldM.Name, includeSelf: true);
+                        BroadcastToNinePatch(session, ProtocolConsts.SM_MONDELETE, oldM.Uid, 0, 0, 0, oldM.Name, includeSelf: true);
                     }
                 }
 
-                string petName = magicId == 30 ? "神兽" : "变异骷髅";
-                int baseHp = magicId == 30 ? 300 : 150;
+                var userMagic = session.State.Magics.Find(m => m.MagicId == magicId);
+                int skillLv = userMagic?.Level ?? 0;
+                var stats = magicId == 30 
+                    ? TaoistCombatEngine.GetShinsuStats(skillLv) 
+                    : TaoistCombatEngine.GetSkeletonStats(skillLv);
+
+                string petName = stats.Name;
+                int baseHp = stats.MaxHp;
                 int petX = magicId == 30 ? session.X : session.X + 1;
                 int petY = magicId == 30 ? session.Y + 1 : session.Y;
                 if (!map.IsWalkable(petX, petY) || RegenEngine.ActiveMonsters.Any(m => !m.IsDead && m.MapId == session.CurrentMapId && m.X == petX && m.Y == petY))
@@ -4347,21 +5215,33 @@ public sealed class PacketDispatcher
                 {
                     pet.MasterSessionId = session.SessionId;
                     pet.TargetSessionId = 0;
+                    pet.Level = stats.Level;
+                    pet.AttackDamageMin = stats.MinDc;
+                    pet.AttackDamageMax = stats.MaxDc;
+                    pet.Defense = stats.Ac;
+
                     session.Pets.RemoveAll(p => p.Name.Contains("骷髅") || p.Name.Contains("神兽"));
                     session.Pets.Add(new HuWeiPetEngine.SlavePet
                     {
                         Uid = pet.Uid,
                         Name = petName,
                         MasterSessionId = session.SessionId,
+                        Level = stats.Level,
                         Hp = pet.Hp,
                         MaxHp = pet.MaxHp,
+                        MinDc = stats.MinDc,
+                        MaxDc = stats.MaxDc,
+                        Ac = stats.Ac,
+                        Mac = stats.Mac,
                         X = pet.X,
                         Y = pet.Y,
                         CurrentMapId = session.CurrentMapId
                     });
+
+                    // 盛大官方 1.5 权威召唤兽进场广播: SM_MONSPAWN (220)
+                    BroadcastToNinePatch(session, ProtocolConsts.SM_MONSPAWN, pet.Uid, petX, petY, pet.Direction, $"{petName}/{petX}/{petY}/{pet.Direction}/{(magicId == 30 ? 11 : 10)}", includeSelf: true);
                 }
                 BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, petX, petY, magicId, petName, includeSelf: true);
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【道法召唤】成功召唤出【{petName}】！");
             }
             return;
         }
@@ -4394,7 +5274,7 @@ public sealed class PacketDispatcher
                 targetPlayer.State.RevealedExpireMs = nowMs + 60_000;
                 session.EnqueuePacket(ProtocolConsts.SM_HEALTHBAR_DELPHI, targetPlayer.SessionId, 1, 0, 0, "");
                 session.EnqueuePacket(ProtocolConsts.SM_HEALTHBAR_COLOR_DELPHI, targetPlayer.SessionId, targetPlayer.State.Hp, targetPlayer.State.MaxHp, 0, "");
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【心灵启示】{targetPlayer.CharacterName} 当前生命: {targetPlayer.State.Hp} / {targetPlayer.State.MaxHp}");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"心灵启示: {targetPlayer.CharacterName} {targetPlayer.State.Hp}/{targetPlayer.State.MaxHp}");
                 return;
             }
             if (RegenEngine != null)
@@ -4407,7 +5287,7 @@ public sealed class PacketDispatcher
                     m.RevealedExpireMs = nowMs + 60_000;
                     session.EnqueuePacket(ProtocolConsts.SM_HEALTHBAR_DELPHI, m.Uid, 1, 0, 0, "");
                     session.EnqueuePacket(ProtocolConsts.SM_HEALTHBAR_COLOR_DELPHI, m.Uid, m.Hp, m.MaxHp, 0, "");
-                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【心灵启示】{m.Name} 当前生命: {m.Hp} / {m.MaxHp}");
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"心灵启示: {m.Name} {m.Hp}/{m.MaxHp}");
                     return;
                 }
             }
@@ -4436,7 +5316,7 @@ public sealed class PacketDispatcher
                 }
             }
             BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, targetX, targetY, 16, "困魔咒", includeSelf: true);
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【困魔咒】金光符文阵禁锢了范围内的生物！");
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "困魔咒生效了。");
             return;
         }
 
@@ -4460,9 +5340,10 @@ public sealed class PacketDispatcher
                 Math.Max(session.State.Dc, session.State.MaxDc), 
                 Random.Shared);
 
+            int halfMoonLvl = session.State.GetSkillLevel(25); // 官方 1.5 半月弯刀 MagicId = 25
             foreach (var (tx, ty, isMain) in affectedTiles)
             {
-                int dmg = WarriorCombatEngine.HalfMoon.CalculateDamage(baseDmg, isMain, skillLevel: 3);
+                int dmg = WarriorCombatEngine.HalfMoon.CalculateDamage(baseDmg, isMain, skillLevel: halfMoonLvl);
 
                 // 结算该格子的玩家
                 var targetSessions = new List<ClientSession>();
@@ -4477,8 +5358,7 @@ public sealed class PacketDispatcher
                         target.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, target.State.Hp, target.State.MaxHp, target.State.Mp, target.State.MaxMp);
                         if (died)
                         {
-                            session.State.AddPkMurder();
-                            BroadcastToNinePatch(target, ProtocolConsts.SM_DEATH_ACTION_DELPHI, target.SessionId, target.X, target.Y, 0, target.CharacterName, includeSelf: true);
+                            AuthoritativeExecutePlayerDeath(target, session, map, nowMs);
                         }
                     }
                 }
@@ -4513,6 +5393,12 @@ public sealed class PacketDispatcher
             }
             session.State.LastWildSlamTickMs = nowMs;
 
+            if (SafeZoneEngine != null && SafeZoneEngine.IsInSafeZone(session.CurrentMapId, session.X, session.Y))
+            {
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "在安全区内不能推开他人。");
+                return;
+            }
+
             int dir = session.Direction;
             if (targetX != session.X || targetY != session.Y)
             {
@@ -4533,6 +5419,74 @@ public sealed class PacketDispatcher
                 session.State.ParalyzeExpireMs = nowMs + 1000;
                 session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
                 BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, session.SessionId, session.X, session.Y, 15, session.CharacterName, includeSelf: true);
+                return;
+            }
+
+            // PVP 玩家碰撞检测
+            ClientSession? frontPlayer = null;
+            lock (_ninePatchBuffer)
+            {
+                map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+                for (int i = 0; i < _ninePatchBuffer.Count; i++)
+                {
+                    var other = _ninePatchBuffer[i];
+                    if (other.SessionId != session.SessionId && other.CurrentMapId == session.CurrentMapId && other.X == fx && other.Y == fy && other.State != null && other.State.Hp > 0)
+                    {
+                        frontPlayer = other;
+                        break;
+                    }
+                }
+            }
+
+            if (frontPlayer != null && frontPlayer.State != null)
+            {
+                bool canPush = session.State.Level > frontPlayer.State.Level;
+                if (!canPush)
+                {
+                    session.State.Hp = Math.Max(1, session.State.Hp - 15);
+                    session.State.StatusBits[5] = true;
+                    session.State.ParalyzeExpireMs = nowMs + 1000;
+                    session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
+                    BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTSTRUCK, session.SessionId, session.X, session.Y, 15, session.CharacterName, includeSelf: true);
+                    return;
+                }
+
+                int pushDist = (session.State.Level - frontPlayer.State.Level >= 3) ? 2 : 1;
+                int targetNewX = frontPlayer.X + dx * pushDist;
+                int targetNewY = frontPlayer.Y + dy * pushDist;
+                if (!map.IsWalkable(targetNewX, targetNewY))
+                {
+                    targetNewX = frontPlayer.X + dx;
+                    targetNewY = frontPlayer.Y + dy;
+                }
+
+                if (map.IsWalkable(targetNewX, targetNewY))
+                {
+                    int tOldX = frontPlayer.X, tOldY = frontPlayer.Y;
+                    frontPlayer.X = targetNewX;
+                    frontPlayer.Y = targetNewY;
+                    UpdateAoiPositionWithTransition(map, frontPlayer, tOldX, tOldY, targetNewX, targetNewY);
+                    SendPositionPullback(frontPlayer, targetNewX, targetNewY, frontPlayer.Direction);
+                    BroadcastToNinePatch(frontPlayer, ProtocolConsts.SM_OBJECTRUN, frontPlayer.SessionId, targetNewX, targetNewY, frontPlayer.Direction, frontPlayer.CharacterName, includeSelf: true);
+                }
+                else
+                {
+                    frontPlayer.State.Hp = Math.Max(1, frontPlayer.State.Hp - 20);
+                    frontPlayer.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, frontPlayer.State.Hp, frontPlayer.State.MaxHp, frontPlayer.State.Mp, frontPlayer.State.MaxMp);
+                }
+
+                frontPlayer.State.StatusBits[5] = true;
+                frontPlayer.State.ParalyzeExpireMs = nowMs + 1500;
+
+                int oldX = session.X;
+                int oldY = session.Y;
+                int newX = fx;
+                int newY = fy;
+                session.X = newX;
+                session.Y = newY;
+                UpdateAoiPositionWithTransition(map, session, oldX, oldY, newX, newY);
+                SendPositionPullback(session, newX, newY, session.Direction);
+                BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTRUN, session.SessionId, newX, newY, session.Direction, session.CharacterName, includeSelf: true);
                 return;
             }
 
@@ -4576,7 +5530,7 @@ public sealed class PacketDispatcher
                 int newY = session.Y + dy * 3;
                 session.X = newX;
                 session.Y = newY;
-                map.Aoi.UpdatePosition(session, oldX, oldY, newX, newY, out _, out _);
+                UpdateAoiPositionWithTransition(map, session, oldX, oldY, newX, newY);
                 SendPositionPullback(session, newX, newY, session.Direction);
                 BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTRUN, session.SessionId, newX, newY, session.Direction, session.CharacterName, includeSelf: true);
                 return;
@@ -4589,7 +5543,7 @@ public sealed class PacketDispatcher
             int pNewY = session.Y + dy * 2;
             session.X = pNewX;
             session.Y = pNewY;
-            map.Aoi.UpdatePosition(session, pOldX, pOldY, pNewX, pNewY, out _, out _);
+            UpdateAoiPositionWithTransition(map, session, pOldX, pOldY, pNewX, pNewY);
             SendPositionPullback(session, pNewX, pNewY, session.Direction);
             BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTRUN, session.SessionId, pNewX, pNewY, session.Direction, session.CharacterName, includeSelf: true);
             return;
@@ -4662,11 +5616,7 @@ public sealed class PacketDispatcher
                         target.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, target.State.Hp, target.State.MaxHp, target.State.Mp, target.State.MaxMp);
                         if (died)
                         {
-                            session.State.AddPkMurder();
-                            uint mask = session.State.GetCurrentStatusMask(nowMs);
-                            session.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0);
-                            BroadcastToNinePatch(session, ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0, session.CharacterName, includeSelf: false);
-                            BroadcastToNinePatch(target, ProtocolConsts.SM_DEATH_ACTION_DELPHI, target.SessionId, target.X, target.Y, 0, target.CharacterName, includeSelf: true);
+                            AuthoritativeExecutePlayerDeath(target, session, map, nowMs);
                         }
                     }
                 }
@@ -4682,7 +5632,7 @@ public sealed class PacketDispatcher
             int oldY = session.Y;
             session.X = tx;
             session.Y = ty;
-            map.Aoi.UpdatePosition(session, oldX, oldY, tx, ty, out _, out _);
+            UpdateAoiPositionWithTransition(map, session, oldX, oldY, tx, ty);
             SendPositionPullback(session, tx, ty, session.Direction);
 
             for (int p = 0; p < session.Pets.Count; p++)
@@ -4694,7 +5644,6 @@ public sealed class PacketDispatcher
 
             BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, tx, ty, 11, "瞬移降临", includeSelf: true);
             BroadcastToNinePatch(session, ProtocolConsts.SM_OBJECTRUN, session.SessionId, tx, ty, session.Direction, session.CharacterName, includeSelf: true);
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【瞬息移动】已瞬移至 ({tx}, {ty})");
             return;
         }
 
@@ -4772,8 +5721,7 @@ public sealed class PacketDispatcher
                             target.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, target.State.Hp, target.State.MaxHp, target.State.Mp, target.State.MaxMp);
                             if (died)
                             {
-                                session.State.AddPkMurder();
-                                BroadcastToNinePatch(target, ProtocolConsts.SM_DEATH_ACTION_DELPHI, target.SessionId, target.X, target.Y, 0, target.CharacterName, includeSelf: true);
+                                AuthoritativeExecutePlayerDeath(target, session, map, nowMs);
                             }
                         }
                     }
@@ -4841,11 +5789,7 @@ public sealed class PacketDispatcher
                                 target.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, target.State.Hp, target.State.MaxHp, target.State.Mp, target.State.MaxMp);
                                 if (died)
                                 {
-                                    session.State.AddPkMurder();
-                                    uint mask = session.State.GetCurrentStatusMask(nowMs);
-                                    session.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0);
-                                    BroadcastToNinePatch(session, ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0, session.CharacterName, includeSelf: false);
-                                    BroadcastToNinePatch(target, ProtocolConsts.SM_DEATH_ACTION_DELPHI, target.SessionId, target.X, target.Y, 0, target.CharacterName, includeSelf: true);
+                                    AuthoritativeExecutePlayerDeath(target, session, map, nowMs);
                                 }
                             }
                         }
@@ -4907,7 +5851,7 @@ public sealed class PacketDispatcher
                     RegenEngine.OnMonsterDied(monster.Uid);
                     BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, monster.Uid, monster.X, monster.Y, 0, monster.Name, includeSelf: true);
                     OnMonsterKilledByPlayer(session, monster);
-                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【圣言术】神圣光芒净化了 {monster.Name}！");
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"圣言术成功度化了{monster.Name}。");
                     return;
                 }
             }
@@ -4963,7 +5907,7 @@ public sealed class PacketDispatcher
                 int rollEvade = OfficialClientRulesEngine.DelphiRandom.Shared.Next(100);
                 if (rollEvade < defender.State.MagicEvade)
                 {
-                    defender.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【躲避】你凭借敏锐身法触发魔法躲避！");
+                    // 官方 1.5 铁律：魔法躲避触发仅免伤与播放闪避动作，绝不发送非官方调试文字
                     return;
                 }
             }
@@ -4996,11 +5940,7 @@ public sealed class PacketDispatcher
             defender.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, defender.State.Hp, defender.State.MaxHp, defender.State.Mp, defender.State.MaxMp);
             if (died)
             {
-                session.State.AddPkMurder();
-                uint mask = session.State.GetCurrentStatusMask(nowMs);
-                session.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0);
-                BroadcastToNinePatch(session, ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0, session.CharacterName, includeSelf: false);
-                BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
+                AuthoritativeExecutePlayerDeath(defender, session, map, nowMs);
             }
         }
         else if (RegenEngine != null)
@@ -5066,13 +6006,13 @@ public sealed class PacketDispatcher
                         var (revived, revHp, revMp) = session.State.CheckAndTriggerRevivalRing(nowMs);
                         if (revived)
                         {
-                            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【神戒护佑】复活戒指释放神圣光芒，生命值完全恢复！");
                             BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 2, "神圣复活", includeSelf: true);
                             session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
                         }
                         else
                         {
-                            BroadcastToNinePatch(session, ProtocolConsts.SM_DEATH_ACTION_DELPHI, session.SessionId, session.X, session.Y, 0, session.CharacterName, includeSelf: true);
+                            var poisonMap = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
+                            AuthoritativeExecutePlayerDeath(session, null, poisonMap, nowMs);
                         }
                     }
                 }
@@ -5165,7 +6105,8 @@ public sealed class PacketDispatcher
                 bool success = HandleWearItem(session, bagSlot, (OfficialEquipSlot)equipSlot);
                 if (success)
                 {
-                    session.EnqueuePacket(ProtocolConsts.SM_TAKEON_OK, session.SessionId, equipSlot, 0, 0);
+                    var wornEquip = session.State.Equipment[equipSlot];
+                    session.EnqueuePacket(ProtocolConsts.SM_TAKEON_OK, session.SessionId, equipSlot, 0, 0, wornEquip?.Name ?? string.Empty);
                     session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
                     SendAbility(session);
                 }
@@ -5222,7 +6163,6 @@ public sealed class PacketDispatcher
 
         if (wasInvis && !session.State.HasInvisibleRing)
         {
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【隐身解除】你脱下了隐身戒指，身形显形于世间！");
             uint mask = session.State.GetCurrentStatusMask(Environment.TickCount64);
             session.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0);
             BroadcastToNinePatch(session, ProtocolConsts.SM_CHANGENAMECOLOR, session.SessionId, (int)mask, 0, 0, session.CharacterName, includeSelf: false);
@@ -5230,6 +6170,9 @@ public sealed class PacketDispatcher
         }
 
         session.EnqueuePacket(ProtocolConsts.SM_TAKEOFF_OK, session.SessionId, slot, 0, 0);
+        int bIdx = session.State.BagItems.Count - 1;
+        int lks = equip.Looks > 0 ? equip.Looks : Mir2.Shared.Data.OfficialStdItemsRegistry.ResolveLooks(equip.Name, 1);
+        session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, equip.Uid, bIdx, equip.Weight, 0, $"{equip.Name}\t{equip.Dura}\t{equip.MaxDura}\t{lks}");
         session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
         SendAbility(session);
     }
@@ -5346,7 +6289,12 @@ public sealed class PacketDispatcher
         // SM_ABILITY: level, hp, maxhp, mp, maxmp, exp, maxexp, weight, maxweight, wearweight, maxwearweight, handweight, maxhandweight
         session.EnqueuePacket(ProtocolConsts.SM_ABILITY, session.State.Level, session.State.Hp, session.State.MaxHp, session.State.Mp,
             $"{session.State.MaxMp}/{session.State.Exp}/{session.State.MaxExp}/{session.State.BagWeight}/{session.State.MaxBagWeight}/{session.State.WearWeight}/{session.State.MaxWearWeight}/{session.State.HandWeight}/{session.State.MaxHandWeight}/{session.State.Gold}/{session.State.BonusPoint}");
+        session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.State.Gold, 0, 0, 0,
+            $"{session.CharacterName}/{session.State.Level}/{session.State.Job}/{session.State.Sex}|{session.State.Ac}-{session.State.MaxAc}/{session.State.Mac}-{session.State.MaxMac}/{session.State.Dc}-{session.State.MaxDc}/{session.State.Mc}-{session.State.MaxMc}/{session.State.Sc}-{session.State.MaxSc}/{session.State.Hit}/{session.State.Speed}");
     }
+
+    /// <summary>击杀经验倍率 (官方 1.0)。由宿主按 ServerConfig.ExpRate 设置，仅用于压测/机器人。</summary>
+    public double ExpRate { get; set; } = 1.0;
 
     public void OnMonsterKilledByPlayer(ClientSession killer, MonsterInstance monster)
     {
@@ -5355,19 +6303,9 @@ public sealed class PacketDispatcher
         long nowMs = Environment.TickCount64;
 
         // 盛大官方怪物掉落与周边空地散射 (80秒归属权保护)
-        var dropRules = MonsterDropEngine.GetMonsterDropRules(monster.Name);
+        var dropRules = MonsterDropEngine.GetDropRulesFor(monster.OfficialKey, monster.Name);
         var drops = MonsterDropEngine.RollMonsterDrops(monster.X, monster.Y, killer.SessionId, nowMs, dropRules, OfficialClientRulesEngine.DelphiRandom.Shared, (tx, ty) => map.IsWalkable(tx, ty));
-        drops.Insert(0, new GroundItemEntity
-        {
-            Uid = 50000 + monster.Uid % 10000,
-            Name = $"{monster.Name}_战利品",
-            X = monster.X,
-            Y = monster.Y,
-            OwnerSessionId = killer.SessionId,
-            DropTickMs = nowMs,
-            Weight = 1
-        });
-
+        // 注意: 这里不再注入任何“<怪物名>_战利品”之类的凭空物品 —— 官方没有该物品，掉落只来自 MonItems 官方掉落表 (数据库 official_mon_drop)。
         foreach (var loot in drops)
         {
             map.AddGroundItem(loot);
@@ -5375,6 +6313,7 @@ public sealed class PacketDispatcher
         }
 
         int exp = monster.Exp > 0 ? monster.Exp : Math.Max(10, monster.MaxHp * 2);
+        if (ExpRate != 1.0) exp = (int)Math.Min(int.MaxValue / 2, Math.Max(1, Math.Round(exp * ExpRate)));
 
         var party = GroupEngine.GetParty(killer.SessionId);
         if (party != null && party.Members.Count > 1)
@@ -5477,6 +6416,9 @@ public sealed class PacketDispatcher
             };
             session.State.BagItems.Add(meatItem);
             session.State.BagWeight += 1;
+            int bagIdx = session.State.BagItems.Count - 1;
+            int looks = Mir2.Shared.Data.OfficialStdItemsRegistry.ResolveLooks(meatItem.Name, 1);
+            session.EnqueuePacket(ProtocolConsts.SM_ADDITEM, meatItem.Uid, bagIdx, meatItem.Weight, 0, $"{meatItem.Name}\t{meatItem.Dura}\t{meatItem.MaxDura}\t{looks}");
             session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
         }
         else
@@ -5512,7 +6454,7 @@ public sealed class PacketDispatcher
             bool hasBagPowder = session.State.BagItems.Exists(i => i.Name.Contains("药粉") || i.Name.Contains("毒药"));
             if (!hasEqPowder && !hasBagPowder)
             {
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "缺少施毒药粉，施法失败！");
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你没有带毒药。");
                 return false;
             }
             return true;
@@ -5536,7 +6478,7 @@ public sealed class PacketDispatcher
                     session.State.WearWeight = Math.Max(0, session.State.WearWeight - eqAmulet.Weight);
                     session.State.RecalculateAttributes();
                     session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
-                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "护身符已耗尽！");
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "护身符的使用次数不足。");
                 }
                 return true;
             }
@@ -5554,12 +6496,12 @@ public sealed class PacketDispatcher
                     session.State.BagItems.Remove(bagAmulet);
                     session.State.BagWeight = Math.Max(0, session.State.BagWeight - bagAmulet.Weight);
                     session.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, session.State.BagWeight, session.State.WearWeight, session.State.HandWeight, 0);
-                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{bagAmulet.Name}已耗尽！");
+                    session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "护身符的使用次数不足。");
                 }
                 return true;
             }
 
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "缺少护身符，施法失败！");
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你没有带护身符。");
             return false;
         }
 
@@ -5624,6 +6566,48 @@ public sealed class PacketDispatcher
         }
     }
 
+    /// <summary>向会话下发当前位置视野内的 NPC(230)、存活怪物(220)与其他玩家(210)；进图与换图（传送门/回城/复活）后都必须调用。</summary>
+    private void SendNearbyEntities(ClientSession session, GameMap map)
+    {
+        if (NpcEngine != null)
+        {
+            foreach (var npc in NpcEngine.AllNpcs)
+            {
+                if (npc.MapId == session.CurrentMapId && Math.Abs(npc.X - session.X) <= 30 && Math.Abs(npc.Y - session.Y) <= 30)
+                {
+                    session.EnqueuePacket(230, npc.Uid, npc.X, npc.Y, 0, $"{npc.Name}\t{npc.X}\t{npc.Y}\t0\t{npc.Appr}");
+                }
+            }
+        }
+
+        // 9. 同步视野内的存活怪物 (SM_MONSPAWN 220)
+        if (RegenEngine != null)
+        {
+            foreach (var mon in RegenEngine.AllActiveMonsters)
+            {
+                if (mon.MapId == session.CurrentMapId && mon.Hp > 0 && Math.Abs(mon.X - session.X) <= 30 && Math.Abs(mon.Y - session.Y) <= 30)
+                {
+                    session.EnqueuePacket(220, mon.Uid, mon.X, mon.Y, mon.Direction, $"{mon.Name}\t{mon.X}\t{mon.Y}\t{mon.Direction}\t{mon.Appr}");
+                }
+            }
+        }
+
+        // 10. 同步视野内的其他在线玩家 (SM_USERSPAWN 210)
+        lock (_ninePatchBuffer)
+        {
+            map.Aoi.GetEntitiesInNinePatch(session.X, session.Y, _ninePatchBuffer);
+            for (int i = 0; i < _ninePatchBuffer.Count; i++)
+            {
+                var other = _ninePatchBuffer[i];
+                if (other.SessionId != session.SessionId && other.State != null)
+                {
+                    int dressAppr = other.State.Equipment[0]?.Shape ?? other.State.Sex;
+                    session.EnqueuePacket(210, other.SessionId, other.X, other.Y, other.Direction, $"{other.CharacterName}\t{other.X}\t{other.Y}\t{other.Direction}\t{dressAppr}");
+                }
+            }
+        }
+    }
+
     public void TriggerMapPassage(ClientSession session, MapPassage passage)
     {
         var oldMap = _mapManager.GetMap(session.CurrentMapId) ?? _mapManager.DefaultMap;
@@ -5655,13 +6639,17 @@ public sealed class PacketDispatcher
         session.Y = passage.ToY;
 
         // 3. 下发客户端地图切换与黑屏转场协议 (SM_NEWMAP_DELPHI 521)
-        session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, newMap.MapId, passage.ToX, passage.ToY, 0, newMap.Name);
+        session.EnqueuePacket(ProtocolConsts.SM_NEWMAP_DELPHI, newMap.MapId, passage.ToX, passage.ToY, 0, NewMapExtra(newMap));
         session.EnqueuePacket(ProtocolConsts.SM_SENDUSERSTATE, session.SessionId, passage.ToX, passage.ToY, session.Direction, session.CharacterName);
-        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"进入【{newMap.Name}】");
 
         // 4. 进入新地图 AOI 空间分区并广播登场
         newMap.Aoi.Enter(session, passage.ToX, passage.ToY);
         BroadcastToNinePatch(session, ProtocolConsts.SM_ENTITYAPPEAR, session.SessionId, passage.ToX, passage.ToY, session.Direction, session.CharacterName, includeSelf: false);
+
+        // 5. 新地图视野内的 NPC/怪物/玩家（此前缺失，导致换图后视野为空）；先同步激活该图刷怪
+        RegenEngine?.PopulateMapNow(newMap.MapId);
+        SendNearbyEntities(session, newMap);
+        session.Flush();
     }
 
     public static (int x, int y) GetFrontCoord(int x, int y, int dir)
@@ -5706,18 +6694,7 @@ public sealed class PacketDispatcher
                         if (monster.Hp <= 0)
                         {
                             RegenEngine.OnMonsterDied(monster.Uid);
-                            var hitMap = _mapManager.GetMap(monster.MapId) ?? _mapManager.DefaultMap;
-                            int killerSessionId = monster.PoisonerSessionId;
-                            hitMap.AddGroundItem(new GroundItemEntity
-                            {
-                                Uid = 50000 + monster.Uid % 10000,
-                                Name = $"{monster.Name}_战利品",
-                                X = monster.X,
-                                Y = monster.Y,
-                                OwnerSessionId = killerSessionId,
-                                DropTickMs = nowMs,
-                                Weight = 1
-                            });
+                            int killerSessionId = monster.PoisonerSessionId; // 掉落统一由 OnMonsterKilledByPlayer 按官方掉落表结算
                             if (killerSessionId != 0 && ActiveSessions.TryGetValue(killerSessionId, out var poisoner))
                             {
                                 OnMonsterKilledByPlayer(poisoner, monster);
@@ -5746,7 +6723,7 @@ public sealed class PacketDispatcher
                     if (masterSession != null)
                     {
                         masterSession.Pets.RemoveAll(p => p.Uid == monster.Uid);
-                        masterSession.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"【生灵叛变】你驯服的随从【{monster.Name}】服役时间过长野性复苏，叛变并开始攻击你！");
+                        masterSession.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"你的随从 {monster.Name} 叛变了。");
                     }
                 }
             }
@@ -5761,6 +6738,34 @@ public sealed class PacketDispatcher
                 if (hpGain > 0 || mpGain > 0)
                 {
                     s.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, s.State.Hp, s.State.Mp, s.State.MaxHp, s.State.MaxMp);
+                }
+
+                // 盛大官方 1.5 权威心跳自然生命与魔法回复 (IDA sub_4C7720 @ 0x4C7851 ~ 0x4C78EA)
+                // 周期为 3 秒 (3000ms)，未中绿毒且未满血按 MaxHp/75+1 回血，未满蓝按 MaxMp/18+1 回蓝
+                if (s.State.LastNaturalRegenMs == 0)
+                {
+                    s.State.LastNaturalRegenMs = nowMs;
+                }
+                else if (nowMs - s.State.LastNaturalRegenMs >= 3000)
+                {
+                    s.State.LastNaturalRegenMs = nowMs;
+                    bool naturalChanged = false;
+                    if (!s.State.HasGreenPoison && s.State.Hp < s.State.MaxHp)
+                    {
+                        int stepHp = Math.Max(1, (s.State.MaxHp / 75) + 1);
+                        s.State.Hp = Math.Min(s.State.MaxHp, s.State.Hp + stepHp);
+                        naturalChanged = true;
+                    }
+                    if (s.State.Mp < s.State.MaxMp)
+                    {
+                        int stepMp = Math.Max(1, (s.State.MaxMp / 18) + 1);
+                        s.State.Mp = Math.Min(s.State.MaxMp, s.State.Mp + stepMp);
+                        naturalChanged = true;
+                    }
+                    if (naturalChanged)
+                    {
+                        s.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, s.State.Hp, s.State.Mp, s.State.MaxHp, s.State.MaxMp);
+                    }
                 }
 
                 if (s.State.FireHitTracker.IsReady && nowMs - s.State.FireHitTracker.ReadyStartTime > WarriorCombatEngine.FireHitReadyDurationMs)
@@ -5846,24 +6851,8 @@ public sealed class PacketDispatcher
                 var (guard, target, dmg) = redExecutions[i];
                 if (target.State != null && target.State.Hp <= 0)
                 {
-                    BroadcastToNinePatch(target, ProtocolConsts.SM_DEATH_ACTION_DELPHI, target.SessionId, target.X, target.Y, 0, target.CharacterName, includeSelf: true);
-                    var dropped = MonsterDropEngine.ExecuteDeathDrop(target.State, OfficialClientRulesEngine.DelphiRandom.Shared);
                     var hitMap = _mapManager.GetMap(target.CurrentMapId) ?? _mapManager.DefaultMap;
-                    for (int d = 0; d < dropped.Count; d++)
-                    {
-                        var drop = dropped[d];
-                        hitMap.AddGroundItem(new GroundItemEntity
-                        {
-                            Uid = drop.ItemUid,
-                            Name = drop.ItemName,
-                            X = target.X,
-                            Y = target.Y,
-                            DropTickMs = nowMs,
-                            Weight = 1
-                        });
-                        BroadcastToNinePatch(target, ProtocolConsts.SM_GROUNDITEM, drop.ItemUid, target.X, target.Y, 0, drop.ItemName, includeSelf: true);
-                    }
-                    OnPlayerDied(target);
+                    AuthoritativeExecutePlayerDeath(target, null, hitMap, nowMs);
                 }
             }
         }
@@ -6011,28 +7000,52 @@ public sealed class PacketDispatcher
 
         if (SabukEngine != null && SabukEngine.Phase == SabukSiegeEngine.WarPhase.InWar)
         {
-            var palaceMap = _mapManager.GetMap(SabukSiegeEngine.SabukPalaceMapId);
-            var palacePlayers = new List<ClientSession>();
-            if (palaceMap != null)
+            // 1. 战役时间到期结算判定
+            if (nowMs >= SabukEngine.WarEndTimeMs)
             {
-                palaceMap.Aoi.GetAllEntities(palacePlayers);
-            }
-            var set = new HashSet<int>(palacePlayers.Select(p => p.SessionId));
-            foreach (var s in GetAllGlobalSessions())
-            {
-                if (s.CurrentMapId == SabukSiegeEngine.SabukPalaceMapId && set.Add(s.SessionId))
+                var (winnerGuild, changed) = SabukEngine.EndSiege();
+                string endMsg = changed
+                    ? $"[沙巴克攻城战] 攻城战结束，{winnerGuild} 占领了沙巴克。"
+                    : $"[沙巴克攻城战] 攻城战结束，{winnerGuild} 守住了沙巴克。";
+                foreach (var s in GetAllGlobalSessions())
                 {
-                    palacePlayers.Add(s);
+                    s.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, endMsg);
                 }
             }
-            var playerInfos = new List<(string characterName, string guildName, bool isAlive)>();
-            foreach (var p in palacePlayers)
+            else
             {
-                string gName = GuildEngine.GetPlayerGuild(p.CharacterName) ?? "";
-                bool isAlive = p.State != null && p.State.Hp > 0;
-                playerInfos.Add((p.CharacterName, gName, isAlive));
+                // 2. 皇宫占领判定
+                var palaceMap = _mapManager.GetMap(SabukSiegeEngine.SabukPalaceMapId);
+                var palacePlayers = new List<ClientSession>();
+                if (palaceMap != null)
+                {
+                    palaceMap.Aoi.GetAllEntities(palacePlayers);
+                }
+                var set = new HashSet<int>(palacePlayers.Select(p => p.SessionId));
+                foreach (var s in GetAllGlobalSessions())
+                {
+                    if (s.CurrentMapId == SabukSiegeEngine.SabukPalaceMapId && set.Add(s.SessionId))
+                    {
+                        palacePlayers.Add(s);
+                    }
+                }
+                var playerInfos = new List<(string characterName, string guildName, bool isAlive)>();
+                foreach (var p in palacePlayers)
+                {
+                    string gName = GuildEngine.GetPlayerGuild(p.CharacterName) ?? "";
+                    bool isAlive = p.State != null && p.State.Hp > 0;
+                    playerInfos.Add((p.CharacterName, gName, isAlive));
+                }
+                var (occupied, newOccupier) = SabukEngine.CheckPalaceOccupation(playerInfos);
+                if (occupied)
+                {
+                    string palaceMsg = $"[沙巴克攻城战] 皇宫已被 {newOccupier} 占领。";
+                    foreach (var s in GetAllGlobalSessions())
+                    {
+                        s.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, palaceMsg);
+                    }
+                }
             }
-            SabukEngine.CheckPalaceOccupation(playerInfos);
         }
     }
 
@@ -6085,8 +7098,8 @@ public sealed class PacketDispatcher
         session.State.BreakSpellInvisibility();
         if (reason.Contains("攻击"))
         {
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【显形破隐】你因发动物理攻击打破了隐身匿踪！");
-            BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 18, "显形破隐", includeSelf: true);
+            session.EnqueuePacket(ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 18, "显形破隐");
+            BroadcastToNinePatch(session, ProtocolConsts.SM_SPELLEFFECT_DELPHI, session.SessionId, session.X, session.Y, 18, "显形破隐", includeSelf: false);
         }
     }
 
@@ -6121,7 +7134,7 @@ public sealed class PacketDispatcher
                 {
                     player.State.Equipment[(int)slot] = null;
                     player.EnqueuePacket(ProtocolConsts.SM_TAKEOFF_OK, (int)slot, 0, 0, 0);
-                    player.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【神之祈祷】承受不住神力冲击，化为飞灰！");
+                    player.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "祈祷装备破碎了。");
                     break;
                 }
             }
@@ -6153,7 +7166,7 @@ public sealed class PacketDispatcher
             monster.TrappedExpireMs = 0;
             monster.NextActionTimeMs = nowMs;
             monster.TargetSessionId = attacker.SessionId;
-            attacker.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【困魔咒】怪物受到攻击，金光禁锢消散！");
+            attacker.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "困魔咒破除了。");
         }
 
         if (monster.IsRevealed && monster.RevealedBySessionId != 0)
@@ -6168,7 +7181,7 @@ public sealed class PacketDispatcher
         if (monster.Name.Contains("祖玛教主") && !monster.IsMad && monster.Hp > 0 && monster.Hp <= monster.MaxHp * 0.2f)
         {
             monster.IsMad = true;
-            attacker.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【狂暴咆哮】祖玛教主残血暴怒咆哮，召唤亲卫誓死护驾！");
+            attacker.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "祖玛教主发怒了！");
             if (RegenEngine != null)
             {
                 RegenEngine.SpawnMonsterDirect(monster.MapId, monster.X + 1, monster.Y + 1, "祖玛卫士", 800, 30, 60);
@@ -6193,7 +7206,8 @@ public sealed class PacketDispatcher
             if (helmet != null && helmet.Name.Contains("祈祷头盔"))
             {
                 session.State.Equipment[(int)OfficialEquipSlot.Helmet] = null;
-                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【祈祷头盔】在死亡冲击中化为了一缕青烟，碎裂消散！");
+                session.EnqueuePacket(ProtocolConsts.SM_TAKEOFF_OK, session.SessionId, (int)OfficialEquipSlot.Helmet, 0, 0);
+                session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "祈祷头盔破碎了。");
             }
         }
 
@@ -6232,7 +7246,7 @@ public sealed class PacketDispatcher
         string targetGuild = payload.ToString().Trim();
         string myGuild = GuildEngine.GetPlayerGuild(session.CharacterName) ?? "战神殿";
         GuildWarEngine.AddAlliance(myGuild, targetGuild);
-        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"行会【{myGuild}】与【{targetGuild}】已缔结同盟！");
+        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{myGuild} 与 {targetGuild} 结盟。");
     }
 
     private void HandleGuildBreakAlly(ClientSession session, ReadOnlySpan<char> payload)
@@ -6240,7 +7254,7 @@ public sealed class PacketDispatcher
         string targetGuild = payload.ToString().Trim();
         string myGuild = GuildEngine.GetPlayerGuild(session.CharacterName) ?? "战神殿";
         GuildWarEngine.RemoveAlliance(myGuild, targetGuild);
-        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"行会【{myGuild}】解除了与【{targetGuild}】的同盟关系！");
+        session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"{myGuild} 与 {targetGuild} 解除结盟。");
     }
 
     public void HandleMonsterDeathAndLoot(ClientSession killer, MonsterInstance monster, GameMap map, long nowMs)
@@ -6262,7 +7276,7 @@ public sealed class PacketDispatcher
             {
                 if (HuWeiPetEngine.AddKillExpAndTryLevelUp(pet, eachPetExp))
                 {
-                    player.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"你的随从【{pet.Name}】已晋升至 {pet.Level} 级（{pet.NameColor}）！");
+                    player.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"你的随从 {pet.Name} 已晋升至 {pet.Level} 级（{pet.NameColor}）");
                 }
             }
         }
@@ -6279,36 +7293,120 @@ public sealed class PacketDispatcher
         }
     }
 
-    public void ProcessPlayerDeath(ClientSession defender, ClientSession killer, GameMap map, long nowMs)
+    /// <summary>
+    /// 盛大官方 1.5 玩家死亡统一权威结算 (涵盖：行会战/攻城免惩罚判定、PK值累计、武器诅咒加深、随从解散、祈祷装备碎裂、爆装与爆背包、25格同心圆散射、SM_TAKEOFF_OK/SM_DELITEM/SM_WEIGHTCHANGED 客户端双向同步)
+    /// 严格对齐官方 M2Server 原版物理反编译: TUserEngine.UserDie @ 0x4A0218, TCreature.ScatterBagItems @ 0x4BB44C, TCreature.DropUseItems @ 0x4BB6C8
+    /// </summary>
+    public void AuthoritativeExecutePlayerDeath(ClientSession defender, ClientSession? killer, GameMap map, long nowMs)
     {
         if (defender.State == null) return;
 
-        if (defender.State.BagItems.Count > 0)
-        {
-            var droppedItem = defender.State.BagItems[0];
-            defender.State.BagItems.RemoveAt(0);
-            defender.State.BagWeight = Math.Max(0, defender.State.BagWeight - droppedItem.Weight);
-            defender.EnqueuePacket(ProtocolConsts.SM_DELITEM, droppedItem.Uid, 0, 0, 0, droppedItem.Name);
-            defender.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, defender.State.BagWeight, defender.State.WearWeight, defender.State.HandWeight, 0);
+        // 1. 确保血量归零并触发官方随从解散与祈祷头盔碎裂 (IDA 0x4BB710)
+        defender.State.Hp = 0;
+        OnPlayerDied(defender);
 
-            map.AddGroundItem(new GroundItemEntity
+        // 2. 杀手 PK 惩罚与武器诅咒结算 (官方 M2 0x4C1EF4 / 0x4B012C)
+        if (killer != null && killer != defender && killer.State != null)
+        {
+            bool isFreePk = false;
+            if (SabukEngine != null && GuildEngine != null && !string.IsNullOrEmpty(killer.CharacterName) && !string.IsNullOrEmpty(defender.CharacterName))
             {
-                Uid = System.Threading.Interlocked.Increment(ref _nextGroundItemUid),
-                Name = droppedItem.Name,
-                X = defender.X,
-                Y = defender.Y,
-                DropTickMs = nowMs,
-                Weight = droppedItem.Weight
-            });
-            BroadcastToNinePatch(defender, ProtocolConsts.SM_ITEMSHOW, _nextGroundItemUid, defender.X, defender.Y, 0, droppedItem.Name, includeSelf: true);
+                isFreePk = SabukEngine.IsFreePkBattle(
+                    defender.CurrentMapId,
+                    GuildEngine.GetPlayerGuild(killer.CharacterName),
+                    GuildEngine.GetPlayerGuild(defender.CharacterName));
+            }
+
+            if (!isFreePk)
+            {
+                bool wasWhiteName = defender.State.PkPoints == 0 && !defender.State.IsFlashingName;
+                if (wasWhiteName)
+                {
+                    killer.State.AddPkMurder();
+                    uint mask = killer.State.GetCurrentStatusMask(nowMs);
+                    killer.EnqueuePacket(ProtocolConsts.SM_CHANGENAMECOLOR, killer.SessionId, (int)mask, 0, 0);
+                    BroadcastToNinePatch(killer, ProtocolConsts.SM_CHANGENAMECOLOR, killer.SessionId, (int)mask, 0, 0, killer.CharacterName, includeSelf: false);
+
+                    // 恶意击杀白名加深武器诅咒 (IDA 0x4C1EF4)
+                    bool cursed = ItemLifecycleEngine.CheckWeaponCurseOnMurder(killer.State, Random.Shared);
+                    if (cursed)
+                    {
+                        killer.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "你的武器被诅咒了。");
+                    }
+                }
+            }
         }
 
+        // 3. 广播死亡倒地动作: SM_DEATH_ACTION_DELPHI (28)
         BroadcastToNinePatch(defender, ProtocolConsts.SM_DEATH_ACTION_DELPHI, defender.SessionId, defender.X, defender.Y, 0, defender.CharacterName, includeSelf: true);
 
-        if (killer != null)
+        // 4. 官方死亡爆装与爆背包结算 (IDA 0x4BB44C / 0x4BB6C8)
+        var dropped = MonsterDropEngine.ExecuteDeathDrop(defender.State, OfficialClientRulesEngine.DelphiRandom.Shared);
+
+        ReadOnlySpan<(int dx, int dy)> scatterOffsets = stackalloc (int, int)[]
         {
-            ProcessPlayerDeathAndMurderSettlement(killer, defender, map, nowMs);
+            (0, 0),
+            (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1),
+            (0, -2), (1, -2), (2, -2), (2, -1), (2, 0), (2, 1), (2, 2), (1, 2),
+            (0, 2), (-1, 2), (-2, 2), (-2, 1), (-2, 0), (-2, -1), (-2, -2), (-1, -2)
+        };
+        int scatterIdx = 0;
+
+        for (int d = 0; d < dropped.Count; d++)
+        {
+            var drop = dropped[d];
+            int dropX = defender.X;
+            int dropY = defender.Y;
+
+            while (scatterIdx < scatterOffsets.Length)
+            {
+                var (ox, oy) = scatterOffsets[scatterIdx++];
+                int testX = defender.X + ox;
+                int testY = defender.Y + oy;
+                if (map.IsWalkable(testX, testY))
+                {
+                    dropX = testX;
+                    dropY = testY;
+                    break;
+                }
+            }
+
+            // 同步死者客户端移除
+            if (drop.FromEquipment)
+            {
+                // 身上装备爆掉: 下发 SM_TAKEOFF_OK (619)
+                defender.EnqueuePacket(ProtocolConsts.SM_TAKEOFF_OK, defender.SessionId, drop.OriginSlot, 0, 0);
+            }
+            else
+            {
+                // 背包物品爆掉: 下发 SM_DELITEM (202)
+                defender.EnqueuePacket(ProtocolConsts.SM_DELITEM, drop.ItemUid, drop.OriginSlot, 0, 0, drop.ItemName);
+            }
+
+            // 生成地表实体，杀手享有 80 秒拾取保护权
+            int groundUid = System.Threading.Interlocked.Increment(ref _nextGroundItemUid);
+            map.AddGroundItem(new GroundItemEntity
+            {
+                Uid = groundUid,
+                Name = drop.ItemName,
+                X = dropX,
+                Y = dropY,
+                OwnerSessionId = killer?.SessionId ?? 0,
+                DropTickMs = nowMs,
+                Weight = 1
+            });
+            BroadcastToNinePatch(defender, ProtocolConsts.SM_GROUNDITEM, groundUid, dropX, dropY, 0, drop.ItemName, includeSelf: true);
         }
+
+        // 5. 同步死者负重与自身状态
+        defender.State.RecalculateAuthoritativeWeights(defender.State.Gold);
+        defender.EnqueuePacket(ProtocolConsts.SM_WEIGHTCHANGED, defender.State.BagWeight, defender.State.WearWeight, defender.State.HandWeight, 0);
+        defender.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, defender.State.Hp, defender.State.MaxHp, defender.State.Mp, defender.State.MaxMp);
+    }
+
+    public void ProcessPlayerDeath(ClientSession defender, ClientSession killer, GameMap map, long nowMs)
+    {
+        AuthoritativeExecutePlayerDeath(defender, killer, map, nowMs);
     }
 
     public void SyncRevivalRingStateToClient(ClientSession session)

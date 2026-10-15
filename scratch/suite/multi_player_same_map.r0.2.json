@@ -1,0 +1,122 @@
+{
+  "kills": 3,
+  "seconds": 15.762976,
+  "rollbacks": 1,
+  "level": 10,
+  "hp": 89,
+  "maxHp": 89,
+  "dead": false,
+  "finalMap": "1",
+  "x": 496,
+  "y": 465,
+  "gold": 0,
+  "exp": 0,
+  "maxExp": 6000,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "level 10 => GM: 等级=10 HP=89/89",
+    "tp 1 497 465 => GM: 已传送到 1(497,465)",
+    "spawn 钉耙猫 8 => GM: 刷出 钉耙猫 x8"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4501447,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 10,
+      "AtSec": 6.2360037,
+      "Kills": 0,
+      "MaxExp": 6000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [
+    {
+      "who": "钉耙猫",
+      "hits": 12,
+      "dmg": 134
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [],
+  "magicUpdates": [],
+  "spellsCast": 0,
+  "spellEffects": 9,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 0,
+  "groupLists": [],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 等级=10 HP=89/89",
+    "GM: 已传送到 1(497,465)",
+    "GM: 刷出 钉耙猫 x8",
+    "物品受保护中，无法拾取"
+  ],
+  "characterName": "机器人4791",
+  "fights": [
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 1,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        19,
+        15
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 1,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        22,
+        22
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 1,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        11,
+        15
+      ],
+      "drops": [
+        "金币"
+      ]
+    }
+  ]
+}

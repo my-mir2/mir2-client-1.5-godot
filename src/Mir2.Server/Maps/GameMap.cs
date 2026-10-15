@@ -19,6 +19,39 @@ public sealed class GameMap
 
     public NinePatchAoi<ClientSession> Aoi { get; }
 
+    /// <summary>官方地图号 (如 0 / 0100 / D001)，客户端据此拼 .map 文件名；内置夹具地图为空。</summary>
+    public string OfficialId { get; set; } = string.Empty;
+
+    // MapInfo.txt 地图标记 (M2 反编译 0x48751c~0x487620 的标记串)
+    public bool IsSafe { get; private set; }
+    public bool IsFight { get; private set; }
+    public bool IsDark { get; private set; }
+    public bool IsMine { get; private set; }
+    public bool NoRecall { get; private set; }
+    public bool NoRandomMove { get; private set; }
+    public bool NoPositionMove { get; private set; }
+
+    /// <summary>解析 MapInfo 行尾标记串 (空格分隔，如 "DARK FIGHT NORECALL NORECONNECT(B011)")。</summary>
+    public void ApplyOfficialFlags(string flags)
+    {
+        foreach (var raw in (flags ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string t = raw.ToUpperInvariant();
+            int paren = t.IndexOf('(');
+            if (paren > 0) t = t[..paren];
+            switch (t)
+            {
+                case "SAFE": IsSafe = true; break;
+                case "FIGHT": case "FIGHT3": IsFight = true; break;
+                case "DARK": IsDark = true; break;
+                case "MINE": IsMine = true; break;
+                case "NORECALL": NoRecall = true; break;
+                case "NORANDOMMOVE": NoRandomMove = true; break;
+                case "NOPOSITIONMOVE": NoPositionMove = true; break;
+            }
+        }
+    }
+
     // 采用紧凑 BitArray 存储阻挡，0=阻挡不可通行，1=可通行
     // 400x400 地图仅占用 20KB 内存，4000x4000 超大地图仅 2MB，单次阻挡检测耗时 < 3ns
     private readonly BitArray _walkableGrid;
@@ -128,6 +161,31 @@ public sealed class GameMap
     }
 
     /// <summary>
+    /// 由数据库 official_map.cells (不含 52 字节头) 装载物理碰撞网格。
+    /// 单元格 12 字节、列优先；FloorRaw/ObjRaw 的 0x8000 位为 1 表示不可通行。
+    /// </summary>
+    public bool LoadFromCells(byte[] cells, int fileWidth, int fileHeight)
+    {
+        if (cells == null || fileWidth <= 0 || fileHeight <= 0) return false;
+        if (cells.Length < fileWidth * fileHeight * 12) return false;
+
+        int checkWidth = Math.Min(Width, fileWidth);
+        int checkHeight = Math.Min(Height, fileHeight);
+        for (int x = 0; x < checkWidth; x++)
+        {
+            for (int y = 0; y < checkHeight; y++)
+            {
+                int offset = (x * fileHeight + y) * 12;
+                short floorRaw = (short)(cells[offset] | (cells[offset + 1] << 8));
+                short objRaw = (short)(cells[offset + 4] | (cells[offset + 5] << 8));
+                bool isBlocked = ((floorRaw & unchecked((short)0x8000)) != 0) || ((objRaw & unchecked((short)0x8000)) != 0);
+                SetWalkable(x, y, !isBlocked);
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
     /// 盛大官方 1.5 原始 .map 二进制文件物理碰撞网格加载器
     /// 文件结构: 52 字节 Header + W*H*12 字节列优先单元格
     /// FloorRaw & 0x8000 != 0 表示该瓦片为不可通行物理阻挡 (山体、建筑、墙体、河流)
@@ -164,7 +222,8 @@ public sealed class GameMap
                 {
                     int offset = (x * fileHeight + y) * 12;
                     short floorRaw = (short)(cellBuffer[offset] | (cellBuffer[offset + 1] << 8));
-                    bool isBlocked = (floorRaw & unchecked((short)0x8000)) != 0;
+                    short objRaw = (short)(cellBuffer[offset + 4] | (cellBuffer[offset + 5] << 8));
+                    bool isBlocked = ((floorRaw & unchecked((short)0x8000)) != 0) || ((objRaw & unchecked((short)0x8000)) != 0);
                     SetWalkable(x, y, !isBlocked);
                 }
             }

@@ -61,7 +61,7 @@ public static class PoisonCraftingEngine
             };
             player.BagItems.Add(grayPowder);
 
-            return (true, grayPowder, "毒汁在药臼中泛起诡异的暗灰泡沫，成功调制出一包【灰色药粉(中)】(持久 50 点)！");
+            return (true, grayPowder, "成功制作了一包灰色药粉(中)。");
         }
         else
         {
@@ -72,7 +72,7 @@ public static class PoisonCraftingEngine
 
             if (leafCount < 4 || tailCount < 1 || eggCount < 4)
             {
-                return (false, null, $"制作黄色药粉材料不足！需要: 食人树叶(4)当前{leafCount}, 蝎子尾巴(1)当前{tailCount}, 蛆卵(4)当前{eggCount}！");
+                return (false, null, "材料不足，无法制作黄色药粉。");
             }
 
             RemoveItems(player.BagItems, "食人树叶", 4);
@@ -88,7 +88,7 @@ public static class PoisonCraftingEngine
             };
             player.BagItems.Add(yellowPowder);
 
-            return (true, yellowPowder, "黄雾升腾，刺鼻的硫磺味四溢，成功调制出一包【黄色药粉(中)】(持久 50 点)！");
+            return (true, yellowPowder, "成功制作了一包黄色药粉(中)。");
         }
     }
 

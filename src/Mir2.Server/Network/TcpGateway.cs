@@ -157,7 +157,7 @@ public sealed class TcpGateway
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[TcpGateway] 会话 #{session.SessionId} 接收异常: {ex.Message}");
+            Console.WriteLine($"[TcpGateway] 会话 #{session.SessionId} 接收异常: {ex}");
         }
         finally
         {

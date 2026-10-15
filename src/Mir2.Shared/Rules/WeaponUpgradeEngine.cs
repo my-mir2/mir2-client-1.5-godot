@@ -233,37 +233,40 @@ public static class WeaponUpgradeEngine
             return new TrialResult(TrialSlashOutcome.None, StatUpgradeType.Dc, 0, "该武器无需试刀。");
         }
 
-        // 升级次数累积达到 25 次或结果码为 1 必碎
-        if (currentTotalUpgrades >= 25 || pendingCode == 1)
+        // 盛大官方 1.5 权威规则: 单把武器升级上限为 7 点，达到上限或结果码为 1 碎刀
+        if (currentTotalUpgrades >= 7 || pendingCode == 1)
         {
             weapon.UpgradeState = 0;
-            return new TrialResult(TrialSlashOutcome.Broken, StatUpgradeType.Dc, 0, "刀身崩裂！你的武器已经碎了！");
+            return new TrialResult(TrialSlashOutcome.Broken, StatUpgradeType.Dc, 0, "你的武器碎了。");
         }
 
         if (pendingCode is >= 10 and <= 12)
         {
             int bonus = pendingCode - 9;
-            weapon.Dc = (short)(weapon.Dc + bonus);
+            weapon.MaxDc = (short)(weapon.MaxDc + bonus);
+            weapon.UpgradeCount++;
             weapon.UpgradeState = 0;
-            return new TrialResult(TrialSlashOutcome.Success, StatUpgradeType.Dc, bonus, $"刀光闪烁！攻击力永久提升 {bonus} 点！武器升级成功！");
+            return new TrialResult(TrialSlashOutcome.Success, StatUpgradeType.Dc, bonus, "你的武器升级成功了。");
         }
         if (pendingCode is >= 20 and <= 22)
         {
             int bonus = pendingCode - 19;
-            weapon.Mc = (short)(weapon.Mc + bonus);
+            weapon.MaxMc = (short)(weapon.MaxMc + bonus);
+            weapon.UpgradeCount++;
             weapon.UpgradeState = 0;
-            return new TrialResult(TrialSlashOutcome.Success, StatUpgradeType.Mc, bonus, $"法力涌动！魔法力永久提升 {bonus} 点！武器升级成功！");
+            return new TrialResult(TrialSlashOutcome.Success, StatUpgradeType.Mc, bonus, "你的武器升级成功了。");
         }
         if (pendingCode is >= 30 and <= 32)
         {
             int bonus = pendingCode - 29;
-            weapon.Sc = (short)(weapon.Sc + bonus);
+            weapon.MaxSc = (short)(weapon.MaxSc + bonus);
+            weapon.UpgradeCount++;
             weapon.UpgradeState = 0;
-            return new TrialResult(TrialSlashOutcome.Success, StatUpgradeType.Sc, bonus, $"道韵环绕！道术力永久提升 {bonus} 点！武器升级成功！");
+            return new TrialResult(TrialSlashOutcome.Success, StatUpgradeType.Sc, bonus, "你的武器升级成功了。");
         }
 
         weapon.UpgradeState = 0;
-        return new TrialResult(TrialSlashOutcome.None, StatUpgradeType.Dc, 0, "试刀完毕，刀身平静。");
+        return new TrialResult(TrialSlashOutcome.None, StatUpgradeType.Dc, 0, "试刀完毕。");
     }
 
     public enum UpgradeOutcome
@@ -298,11 +301,11 @@ public static class WeaponUpgradeEngine
         if (roll < successRate)
         {
             int nextBonus = currentBonus + 1;
-            return (UpgradeOutcome.Success, nextBonus, duraDelta, $"【开刀成功】神兵光芒大盛！武器属性 +1！(当前强化: +{nextBonus})");
+            return (UpgradeOutcome.Success, nextBonus, duraDelta, "你的武器升级成功了。");
         }
         else
         {
-            return (UpgradeOutcome.Failed, 0, duraDelta, "【开刀失败】刀身发出一声悲鸣，武器化为碎片碎裂消失！");
+            return (UpgradeOutcome.Failed, 0, duraDelta, "你的武器碎了。");
         }
     }
 }

@@ -1,0 +1,134 @@
+{
+  "kills": 3,
+  "seconds": 17.3442493,
+  "rollbacks": 1,
+  "level": 25,
+  "hp": 90,
+  "maxHp": 101,
+  "dead": false,
+  "finalMap": "1",
+  "x": 498,
+  "y": 468,
+  "gold": 50,
+  "exp": 54,
+  "maxExp": 500000,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "job 1 => GM: 职业=1 HP=16/16 MP=11/18",
+    "level 25 => GM: 等级=25 HP=101/101",
+    "skill 雷电术 3 => GM: 已习得技能 雷电术(ID=10) Lv=3",
+    "tp 1 497 465 => GM: 已传送到 1(497,465)",
+    "spawn 钉耙猫 6 => GM: 刷出 钉耙猫 x6"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4353252,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 25,
+      "AtSec": 7.0431559,
+      "Kills": 0,
+      "MaxExp": 500000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [
+    {
+      "who": "钉耙猫",
+      "hits": 3,
+      "dmg": 169
+    },
+    {
+      "who": "食人花",
+      "hits": 2,
+      "dmg": 15
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [
+    {
+      "id": 10,
+      "name": "雷电术",
+      "level": 3,
+      "key": 255
+    }
+  ],
+  "magicUpdates": [],
+  "spellsCast": 3,
+  "spellEffects": 0,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 0,
+  "groupLists": [],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 职业=1 HP=16/16 MP=11/18",
+    "GM: 等级=25 HP=101/101",
+    "GM: 已习得技能 雷电术(ID=10) Lv=3",
+    "GM: 已传送到 1(497,465)",
+    "GM: 刷出 钉耙猫 x6"
+  ],
+  "characterName": "机器人7983",
+  "fights": [
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 0,
+      "Spells": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        62
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 0,
+      "Spells": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        50
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 0,
+      "Spells": 1,
+      "Misses": 0,
+      "DamageTaken": 9,
+      "Hits": [
+        57
+      ],
+      "drops": [
+        "金币"
+      ]
+    }
+  ]
+}

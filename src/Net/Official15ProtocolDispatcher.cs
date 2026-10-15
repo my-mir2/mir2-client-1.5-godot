@@ -5,6 +5,7 @@ using Godot;
 using Mir2Client.Game;
 using Mir2Client.Render;
 using Mir2Client.UI;
+using Mir2Client.Utils;
 
 namespace Mir2Client.Net;
 
@@ -37,6 +38,11 @@ public sealed class Official15ProtocolDispatcher
         _gameView = gv;
         _entityManager = em;
         _groundItemManager = gm;
+    }
+
+    public void RegisterHandler(short smId, ProtocolHandler handler)
+    {
+        _handlers[smId] = handler;
     }
 
     private void Register(short smId, ProtocolHandler handler)
@@ -88,37 +94,27 @@ public sealed class Official15ProtocolDispatcher
 
         Register(100, (id, rec, p, t, s, b) =>
         {
-            // SM_SYSMSG_DELPHI 系统私聊普通消息
-            string text = DecodeString(b);
-            if (!string.IsNullOrEmpty(text)) _hud?.AddChat("系统", text, new Color(0.8f, 0.8f, 0.8f));
+            // SM_SYSMSG_DELPHI 系统消息统一由 ServerMessageRouter.HandleSysMsgDelphi 专职路由解析
         });
 
         Register(101, (id, rec, p, t, s, b) =>
         {
-            // SM_WHISPER 密语提示 (金黄字体)
-            string text = DecodeString(b);
-            _hud?.AddChat("密语", text, new Color(1f, 0.9f, 0.3f));
+            // SM_WHISPER 密语提示由 HandleSysMsgDelphi 处理
         });
 
         Register(102, (id, rec, p, t, s, b) =>
         {
-            // SM_CRY 喇叭全服喊话
-            string text = DecodeString(b);
-            _hud?.AddChat("喊话", text, new Color(1f, 0.8f, 0.4f));
+            // SM_CRY 喊话由 HandleSysMsgDelphi 处理
         });
 
         Register(103, (id, rec, p, t, s, b) =>
         {
-            // SM_GROUPMESSAGE 组队频道消息
-            string text = DecodeString(b);
-            _hud?.AddChat("组队", text, new Color(0.4f, 1f, 0.4f));
+            // SM_GROUPMESSAGE 组队由 HandleSysMsgDelphi 处理
         });
 
         Register(104, (id, rec, p, t, s, b) =>
         {
-            // SM_GUILDMESSAGE 行会频道消息
-            string text = DecodeString(b);
-            _hud?.AddChat("行会", text, new Color(0.4f, 0.8f, 1f));
+            // SM_GUILDMESSAGE 行会由 HandleSysMsgDelphi 处理
         });
 
         // ============================================================================
@@ -157,7 +153,6 @@ public sealed class Official15ProtocolDispatcher
         Register(20, (id, rec, p, t, s, b) =>
         {
             // SM_STARTPLAY 进入游戏大世界场景
-            _hud?.AddChat("系统", "欢迎来到热血传奇！", new Color(0.4f, 1f, 0.4f));
         });
 
         Register(21, (id, rec, p, t, s, b) =>
@@ -218,15 +213,30 @@ public sealed class Official15ProtocolDispatcher
         Register(210, (id, rec, p, t, s, b) =>
         {
             // SM_USERSPAWN 玩家进入视野
-            string name = DecodeString(b);
+            string raw = DecodeString(b);
+            string name = raw;
+            int x = p, y = t;
+            byte dir = (byte)(s & 7);
+            int dressAppr = 0;
+            if (!string.IsNullOrEmpty(raw))
+            {
+                var parts = raw.Split(new[] { '\t', '/', '|' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0) name = parts[0];
+                if (parts.Length > 1 && int.TryParse(parts[1], out var px)) x = px;
+                if (parts.Length > 2 && int.TryParse(parts[2], out var py)) y = py;
+                if (parts.Length > 3 && byte.TryParse(parts[3], out var pd)) dir = (byte)(pd & 7);
+                if (parts.Length > 4 && int.TryParse(parts[4], out var pa)) dressAppr = pa;
+            }
+
             _entityManager?.AddEntity(new EntityManager.EntityData
             {
                 Uid = rec,
                 Name = string.IsNullOrEmpty(name) ? $"玩家_{rec}" : name,
                 Type = EntityManager.EntityType.Player,
-                TileX = p,
-                TileY = t,
-                Direction = (byte)(s & 7)
+                TileX = x,
+                TileY = y,
+                Direction = dir,
+                Appr = dressAppr
             });
         });
 
@@ -238,16 +248,41 @@ public sealed class Official15ProtocolDispatcher
 
         Register(220, (id, rec, p, t, s, b) =>
         {
-            // SM_MONSPAWN 怪物刷新进场
-            string name = DecodeString(b);
+            // SM_MONSPAWN 怪物刷新进场 (支持 \t, /, | 分隔符)
+            string raw = DecodeString(b);
+            string name = raw;
+            int x = p, y = t;
+            byte dir = (byte)(s & 7);
+            int appr = 0;
+            bool hasAppr = false;
+            if (!string.IsNullOrEmpty(raw))
+            {
+                var parts = raw.Split(new[] { '\t', '/', '|' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0) name = parts[0];
+                if (parts.Length > 1 && int.TryParse(parts[1], out var px)) x = px;
+                if (parts.Length > 2 && int.TryParse(parts[2], out var py)) y = py;
+                if (parts.Length > 3 && byte.TryParse(parts[3], out var pd)) dir = (byte)(pd & 7);
+                if (parts.Length > 4 && int.TryParse(parts[4], out var pa))
+                {
+                    appr = pa;
+                    hasAppr = true;
+                }
+            }
+
+            if (!hasAppr)
+            {
+                appr = Mir2.Shared.Data.OfficialMonsterDBRegistry.ResolveAppr(name, 25);
+            }
+
             _entityManager?.AddEntity(new EntityManager.EntityData
             {
                 Uid = rec,
                 Name = string.IsNullOrEmpty(name) ? $"怪物_{rec}" : name,
                 Type = EntityManager.EntityType.Monster,
-                TileX = p,
-                TileY = t,
-                Direction = (byte)(s & 7)
+                TileX = x,
+                TileY = y,
+                Direction = dir,
+                Appr = appr
             });
         });
 
@@ -266,15 +301,30 @@ public sealed class Official15ProtocolDispatcher
         Register(230, (id, rec, p, t, s, b) =>
         {
             // SM_NPCSPAWN NPC 进场
-            string name = DecodeString(b);
+            string raw = DecodeString(b);
+            string name = raw;
+            int x = p, y = t;
+            byte dir = (byte)(s & 7);
+            int appr = 0;
+            if (!string.IsNullOrEmpty(raw))
+            {
+                var parts = raw.Split(new[] { '\t', '/', '|' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0) name = parts[0];
+                if (parts.Length > 1 && int.TryParse(parts[1], out var px)) x = px;
+                if (parts.Length > 2 && int.TryParse(parts[2], out var py)) y = py;
+                if (parts.Length > 3 && byte.TryParse(parts[3], out var pd)) dir = (byte)(pd & 7);
+                if (parts.Length > 4 && int.TryParse(parts[4], out var pa)) appr = pa;
+            }
+
             _entityManager?.AddEntity(new EntityManager.EntityData
             {
                 Uid = rec,
                 Name = string.IsNullOrEmpty(name) ? $"NPC_{rec}" : name,
                 Type = EntityManager.EntityType.Npc,
-                TileX = p,
-                TileY = t,
-                Direction = (byte)(s & 7)
+                TileX = x,
+                TileY = y,
+                Direction = dir,
+                Appr = appr
             });
         });
 
@@ -291,8 +341,7 @@ public sealed class Official15ProtocolDispatcher
 
         Register(244, (id, rec, p, t, s, b) =>
         {
-            // SM_OBJECTSTRUCK 实体受击后仰动画
-            _entityManager?.TriggerStruck(rec, p, t);
+            // SM_OBJECTSTRUCK 实体受击后仰动画 (由 ServerMessageRouter.HandleSpellResult 统一结算真实伤害与生命值)
         });
 
         // ============================================================================
@@ -369,20 +418,51 @@ public sealed class Official15ProtocolDispatcher
         Register(53, (id, rec, p, t, s, b) =>
         {
             // 盛大官方 1.5 铁律: SM_HEALTHSPELLCHANGED (53)
-            // 协议参数映射: rec=HP, p=MP, t=MaxHp, s=MaxMp
-            int hp = rec;
-            int mp = p;
+            // rec=UID 或 HP, p=HP 或 MP, t=MaxHP, s=MaxMP; 若附带字符串 Extra 则为 "HP/MaxHP/MP/MaxMP"
+            int hp = p;
             int maxHp = t > 0 ? t : Math.Max(hp, 1);
-            int maxMp = s > 0 ? s : Math.Max(mp, 1);
+            int mp = 0;
+            int maxMp = 0;
+
+            string extra = DecodeString(b);
+            if (!string.IsNullOrEmpty(extra))
+            {
+                var parts = extra.Split(new[] { '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2 && int.TryParse(parts[0], out var eHp) && int.TryParse(parts[1], out var eMaxHp))
+                {
+                    hp = eHp;
+                    maxHp = eMaxHp;
+                    if (parts.Length >= 4 && int.TryParse(parts[2], out var eMp) && int.TryParse(parts[3], out var eMaxMp))
+                    {
+                        mp = eMp;
+                        maxMp = eMaxMp;
+                    }
+                }
+            }
+            else if (rec > 0 && t > 0 && p >= 0)
+            {
+                // 服务端直接以四参数 EnqueuePacket(53, Hp, Mp, MaxHp, MaxMp) 下发
+                hp = rec;
+                mp = p;
+                maxHp = t;
+                maxMp = s > 0 ? s : Math.Max(mp, 1);
+            }
+
             if (_gameView?.PlayerInstance != null)
             {
                 _gameView.PlayerInstance.Hp = hp;
                 _gameView.PlayerInstance.MaxHp = maxHp;
-                _gameView.PlayerInstance.Mp = mp;
-                _gameView.PlayerInstance.MaxMp = maxMp;
+                if (maxMp > 0)
+                {
+                    _gameView.PlayerInstance.Mp = mp;
+                    _gameView.PlayerInstance.MaxMp = maxMp;
+                }
             }
             _hud?.UpdateHp(hp, maxHp);
-            _hud?.UpdateMp(mp, maxMp);
+            if (maxMp > 0)
+            {
+                _hud?.UpdateMp(mp, maxMp);
+            }
         });
 
         Register(622, (id, rec, p, t, s, b) =>
@@ -396,10 +476,12 @@ public sealed class Official15ProtocolDispatcher
         // ============================================================================
         Register(200, (id, rec, p, t, s, b) =>
         {
-            // SM_ADDITEM 背包添加物品
-            int slot = rec;
+            // SM_ADDITEM 背包添加物品 (盛大官方 1.5 权威字段: rec=物品Uid, p=背包槽位, t=重量, b=Extra)
+            int slot = p >= 0 && p < 40 ? p : (rec >= 0 && rec < 40 ? rec : (_hud?.FindFirstEmptyBagSlot() ?? 0));
             string itemName = DecodeString(b);
-            _hud?.SetBagItem(slot, itemName, string.Empty, $"持久: {p}/{t}");
+            if (string.IsNullOrEmpty(itemName)) itemName = "新物品";
+            string iconFile = ItemIconMapper.GetIconFile(itemName);
+            _hud?.SetBagItem(slot, itemName, iconFile, $"[color=#ffff00]{itemName}[/color]\n[color=#c0c0c0]重量 {t}[/color]");
         });
 
         Register(202, (id, rec, p, t, s, b) =>
@@ -535,8 +617,32 @@ public sealed class Official15ProtocolDispatcher
         Register(521, (id, rec, p, t, s, b) =>
         {
             // SM_NEWMAP 地图黑屏转场与新地图加载
-            string mapName = DecodeString(b);
-            _hud?.AddChat("系统", $"正在传送至地图: {(string.IsNullOrEmpty(mapName) ? "未知地图" : mapName)}", new Color(0.8f, 0.8f, 0.8f));
+            _entityManager?.ClearExceptLocalPlayer();
+        });
+
+        Register(314, (id, rec, p, t, s, b) =>
+        {
+            // SM_GROUNDITEM (314) 地表物品显现
+            int itemId = rec;
+            int x = p;
+            int y = t;
+            int looks = s;
+            string name = DecodeString(b);
+            if (string.IsNullOrEmpty(name)) name = "掉落物";
+            if (looks <= 0)
+            {
+                looks = name.Contains("金币") ? 1 : ((name.Contains("药") || name.Contains("水") || name.Contains("霜") || name.Contains("丹")) ? 2 : (name.Contains("甲") || name.Contains("袍") ? 13 : 3));
+            }
+            var gm = _groundItemManager ?? _gameView?.GroundItemManagerInstance;
+            gm?.AddItem(itemId, name, x, y, looks);
+        });
+
+        Register(315, (id, rec, p, t, s, b) =>
+        {
+            // SM_DELGROUNDITEM (315) 地表物品消失/被拾取
+            int itemId = rec;
+            var gm = _groundItemManager ?? _gameView?.GroundItemManagerInstance;
+            gm?.RemoveItem(itemId);
         });
 
         Register(2014, (id, rec, p, t, s, b) =>

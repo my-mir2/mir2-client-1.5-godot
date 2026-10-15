@@ -1,0 +1,227 @@
+{
+  "kills": 8,
+  "seconds": 212.7429518,
+  "rollbacks": 1,
+  "level": 15,
+  "hp": 149,
+  "maxHp": 149,
+  "dead": false,
+  "finalMap": "1",
+  "x": 488,
+  "y": 496,
+  "gold": 200,
+  "exp": 151,
+  "maxExp": 40000,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "level 15 => GM: 等级=15 HP=149/149"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4771583,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 15,
+      "AtSec": 5.4214667,
+      "Kills": 0,
+      "MaxExp": 40000
+    }
+  ],
+  "arrivals": [
+    {
+      "map": "1",
+      "ents": 2,
+      "monsters": 2,
+      "expectX": 563,
+      "expectY": 557,
+      "x": 563,
+      "y": 557,
+      "expect": "1"
+    }
+  ],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [
+    {
+      "who": "鹿",
+      "hits": 2,
+      "dmg": 4
+    },
+    {
+      "who": "蛤蟆",
+      "hits": 1,
+      "dmg": 1
+    },
+    {
+      "who": "多钩猫",
+      "hits": 7,
+      "dmg": 124
+    },
+    {
+      "who": "钉耙猫",
+      "hits": 10,
+      "dmg": 159
+    },
+    {
+      "who": "食人花",
+      "hits": 2,
+      "dmg": 52
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130",
+    "食人花叶"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [],
+  "magicUpdates": [],
+  "spellsCast": 0,
+  "spellEffects": 16,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 0,
+  "groupLists": [],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 等级=15 HP=149/149"
+  ],
+  "characterName": "机器人9081",
+  "fights": [
+    {
+      "Map": "1",
+      "Name": "多钩猫",
+      "Killed": true,
+      "Swings": 2,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        25,
+        21
+      ],
+      "drops": [
+        "金币"
+      ]
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 2,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        22,
+        14
+      ],
+      "drops": [
+        "金币"
+      ]
+    },
+    {
+      "Map": "1",
+      "Name": "多钩猫",
+      "Killed": true,
+      "Swings": 2,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        25,
+        11
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 2,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        25,
+        18
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "多钩猫",
+      "Killed": true,
+      "Swings": 2,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        12,
+        25
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 2,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        12,
+        15
+      ],
+      "drops": [
+        "金币"
+      ]
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 2,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        22,
+        13
+      ],
+      "drops": [
+        "金币"
+      ]
+    },
+    {
+      "Map": "1",
+      "Name": "食人花",
+      "Killed": true,
+      "Swings": 2,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        25,
+        27
+      ],
+      "drops": [
+        "食人花叶"
+      ]
+    }
+  ]
+}

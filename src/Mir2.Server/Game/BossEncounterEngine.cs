@@ -109,10 +109,10 @@ public sealed class BossEncounterEngine
                 2 => new EquipItem { Uid = 88801 + rng.Next(1000), Name = "法神手镯", Dura = 7000, MaxDura = 7000, Ac = 0, MaxAc = 1, Mac = 0, MaxMac = 1, Mc = 0, MaxMc = 4, Weight = 2 },
                 _ => new EquipItem { Uid = 88801 + rng.Next(1000), Name = "法神戒指", Dura = 7000, MaxDura = 7000, Mac = 0, MaxMac = 1, Mc = 1, MaxMc = 6, Weight = 1 }
             };
-            return (true, fashenItem, $"你从双头金刚体内挖掘到了绝世至宝【{fashenItem.Name}】！");
+            return (true, fashenItem, $"割下了 {fashenItem.Name}。");
         }
 
-        return (true, null, "你割下了一块金刚肉，但并未发现法神至宝。");
+        return (true, null, "割下了一块肉。");
     }
 
     /// <summary>

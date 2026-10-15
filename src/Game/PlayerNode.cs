@@ -28,10 +28,10 @@ namespace Mir2Client.Game
         public int Uid { get; set; } = 0;
         public string CharacterName { get; set; } = "玩家";
         public int Level { get; set; } = 1;
-        public int Hp { get; set; } = 100;
-        public int MaxHp { get; set; } = 100;
-        public int Mp { get; set; } = 50;
-        public int MaxMp { get; set; } = 50;
+        public int Hp { get; set; } = 19;
+        public int MaxHp { get; set; } = 19;
+        public int Mp { get; set; } = 11;
+        public int MaxMp { get; set; } = 11;
         public int Exp { get; set; } = 0;
         public int MaxExp { get; set; } = 1000;
         public int Gold { get; set; } = 0;
@@ -67,6 +67,7 @@ namespace Mir2Client.Game
         public AnimState Anim { get; } = new();
 
         private bool _isMoving = false;
+        private ulong _moveCooldownUntilMs = 0;
         private Vector2 _moveStartWorld = Vector2.Zero;
         private Vector2 _moveTargetWorld = Vector2.Zero;
         private float _moveDuration = 0.5f;
@@ -98,30 +99,38 @@ namespace Mir2Client.Game
 
             _nameLabel = new Label
             {
-                HorizontalAlignment = HorizontalAlignment.Center
+                Name = "PlayerNameLabel",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Visible = !IsDead,
+                ZAsRelative = false,
+                ZIndex = 3600,
+                MouseFilter = Control.MouseFilterEnum.Ignore
             };
-            _nameLabel.AddThemeFontSizeOverride("font_size", 11);
-            _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0));
-            _nameLabel.AddThemeConstantOverride("outline_size", 2);
+            FontManager.ApplyOfficialStyle(_nameLabel, Colors.White, FontManager.OfficialFontSize, true);
             AddChild(_nameLabel);
 
-            // 官方 1.5 角色/怪物受击头顶微型血条 (IDA 0x46B210（已证client无函数）, 36x3 像素)
+            // 官方 1.5 角色头顶微型血条 (PlayScn.pas 0x471310 SayY=-47 & DrawScrn.pas 0x47A186 SayY-10=-57, Prguse2.wil 0/1 帧 30x4)
             _hpBarBg = new ColorRect
             {
                 Name = "HpBarBg",
-                Size = new Vector2(36, 4),
-                Color = new Color(0.1f, 0.1f, 0.1f, 0.9f),
-                Visible = false
+                Position = new Vector2(9, -57),
+                Size = new Vector2(30, 4),
+                Color = new Color(0.05f, 0.05f, 0.05f, 0.95f),
+                Visible = !IsDead,
+                ZAsRelative = false,
+                ZIndex = 3601,
+                MouseFilter = Control.MouseFilterEnum.Ignore
             };
             AddChild(_hpBarBg);
 
             _hpBarFill = new ColorRect
             {
                 Name = "HpBarFill",
-                Size = new Vector2(34, 2),
+                Size = new Vector2(28, 2),
                 Position = new Vector2(1, 1),
-                Color = new Color(0.2f, 0.95f, 0.2f),
-                Visible = false
+                Color = new Color(0.95f, 0.15f, 0.15f),
+                Visible = !IsDead,
+                MouseFilter = Control.MouseFilterEnum.Ignore
             };
             _hpBarBg.AddChild(_hpBarFill);
 
@@ -138,14 +147,14 @@ namespace Mir2Client.Game
         {
             Hp = newHp;
             MaxHp = newMaxHp;
-            _hpBarHideTimer = 3.0f; // 官方 3 秒受创血条显示防抖
+            _hpBarHideTimer = 3.0f;
             if (_hpBarBg != null && _hpBarFill != null)
             {
-                _hpBarBg.Visible = true;
-                _hpBarFill.Visible = true;
-                float ratio = MaxHp > 0 ? Mathf.Clamp((float)Hp / MaxHp, 0f, 1f) : 0f;
-                _hpBarFill.Size = new Vector2(34 * ratio, 2);
-                _hpBarFill.Color = ratio > 0.5f ? new Color(0.2f, 0.95f, 0.2f) : (ratio > 0.2f ? new Color(1.0f, 0.8f, 0.1f) : new Color(0.95f, 0.2f, 0.2f));
+                _hpBarBg.Visible = !IsDead;
+                _hpBarFill.Visible = !IsDead;
+                float ratio = MaxHp > 0 ? Mathf.Clamp((float)Hp / MaxHp, 0f, 1f) : 1f;
+                _hpBarFill.Size = new Vector2(28 * ratio, 2);
+                _hpBarFill.Color = new Color(0.95f, 0.15f, 0.15f);
             }
         }
 
@@ -170,23 +179,28 @@ namespace Mir2Client.Game
                 >= 100 => new Color(1.0f, 0.95f, 0.1f),  // 亮黄名 (警告)
                 _ => new Color(1.0f, 1.0f, 1.0f)        // 白名 (良民)
             };
-            _nameLabel.AddThemeColorOverride("font_color", nameColor);
+            // 盛大官方 1.5 权威名牌与血条基准锁死 (严格 1:1 对齐 Delphi PlayScn.pas 0x471310 SayY=-47 & DrawScrn.pas 0x47A186):
+            // 人类发髻最高点在 Y = -49 (Hair.wil 3000 py=-49)，血条置于 Y=-57 (SayY-10)，名字置于 Y=-71，彻底杜绝名字横穿发髻！
+            FontManager.ApplyOfficialWorldNameplateStyle(_nameLabel, nameColor);
 
             if (!string.IsNullOrEmpty(GuildName))
             {
                 string rankStr = !string.IsNullOrEmpty(GuildRank) ? " " + GuildRank : "";
                 _nameLabel.Text = $"【{GuildName}{rankStr}】\n{CharacterName}";
-                _nameLabel.Position = new Vector2(-20, -48);
-                _nameLabel.CustomMinimumSize = new Vector2(136, 32);
-                if (_hpBarBg != null) _hpBarBg.Position = new Vector2(30, -56);
+                _nameLabel.Position = new Vector2(-40, -85);
+                _nameLabel.CustomMinimumSize = new Vector2(128, 32);
+                if (_hpBarBg != null) _hpBarBg.Position = new Vector2(9, -57);
             }
             else
             {
                 _nameLabel.Text = CharacterName;
-                _nameLabel.Position = new Vector2(8, -34);
-                _nameLabel.CustomMinimumSize = new Vector2(80, 20);
-                if (_hpBarBg != null) _hpBarBg.Position = new Vector2(30, -42);
+                _nameLabel.Position = new Vector2(-40, IsDead ? -14 : -71);
+                _nameLabel.CustomMinimumSize = new Vector2(128, 20);
+                if (_hpBarBg != null) _hpBarBg.Position = new Vector2(9, -57);
             }
+            _nameLabel.Visible = !IsDead;
+            if (_hpBarBg != null) _hpBarBg.Visible = !IsDead;
+            if (_hpBarFill != null) _hpBarFill.Visible = !IsDead;
         }
 
         public Vector2 SmoothOffset { get; set; } = Vector2.Zero;
@@ -224,7 +238,7 @@ namespace Mir2Client.Game
 
         /// <summary>
         /// 服务端权威位置纠偏与碰撞/阻挡/弱网拉回校准
-        /// - 若物理偏移在 1 格容差以内 (<= 64 像素): 阻尼吸收误差，视觉无突兀瞬移，不打断前进动作
+        /// - 若物理偏移在 1 格容差以内 (<= 64 像素): 阻尼吸收误差，视觉无突兀瞬移，且终止错误目标格防覆写
         /// - 若物理偏移超过容差 (如传送、被冲撞退、撞墙硬阻挡): 强制瞬间瞬移拉回并恢复站立
         /// </summary>
         public void ReconcilePosition(int tx, int ty, int dir)
@@ -233,25 +247,23 @@ namespace Mir2Client.Game
             Vector2 currentRender = GetCurrentRenderPos();
             float dist = currentRender.DistanceTo(serverWorld);
 
+            if (Engine.GetMainLoop() != null)
+            {
+                _moveCooldownUntilMs = Time.GetTicksMsec() + 180;
+            }
+
             if (dist <= SnapToleranceDistance)
             {
                 // 容差范围内：将当前视觉坐标相对服务端权威坐标的差值赋给 SmoothOffset
-                // 保证当前视觉位置在纠偏瞬间严格连续 (currentRender == serverWorld + SmoothOffset)，消除抽搐拉扯
+                // 同时必须同步重置 _targetTileX/Y 并停止步进，防止步进结束时将 TileX/Y 覆写回被服务端拒绝的非法格！
                 TileX = tx;
                 TileY = ty;
+                _targetTileX = tx;
+                _targetTileY = ty;
+                _isMoving = false;
+                _pathQueue.Clear();
                 Direction = dir & 7;
-
-                if (_isMoving)
-                {
-                    _moveStartWorld = serverWorld;
-                    _moveTimer = 0f;
-                    _moveDuration = Math.Max(0.08f, _moveDuration - _moveTimer);
-                }
-                else
-                {
-                    _targetTileX = tx;
-                    _targetTileY = ty;
-                }
+                Anim?.SetAction(ActionType.Stand, Direction);
 
                 SmoothOffset = currentRender - serverWorld;
             }
@@ -267,12 +279,30 @@ namespace Mir2Client.Game
         private float _stunTimer = 0f;
         public bool IsStunned => _stunTimer > 0f;
 
+        private float _attackLockTimer = 0f;
+        public bool IsAttacking => _attackLockTimer > 0f && Anim.Action == ActionType.Hit;
+
         public void TriggerStun(float durationSec, ActionType animAction = ActionType.Struck)
         {
             _stunTimer = Math.Max(_stunTimer, durationSec);
+            _attackLockTimer = 0f;
             _isMoving = false;
             _pathQueue.Clear();
             Anim.SetAction(animAction, Direction);
+        }
+
+        /// <summary>
+        /// 盛大官方 1.5 物理出刀攻击动作锁 (450ms 严格锁定，保护出刀动画完整播放，防止被走动/转向打断)
+        /// </summary>
+        public void PlayHit(int dir = -1)
+        {
+            if (IsStunned || IsDead) return;
+            if (dir >= 0) Direction = dir & 7;
+            _attackLockTimer = 0.45f;
+            _isMoving = false;
+            _pathQueue.Clear();
+            Anim.SetAction(ActionType.Hit, Direction);
+            AudioManager.Instance?.PlayWeaponSwingSound(WeaponType);
         }
 
         /// <summary>
@@ -291,7 +321,7 @@ namespace Mir2Client.Game
 
         public void TurnTo(int dir)
         {
-            if (_isMoving || IsStunned || IsDead) return;
+            if (_isMoving || IsStunned || IsDead || IsAttacking) return;
             int newDir = dir & 7;
             if (Direction == newDir && Anim.Action == ActionType.Stand) return;
             Direction = newDir;
@@ -301,16 +331,22 @@ namespace Mir2Client.Game
 
         public void StartStepMovement(int tx, int ty, int stepTiles, ActionType action, int dir)
         {
-            if (_isMoving || IsStunned || IsDead) return;
+            if (_isMoving || IsStunned || IsDead || IsAttacking) return;
+            if (Engine.GetMainLoop() != null && Time.GetTicksMsec() < _moveCooldownUntilMs) return;
 
             _isMoving = true;
             _moveStartWorld = new Vector2(TileX * 48, TileY * 32);
             _moveTargetWorld = new Vector2(tx * 48, ty * 32);
+            // 盛大官方 1.5 Actor.pas SetAction (0x44C800) 铁律：迈步瞬间立即更新逻辑瓦片坐标 m_nCurrX/Y = tx/ty，
+            // 通过 m_nShiftX/Y (_moveStartWorld -> _moveTargetWorld) 进行平滑像素插值，防止服务端回包时误判坐标差而拉回打断！
+            TileX = tx;
+            TileY = ty;
             _targetTileX = tx;
             _targetTileY = ty;
             Direction = dir & 7;
             _moveTimer = 0f;
-            _moveDuration = stepTiles == 1 ? 0.36f : 0.30f;
+            // IDA sub_4CAF08 / sub_4CB11C：服务端行走与奔跑均有 600ms 速度门禁，客户端行走设为 0.65s (跑动 0.60s)
+            _moveDuration = (action == ActionType.Run) ? 0.60f : 0.65f;
             Anim.SetAction(action, dir);
 
             // 触发官方 1:1 左右脚交替脚步声 (对齐 Delphi SoundUtil.pas: s_walk_ground / s_run_ground)
@@ -367,6 +403,9 @@ namespace Mir2Client.Game
 
         public void SyncCameraAndPlayer(Vector2 worldPos)
         {
+            int curTileY = (int)MathF.Round(worldPos.Y / 32.0f);
+            ZIndex = IsDead ? -1600 : Math.Clamp(curTileY * 2, 1, 3500);
+
             if (_mapRenderer == null)
             {
                 Position = new Vector2(400, 225);
@@ -384,15 +423,16 @@ namespace Mir2Client.Game
         {
             float dt = (float)delta;
 
-            // 盛大官方 1.5 角色/怪物受击微型血条 3 秒防抖倒计时自动隐匿 (IDA 0x46B210（已证client无函数）)
-            if (_hpBarHideTimer > 0f)
+            if (_nameLabel != null)
             {
-                _hpBarHideTimer -= dt;
-                if (_hpBarHideTimer <= 0f)
-                {
-                    _hpBarHideTimer = 0f;
-                    if (_hpBarBg != null) _hpBarBg.Visible = false;
-                }
+                _nameLabel.Visible = !IsDead;
+            }
+            if (_hpBarBg != null && _hpBarFill != null)
+            {
+                _hpBarBg.Visible = !IsDead;
+                _hpBarFill.Visible = !IsDead;
+                float ratio = MaxHp > 0 ? Mathf.Clamp((float)Hp / MaxHp, 0f, 1f) : 1f;
+                _hpBarFill.Size = new Vector2(28 * ratio, 2);
             }
 
             if (_stunTimer > 0f)
@@ -402,6 +442,19 @@ namespace Mir2Client.Game
                 {
                     _stunTimer = 0f;
                     Anim.SetAction(ActionType.Stand, Direction);
+                }
+            }
+
+            if (_attackLockTimer > 0f)
+            {
+                _attackLockTimer -= dt;
+                if (_attackLockTimer <= 0f)
+                {
+                    _attackLockTimer = 0f;
+                    if (Anim.Action == ActionType.Hit)
+                    {
+                        Anim.SetAction(ActionType.Stand, Direction);
+                    }
                 }
             }
 
@@ -457,14 +510,16 @@ namespace Mir2Client.Game
         {
             if (_wilHum == null || _bodySprite == null) return;
 
-            var baseAnchor = new Vector2(24, 32);
+            // 盛大官方 1.5 人物纸娃娃切片原生物理真值 (严格 1:1 对齐 Delphi THumActor.DrawChr & Actor.pas:3663)
+            // dx + m_nPx + m_nShiftX, dy + m_nPy + m_nShiftY
+            // dx, dy 即瓦片左上角原点，切片相对瓦片绝对坐标为 (anchor.X, anchor.Y)，严禁叠加额外偏移！
             int frameIdx = Anim.GetHumFrame(BodyDressType);
             var tex = _wilHum.GetFrame(frameIdx);
             if (tex != null)
             {
                 _bodySprite.Texture = tex;
                 var anchor = _wilHum.GetAnchor(frameIdx);
-                _bodySprite.Position = baseAnchor + new Vector2(anchor.X, anchor.Y);
+                _bodySprite.Position = new Vector2(anchor.X, anchor.Y);
             }
 
             if (_weaponSprite != null)
@@ -477,7 +532,7 @@ namespace Mir2Client.Game
                     {
                         _weaponSprite.Texture = wTex;
                         var wAnchor = _wilWeapon.GetAnchor(wIdx);
-                        _weaponSprite.Position = baseAnchor + new Vector2(wAnchor.X, wAnchor.Y);
+                        _weaponSprite.Position = new Vector2(wAnchor.X, wAnchor.Y);
                         bool inFront = SpriteEngine.IsWeaponInFront(Anim.Action, Anim.Direction, Anim.AnimFrame);
                         _weaponSprite.ZIndex = inFront ? 1 : -1;
                         _weaponSprite.Visible = true;
@@ -491,13 +546,13 @@ namespace Mir2Client.Game
             {
                 if (_wilHair != null)
                 {
-                    int hIdx = SpriteEngine.CalcHairFrame(Anim.Action, Anim.Direction, Anim.AnimFrame, HairStyle);
+                    int hIdx = SpriteEngine.CalcHairFrame(Anim.Action, Anim.Direction, Anim.AnimFrame, HairStyle, Gender);
                     var hTex = _wilHair.GetFrame(hIdx);
                     if (hTex != null)
                     {
                         _hairSprite.Texture = hTex;
                         var hAnchor = _wilHair.GetAnchor(hIdx);
-                        _hairSprite.Position = baseAnchor + new Vector2(hAnchor.X, hAnchor.Y);
+                        _hairSprite.Position = new Vector2(hAnchor.X, hAnchor.Y);
                         _hairSprite.ZIndex = 2;
                         _hairSprite.Visible = true;
                     }
@@ -511,9 +566,11 @@ namespace Mir2Client.Game
         {
             IsDead = true;
             Anim.SetAction(ActionType.Die);
-            // 播放官方死亡惨叫音效 (男 144 / 女 145，对齐 Delphi SoundUtil.pas:s_man_die/s_wom_die)
+            UpdateNameLabelText();
+            // 播放官方死亡惨叫音效 (男 144 / 女 145，对齐 Delphi SoundUtil.pas:s_man_die/s_wom_die) 与死亡音乐 Game over2.wav
             int dieSfx = Gender == 0 ? AudioManager.SoundId.ManDie : AudioManager.SoundId.WomDie;
             AudioManager.Instance?.PlaySoundId(dieSfx);
+            AudioManager.Instance?.PlayBgm("Game over2.wav", loop: false);
             EmitSignal(SignalName.PlayerDied);
         }
 
@@ -523,6 +580,8 @@ namespace Mir2Client.Game
             Hp = newHp > 0 ? newHp : Math.Max(1, MaxHp);
             Mp = newMp > 0 ? newMp : Math.Max(1, MaxMp);
             Anim.SetAction(ActionType.Stand, Direction);
+            UpdateNameLabelText();
+            AudioManager.Instance?.PlayBgm("main_theme.wav", loop: true);
             EmitSignal(SignalName.Revived);
             EmitSignal(SignalName.HealthChanged, Hp, MaxHp, Mp, MaxMp);
         }

@@ -29,6 +29,7 @@ public sealed class EquipItem
     public int Uid { get; set; }
     public int Id { get => Uid; set => Uid = value; }
     public string Name { get; set; } = string.Empty;
+    public int Looks { get; set; }
     public int Shape { get; set; }
     public int Weight { get; set; }
     public int Dura { get; set; }
@@ -74,6 +75,7 @@ public sealed class PlayerState
     public string CharacterName { get => Name; set => Name = value; }
     public int Job { get; set; } // 0=战士, 1=法师, 2=道士
     public int Sex { get; set; } // 0=男, 1=女
+    public int Hair { get; set; } = 1; // 1 或 2 (发型编号)
     public int Level { get; set; } = 1;
 
     public int Hp { get; set; } = 100;
@@ -83,8 +85,8 @@ public sealed class PlayerState
     public bool IsDead => Hp <= 0;
 
     // 基础 HP/MP (供魔血套装转化计算)
-    public int BaseMaxHp { get; set; } = 100;
-    public int BaseMaxMp { get; set; } = 100;
+    public int BaseMaxHp { get; set; } = 0;
+    public int BaseMaxMp { get; set; } = 0;
 
     public int MapX { get; set; }
     public int MapY { get; set; }
@@ -239,6 +241,7 @@ public sealed class PlayerState
     public int IncHealth { get; set; } = 0;
     public int IncSpell { get; set; } = 0;
     public long LastPotionTick { get; set; } = 0;
+    public long LastNaturalRegenMs { get; set; } = 0;
 
     // ==================== 官方 7 大特戒与 4 大套装运行时状态 ====================
     public bool HasProtectRing { get; private set; }
@@ -388,7 +391,7 @@ public sealed class PlayerState
             if (eq.Shape == 114 || eq.Name.Contains("复活戒指"))
             {
                 HasReviveRing = true;
-                ReviveRingDura = eq.Dura * 1000;
+                ReviveRingDura = eq.Dura >= 1000 ? eq.Dura : eq.Dura * 1000;
             }
             // 麻痹戒指
             if (eq.Shape == 113 || eq.Name.Contains("麻痹戒指"))
@@ -443,12 +446,14 @@ public sealed class PlayerState
         GrantedRingSkills.Clear();
         GrantedRingSkills.AddRange(SpecialRings.GetSpecialRingGrantedSkills(Equipment, Job));
 
-        // 5. 魔血套装重算 (若未穿戴魔血套且外部设置了更高的 MaxHp/MaxMp，自适应保持基准)
+        // 5. 魔血套装重算 (以角色等级成长的 BaseMaxHp/BaseMaxMp 为真值基准)
         bool hasAnyMagicBloodPiece = pieceShapes.Exists(s => s is 133 or 134 or 135);
         if (!hasAnyMagicBloodPiece)
         {
-            if (BaseMaxHp < MaxHp) BaseMaxHp = MaxHp;
-            if (BaseMaxMp < MaxMp) BaseMaxMp = MaxMp;
+            if (BaseMaxHp <= 0 && MaxHp > 0) BaseMaxHp = MaxHp;
+            if (BaseMaxMp <= 0 && MaxMp > 0) BaseMaxMp = MaxMp;
+            if (MaxHp > BaseMaxHp) BaseMaxHp = MaxHp;
+            if (MaxMp > BaseMaxMp) BaseMaxMp = MaxMp;
         }
         var mb = SpecialRings.CalculateMagicBloodBonus(pieceShapes.ToArray(), BaseMaxHp, BaseMaxMp);
         HasMagicBloodSet = mb.hasFullSet;
@@ -516,15 +521,15 @@ public sealed class PlayerState
             }
 
             sumAc += curAc;
-            sumMaxAc += curMaxAc;
+            sumMaxAc += curMaxAc + eq.BonusAc;
             sumMac += curMac;
-            sumMaxMac += curMaxMac;
+            sumMaxMac += curMaxMac + eq.BonusMac;
             sumDc += curDc;
-            sumMaxDc += curMaxDc;
+            sumMaxDc += curMaxDc + eq.BonusDc;
             sumMc += curMc;
-            sumMaxMc += curMaxMc;
+            sumMaxMc += curMaxMc + eq.BonusMc;
             sumSc += curSc;
-            sumMaxSc += curMaxSc;
+            sumMaxSc += curMaxSc + eq.BonusSc;
 
             // 盛大官方 1.5 经典装备特殊属性自适应与累加
             int acc = eq.Accuracy;
@@ -759,7 +764,7 @@ public sealed class PlayerState
                 var ring = Equipment[i];
                 if (ring != null && (ring.Shape == 114 || ring.Name.Contains("复活戒指")))
                 {
-                    ring.Dura = ReviveRingDura / 1000;
+                    ring.Dura = (ring.MaxDura >= 1000 || ring.Dura >= 1000) ? ReviveRingDura : ReviveRingDura / 1000;
                     if (revRes.isBroken)
                     {
                         TakeOffItem((OfficialEquipSlot)i, nowTick);
@@ -936,7 +941,6 @@ public sealed class PlayerState
         }
         else if (res.Outcome == WeaponUpgradeEngine.TrialSlashOutcome.Success)
         {
-            weapon.UpgradeCount++;
             RecalculateAttributes();
         }
         return res;
@@ -1143,35 +1147,40 @@ public sealed class PlayerState
 
     /// <summary>
     /// 盛大官方 1.5 权威生命与魔法基础上限成长计算 (按职业与等级)
+    /// 严格 1:1 对齐官方 Delphi ObjBase.pas L966-1030 RecalcLevelAbilitys 绝对物理真值
     /// </summary>
     public void RecalculateBaseHpMp()
     {
+        double lv = Math.Max(1, Level);
         switch (Job)
         {
-            case 0: // 战士
-                BaseMaxHp = 19 + (int)((Level - 1) * 4.5);
-                BaseMaxMp = 14 + (Level - 1) * 2;
+            case 0: // 战士 (jWarr): HP = 14 + ROUND((Level/4 + 4.5 + Level/20) * Level), MP = 11 + ROUND(Level * 3.5)
+                BaseMaxHp = (int)(14.0 + Math.Round((lv / 4.0 + 4.5 + lv / 20.0) * lv));
+                BaseMaxMp = (int)(11.0 + Math.Round(lv * 3.5));
                 break;
-            case 1: // 法师
-                BaseMaxHp = 14 + (int)((Level - 1) * 1.8);
-                BaseMaxMp = 19 + (int)((Level - 1) * 9.5);
+            case 1: // 法师 (jWizard): HP = 14 + ROUND((Level/15 + 1.8) * Level), MP = 13 + ROUND((Level/5 + 2) * 2.2 * Level)
+                BaseMaxHp = (int)(14.0 + Math.Round((lv / 15.0 + 1.8) * lv));
+                BaseMaxMp = (int)(13.0 + Math.Round((lv / 5.0 + 2.0) * 2.2 * lv));
                 break;
-            case 2: // 道士
-                BaseMaxHp = 17 + (int)((Level - 1) * 3.0);
-                BaseMaxMp = 17 + (int)((Level - 1) * 6.0);
+            case 2: // 道士 (jTaos): HP = 14 + ROUND((Level/6 + 2.5) * Level), MP = 13 + ROUND((Level/8) * 2.2 * Level)
+                BaseMaxHp = (int)(14.0 + Math.Round((lv / 6.0 + 2.5) * lv));
+                BaseMaxMp = (int)(13.0 + Math.Round((lv / 8.0) * 2.2 * lv));
                 break;
             default:
-                BaseMaxHp = 20 + Level * 3;
-                BaseMaxMp = 20 + Level * 3;
+                BaseMaxHp = (int)(14.0 + Math.Round((lv / 15.0 + 1.8) * lv));
+                BaseMaxMp = (int)(11.0 + Math.Round(lv * 3.5));
                 break;
         }
 
+        MaxHp = BaseMaxHp;
+        MaxMp = BaseMaxMp;
         RecalculateAuthoritativeWeights(Gold);
         RecalculateAttributes();
     }
 
     /// <summary>
     /// 经验获取与连续升级权威判定
+    /// 盛大官方原版绝无升级自由属性点分配，升级完全由系统底层自动提升生命、魔法与多维负重
     /// </summary>
     public bool GainExp(long amount)
     {
@@ -1182,7 +1191,6 @@ public sealed class PlayerState
         {
             Exp -= ExpTable.ExpForLevel(Level);
             Level++;
-            BonusPoint += 3; // 每升一级给予 3 点自由属性点
             leveledUp = true;
         }
 

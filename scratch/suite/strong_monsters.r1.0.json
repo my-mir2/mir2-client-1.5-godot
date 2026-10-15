@@ -1,0 +1,81 @@
+{
+  "kills": 0,
+  "seconds": 14.9269136,
+  "rollbacks": 1,
+  "level": 12,
+  "hp": 57,
+  "maxHp": 111,
+  "dead": false,
+  "finalMap": "0",
+  "x": 330,
+  "y": 270,
+  "gold": 0,
+  "exp": 0,
+  "maxExp": 10000,
+  "problems": [
+    "视野内没有可打的怪物，也找不到可前往的刷怪点 (地图 0 位置 330,270)"
+  ],
+  "gm": [
+    "level 12 => GM: 等级=12 HP=111/111",
+    "tp 1 497 465 => GM: 已传送到 1(497,465)",
+    "spawn 半兽勇士 4 => GM: 刷出 半兽勇士 x4"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4432584,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 12,
+      "AtSec": 6.2196113,
+      "Kills": 0,
+      "MaxExp": 10000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 1,
+  "deathPackets": 1,
+  "revives": 1,
+  "struckBy": [
+    {
+      "who": "半兽勇士",
+      "hits": 10,
+      "dmg": 169
+    },
+    {
+      "who": "多钩猫",
+      "hits": 2,
+      "dmg": 3
+    },
+    {
+      "who": "钉耙猫",
+      "hits": 2,
+      "dmg": 6
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "fights": [
+    {
+      "Map": "1",
+      "Name": "半兽勇士",
+      "Killed": false,
+      "Swings": 4,
+      "Misses": 0,
+      "DamageTaken": 81,
+      "Hits": [
+        10,
+        22,
+        12,
+        20
+      ],
+      "drops": []
+    }
+  ]
+}

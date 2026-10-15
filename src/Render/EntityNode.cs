@@ -14,9 +14,41 @@ namespace Mir2Client.Render
     public partial class EntityNode : Node2D
     {
         public int Uid { get; set; }
-        public string EntityName { get; set; } = string.Empty;
+        private string _entityName = string.Empty;
+        public string EntityName
+        {
+            get => _entityName;
+            set
+            {
+                if (_entityName != value)
+                {
+                    _entityName = value;
+                    UpdateNameColor();
+                    if (Type == EntityManager.EntityType.Monster)
+                    {
+                        var spec = OfficialMonsterAssetRegistry.Resolve(value, _appr);
+                        _loader = MonsterWilPool.Instance.GetLoader(spec.WilIndex);
+                        UpdateFrameGraphic();
+                    }
+                }
+            }
+        }
         public EntityManager.EntityType Type { get; set; } = EntityManager.EntityType.Monster;
-        public int Appr { get; set; } = 0;
+        private int _appr = 0;
+        public int Appr
+        {
+            get => _appr;
+            set
+            {
+                _appr = value;
+                if (Type == EntityManager.EntityType.Monster)
+                {
+                    var spec = OfficialMonsterAssetRegistry.Resolve(EntityName, value);
+                    _loader = MonsterWilPool.Instance.GetLoader(spec.WilIndex);
+                    UpdateFrameGraphic();
+                }
+            }
+        }
         public int TileX { get; set; }
         public int TileY { get; set; }
         public int Direction { get; set; } = 2;
@@ -59,20 +91,64 @@ namespace Mir2Client.Render
             _sprite = new Sprite2D { Centered = false };
             AddChild(_sprite);
 
-            // 头顶名字 (怪物为浅黄，NPC 为水绿，带 2px 黑色轮廓描边)
+            // 头顶名字 (官方 1.5 PlayScn.pas SayY=-47 & DrawScrn.pas: 位于血条上方 -71，活体常显、死尸隐藏)
             _nameLabel = new Label
             {
                 Name = "EntityNameLabel",
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Position = new Vector2(-40, -45),
-                Size = new Vector2(128, 16)
+                Position = new Vector2(-40, -71),
+                Size = new Vector2(128, 16),
+                Visible = !IsDead && !IsCorpse,
+                ZAsRelative = false,
+                ZIndex = 3600,
+                MouseFilter = Control.MouseFilterEnum.Ignore
             };
-            _nameLabel.AddThemeFontSizeOverride("font_size", 10);
-            _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
-            _nameLabel.AddThemeConstantOverride("outline_size", 2);
+            FontManager.ApplyOfficialWorldNameplateStyle(_nameLabel, new Color(1.0f, 1.0f, 1.0f));
             _nameLabel.Text = EntityName;
-            UpdateNameColor();
             AddChild(_nameLabel);
+
+            // 官方 1.5 怪物头顶微型血条 (PlayScn.pas 0x471310 SayY=-47 & DrawScrn.pas 0x47A186 SayY-10=-57, Prguse2.wil 0/1 帧 30x4)
+            bool showHp = Type != EntityManager.EntityType.Npc && !IsDead && !IsCorpse;
+            _hpBarBg = new ColorRect
+            {
+                Name = "EntityHpBg",
+                Size = new Vector2(30, 4),
+                Position = new Vector2(9, -57),
+                Color = new Color(0.05f, 0.05f, 0.05f, 0.95f),
+                Visible = showHp,
+                ZAsRelative = false,
+                ZIndex = 3601,
+                MouseFilter = Control.MouseFilterEnum.Ignore
+            };
+            AddChild(_hpBarBg);
+
+            _hpBarFill = new ColorRect
+            {
+                Name = "EntityHpFill",
+                Size = new Vector2(28, 2),
+                Position = new Vector2(1, 1),
+                Color = new Color(0.95f, 0.15f, 0.15f),
+                Visible = showHp,
+                MouseFilter = Control.MouseFilterEnum.Ignore
+            };
+            _hpBarBg.AddChild(_hpBarFill);
+
+            // 受击浮动飘字 (-Damage)
+            _damageLabel = new Label
+            {
+                Name = "DamageLabel",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Position = new Vector2(-16, -60),
+                Size = new Vector2(80, 20),
+                Visible = false,
+                ZAsRelative = false,
+                ZIndex = 3602,
+                MouseFilter = Control.MouseFilterEnum.Ignore
+            };
+            FontManager.ApplyOfficialWorldNameplateStyle(_damageLabel, new Color(1.0f, 0.25f, 0.25f));
+            AddChild(_damageLabel);
+
+            UpdateNameColor();
         }
 
         private int _poisonMask = 0;
@@ -112,35 +188,34 @@ namespace Mir2Client.Render
             }
             _nameLabel.Text = displayName;
 
+            Color finalColor;
             if (IsDead)
             {
-                _nameLabel.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f));
-                return;
+                finalColor = new Color(0.5f, 0.5f, 0.5f);
             }
-
-            if (_poisonMask == 3) // 双毒兼具
+            else if (_poisonMask == 3) // 双毒兼具
             {
-                _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.3f, 0.9f)); // 紫红色
+                finalColor = new Color(1.0f, 0.3f, 0.9f); // 紫红色
             }
             else if ((_poisonMask & 1) != 0) // 绿毒
             {
-                _nameLabel.AddThemeColorOverride("font_color", new Color(0.15f, 1.0f, 0.2f)); // 荧光绿
+                finalColor = new Color(0.15f, 1.0f, 0.2f); // 荧光绿
             }
             else if ((_poisonMask & 2) != 0) // 红毒
             {
-                _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.25f, 0.25f)); // 暗红
+                finalColor = new Color(1.0f, 0.25f, 0.25f); // 暗红
             }
             else if (_pkPoint >= 200) // 官方红名恶徒
             {
-                _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.15f, 0.15f)); // 鲜红色
+                finalColor = new Color(1.0f, 0.15f, 0.15f); // 鲜红色
             }
             else if (_pkPoint >= 100) // 官方黄名警告
             {
-                _nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.2f)); // 亮黄色
+                finalColor = new Color(1.0f, 0.95f, 0.2f); // 亮黄色
             }
             else if (PetLevel > 0 || !string.IsNullOrEmpty(MasterName)) // 盛大官方 1.5 随从名牌变色阶梯 (0~7级)
             {
-                Color petColor = PetLevel switch
+                finalColor = PetLevel switch
                 {
                     0 => new Color(1.0f, 1.0f, 1.0f),       // 0级: 纯白
                     1 or 2 => new Color(0.85f, 1.0f, 0.4f),  // 1~2级: 黄绿
@@ -149,54 +224,17 @@ namespace Mir2Client.Render
                     7 => new Color(0.5f, 0.4f, 1.0f),        // 7级: 官方招牌深蓝紫
                     _ => new Color(1.0f, 1.0f, 1.0f)
                 };
-                _nameLabel.AddThemeColorOverride("font_color", petColor);
             }
             else
             {
-                Color nameColor = Type switch
+                finalColor = Type switch
                 {
                     EntityManager.EntityType.Npc => new Color(0.45f, 1.0f, 0.45f),
                     EntityManager.EntityType.Monster => new Color(1.0f, 0.95f, 0.5f),
                     _ => new Color(1.0f, 1.0f, 1.0f)
                 };
-                _nameLabel.AddThemeColorOverride("font_color", nameColor);
             }
-
-            // 官方 1.5 怪物头顶微型血条 (36x4 像素)
-            _hpBarBg = new ColorRect
-            {
-                Name = "EntityHpBg",
-                Size = new Vector2(36, 4),
-                Position = new Vector2(6, -26),
-                Color = new Color(0.1f, 0.1f, 0.1f, 0.85f),
-                Visible = false
-            };
-            AddChild(_hpBarBg);
-
-            _hpBarFill = new ColorRect
-            {
-                Name = "EntityHpFill",
-                Size = new Vector2(34, 2),
-                Position = new Vector2(1, 1),
-                Color = new Color(0.2f, 0.95f, 0.2f),
-                Visible = false
-            };
-            _hpBarBg.AddChild(_hpBarFill);
-
-            // 受击浮动飘字 (-Damage)
-            _damageLabel = new Label
-            {
-                Name = "DamageLabel",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Position = new Vector2(-16, -60),
-                Size = new Vector2(80, 20),
-                Visible = false
-            };
-            _damageLabel.AddThemeFontSizeOverride("font_size", 12);
-            _damageLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.25f, 0.25f));
-            _damageLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 1.0f));
-            _damageLabel.AddThemeConstantOverride("outline_size", 2);
-            AddChild(_damageLabel);
+            FontManager.ApplyOfficialWorldNameplateStyle(_nameLabel, finalColor);
         }
 
         public void SetLoader(WilLoader? loader)
@@ -213,6 +251,7 @@ namespace Mir2Client.Render
 
         public void SetTilePos(int tx, int ty, int dir = -1)
         {
+            if ((IsDead || IsCorpse) && (TileX != 0 || TileY != 0)) return;
             TileX = tx;
             TileY = ty;
             if (dir >= 0) Direction = dir & 7;
@@ -233,6 +272,7 @@ namespace Mir2Client.Render
 
         public void ReconcilePosition(int serverX, int serverY, byte dir)
         {
+            if ((IsDead || IsCorpse) && (TileX != 0 || TileY != 0)) return;
             TileX = serverX;
             TileY = serverY;
             Direction = dir & 7;
@@ -242,7 +282,9 @@ namespace Mir2Client.Render
 
         private void UpdatePosition()
         {
-            var worldPos = DeadReckoningEngine.GetRenderPosition(MovementState);
+            var worldPos = (IsDead || IsCorpse)
+                ? new Vector2(TileX * 48, TileY * 32)
+                : DeadReckoningEngine.GetRenderPosition(MovementState);
             if (_mapRenderer != null)
             {
                 Position = _mapRenderer.WorldToScreen(worldPos);
@@ -251,14 +293,32 @@ namespace Mir2Client.Render
             {
                 Position = worldPos;
             }
-            // 依据视觉 Y 坐标动态计算 ZIndex 确保透视深度排序
-            int currentTileY = (int)MathF.Round(worldPos.Y / 32.0f);
-            ZIndex = Math.Clamp(currentTileY, 1, 99);
+            // 盛大官方 1.5 PlayScn.pas 深度排序铁律:
+            // - 死亡尸体固定绘制在地表层 (-1600)，绝不遮挡存活角色或怪物
+            // - 存活实体按当前视觉瓦片行号 currentTileY * 2 排序 (覆盖全图 0~1000 行，绝不截断在 99)
+            if (IsDead || IsCorpse)
+            {
+                ZIndex = -1600;
+            }
+            else
+            {
+                int currentTileY = (int)MathF.Round(worldPos.Y / 32.0f);
+                ZIndex = Math.Clamp(currentTileY * 2, 1, 3500);
+            }
         }
 
         public void PlayAction(ActionType action, int dir = -1, float duration = 0.4f)
         {
-            if (IsCorpse) return;
+            if (IsCorpse || (IsDead && action != ActionType.Die)) return;
+
+            // 盛大官方 1.5 受击硬直保护 (Actor.pas)：
+            // 若当前正处于受击后仰动画 (Struck) 且尚未播完，普通走跑与待机不得强制覆写，防止抽搐滑步
+            if (_isActionLocked && CurrentAction == ActionType.Struck && action is ActionType.Walk or ActionType.Run or ActionType.Stand)
+            {
+                if (dir >= 0) Direction = dir & 7;
+                return;
+            }
+
             if (dir >= 0) Direction = dir & 7;
 
             CurrentAction = action;
@@ -267,17 +327,16 @@ namespace Mir2Client.Render
             _actionDuration = duration;
             _isActionLocked = (action == ActionType.Hit || action == ActionType.Struck || action == ActionType.Die);
 
-            // 盛大官方 1.5 怪物 80 种生态帧率与音效统一调度
-            var monDef = OfficialMonsterCompendium.GetByName(EntityName) ?? OfficialMonsterCompendium.GetByAppr(Appr);
-            if (monDef != null)
+            // 盛大官方 1.5 怪物原生态音效公式调度 (200 + Appr * 10 + offset)
+            if (Type == EntityManager.EntityType.Monster)
             {
-                if (action == ActionType.Hit && monDef.SoundAttack > 0)
+                if (action == ActionType.Hit)
                 {
-                    AudioManager.Instance?.PlaySoundId(monDef.SoundAttack);
+                    AudioManager.Instance?.PlayMonsterSound(EntityName, Appr, 2);
                 }
-                else if (action == ActionType.Die && monDef.SoundDie > 0)
+                else if (action == ActionType.Die)
                 {
-                    AudioManager.Instance?.PlaySoundId(monDef.SoundDie);
+                    AudioManager.Instance?.PlayMonsterSound(EntityName, Appr, 5);
                 }
             }
 
@@ -288,12 +347,41 @@ namespace Mir2Client.Render
         public bool IsShinsuProne { get; private set; } = false; // 神兽趴下防御姿态
         private float _shinsuIdleTimer = 0f;
 
+        private float GetStandingHeadTopY(int currentFrameIdx = -1)
+        {
+            if (_loader == null) return -47f;
+            if (Type == EntityManager.EntityType.Npc)
+            {
+                _ = _loader.GetFrame(Appr * 10);
+                var npcAnchor = _loader.GetAnchor(Appr * 10);
+                return npcAnchor != Vector2I.Zero ? Math.Min(-47f, Math.Clamp((float)npcAnchor.Y, -68f, -47f)) : -47f;
+            }
+            var spec = OfficialMonsterAssetRegistry.Resolve(EntityName, Appr);
+            _ = _loader.GetFrame(spec.BaseOffset);
+            var standAnchor = _loader.GetAnchor(spec.BaseOffset);
+            float topY = -47f;
+            if (standAnchor != Vector2I.Zero)
+            {
+                topY = Math.Min(topY, Math.Clamp((float)standAnchor.Y, -72f, -47f));
+            }
+            if (currentFrameIdx >= 0)
+            {
+                var curAnchor = _loader.GetAnchor(currentFrameIdx);
+                if (curAnchor != Vector2I.Zero)
+                {
+                    topY = Math.Min(topY, Math.Clamp((float)curAnchor.Y, -72f, -47f));
+                }
+            }
+            return topY;
+        }
+
         public void TriggerMiss()
         {
             if (_damageLabel != null)
             {
+                float topY = GetStandingHeadTopY();
                 _damageLabel.Text = "MISS";
-                _damageLabel.Position = new Vector2(-40, -95);
+                _damageLabel.Position = new Vector2(-16, topY - 24);
                 _damageLabel.Visible = true;
                 _damageLabel.Modulate = new Color(0.2f, 1.0f, 0.4f, 1.0f); // 官方原版亮绿 MISS
                 _damageLabelTimer = 0.8f;
@@ -302,6 +390,7 @@ namespace Mir2Client.Render
 
         public void TriggerStruck(int damage, int curHp)
         {
+            if (IsDead || IsCorpse) return;
             Hp = curHp;
             if (damage <= 0)
             {
@@ -310,24 +399,31 @@ namespace Mir2Client.Render
             }
 
             PlayAction(ActionType.Struck, Direction, 0.3f);
-            AudioManager.Instance?.PlaySoundId(2);
+            // 播放官方刀剑砍中躯体音效 (62: s_struck_sword) + 怪物受击惨叫音效 (200 + Appr*10 + 4)
+            AudioManager.Instance?.PlaySoundId(62);
+            if (Type == EntityManager.EntityType.Monster)
+            {
+                AudioManager.Instance?.PlayMonsterSound(EntityName, Appr, 4);
+            }
 
-            // 显示微型血条并维持 3 秒
+            // 更新官方 1.5 微型红血条 (DrawScrn.pas 0x47A186..0x47A231, Prguse2.wil 0/1 帧 30x4)
             _hpBarHideTimer = 3.0f;
             if (_hpBarBg != null && _hpBarFill != null)
             {
-                _hpBarBg.Visible = true;
-                _hpBarFill.Visible = true;
+                bool showHp = Type != EntityManager.EntityType.Npc && !IsDead && !IsCorpse;
+                _hpBarBg.Visible = showHp;
+                _hpBarFill.Visible = showHp;
                 float ratio = MaxHp > 0 ? Mathf.Clamp((float)Hp / MaxHp, 0f, 1f) : 0f;
-                _hpBarFill.Size = new Vector2(34 * ratio, 2);
-                _hpBarFill.Color = ratio > 0.5f ? new Color(0.2f, 0.95f, 0.2f) : (ratio > 0.2f ? new Color(1.0f, 0.8f, 0.1f) : new Color(0.95f, 0.2f, 0.2f));
+                _hpBarFill.Size = new Vector2(28 * ratio, 2);
+                _hpBarFill.Color = new Color(0.95f, 0.15f, 0.15f);
             }
 
-            // 弹出浮动受创飘字
+            // 弹出浮动受创飘字 (紧随怪物体型顶线上方)
             if (_damageLabel != null && damage > 0)
             {
+                float topY = GetStandingHeadTopY();
                 _damageLabel.Text = $"-{damage}";
-                _damageLabel.Position = new Vector2(-40, -95);
+                _damageLabel.Position = new Vector2(-16, topY - 24);
                 _damageLabel.Visible = true;
                 _damageLabel.Modulate = new Color(1, 1, 1, 1);
                 _damageLabelTimer = 0.8f;
@@ -342,13 +438,36 @@ namespace Mir2Client.Render
         public void TriggerDeath()
         {
             IsDead = true;
+            DeadReckoningEngine.InitializeEntity(MovementState, TileX, TileY, (byte)Direction);
+            UpdatePosition();
             PlayAction(ActionType.Die, Direction, 0.8f);
-            AudioManager.Instance?.PlaySoundId(4);
 
             if (_hpBarBg != null) _hpBarBg.Visible = false;
+            if (_hpBarFill != null) _hpBarFill.Visible = false;
             if (_nameLabel != null)
             {
-                _nameLabel.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f));
+                _nameLabel.Visible = false;
+                UpdateNameColor();
+            }
+        }
+
+        private void UpdateCorpseNameVisibility()
+        {
+            bool alive = !IsDead && !IsCorpse;
+            if (_nameLabel != null)
+            {
+                _nameLabel.Visible = alive;
+            }
+            if (_hpBarBg != null && _hpBarFill != null)
+            {
+                bool showHp = alive && Type != EntityManager.EntityType.Npc;
+                _hpBarBg.Visible = showHp;
+                _hpBarFill.Visible = showHp;
+                if (showHp)
+                {
+                    float ratio = MaxHp > 0 ? Mathf.Clamp((float)Hp / MaxHp, 0f, 1f) : 1f;
+                    _hpBarFill.Size = new Vector2(28 * ratio, 2);
+                }
             }
         }
 
@@ -357,8 +476,11 @@ namespace Mir2Client.Render
             float dt = (float)delta;
 
             // 盛大官方 1.5 规则: 尸体存留 60 秒后老化腐烂沉入地底消除
+            // 关键修复: 尸体状态下必须每帧调用 UpdatePosition() 跟随镜头偏移转换屏幕坐标，严禁锁死在屏幕固定位置跟玩家跑！
             if (IsCorpse)
             {
+                UpdatePosition();
+                UpdateCorpseNameVisibility();
                 _corpseRemainTimer -= dt;
                 if (_corpseRemainTimer <= 2.0f && _corpseRemainTimer > 0f)
                 {
@@ -389,20 +511,14 @@ namespace Mir2Client.Render
                 }
             }
 
-            DeadReckoningEngine.Update(MovementState, dt);
+            if (!IsDead)
+            {
+                DeadReckoningEngine.Update(MovementState, dt);
+            }
             UpdatePosition();
+            UpdateCorpseNameVisibility();
 
             _animTimer += dt;
-
-            // 血条 3 秒倒计时自动隐退
-            if (_hpBarHideTimer > 0f)
-            {
-                _hpBarHideTimer -= dt;
-                if (_hpBarHideTimer <= 0f && _hpBarBg != null)
-                {
-                    _hpBarBg.Visible = false;
-                }
-            }
 
             // 浮动伤害字向上飘动渐隐
             if (_damageLabelTimer > 0f && _damageLabel != null)
@@ -423,14 +539,15 @@ namespace Mir2Client.Render
             }
             else
             {
+                var spec = OfficialMonsterAssetRegistry.Resolve(EntityName, Appr);
                 int maxF = CurrentAction switch
                 {
-                    ActionType.Stand => 4,
-                    ActionType.Walk => 6,
-                    ActionType.Hit => 6,
-                    ActionType.Struck => 2,
-                    ActionType.Die => 6,
-                    _ => 4
+                    ActionType.Stand => Math.Max(1, spec.StandFrames),
+                    ActionType.Walk => Math.Max(1, spec.WalkFrames),
+                    ActionType.Hit => Math.Max(1, spec.AttackFrames),
+                    ActionType.Struck => Math.Max(1, spec.StruckFrames),
+                    ActionType.Die => Math.Max(1, spec.DieFrames),
+                    _ => Math.Max(1, spec.StandFrames)
                 };
 
                 if (_isActionLocked)
@@ -441,7 +558,7 @@ namespace Mir2Client.Render
                     {
                         if (CurrentAction == ActionType.Die)
                         {
-                            _currentFrame = maxF - 1; // 保持倒地尸体最后一帧
+                            _currentFrame = maxF - 1; // 保持倒地尸体最后一帧 (躺平状态)
                             IsCorpse = true;
                             _isActionLocked = false;
                         }
@@ -470,17 +587,62 @@ namespace Mir2Client.Render
 
             int frameIdx = CalcAbsoluteFrameIndex();
             Texture2D? tex = _loader.GetFrame(frameIdx);
-            if (tex != null)
+            bool isEmpty = tex == null || (tex.GetWidth() <= 4 && tex.GetHeight() <= 4);
+
+            if (isEmpty && Type == EntityManager.EntityType.Monster)
+            {
+                var spec = OfficialMonsterAssetRegistry.Resolve(EntityName, Appr);
+                int baseOffset = spec.BaseOffset;
+                int standFrame = baseOffset + (Direction & 7) * 10;
+                tex = _loader.GetFrame(standFrame);
+                if (tex != null && tex.GetWidth() > 4) frameIdx = standFrame;
+                else
+                {
+                    tex = _loader.GetFrame(baseOffset);
+                    if (tex != null && tex.GetWidth() > 4) frameIdx = baseOffset;
+                }
+            }
+
+            if (tex != null && tex.GetWidth() > 4)
             {
                 _sprite.Texture = tex;
                 var anchor = _loader.GetAnchor(frameIdx);
-                _sprite.Position = new Vector2(24 + anchor.X, 32 + anchor.Y);
+
+                Vector2 spritePos;
+                if (anchor != Vector2I.Zero)
+                {
+                    spritePos = new Vector2(anchor.X, anchor.Y);
+                }
+                else
+                {
+                    int ox = 24 - tex.GetWidth() / 2;
+                    int oy = 32 - tex.GetHeight();
+                    spritePos = new Vector2(ox, oy);
+                }
+
+                _sprite.Position = spritePos;
                 _sprite.Visible = true;
+
+                // 依据官方 PlayScn.pas SayY=-47 与该怪物站立帧的真实头顶高度 (standTopY) 紧贴排布血条与名牌 (对齐 DrawScrn.pas 0x47A186)
+                float standTopY = GetStandingHeadTopY(frameIdx);
+                float hpY = standTopY - 10.0f;
+                float nameY = hpY - 14.0f;
+                if (_nameLabel != null)
+                {
+                    _nameLabel.Position = new Vector2(-40.0f, nameY);
+                }
+                if (_hpBarBg != null)
+                {
+                    _hpBarBg.Position = new Vector2(9.0f, hpY);
+                }
+                UpdateCorpseNameVisibility();
             }
         }
 
         /// <summary>
-        /// 依据官方 IDA sub_495EBC & sub_496120 算法计算贴图绝对帧号
+        /// 依据官方 1.5 权威切片与动作帧算法计算贴图绝对帧号 (严格对齐 Delphi Actor.pas CalcActorFrame 0x44A008)
+        /// - MA10 (Mon1.wil 守卫/带刀护卫/弓箭守卫): 每方向 8 帧步长 (Stand=0, Walk=64, Hit=128, Struck=192+dir*2, Die=208+dir*8)
+        /// - MA14 (标准 360 帧怪物): 每方向 10 帧步长 (Stand=0, Walk=80, Hit=160, Struck=240+dir*2, Die=260+dir*10)
         /// </summary>
         private int CalcAbsoluteFrameIndex()
         {
@@ -489,19 +651,37 @@ namespace Mir2Client.Render
                 return Appr * 10 + (_currentFrame % 6);
             }
 
-            // 官方传奇 1.5 怪物帧偏移权威算法 (sub_496120)
-            int baseOffset = MonsterWilPool.CalcMonsterBaseOffset(Appr);
-
+            var spec = OfficialMonsterAssetRegistry.Resolve(EntityName, Appr);
+            int baseOffset = spec.BaseOffset;
             int dir = Direction & 7;
-            return CurrentAction switch
+            int dieFrame = IsCorpse ? Math.Max(0, spec.DieFrames - 1) : _currentFrame;
+
+            // 1. 守卫/大刀卫士/弓箭守卫 (Mon1.wil 280 帧 MA10 8 帧步长特异规则, Delphi Actor.pas:96)
+            if (spec.WilIndex == 1)
             {
-                ActionType.Stand => baseOffset + dir * 4 + (_currentFrame % 4),
-                ActionType.Walk => baseOffset + 32 + dir * 6 + (_currentFrame % 6),
-                ActionType.Hit => baseOffset + 80 + dir * 6 + (_currentFrame % 6),
-                ActionType.Struck => baseOffset + 128 + dir * 2 + (_currentFrame % 2),
-                ActionType.Die => baseOffset + 144 + dir * 6 + Math.Min(_currentFrame, 5),
-                _ => baseOffset + dir * 4 + (_currentFrame % 4)
+                int guardOffset = CurrentAction switch
+                {
+                    ActionType.Stand => dir * 8 + (_currentFrame % 4),
+                    ActionType.Walk => 64 + dir * 8 + (_currentFrame % 6),
+                    ActionType.Hit => 128 + dir * 8 + (_currentFrame % 6),
+                    ActionType.Struck => 192 + dir * 2 + (_currentFrame % 2),
+                    ActionType.Die => 208 + dir * 8 + Math.Min(dieFrame, Math.Min(spec.DieFrames, 8) - 1),
+                    _ => dir * 8 + (_currentFrame % 4)
+                };
+                return baseOffset + guardOffset;
+            }
+
+            // 2. 普通怪物族 (MA14 10 帧步长权威规则, Delphi Actor.pas:106, ActDie start=260, frame=10, skip=0 -> 260 + dir*10 + frame)
+            int frameOffset = CurrentAction switch
+            {
+                ActionType.Stand => dir * 10 + (_currentFrame % spec.StandFrames),
+                ActionType.Walk => 80 + dir * 10 + (_currentFrame % spec.WalkFrames),
+                ActionType.Hit => 160 + dir * 10 + (_currentFrame % spec.AttackFrames),
+                ActionType.Struck => 240 + dir * 2 + (_currentFrame % spec.StruckFrames),
+                ActionType.Die => 260 + dir * 10 + Math.Min(dieFrame, Math.Min(spec.DieFrames, 10) - 1),
+                _ => dir * 10 + (_currentFrame % spec.StandFrames)
             };
+            return baseOffset + frameOffset;
         }
     }
 }

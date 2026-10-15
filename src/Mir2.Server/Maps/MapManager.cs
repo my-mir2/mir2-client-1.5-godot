@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
@@ -21,9 +22,20 @@ public sealed class MapManager
         RegisterMap(new GameMap(11, "白日门/祖玛寺庙", 500, 500));
         RegisterMap(new GameMap(157, "祖玛寺庙大厅", 500, 500));
 
-        // 在比奇省初始化一段自然河道阻挡 (例如 X: 100..105, Y: 100..150 为水面不可通行)
         var biqi = GetMap(0);
-        biqi?.SetBlockRect(100, 100, 5, 50, blocked: true);
+        if (biqi != null)
+        {
+            string mapPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "maps", "Map", "0.map");
+            if (!System.IO.File.Exists(mapPath))
+            {
+                mapPath = "resources/maps/Map/0.map";
+            }
+            if (System.IO.File.Exists(mapPath))
+            {
+                biqi.LoadMapFile(mapPath);
+            }
+            biqi.SetBlockRect(100, 100, 5, 50, blocked: true);
+        }
 
         // 注册盛大官方经典跨地图跳点传送通道 (Transfer Passage)
         // 兼容测试跳点
@@ -88,6 +100,20 @@ public sealed class MapManager
         }
         _passages.TryGetValue(key, out var passage);
         return passage;
+    }
+
+    /// <summary>
+    /// 用数据库真实世界 (official_map / official_map_gate) 整体替换内置地图与跳点。
+    /// 构造函数中的内置地图与“兼容通道”仅作单元测试夹具，生产启动必须经由本方法覆盖。
+    /// </summary>
+    public void ReplaceWorld(IEnumerable<GameMap> maps, IEnumerable<MapPassage> passages)
+    {
+        _maps.Clear();
+        _passages.Clear();
+        _frozenPassages = null;
+        foreach (var m in maps) _maps[m.MapId] = m;
+        foreach (var p in passages) _passages[MakePassageKey(p.FromMapId, p.FromX, p.FromY)] = p;
+        FreezePassages();
     }
 
     public void RegisterMap(GameMap map)

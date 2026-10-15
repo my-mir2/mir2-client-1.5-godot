@@ -10,6 +10,8 @@ public static class ProtocolConsts
     public const short CM_QUERYVERSION           = 2001; // 官方版本查询 / 登录认证
     public const short CM_LOGINNOTICEOK          = 1;    // 登录公告确认
     public const short CM_LOGIN                  = 2;    // 官方账号密码登录
+    public const short CM_NEWACCOUNT             = 2002; // 盛大官方 1.5 账号注册 (IDA case 2002)
+    public const short CM_UPDATEACCOUNT          = 2003; // 盛大官方 1.5 修改密码 (IDA case 2003)
     public const short CM_GAMELOGIN              = 10;   // 官方游戏网关凭证登录
     public const short CM_QUERYCHRINFO           = 119;  // 查询角色列表
     public const short CM_NEWCHAR                = 101;  // 新建角色
@@ -263,8 +265,8 @@ public static class ProtocolConsts
     public const short SM_SELL_FAIL_DELPHI         = 649;  // 出售物品失败 (IDA sub_467920 0x469F04)
     public const short SM_SELL_OK_DELPHI           = 650;  // 出售成功更新金币 (IDA sub_467920 0x46A119)
     public const short SM_BUY_FAIL_DELPHI          = 651;  // 购买物品失败 (IDA sub_467920 0x46A157)
-    public const short SM_GOLDCHANGED_DELPHI       = 653;  // 金币数值变动 (历史兼容别名)
-    public const short SM_LEVELUP_DELPHI          = 653;  // 盛大官方 1.5 角色升级广播与音效 (IDA sub_467920 0x469C80)
+    public const short SM_GOLDCHANGED_DELPHI       = 653;  // 金币数值变动 (IDA sub_467920 0x469C80)
+    public const short SM_LEVELUP_DELPHI          = 44;   // 盛大官方 1.5 角色升级广播与音效 (IDA sub_467920 0x46A18D case ',')
     public const short SM_CHARSTATUSCHANGED       = 657;  // 盛大官方 1.5 实体状态位图与攻速同步 (IDA sub_467920 0x469D0B)
     public const short SM_MYSTATUS                = 708;  // 盛大官方 1.5 角色体态与饥饿度变动 (IDA sub_467920 0x4689FE)
     public const short SM_READMINIMAP_OK          = 710;  // 盛大官方 1.5 小地图读取与雷达刷新 (IDA sub_467920 0x46A7F8 sub_46EA50)

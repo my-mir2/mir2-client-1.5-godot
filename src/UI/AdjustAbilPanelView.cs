@@ -147,8 +147,7 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            lblBase.AddThemeFontSizeOverride("font_size", 11);
-            lblBase.AddThemeColorOverride("font_color", new Color(0xC0 / 255f, 0xC0 / 255f, 0xC0 / 255f));
+            FontManager.ApplyOfficialStyle(lblBase, new Color(0xC0 / 255f, 0xC0 / 255f, 0xC0 / 255f), FontManager.OfficialFontSize, false);
             panel.AddChild(lblBase);
             _lblBaseStats[statIdx] = lblBase;
 
@@ -162,8 +161,7 @@ public partial class AdjustAbilPanelView : Control, IManagedWindow
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            lblVal.AddThemeFontSizeOverride("font_size", 11);
-            lblVal.AddThemeColorOverride("font_color", new Color(0.95f, 0.95f, 0.8f));
+            FontManager.ApplyOfficialStyle(lblVal, new Color(0.95f, 0.95f, 0.8f), FontManager.OfficialFontSize, false);
             panel.AddChild(lblVal);
             _lblStatAllocations[statIdx] = lblVal;
 

@@ -39,38 +39,47 @@ public static class SpecialRingEngine
         {
             if (currentDura <= 0)
             {
-                return (false, 0, 0, 0, "复活戒指已破损失效！无法触发神圣复生！");
+                return (false, 0, 0, 0, "复活戒指已损坏。");
             }
 
             if (lastReviveTick > 0 && (nowTick - lastReviveTick) < cooldownSec * 1000L)
             {
-                return (false, 0, 0, currentDura, $"复活戒指处于冷却中！冷却剩余 {(cooldownSec * 1000L - (nowTick - lastReviveTick)) / 1000.0:F1} 秒！");
+                return (false, 0, 0, currentDura, "复活戒指正在冷却中。");
             }
 
             int nextDura = currentDura - 1;
-            return (true, maxHp, maxMp, nextDura, $"【复活戒指】神力觉醒！生命与魔法完全恢复！(戒指剩余持久: {nextDura})");
+            return (true, maxHp, maxMp, nextDura, "The Ring made you live");
         }
     }
 
     // ==================== 3. 护身戒指 ====================
     public static class ProtectionRing
     {
+        public const double MpAbsorbRatio = 1.5; // 官方 M2Server sub_4BE3FC @ 0x4BE40B (flt_4BE508 = 1.5)
+
+        /// <summary>
+        /// 盛大官方 1.5 护身戒指伤害吸收与空蓝穿透精算 (sub_4BE3FC)
+        /// 规则: 受到伤害优先扣除 MP，扣蓝比例为 ROUND(damage * 1.5)；
+        /// 若 MP 不足，扣除全部 MP，剩余未吸收伤害按照 damage - (MP / 1.5) 穿透扣除 HP。
+        /// </summary>
         public static (int actualHpDamage, int consumedMp, int remainingMp) AbsorbDamage(
             int incomingDamage, int currentMp)
         {
             if (incomingDamage <= 0) return (0, 0, currentMp);
 
-            if (currentMp >= incomingDamage)
+            int mpNeeded = (int)Math.Round(incomingDamage * MpAbsorbRatio);
+
+            if (currentMp >= mpNeeded)
             {
-                // 蓝量完全抵消所有伤害，生命值不受任何损失
-                return (0, incomingDamage, currentMp - incomingDamage);
+                // 蓝量充足，完全抵扣伤害，HP 不受任何损失
+                return (0, mpNeeded, currentMp - mpNeeded);
             }
             else
             {
-                // 蓝量耗尽，剩余伤害穿透扣除生命值
-                int absorbed = currentMp;
-                int penetrativeDamage = incomingDamage - currentMp;
-                return (penetrativeDamage, absorbed, 0);
+                // 蓝量耗尽，已抵扣伤害 = Floor(currentMp / 1.5)，余量穿透扣除生命值
+                int absorbedDmg = (int)(currentMp / MpAbsorbRatio);
+                int penetrativeDamage = Math.Max(0, incomingDamage - absorbedDmg);
+                return (penetrativeDamage, currentMp, 0);
             }
         }
     }
@@ -175,11 +184,11 @@ public static class SpecialRingEngine
     {
         if (magicId == FlameRing.GrantedMagicId && job != 1 && !hasFlameRing)
         {
-            return (false, "【特戒】你未佩戴火焰戒指，无法运转真气施展火球术！");
+            return (false, "需要佩戴火焰戒指方可施放。");
         }
         if (magicId == DefenseRing.GrantedMagicId && job != 2 && !hasHealingRing)
         {
-            return (false, "【特戒】你未佩戴防御戒指，无法运转神圣力量施展治愈术！");
+            return (false, "需要佩戴防御戒指方可施放。");
         }
         return (true, string.Empty);
     }

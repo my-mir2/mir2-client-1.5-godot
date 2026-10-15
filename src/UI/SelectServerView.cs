@@ -78,7 +78,7 @@ public partial class SelectServerView : Control
                 Size = new Vector2(16, 23),
                 TextureNormal = texClose
             };
-            _btnClose.Pressed += () => GetTree().Quit();
+            _btnClose.Pressed += () => AppLifecycle.SafeQuit(0);
             _panel.AddChild(_btnClose);
         }
 

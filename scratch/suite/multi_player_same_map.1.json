@@ -1,0 +1,84 @@
+{
+  "kills": 1,
+  "seconds": 14.1123042,
+  "rollbacks": 1,
+  "level": 10,
+  "hp": 46,
+  "maxHp": 89,
+  "dead": false,
+  "finalMap": "0",
+  "x": 330,
+  "y": 270,
+  "gold": 0,
+  "exp": 18,
+  "maxExp": 6000,
+  "problems": [
+    "视野内没有可打的怪物，也找不到可前往的刷怪点 (地图 0 位置 330,270)"
+  ],
+  "gm": [
+    "level 10 => GM: 等级=10 HP=89/89",
+    "tp 1 497 465 => GM: 已传送到 1(497,465)",
+    "spawn 钉耙猫 8 => GM: 刷出 钉耙猫 x8"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4492798,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 10,
+      "AtSec": 6.2172749,
+      "Kills": 0,
+      "MaxExp": 6000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 1,
+  "deathPackets": 1,
+  "revives": 1,
+  "struckBy": [
+    {
+      "who": "钉耙猫",
+      "hits": 34,
+      "dmg": 201
+    },
+    {
+      "who": "半兽勇士",
+      "hits": 8,
+      "dmg": 103
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "fights": [
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 21,
+      "Hits": [
+        14,
+        11
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": false,
+      "Swings": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [],
+      "drops": []
+    }
+  ]
+}

@@ -27,7 +27,7 @@ sub_4C1EF4_code.c
 __pycache__/
 *.pyc
 
-# Local IDE / OS
+# Local IDE / OS / Logs / Temp
 .DS_Store
 .vscode/
 .idea/
@@ -39,3 +39,10 @@ tests/CSharp/obj/
 *.user
 *.suo
 /doc
+logs/
+*.log
+scratch/*.log
+scratch/*.png
+scratch/*.txt
+backups/
+save/

@@ -1,0 +1,164 @@
+{
+  "kills": 8,
+  "seconds": 63.2983906,
+  "rollbacks": 0,
+  "level": 0,
+  "hp": 19,
+  "maxHp": 19,
+  "dead": false,
+  "finalMap": "0",
+  "x": 357,
+  "y": 306,
+  "gold": -1,
+  "exp": 40,
+  "maxExp": 100,
+  "problems": [],
+  "gm": [],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4480458,
+      "Kills": 0,
+      "MaxExp": 100
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [
+    {
+      "who": "鸡",
+      "hits": 10,
+      "dmg": 61
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉"
+  ],
+  "fights": [
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        5
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        8
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        8
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        9
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        9
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        5
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        10
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        7
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    }
+  ]
+}

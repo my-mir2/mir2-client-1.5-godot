@@ -1,0 +1,81 @@
+{
+  "kills": 0,
+  "seconds": 12.7196569,
+  "rollbacks": 1,
+  "level": 15,
+  "hp": 149,
+  "maxHp": 149,
+  "dead": false,
+  "finalMap": "1",
+  "x": 497,
+  "y": 465,
+  "gold": 0,
+  "exp": 11,
+  "maxExp": 40000,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "level 15 => GM: 等级=15 HP=149/149",
+    "tp 1 497 465 => GM: 已传送到 1(497,465)"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4270029,
+      "Kills": 0,
+      "MaxExp": 40000
+    },
+    {
+      "Level": 15,
+      "AtSec": 5.7931618,
+      "Kills": 0,
+      "MaxExp": 40000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [
+    {
+      "who": "钉耙猫",
+      "hits": 2,
+      "dmg": 41
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [],
+  "magicUpdates": [],
+  "spellsCast": 0,
+  "spellEffects": 2,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 0,
+  "groupLists": [
+    {
+      "count": 2,
+      "members": "队长_0/队员_0"
+    }
+  ],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 等级=15 HP=149/149",
+    "GM: 已传送到 1(497,465)",
+    "允许编组",
+    "你加入了 队长_0 的队伍。"
+  ],
+  "characterName": "队员_0",
+  "fights": []
+}

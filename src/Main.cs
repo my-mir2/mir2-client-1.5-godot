@@ -35,6 +35,8 @@ public partial class Main : Node
     private string _password = string.Empty;
     private string _selectedCharName = "热血战士";
     private int _selectedCharLevel = 35;
+    private int _selectedCharGender = 0;
+    private int _selectedCharJob = 0;
     private int _sessionId = 1;
 
     private readonly List<string> _serverList = new();
@@ -60,7 +62,8 @@ public partial class Main : Node
 
         SetupCustomCursor();
         DisplayServer.WindowSetTitle("热血传奇 1.50 - 虎卫传说 (官方 1:1 C# 工业级单轨版)");
-        GD.Print("[Main] 盛大传奇 1.5 C# 主入口已就绪");
+        FontManager.AttachTreeAutoStyler(GetTree());
+        GD.Print("[Main] 盛大传奇 1.5 C# 主入口已就绪 (官方中易宋体全局样式已挂载)");
 
         SwitchPhase(Phase.Login);
 
@@ -84,18 +87,29 @@ public partial class Main : Node
             AddChild(new AutoEndToEndDriver());
         }
 #endif
-        if (allArgs.Any(a => a.Contains("auto-screenshot")))
+        if (allArgs.Any(a => a.Contains("auto-screenshot") || a.Contains("auto-live-screenshot")))
         {
+            GD.Print("[Main] 正在挂载 AutoLiveScreenshotRunner 巡检驱动器...");
             AddChild(new AutoLiveScreenshotRunner());
         }
     }
 
     public Node? CurrentSceneNode => _currentSceneNode;
 
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMCloseRequest)
+        {
+            GD.Print("[Main] 收到窗口关闭请求 (NotificationWMCloseRequest)，执行安全退出...");
+            AppLifecycle.SafeQuit(0);
+        }
+    }
+
     public override void _ExitTree()
     {
         // 退出前释放自定义鼠标指针纹理,避免引擎退出期纹理泄漏 ERROR
         Input.SetCustomMouseCursor(null, Input.CursorShape.Arrow, Vector2.Zero);
+        _net?.DisconnectFromServer();
     }
 
     private static void SetupCustomCursor()
@@ -123,6 +137,7 @@ public partial class Main : Node
         {
             case Phase.Login:
             {
+                AudioManager.Instance?.PlayBgm("Log-in-long2.wav", loop: true);
                 var loginScene = GD.Load<PackedScene>("res://scenes/Login.tscn");
                 if (loginScene != null)
                 {
@@ -130,14 +145,8 @@ public partial class Main : Node
                     node.ServerHost = DefaultHost;
                     node.ServerPort = DefaultPort;
                     node.LoginRequested += OnLoginRequested;
-                    node.RegisterRequested += (acc, pwd) =>
-                    {
-                        GD.Print($"[Main] 收到新账号注册请求: {acc}");
-                    };
-                    node.ChangePasswordRequested += (acc, oldP, newP) =>
-                    {
-                        GD.Print($"[Main] 收到修改密码请求: {acc}");
-                    };
+                    node.RegisterRequested += OnRegisterRequested;
+                    node.ChangePasswordRequested += OnChangePasswordRequested;
                     AddChild(node);
                     _currentSceneNode = node;
                 }
@@ -145,6 +154,7 @@ public partial class Main : Node
             }
             case Phase.SelectServer:
             {
+                AudioManager.Instance?.PlayBgm("Log-in-long2.wav", loop: true);
                 var srvScene = GD.Load<PackedScene>("res://scenes/SelectServer.tscn");
                 if (srvScene != null)
                 {
@@ -184,6 +194,7 @@ public partial class Main : Node
             }
             case Phase.SelectChar:
             {
+                AudioManager.Instance?.PlayBgm("sellect-loop2.wav", loop: true);
                 var charScene = GD.Load<PackedScene>("res://scenes/SelectChar.tscn");
                 if (charScene != null)
                 {
@@ -202,10 +213,12 @@ public partial class Main : Node
                         });
                     }
 #endif
-                    node.CharSelected += (idx, name, lvl) =>
+                    node.CharSelected += (idx, name, lvl, sex, job) =>
                     {
                         _selectedCharName = name;
                         _selectedCharLevel = lvl;
+                        _selectedCharGender = sex;
+                        _selectedCharJob = job;
                         if (_net != null && _net.IsConnectedToServer)
                         {
                             var selChar = BinaryProtocol.SelectCharIntentPayload.Create(idx, name);
@@ -226,11 +239,11 @@ public partial class Main : Node
                         }
 #endif
                     };
-                    node.NewCharRequested += (name, job, sex) =>
+                    node.NewCharRequested += (name, job, sex, hair) =>
                     {
                         if (_net != null && _net.IsConnectedToServer)
                         {
-                            var newChar = BinaryProtocol.CreateCharIntentPayload.Create(name, (byte)job, (byte)sex);
+                            var newChar = BinaryProtocol.CreateCharIntentPayload.Create(name, (byte)job, (byte)sex, (byte)(hair + 1));
                             _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.CreateCharRequest, in newChar);
                         }
                     };
@@ -249,6 +262,7 @@ public partial class Main : Node
             }
             case Phase.Game:
             {
+                AudioManager.Instance?.PlayBgm("main_theme.wav", loop: false);
                 var gameScene = GD.Load<PackedScene>("res://scenes/Game.tscn");
                 if (gameScene != null)
                 {
@@ -257,7 +271,7 @@ public partial class Main : Node
                     _currentSceneNode = node;
                     if (_net != null)
                     {
-                        node.SetNet(_net, _sessionId, _selectedCharName, _selectedCharLevel);
+                        node.SetNet(_net, _sessionId, _selectedCharName, _selectedCharLevel, _selectedCharGender, _selectedCharJob);
                         if (_net.IsConnectedToServer)
                         {
                             var loginOk = new BinaryProtocol.LoginNoticeOkPayload { Acknowledged = 1 };
@@ -267,6 +281,11 @@ public partial class Main : Node
                 }
                 break;
             }
+        }
+
+        if (_currentSceneNode != null)
+        {
+            FontManager.ApplyRecursively(_currentSceneNode);
         }
     }
 
@@ -316,9 +335,61 @@ public partial class Main : Node
 #endif
     }
 
+    private Action? _onConnectedAction;
+
+    private void OnRegisterRequested(string acc, string pwd)
+    {
+        GD.Print($"[Main] 处理新账号注册请求: {acc}");
+        if (_net == null) return;
+        Action sendRegister = () =>
+        {
+            var regIntent = BinaryProtocol.CreateAccountPayload.Create(acc, pwd);
+            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.CreateAccountRequest, in regIntent);
+        };
+
+        if (_net.IsConnectedToServer)
+        {
+            sendRegister();
+        }
+        else
+        {
+            _onConnectedAction = sendRegister;
+            _net.ConnectTo(DefaultHost, DefaultPort, autoReconnect: false);
+        }
+    }
+
+    private void OnChangePasswordRequested(string acc, string oldP, string newP)
+    {
+        GD.Print($"[Main] 处理修改密码请求: {acc}");
+        if (_net == null) return;
+        Action sendChange = () =>
+        {
+            var chgIntent = BinaryProtocol.ChangePasswordPayload.Create(acc, oldP, newP);
+            _net.SendBinaryIntent((ushort)BinaryProtocol.MsgType.ChangePasswordRequest, in chgIntent);
+        };
+
+        if (_net.IsConnectedToServer)
+        {
+            sendChange();
+        }
+        else
+        {
+            _onConnectedAction = sendChange;
+            _net.ConnectTo(DefaultHost, DefaultPort, autoReconnect: false);
+        }
+    }
+
     private void OnNetworkConnected()
     {
         GD.Print($"[Main] 网络成功连接到服务器，当前生命周期阶段: {_currentPhase}");
+        if (_onConnectedAction != null)
+        {
+            var action = _onConnectedAction;
+            _onConnectedAction = null;
+            action();
+            return;
+        }
+
         if (_currentPhase == Phase.Login && !string.IsNullOrEmpty(_account))
         {
             GD.Print($"[Main] 连接建立完毕，发送登录封包: account={_account}");
@@ -391,6 +462,57 @@ public partial class Main : Node
                 }
                 break;
             }
+            case ProtocolConsts.SM_NEWID_SUCCESS: // 504 盛大官方 1.5 账号注册成功
+            {
+                var parsed = DecodeServerPacket(smCode, data);
+                string text = parsed?.ExtraStr ?? string.Empty;
+                GD.Print($"[Main] 收到官方 1.5 账号注册成功回执: {text}");
+                if (_currentSceneNode is UI.LoginView lv)
+                {
+                    lv.SwitchSubState(0);
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        lv.SetUsername(text);
+                    }
+                    lv.ShowMessageModal("账号注册成功！请直接输入密码登录。");
+                }
+                break;
+            }
+            case ProtocolConsts.SM_NEWID_FAIL: // 505 盛大官方 1.5 账号注册失败
+            {
+                var parsed = DecodeServerPacket(smCode, data);
+                string text = parsed?.ExtraStr ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(text)) text = "该账号已被占用或注册信息不合法！";
+                GD.Print($"[Main] 收到官方 1.5 账号注册失败回执: {text}");
+                if (_currentSceneNode is UI.LoginView lv)
+                {
+                    lv.ShowMessageModal(text);
+                }
+                break;
+            }
+            case ProtocolConsts.SM_CHGPASSWD_SUCCESS: // 506
+            case ProtocolConsts.SM_CHANGEPASS_OK: // 532 盛大官方 1.5 密码修改成功
+            {
+                GD.Print("[Main] 收到官方 1.5 密码修改成功回执");
+                if (_currentSceneNode is UI.LoginView lv)
+                {
+                    lv.SwitchSubState(0);
+                    lv.ShowMessageModal("密码修改成功！请使用新密码重新登录。");
+                }
+                break;
+            }
+            case ProtocolConsts.SM_CHANGEPASS_FAIL: // 503 盛大官方 1.5 密码修改失败
+            {
+                var parsed = DecodeServerPacket(smCode, data);
+                string text = parsed?.ExtraStr ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(text)) text = "原密码不正确或账号不存在！";
+                GD.Print($"[Main] 收到官方 1.5 密码修改失败回执: {text}");
+                if (_currentSceneNode is UI.LoginView lv)
+                {
+                    lv.ShowMessageModal(text);
+                }
+                break;
+            }
             case ProtocolConsts.SM_PASSOK: // 500
             case 530: // SM_LOGINSUCCESS
             {
@@ -448,11 +570,9 @@ public partial class Main : Node
                         {
                             string cname = parts[0];
                             int job = int.TryParse(parts[1], out var j) ? j : 0;
-                            int f2 = int.TryParse(parts[2], out var v2) ? v2 : 0;
-                            int f3 = int.TryParse(parts[3], out var v3) ? v3 : 0;
-                            int level = (f2 > 1) ? f2 : f3;
-                            int gender = (f2 > 1) ? f3 : f2;
-                            list.Add(new UI.SelectCharView.CharEntry(cname, job, gender, level));
+                            int level = int.TryParse(parts[2], out var lvl) ? lvl : 1;
+                            int sex = int.TryParse(parts[3], out var s) ? s : 0;
+                            list.Add(new UI.SelectCharView.CharEntry(cname, job, sex, level));
                         }
                     }
                 }
@@ -488,10 +608,10 @@ public partial class Main : Node
                 int code = parsed?.Recog ?? 0;
                 string failMsg = code switch
                 {
-                    2 => "[failure] 这个名字已经存在。", // 0x46B4C8
-                    3 => "[Failure] 你只能为一个帐户设两个角色.\n请和游戏管理员联系。", // 0x46B4F0
-                    4 => "[failure] 角色建立失败. Error=4", // 0x46B534
-                    _ => "[Failure] 未知的错误. 请写信给: support@legendofmir.net" // 0x46B55C
+                    2 => "角色建立失败：这个名字已经存在！", // 0x46B4C8
+                    3 => "角色建立失败：每个帐号最多只能建立两个角色！", // 0x46B4F0
+                    4 => "角色建立失败：角色名称不合规范，长度应在1至14个字符之间！", // 0x46B534
+                    _ => "角色建立失败：发生未知错误，请联系游戏管理员。" // 0x46B55C
                 };
                 GD.Print($"[Main] 官方 1.5 创角失败模态弹窗: code={code}, msg={failMsg}");
                 if (_currentSceneNode is UI.SelectCharView selView)

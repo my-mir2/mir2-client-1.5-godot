@@ -31,7 +31,7 @@ public sealed class TeleportScrollEngine
                 if (!string.IsNullOrWhiteSpace(playerGuild) &&
                     playerGuild.Equals(sabukEngine.OwnerGuild, StringComparison.OrdinalIgnoreCase))
                 {
-                    return (true, SabukSiegeEngine.SabukCastleMapId, 644, 290, "【沙城战备】回城卷闪耀行会军徽，你已火速传送回沙巴克城池阵地！");
+                    return (true, SabukSiegeEngine.SabukCastleMapId, 644, 290, "返回沙巴克城池阵地。");
                 }
             }
         }
@@ -43,7 +43,7 @@ public sealed class TeleportScrollEngine
         int targetX = targetMap == 0 ? 330 : 330;
         int targetY = targetMap == 0 ? 270 : 330;
 
-        return (true, targetMap, targetX, targetY, "时空流转，你已安全返回主城！");
+        return (true, targetMap, targetX, targetY, string.Empty);
     }
 
     public static (bool success, int targetX, int targetY, string message) UseRandomTeleport(
@@ -62,11 +62,11 @@ public sealed class TeleportScrollEngine
 
             if (currentMap.IsWalkable(rx, ry))
             {
-                return (true, rx, ry, "随机传送卷光芒四射，你被传送到了未知方位！");
+                return (true, rx, ry, string.Empty);
             }
         }
 
-        return (false, session.X, session.Y, "四周空间紊乱，随机传送失败！");
+        return (false, session.X, session.Y, "传送失败。");
     }
 
     public static (bool success, int targetMapId, int targetX, int targetY, string message) UseDungeonEscape(
@@ -78,6 +78,6 @@ public sealed class TeleportScrollEngine
         }
 
         // 地牢逃脱卷强制回比奇地表大地图
-        return (true, 0, 330, 270, "脱离阴暗地牢，重见天日！");
+        return (true, 0, 330, 270, string.Empty);
     }
 }

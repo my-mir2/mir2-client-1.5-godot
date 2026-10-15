@@ -1,0 +1,214 @@
+{
+  "kills": 8,
+  "seconds": 221.3852488,
+  "rollbacks": 1,
+  "level": 15,
+  "hp": 115,
+  "maxHp": 149,
+  "dead": false,
+  "finalMap": "0",
+  "x": 359,
+  "y": 292,
+  "gold": 0,
+  "exp": 40,
+  "maxExp": 40000,
+  "problems": [],
+  "gm": [
+    "level 15 => GM: 等级=15 HP=149/149"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4336677,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 15,
+      "AtSec": 5.3823059,
+      "Kills": 0,
+      "MaxExp": 40000
+    }
+  ],
+  "arrivals": [
+    {
+      "map": "1",
+      "ents": 2,
+      "monsters": 2,
+      "expectX": 563,
+      "expectY": 557,
+      "x": 563,
+      "y": 557,
+      "expect": "1"
+    }
+  ],
+  "deaths": 1,
+  "deathPackets": 1,
+  "revives": 1,
+  "struckBy": [
+    {
+      "who": "鹿",
+      "hits": 5,
+      "dmg": 3
+    },
+    {
+      "who": "钉耙猫",
+      "hits": 12,
+      "dmg": 32
+    },
+    {
+      "who": "半兽勇士",
+      "hits": 12,
+      "dmg": 252
+    },
+    {
+      "who": "鸡",
+      "hits": 10,
+      "dmg": 147
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉",
+    "鸡肉"
+  ],
+  "fights": [
+    {
+      "Map": "1",
+      "Name": "半兽勇士",
+      "Killed": false,
+      "Swings": 5,
+      "Misses": 0,
+      "DamageTaken": 162,
+      "Hits": [
+        13,
+        20,
+        13,
+        24,
+        27
+      ],
+      "drops": []
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        18
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        16
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        22
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        17
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        11
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        17
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        27
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    },
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        18
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    }
+  ]
+}

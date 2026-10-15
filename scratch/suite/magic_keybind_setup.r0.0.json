@@ -1,0 +1,84 @@
+{
+  "kills": 0,
+  "seconds": 6.3458322,
+  "rollbacks": 0,
+  "level": 25,
+  "hp": 101,
+  "maxHp": 101,
+  "dead": false,
+  "finalMap": "0",
+  "x": 330,
+  "y": 270,
+  "gold": 0,
+  "exp": 0,
+  "maxExp": 500000,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "job 1 => GM: 职业=1 HP=16/16 MP=11/18",
+    "level 25 => GM: 等级=25 HP=101/101",
+    "skill 雷电术 3 => GM: 已习得技能 雷电术(ID=10) Lv=3"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4629948,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 25,
+      "AtSec": 6.251289,
+      "Kills": 0,
+      "MaxExp": 500000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [
+    {
+      "id": 10,
+      "name": "雷电术",
+      "level": 3,
+      "key": 0
+    }
+  ],
+  "magicUpdates": [
+    {
+      "id": 10,
+      "level": 3,
+      "key": 0
+    }
+  ],
+  "spellsCast": 0,
+  "spellEffects": 0,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 0,
+  "groupLists": [],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 职业=1 HP=16/16 MP=11/18",
+    "GM: 等级=25 HP=101/101",
+    "GM: 已习得技能 雷电术(ID=10) Lv=3",
+    "技能【雷电术】快捷键已设置为 F1"
+  ],
+  "characterName": "机器人4095",
+  "fights": []
+}

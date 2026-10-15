@@ -5,6 +5,7 @@
 
 using System;
 using Godot;
+using Mir2Client.Utils;
 
 namespace Mir2Client.Render
 {
@@ -34,22 +35,25 @@ namespace Mir2Client.Render
             _sprite = new Sprite2D { Centered = false };
             AddChild(_sprite);
 
+            // 盛大官方 1.5 地表物品名称定位 (严格 1:1 对齐 Delphi PlayScn.pas:1397-1398):
+            // ix + HALFX - W/2, iy + HALFY - H*2 = (24 - 40 = -16, -12)
             _nameLabel = new Label
             {
                 Name = "GroundItemName",
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Position = new Vector2(-40, -18),
-                Size = new Vector2(80, 14)
+                Position = new Vector2(-16, -12),
+                Size = new Vector2(80, 14),
+                Visible = true,
+                ZAsRelative = false,
+                ZIndex = 110,
+                MouseFilter = Control.MouseFilterEnum.Ignore
             };
-            _nameLabel.AddThemeFontSizeOverride("font_size", 9);
             Color nameColor = ItemName.Contains("金币")
                 ? new Color(1.0f, 0.95f, 0.4f)
                 : (ItemName.Contains("裁决") || ItemName.Contains("屠龙") || ItemName.Contains("骨玉") || ItemName.Contains("龙纹")
                     ? new Color(1.0f, 0.4f, 0.4f)
                     : new Color(0.9f, 0.9f, 0.9f));
-            _nameLabel.AddThemeColorOverride("font_color", nameColor);
-            _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
-            _nameLabel.AddThemeConstantOverride("outline_size", 1);
+            FontManager.ApplyOfficialWorldNameplateStyle(_nameLabel, nameColor);
             _nameLabel.Text = Amount > 1 && ItemName.Contains("金币") ? $"{ItemName} ({Amount})" : ItemName;
             AddChild(_nameLabel);
         }
@@ -92,18 +96,30 @@ namespace Mir2Client.Render
             if (_sprite == null || _loader == null) return;
 
             int frameIdx = Looks;
-            if (ItemName.Contains("金币"))
+            if (ItemName.Contains("金币") && frameIdx < 112)
             {
-                frameIdx = 1; // 统一为显目的大金币堆 (DnItems_0001.png)，彻底杜绝足球误判
+                // 盛大官方 1.5 DnItems.wil 权威真值：112~116 为小中大 5 档金币堆（DnItems_0001 为生肉块，严禁混用！）
+                frameIdx = Amount >= 1000 ? 116 : (Amount >= 500 ? 115 : (Amount >= 200 ? 114 : (Amount >= 100 ? 113 : 112)));
+            }
+            else if (frameIdx <= 0)
+            {
+                if (ItemName.Contains("药") || ItemName.Contains("水") || ItemName.Contains("霜")) frameIdx = 28;
+                else if (ItemName.Contains("卷")) frameIdx = 3;
+                else if (ItemName.Contains("剑") || ItemName.Contains("刀") || ItemName.Contains("杖") || ItemName.Contains("斧")) frameIdx = 22;
+                else if (ItemName.Contains("甲") || ItemName.Contains("衣") || ItemName.Contains("袍")) frameIdx = 62;
+                else if (ItemName.Contains("肉")) frameIdx = 1;
+                else frameIdx = 112;
             }
 
             Texture2D? tex = _loader.GetFrame(frameIdx);
             if (tex != null)
             {
                 _sprite.Texture = tex;
-                var anchor = _loader.GetAnchor(frameIdx);
-                // 盛大官方 1.5 瓦片中心底部地表定位
-                _sprite.Position = new Vector2(24 + anchor.X - 10, 32 + anchor.Y + 14);
+                // 盛大官方 1.5 地表物品居中定位 (严格 1:1 对齐 Delphi PlayScn.pas:1221):
+                // m_ObjSurface.Draw(ix + HALFX - (d.Width div 2), iy + HALFY - (d.Height div 2))
+                int ox = 24 - (int)(tex.GetWidth() / 2);
+                int oy = 16 - (int)(tex.GetHeight() / 2);
+                _sprite.Position = new Vector2(ox, oy);
                 _sprite.Visible = true;
             }
         }
@@ -114,6 +130,10 @@ namespace Mir2Client.Render
         public override void _Process(double delta)
         {
             UpdatePosition();
+            if (_nameLabel != null)
+            {
+                _nameLabel.Visible = Visible;
+            }
             float dt = (float)delta;
             RemainingLifeSec -= dt;
             if (RemainingLifeSec <= 10.0f && RemainingLifeSec > 0f)

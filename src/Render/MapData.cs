@@ -18,8 +18,8 @@ public readonly record struct MapCell(
     public int SmTileIdx => (MidRaw & 0x7FFF) > 0 ? (MidRaw & 0x7FFF) - 1 : -1;
     public int ObjIdx => (ObjRaw & 0x7FFF) > 0 ? (ObjRaw & 0x7FFF) - 1 : -1;
 
-    // 最高位 MSB=1 表示阻挡不可通行
-    public bool Passable => (FloorRaw & 0x8000) == 0;
+    // 最高位 MSB=1 表示阻挡不可通行 (官方 PlayScn.pas CanWalk 0x475E34: BkImg & 0x8000 == 0 且 FrImg & 0x8000 == 0)
+    public bool Passable => (FloorRaw & 0x8000) == 0 && (ObjRaw & 0x8000) == 0;
 }
 
 /// <summary>

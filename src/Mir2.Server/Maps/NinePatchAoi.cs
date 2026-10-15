@@ -164,6 +164,21 @@ public sealed class NinePatchAoi<TEntity> where TEntity : class
     }
 
     /// <summary>
+    /// 遍历指定 Zone 索引内的所有实体
+    /// </summary>
+    public void ForEachInZone(int zoneIndex, Action<TEntity> action)
+    {
+        if (zoneIndex < 0 || zoneIndex >= _zones.Length) return;
+        lock (_zones[zoneIndex])
+        {
+            foreach (var entity in _zones[zoneIndex])
+            {
+                action(entity);
+            }
+        }
+    }
+
+    /// <summary>
     /// 获取当前坐标周围九宫格内的所有实体 (广播目标集合)
     /// </summary>
     public void GetEntitiesInNinePatch(int tileX, int tileY, List<TEntity> result)

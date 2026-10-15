@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using Mir2Client.Utils;
 
 namespace Mir2Client.UI;
 
@@ -21,8 +22,24 @@ public partial class ChatBoxView : Control
         _log = GetNodeOrNull<RichTextLabel>("Log");
         _input = GetNodeOrNull<LineEdit>("Input");
 
+        if (_log != null)
+        {
+            if (FontManager.OfficialSongti != null)
+            {
+                _log.AddThemeFontOverride("normal_font", FontManager.OfficialSongti);
+                _log.AddThemeFontOverride("bold_font", FontManager.OfficialSongti);
+            }
+            _log.AddThemeFontSizeOverride("normal_font_size", FontManager.OfficialFontSize);
+            _log.AddThemeFontSizeOverride("bold_font_size", FontManager.OfficialFontSize);
+        }
+
         if (_input != null)
         {
+            if (FontManager.OfficialSongti != null)
+            {
+                _input.AddThemeFontOverride("font", FontManager.OfficialSongti);
+            }
+            _input.AddThemeFontSizeOverride("font_size", FontManager.OfficialFontSize);
             _input.TextSubmitted += OnSubmit;
             _input.FocusExited += () => _input.Visible = false;
         }

@@ -1,0 +1,66 @@
+{
+  "kills": 0,
+  "seconds": 5.4603965,
+  "rollbacks": 0,
+  "level": 1,
+  "hp": 19,
+  "maxHp": 19,
+  "dead": false,
+  "finalMap": "0",
+  "x": 330,
+  "y": 270,
+  "gold": 1800,
+  "exp": 0,
+  "maxExp": 100,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "gold 2000 => GM: 金币=2000"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4618343,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 1,
+      "AtSec": 5.4251074,
+      "Kills": 0,
+      "MaxExp": 100
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [],
+  "magicUpdates": [],
+  "spellsCast": 0,
+  "spellEffects": 0,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 1,
+  "groupLists": [],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 金币=2000"
+  ],
+  "characterName": "机器人1841",
+  "fights": []
+}

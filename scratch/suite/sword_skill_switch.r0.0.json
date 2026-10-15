@@ -1,0 +1,85 @@
+{
+  "kills": 0,
+  "seconds": 6.4442309,
+  "rollbacks": 0,
+  "level": 30,
+  "hp": 419,
+  "maxHp": 419,
+  "dead": false,
+  "finalMap": "0",
+  "x": 330,
+  "y": 270,
+  "gold": 0,
+  "exp": 0,
+  "maxExp": 2000000,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "level 30 => GM: 等级=30 HP=419/419",
+    "skill 刺杀剑术 3 => GM: 已习得技能 刺杀剑术(ID=12) Lv=3",
+    "skill 半月弯刀 3 => GM: 已习得技能 半月弯刀(ID=25) Lv=3"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4402583,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 30,
+      "AtSec": 6.2397096,
+      "Kills": 0,
+      "MaxExp": 2000000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [
+    {
+      "id": 12,
+      "name": "刺杀剑术",
+      "level": 3,
+      "key": 255
+    },
+    {
+      "id": 25,
+      "name": "半月弯刀",
+      "level": 3,
+      "key": 255
+    }
+  ],
+  "magicUpdates": [],
+  "spellsCast": 0,
+  "spellEffects": 0,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 0,
+  "groupLists": [],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 等级=30 HP=419/419",
+    "GM: 已习得技能 刺杀剑术(ID=12) Lv=3",
+    "GM: 已习得技能 半月弯刀(ID=25) Lv=3",
+    "打开刺杀剑术",
+    "打开半月弯刀"
+  ],
+  "characterName": "机器人8682",
+  "fights": []
+}

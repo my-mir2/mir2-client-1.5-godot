@@ -59,7 +59,7 @@ public static class PkJusticeEngine
         int dist = Math.Max(Math.Abs(guardX - targetX), Math.Abs(guardY - targetY));
         if (dist <= GuardDetectRange)
         {
-            return (true, GuardLethalDamage, "【大刀卫士怒吼】恶贼伏诛！大刀划破苍穹，一击将红名暴徒斩落马下！");
+            return (true, GuardLethalDamage, "大刀卫士攻击红名");
         }
 
         return (false, 0, "红名超出卫士视线范围");

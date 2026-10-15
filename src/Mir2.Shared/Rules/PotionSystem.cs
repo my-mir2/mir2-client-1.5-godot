@@ -91,13 +91,29 @@ public class PotionSystem
             };
         }
 
-        // 兜底模糊匹配
-        if (trimmed.Contains("太阳水") || trimmed.Contains("疗伤药") || trimmed.Contains("万年雪霜"))
-            return new PotionMeta { Name = trimmed, Kind = PotionKind.InstantHpMp, TotalHp = 50, TotalMp = 50 };
-        if (trimmed.Contains("金创药") || trimmed.Contains("红"))
+        // 官方 1.5 权威药水名称兜底匹配 (完全对齐 StdItems.DB 物理真值)
+        if (trimmed.Contains("疗伤药"))
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.InstantHpMp, TotalHp = 150, TotalMp = 150 };
+        if (trimmed.Contains("万年雪霜"))
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.InstantHpMp, TotalHp = 100, TotalMp = 100 };
+        if (trimmed.Contains("强效太阳水"))
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.InstantHpMp, TotalHp = 50, TotalMp = 80 };
+        if (trimmed.Contains("太阳水"))
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.InstantHpMp, TotalHp = 30, TotalMp = 40 };
+
+        if (trimmed.Contains("强效金创药"))
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualHp, TotalHp = 90, TotalMp = 0 };
+        if (trimmed.Contains("中量金创药") || trimmed.Contains("金创药(中量)"))
             return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualHp, TotalHp = 50, TotalMp = 0 };
-        if (trimmed.Contains("魔法药") || trimmed.Contains("蓝"))
+        if (trimmed.Contains("金创药") || trimmed.Contains("红"))
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualHp, TotalHp = 25, TotalMp = 0 };
+
+        if (trimmed.Contains("强效魔法药"))
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualMp, TotalHp = 0, TotalMp = 150 };
+        if (trimmed.Contains("中量魔法药") || trimmed.Contains("魔法药(中量)"))
             return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualMp, TotalHp = 0, TotalMp = 80 };
+        if (trimmed.Contains("魔法药") || trimmed.Contains("蓝"))
+            return new PotionMeta { Name = trimmed, Kind = PotionKind.GradualMp, TotalHp = 0, TotalMp = 35 };
 
         return new PotionMeta { Name = trimmed, Kind = PotionKind.None };
     }

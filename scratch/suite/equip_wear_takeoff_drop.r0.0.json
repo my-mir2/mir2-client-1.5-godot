@@ -1,0 +1,90 @@
+{
+  "kills": 0,
+  "seconds": 6.6055046,
+  "rollbacks": 0,
+  "level": 20,
+  "hp": 224,
+  "maxHp": 224,
+  "dead": false,
+  "finalMap": "0",
+  "x": 330,
+  "y": 270,
+  "gold": 0,
+  "exp": 0,
+  "maxExp": 140000,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "level 20 => GM: 等级=20 HP=224/224",
+    "item 铁剑 1 => GM: 发放 IronSword x1",
+    "item 金手镯 1 => GM: 发放 GoldBracelet x1"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4665234,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 20,
+      "AtSec": 6.2763783,
+      "Kills": 0,
+      "MaxExp": 140000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130",
+    "IronSword\t10000\t10000\t36",
+    "GoldBracelet\t7000\t7000\t207"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [],
+  "magicUpdates": [],
+  "spellsCast": 0,
+  "spellEffects": 0,
+  "takeOns": [
+    {
+      "slot": 0,
+      "name": "金创药(小量)"
+    },
+    {
+      "slot": 5,
+      "name": "金创药(小量)"
+    }
+  ],
+  "takeOffs": [
+    {
+      "slot": 0
+    }
+  ],
+  "delItems": [
+    {
+      "uid": 12,
+      "name": "魔法药(小量)"
+    }
+  ],
+  "groundCount": 1,
+  "groupLists": [],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 等级=20 HP=224/224",
+    "GM: 发放 IronSword x1",
+    "GM: 发放 GoldBracelet x1"
+  ],
+  "characterName": "机器人7471",
+  "fights": []
+}

@@ -22,8 +22,10 @@ namespace Mir2.Server.Network;
 public sealed class ClientSession : IDisposable, INpcPlayerSession
 {
     private readonly Socket? _socket;
-    private readonly byte[] _sendBuffer;
+    private byte[] _sendBuffer;
     private int _sendBufferOffset;
+    private int _disposed;     // 0=存活 1=已释放。Dispose 幂等
+    private int _poolReturned; // 1=缓冲已归还 ArrayPool (此后本会话禁止再读写它)。保证缓冲只归还一次，杜绝两个会话租到同一块数组而串包
     private readonly System.Threading.Lock _sendLock = new();
 
     public int SessionId { get; }
@@ -68,6 +70,7 @@ public sealed class ClientSession : IDisposable, INpcPlayerSession
 
     // 变速齿轮与防假刀加速防御 (SpeedHack Mitigation)
     public long PenaltyFrozenUntilMs { get; set; }
+    public int ConsecutiveFastMoves { get; set; }
     public bool IsActionFrozen(long nowMs) => nowMs < PenaltyFrozenUntilMs;
 
     /// <summary>
@@ -139,9 +142,17 @@ public sealed class ClientSession : IDisposable, INpcPlayerSession
 
         lock (_sendLock)
         {
+            if (_poolReturned != 0) return; // 缓冲已归还对象池，禁止再写入
             if (_sendBuffer.Length - _sendBufferOffset < totalLen)
             {
-                FlushDirectUnsafe();
+                if (_socket != null && _socket.Connected)
+                {
+                    FlushDirectUnsafe();
+                }
+                else
+                {
+                    _sendBufferOffset = 0;
+                }
             }
 
             var dest = _sendBuffer.AsSpan(_sendBufferOffset, totalLen);
@@ -176,6 +187,29 @@ public sealed class ClientSession : IDisposable, INpcPlayerSession
             }
 
             _sendBufferOffset += totalLen;
+
+            // 关键认证与生命周期响应包立即主动刷新，杜绝在缓冲区中停滞导致客户端无谓等待
+            if (ident == ProtocolConsts.SM_PASSOK || 
+                ident == 530 || 
+                ident == ProtocolConsts.SM_NEWID_SUCCESS || 
+                ident == ProtocolConsts.SM_NEWID_FAIL || 
+                ident == ProtocolConsts.SM_CHGPASSWD_SUCCESS || 
+                ident == ProtocolConsts.SM_CHANGEPASS_OK || 
+                ident == ProtocolConsts.SM_CHANGEPASS_FAIL || 
+                ident == ProtocolConsts.SM_NEWCHR_SUCCESS || 
+                ident == ProtocolConsts.SM_NEWCHR_FAIL || 
+                ident == ProtocolConsts.SM_DELCHR_SUCCESS || 
+                ident == ProtocolConsts.SM_DELCHR_FAIL || 
+                ident == ProtocolConsts.SM_QUERYCHAR_OK || 
+                ident == ProtocolConsts.SM_CHARLIST_DELPHI || 
+                ident == ProtocolConsts.SM_SELECTSERVER_OK || 
+                ident == ProtocolConsts.SM_STARTPLAY)
+            {
+                if (_socket != null && _socket.Connected)
+                {
+                    FlushDirectUnsafe();
+                }
+            }
         }
     }
 
@@ -187,9 +221,17 @@ public sealed class ClientSession : IDisposable, INpcPlayerSession
         int totalLen = Mir2.Shared.Protocols.Modern.BinaryProtocol.HeaderSize + payload.Length;
         lock (_sendLock)
         {
+            if (_poolReturned != 0) return; // 缓冲已归还对象池，禁止再写入
             if (_sendBuffer.Length - _sendBufferOffset < totalLen)
             {
-                FlushDirectUnsafe();
+                if (_socket != null && _socket.Connected)
+                {
+                    FlushDirectUnsafe();
+                }
+                else
+                {
+                    _sendBufferOffset = 0;
+                }
             }
 
             ushort seq = ++SendSequence;
@@ -216,6 +258,10 @@ public sealed class ClientSession : IDisposable, INpcPlayerSession
             }
 
             _sendBufferOffset += totalLen;
+            if (_socket != null && _socket.Connected)
+            {
+                FlushDirectUnsafe();
+            }
         }
     }
 
@@ -239,9 +285,11 @@ public sealed class ClientSession : IDisposable, INpcPlayerSession
 
     private void FlushDirectUnsafe()
     {
+        if (_socket == null || !_socket.Connected) return;
+
         try
         {
-            if (_sendBufferOffset > 0 && _socket != null && _socket.Connected)
+            if (_sendBufferOffset > 0)
             {
                 _socket.Send(_sendBuffer, 0, _sendBufferOffset, SocketFlags.None);
             }
@@ -340,6 +388,8 @@ public sealed class ClientSession : IDisposable, INpcPlayerSession
     {
         lock (_sendLock)
         {
+            if (_disposed != 0) return; // 派发器 Disconnect 与网关 Dispose 都会走到这里，必须幂等
+            _disposed = 1;
             try
             {
                 if (_socket != null)
@@ -358,7 +408,16 @@ public sealed class ClientSession : IDisposable, INpcPlayerSession
             }
             finally
             {
-                ArrayPool<byte>.Shared.Return(_sendBuffer);
+                // 只有真实 socket 会话才归还缓冲；无 socket 的模拟会话 (单元测试) 断开后仍需读取其缓冲做断言，
+                // 其缓冲不归还池 (交给 GC)，同样不会被别的会话租到。
+                if (_socket != null)
+                {
+                    var buf = _sendBuffer;
+                    _sendBuffer = Array.Empty<byte>(); // 先断开引用再归还，之后本会话任何读写都碰不到共享池里的数组
+                    _sendBufferOffset = 0;
+                    _poolReturned = 1;
+                    ArrayPool<byte>.Shared.Return(buf);
+                }
             }
         }
     }

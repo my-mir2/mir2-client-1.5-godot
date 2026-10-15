@@ -72,9 +72,7 @@ public static class PkRuleEngine
         int damage = GuardExecutionDamage;
         target.Hp = 0; // 一刀斩杀当场暴毙
 
-        string msg = target.PkPoint >= 300
-            ? $"【大刀卫士】一声怒吼，手起刀落将恶贯满盈的超级杀人魔【{target.Name}】当场正法斩首！"
-            : $"【大刀卫士】凛然出手，一道森寒刀光将红名通缉犯【{target.Name}】当场格杀斩落马下！";
+        string msg = "大刀卫士攻击红名";
 
         return (damage, true, msg);
     }

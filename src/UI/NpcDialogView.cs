@@ -72,9 +72,8 @@ public partial class NpcDialogView : Control, IManagedWindow
                 _lblContent.Size = new Vector2(355, 145);
                 _lblContent.BbcodeEnabled = true;
                 _lblContent.ScrollActive = false;
-                _lblContent.AddThemeFontSizeOverride("normal_font_size", 11);
-                _lblContent.AddThemeConstantOverride("line_separation", 1); // 配合11号字体严格控制在16px行高
-                _lblContent.AddThemeColorOverride("default_color", new Color(1f, 1f, 1f));
+                Mir2Client.Utils.FontManager.ApplyOfficialStyleToRichText(_lblContent, new Color(1f, 1f, 1f), 12);
+                _lblContent.AddThemeConstantOverride("line_separation", 1); // 严格控制在16px行高
                 _lblContent.MetaClicked += OnMetaClicked;
             }
 

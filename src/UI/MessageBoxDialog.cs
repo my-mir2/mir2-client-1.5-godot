@@ -73,11 +73,11 @@ public partial class MessageBoxDialog : Control, IManagedWindow
 
         _lblMsg = new Label
         {
-            Position = new Vector2(25, 25),
-            Size = new Vector2(400, 45),
+            Position = new Vector2(20, 20),
+            Size = new Vector2(412, 60),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            AutowrapMode = TextServer.AutowrapMode.WordSmart
+            AutowrapMode = TextServer.AutowrapMode.Arbitrary
         };
         _lblMsg.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.6f));
         _lblMsg.AddThemeFontSizeOverride("font_size", 12);

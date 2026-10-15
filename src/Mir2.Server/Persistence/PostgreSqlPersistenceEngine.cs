@@ -54,6 +54,38 @@ public sealed class PostgreSqlPersistenceEngine : IDisposable
     }
 
     /// <summary>
+    /// 从 official_monster 表 (由 tools/convert_official_db_to_sql.py 导入的官方 Monster.DB) 读取全量怪物属性。
+    /// 表不存在或为空时返回 null，由调用方回退到内置生成表。
+    /// </summary>
+    public List<Mir2.Shared.Data.OfficialMonsterStats>? LoadOfficialMonsterStats()
+    {
+        using var conn = new NpgsqlConnection(_connectionString);
+        conn.Open();
+
+        using (var exists = conn.CreateCommand())
+        {
+            exists.CommandText = "SELECT to_regclass('public.official_monster') IS NOT NULL;";
+            if (!(exists.ExecuteScalar() is bool ok && ok)) return null;
+        }
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"SELECT name, race, raceimg, appr, lvl, undead, coolEye, exp, hp, mp, ac, mac,
+                                   dc, dcmax, mc, sc, speed, hit, walk_spd, walkstep, walkwait, attack_spd, name_cn
+                            FROM official_monster;";
+        var list = new List<Mir2.Shared.Data.OfficialMonsterStats>();
+        using var r = cmd.ExecuteReader();
+        int I(int i) => r.IsDBNull(i) ? 0 : Convert.ToInt32(r.GetValue(i));
+        while (r.Read())
+        {
+            list.Add(new Mir2.Shared.Data.OfficialMonsterStats(
+                r.GetString(0), I(1), I(2), I(3), I(4), I(5), I(6), I(7), I(8), I(9), I(10), I(11),
+                I(12), I(13), I(14), I(15), I(16), I(17), I(18), I(19), I(20), I(21),
+                r.IsDBNull(22) ? string.Empty : r.GetString(22)));
+        }
+        return list.Count > 0 ? list : null;
+    }
+
+    /// <summary>
     /// 初始化 PostgreSQL 物理表结构与索引 (若不存在则自动执行 DDL 创建)
     /// </summary>
     public void InitializeSchema()
@@ -87,8 +119,8 @@ public sealed class PostgreSqlPersistenceEngine : IDisposable
                 mp INT NOT NULL DEFAULT 15,
                 max_mp INT NOT NULL DEFAULT 15,
                 map_id INT NOT NULL DEFAULT 0,
-                map_x INT NOT NULL DEFAULT 330,
-                map_y INT NOT NULL DEFAULT 270,
+                map_x INT NOT NULL DEFAULT 288,
+                map_y INT NOT NULL DEFAULT 615,
                 direction SMALLINT NOT NULL DEFAULT 0,
                 gold BIGINT NOT NULL DEFAULT 0,
                 pk_points INT NOT NULL DEFAULT 0,
@@ -106,6 +138,7 @@ public sealed class PostgreSqlPersistenceEngine : IDisposable
                 guild_rank SMALLINT NOT NULL DEFAULT 0,
                 last_saved TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
+            ALTER TABLE mir2_characters ADD COLUMN IF NOT EXISTS hair SMALLINT NOT NULL DEFAULT 1;
 
             -- 道具槽位全量表（使用复合唯一键进行 ON CONFLICT UPSERT，杜绝全表 DELETE 锁死）
             CREATE TABLE IF NOT EXISTS mir2_inventory (
@@ -319,6 +352,48 @@ public sealed class PostgreSqlPersistenceEngine : IDisposable
     }
 
     /// <summary>
+    /// 注册新账号 (账号已存在则拒绝，保证唯一性)
+    /// </summary>
+    public bool RegisterAccount(string account, string rawPassword)
+    {
+        account = Sanitize(account, 64);
+        if (string.IsNullOrWhiteSpace(account) || string.IsNullOrWhiteSpace(rawPassword))
+            return false;
+
+        if (AccountExists(account))
+            return false;
+
+        return RegisterOrUpdateAccount(account, rawPassword);
+    }
+
+    /// <summary>
+    /// 修改账号密码 (需校验旧密码)
+    /// </summary>
+    public bool ChangePassword(string account, string oldPassword, string newPassword)
+    {
+        account = Sanitize(account, 64);
+        if (string.IsNullOrWhiteSpace(account) || string.IsNullOrWhiteSpace(oldPassword) || string.IsNullOrWhiteSpace(newPassword))
+            return false;
+
+        if (!VerifyAccount(account, oldPassword))
+            return false;
+
+        string salt = Guid.NewGuid().ToString("N")[..16];
+        string pwdHash = HashPassword(newPassword, salt);
+
+        using var conn = new NpgsqlConnection(_connectionString);
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE mir2_accounts SET password_hash = @pwd, salt = @salt WHERE account_name = @acc;";
+        cmd.Parameters.AddWithValue("acc", account);
+        cmd.Parameters.AddWithValue("pwd", pwdHash);
+        cmd.Parameters.AddWithValue("salt", salt);
+
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
+    /// <summary>
     /// 异步非阻塞推入玩家落盘队列 (100% 零阻塞主心跳循环)
     /// </summary>
     public void EnqueueSavePlayer(string accountName, string playerName, PlayerState state, int mapId, int mapX, int mapY)
@@ -475,13 +550,134 @@ public sealed class PostgreSqlPersistenceEngine : IDisposable
     }
 
     /// <summary>
+    /// 查询指定账号下的角色列表 (最多 2 个席位，官方 1.5 原版设计)
+    /// </summary>
+    public List<(string CharName, int Job, int Sex, int Level)> GetCharactersByAccount(string accountName)
+    {
+        var list = new List<(string CharName, int Job, int Sex, int Level)>();
+        accountName = Sanitize(accountName, 64);
+        if (string.IsNullOrWhiteSpace(accountName)) return list;
+
+        using var conn = new NpgsqlConnection(_connectionString);
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT char_name, job, sex, level FROM mir2_characters WHERE account_name = @acc ORDER BY level DESC, char_name LIMIT 2;";
+        cmd.Parameters.AddWithValue("acc", accountName);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            string name = reader.GetString(0);
+            int job = reader.GetInt16(1);
+            int sex = reader.GetInt16(2);
+            int lvl = reader.GetInt32(3);
+            list.Add((name, job, sex, lvl));
+        }
+
+        return list;
+    }
+
+    /// <summary>
+    /// 创建新角色 (官方错误码: 2=重名, 3=已满2角, 4=非法参数/失败, 0=成功)
+    /// </summary>
+    public (bool Success, int ErrorCode) CreateCharacter(string accountName, string charName, int job, int sex, int hair = 1)
+    {
+        accountName = Sanitize(accountName, 64);
+        charName = Sanitize(charName, 64);
+        if (string.IsNullOrWhiteSpace(accountName) || string.IsNullOrWhiteSpace(charName))
+            return (false, 4);
+
+        if (charName.Length > 14) return (false, 4);
+
+        using var conn = new NpgsqlConnection(_connectionString);
+        conn.Open();
+
+        // 1. 检查重名 (Error 2: 这个名字已经存在)
+        using (var checkNameCmd = conn.CreateCommand())
+        {
+            checkNameCmd.CommandText = "SELECT 1 FROM mir2_characters WHERE char_name = @cname LIMIT 1;";
+            checkNameCmd.Parameters.AddWithValue("cname", charName);
+            if (checkNameCmd.ExecuteScalar() != null)
+            {
+                return (false, 2);
+            }
+        }
+
+        // 2. 检查席位数 (Error 3: 你只能为一个帐户设两个角色)
+        using (var countCmd = conn.CreateCommand())
+        {
+            countCmd.CommandText = "SELECT count(1) FROM mir2_characters WHERE account_name = @acc;";
+            countCmd.Parameters.AddWithValue("acc", accountName);
+            long count = (long)(countCmd.ExecuteScalar() ?? 0L);
+            if (count >= 2)
+            {
+                return (false, 3);
+            }
+        }
+
+        // 3. 初始数值
+        job = Math.Clamp(job, 0, 2);
+        sex = Math.Clamp(sex, 0, 1);
+        hair = Math.Clamp(hair, 1, 2);
+        int initHp = job switch { 0 => 19, 1 => 16, _ => 17 };
+        int initMp = job switch { 0 => 11, 1 => 17, _ => 13 };
+
+        using var insertCmd = conn.CreateCommand();
+        insertCmd.CommandText = @"
+            INSERT INTO mir2_characters (
+                char_name, account_name, job, sex, hair, level, hp, max_hp, mp, max_mp,
+                map_id, map_x, map_y, direction, gold, pk_points, attack_mode,
+                bonus_dc, bonus_mc, bonus_sc, bonus_ac, bonus_mac, bonus_hp, bonus_mp,
+                storage_gold, storage_password, guild_rank, last_saved
+            ) VALUES (
+                @char_name, @account_name, @job, @sex, @hair, 1, @hp, @hp, @mp, @mp,
+                0, 288, 615, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0,
+                0, '', 0, NOW()
+            );
+        ";
+        insertCmd.Parameters.AddWithValue("char_name", charName);
+        insertCmd.Parameters.AddWithValue("account_name", accountName);
+        insertCmd.Parameters.AddWithValue("job", (short)job);
+        insertCmd.Parameters.AddWithValue("sex", (short)sex);
+        insertCmd.Parameters.AddWithValue("hair", (short)hair);
+        insertCmd.Parameters.AddWithValue("hp", initHp);
+        insertCmd.Parameters.AddWithValue("mp", initMp);
+
+        int rows = insertCmd.ExecuteNonQuery();
+        return rows > 0 ? (true, 0) : (false, 4);
+    }
+
+    /// <summary>
+    /// 删除角色 (根据账号与角色名)
+    /// </summary>
+    public bool DeleteCharacter(string accountName, string charName)
+    {
+        accountName = Sanitize(accountName, 64);
+        charName = Sanitize(charName, 64);
+        if (string.IsNullOrWhiteSpace(accountName) || string.IsNullOrWhiteSpace(charName))
+            return false;
+
+        using var conn = new NpgsqlConnection(_connectionString);
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM mir2_characters WHERE char_name = @cname AND account_name = @acc;";
+        cmd.Parameters.AddWithValue("cname", charName);
+        cmd.Parameters.AddWithValue("acc", accountName);
+
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
+    /// <summary>
     /// 从 PostgreSQL 加载角色全景状态
     /// </summary>
     public PlayerState? LoadPlayer(string playerName, out int mapId, out int mapX, out int mapY)
     {
         mapId = 0;
-        mapX = 330;
-        mapY = 270;
+        mapX = 288;
+        mapY = 615;
 
         playerName = Sanitize(playerName, 64);
         if (string.IsNullOrWhiteSpace(playerName)) return null;
@@ -496,7 +692,8 @@ public sealed class PostgreSqlPersistenceEngine : IDisposable
             cmd.CommandText = @"
                 SELECT job, sex, level, hp, max_hp, mp, max_mp, map_id, map_x, map_y,
                        direction, gold, pk_points, attack_mode, bonus_dc, bonus_mc, bonus_sc,
-                       bonus_ac, bonus_mac, bonus_hp, bonus_mp, storage_gold, storage_password, guild_rank
+                       bonus_ac, bonus_mac, bonus_hp, bonus_mp, storage_gold, storage_password, guild_rank,
+                       hair
                 FROM mir2_characters
                 WHERE char_name = @name;
             ";
@@ -510,6 +707,7 @@ public sealed class PostgreSqlPersistenceEngine : IDisposable
                     Name = playerName,
                     Job = (byte)reader.GetInt16(0),
                     Sex = (byte)reader.GetInt16(1),
+                    Hair = reader.IsDBNull(24) ? 1 : (int)reader.GetInt16(24),
                     Level = Math.Max(1, reader.GetInt32(2)),
                     Hp = reader.GetInt32(3),
                     MaxHp = reader.GetInt32(4),

@@ -81,7 +81,12 @@ public partial class HudController : CanvasLayer
     private Label? _lblHp;
     private Label? _lblMp;
     private Label? _lblLevel;
+    private Control? _levelNumberContainer;
     private Label? _lblName;
+    private Label? _lblMapCoord;
+    private Label? _lblEquipCharName;
+    private string _playerName = "热血战士";
+    private string _currentMapTitle = "比奇省";
     private Label? _lblBagGold;
     private RichTextLabel? _lblBagItemDesc;
     private RichTextLabel? _lblEquipItemDesc;
@@ -103,6 +108,8 @@ public partial class HudController : CanvasLayer
     private TextureRect? _dollWeapon;
     private TextureRect? _dollHelm;
     private Control? _equipSlotsContainer;
+    private int _playerGender = 0;
+    private bool _hasLearnedMpSkill = false;
     private MinimapView? _minimapView;
     private NpcDialogView? _npcDialogView;
     private DeathScreenView? _deathScreenView;
@@ -124,8 +131,8 @@ public partial class HudController : CanvasLayer
     private int _maxHp = 100;
     private float _displayHpRatio = 1.0f;
     private float _targetHpRatio = 1.0f;
-    private float _displayMpRatio = 1.0f;
-    private float _targetMpRatio = 1.0f;
+    private float _displayMpRatio = 0.0f;
+    private float _targetMpRatio = 0.0f;
     private bool _isStunned = false;
     private bool _isFrozen = false;
 
@@ -143,6 +150,7 @@ public partial class HudController : CanvasLayer
         public long Timestamp;
     }
     private readonly Dictionary<int, PendingEquipAction> _pendingEquipActions = new();
+    private static bool[,]? _hudBottomBarAlphaMask; // 盛大官方 1.5 原版底栏异形像素命中检测掩码 (IDA 0x48ba74 TFrmDlg_DBottomInRealArea)
 
     public int CurrentHp => _currentHp;
     public int MaxHp => _maxHp;
@@ -399,9 +407,33 @@ public partial class HudController : CanvasLayer
         _lblLevel = GetNodeOrNull<Label>("StatusBar/LblLevel");
         _lblName = GetNodeOrNull<Label>("StatusBar/LblName");
         _chatLog = GetNodeOrNull<RichTextLabel>("ChatBox/ChatLog");
+        if (_chatLog != null)
+        {
+            // 盛大官方 1.5 聊天框点阵字体锐化 (彻底消除双线性滤波抗锯齿导致的发虚麻呼)
+            _chatLog.TextureFilter = CanvasItem.TextureFilterEnum.Nearest;
+            if (FontManager.OfficialSongti != null)
+            {
+                _chatLog.AddThemeFontOverride("normal_font", FontManager.OfficialSongti);
+                _chatLog.AddThemeFontOverride("bold_font", FontManager.OfficialSongti);
+            }
+            _chatLog.AddThemeFontSizeOverride("normal_font_size", FontManager.OfficialFontSize);
+            _chatLog.AddThemeFontSizeOverride("bold_font_size", FontManager.OfficialFontSize);
+            var themeFont = _chatLog.GetThemeFont("normal_font");
+            if (themeFont is FontFile fontFile)
+            {
+                fontFile.Antialiasing = TextServer.FontAntialiasing.None;
+                fontFile.Hinting = TextServer.Hinting.None;
+                fontFile.SubpixelPositioning = TextServer.SubpixelPositioning.Disabled;
+            }
+        }
         _chatInput = GetNodeOrNull<LineEdit>("ChatInput");
         if (_chatInput != null)
         {
+            if (FontManager.OfficialSongti != null)
+            {
+                _chatInput.AddThemeFontOverride("font", FontManager.OfficialSongti);
+            }
+            _chatInput.AddThemeFontSizeOverride("font_size", FontManager.OfficialFontSize);
             _chatInput.MaxLength = 70; // 盛大官方 1.5 聊天单行最大 70 字符规约 (ClMain.pas / IDA sub_461DEC)
             _chatInput.TextSubmitted += OnChatInputSubmitted;
         }
@@ -426,6 +458,33 @@ public partial class HudController : CanvasLayer
             };
             AddChild(tr);
             MoveChild(tr, 0);
+
+            // 盛大官方 1.5 原版底栏异形像素命中检测 (IDA 0x48ba74 TFrmDlg_DBottomInRealArea 权威实证)
+            // 提取 Prguse_0001 的非透明像素矩阵，镂空/透明区域放行大世界点击寻路
+            if (_hudBottomBarAlphaMask == null)
+            {
+                try
+                {
+                    var img = hudBgTex.GetImage();
+                    if (img != null)
+                    {
+                        int w = img.GetWidth();
+                        int h = img.GetHeight();
+                        _hudBottomBarAlphaMask = new bool[w, h];
+                        for (int y = 0; y < h; y++)
+                        {
+                            for (int x = 0; x < w; x++)
+                            {
+                                _hudBottomBarAlphaMask[x, y] = img.GetPixel(x, y).A > 0.05f;
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // 降级兜底
+                }
+            }
         }
 
         // 挂载官方 1.5 血球魔球底座 (IDA sub_48B2A0: Prguse_0005.png 96x92 @ (38, 439) 空槽金属暗底)
@@ -453,7 +512,7 @@ public partial class HudController : CanvasLayer
             {
                 _orbShaderMat = new ShaderMaterial { Shader = orbShader };
                 _orbShaderMat.SetShaderParameter("hp_ratio", 1.0f);
-                _orbShaderMat.SetShaderParameter("mp_ratio", 1.0f);
+                _orbShaderMat.SetShaderParameter("mp_ratio", (_playerJob == 0 && !_hasLearnedMpSkill) ? 0.0f : 1.0f);
                 _orbShaderMat.SetShaderParameter("is_single_hp_ball", false);
             }
 
@@ -468,43 +527,45 @@ public partial class HudController : CanvasLayer
                 ZIndex = 1 // 位于底座上方，裁切透明部分自然显露金属空槽
             };
             AddChild(_orbTextureRect);
-
-            // 盛大官方 1.5 规则：血球魔球玻璃罩高光层 (Prguse_0004 覆盖于血球魔球上，位于 ZIndex=2，提供真实玻璃球曲面反光立体质感)
-            var orbGlassTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0004.png");
-            if (orbGlassTex != null)
-            {
-                var orbGlassOverlay = new TextureRect
-                {
-                    Name = "HudOrbGlassOverlay",
-                    Texture = orbGlassTex,
-                    Position = new Vector2(40, 440),
-                    Size = new Vector2(92, 90),
-                    MouseFilter = Control.MouseFilterEnum.Ignore,
-                    ZIndex = 2
-                };
-                AddChild(orbGlassOverlay);
-            }
         }
 
         // 挂载官方 1.5 等级、经验条与负重条 (IDA sub_48B2A0 @ 0x48b840 & 0x48b8d0, Prguse_0007 76x13)
-        // 1. 等级文本框：精准嵌入 HUD 右下角 Lv 金属徽章右侧黑槽 (642, 492, 40, 16)
+        // 官方 1.5 原版等级艺术字贴图数字容器 (IDA 0x48b749 @ sub_48B2A0: (660, 496), Prguse_0030..0039)
+        _levelNumberContainer = new Control
+        {
+            Name = "HudLevelNumberContainer",
+            Position = new Vector2(660, 496),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            ZIndex = 2
+        };
+        AddChild(_levelNumberContainer);
+        UpdateLevelTextureDisplay(_playerLevel);
+
         _lblLevel = new Label
         {
             Name = "HudLevelLabel",
-            Position = new Vector2(642, 492),
+            Position = new Vector2(660, 496),
             Size = new Vector2(40, 16),
-            Text = "35",
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
+            Text = "1",
             ZIndex = 2,
-            Visible = true
+            Visible = false // 盛大官方 1.5 铁律：原版使用 Prguse_0030..0039 贴图艺术字，普通 Label 隐蔽防重叠
         };
-        _lblLevel.AddThemeFontSizeOverride("font_size", 13);
-        _lblLevel.AddThemeColorOverride("font_color", new Color(1.0f, 0.95f, 0.5f));
-        _lblLevel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.9f));
-        _lblLevel.AddThemeConstantOverride("shadow_offset_x", 1);
-        _lblLevel.AddThemeConstantOverride("shadow_offset_y", 1);
         AddChild(_lblLevel);
+
+        // 盛大官方 1.5 左下角地图名称与角色坐标常显标签 (DrawScrn.pas 0x47AA09: mov ecx, 0x244; mov edx, 8 -> BoldTextOut(MSurface, 8, 580, clWhite, clBlack, MapTitle + ' ' + XX + ':' + YY))
+        _lblMapCoord = new Label
+        {
+            Name = "HudMapCoordLabel",
+            Position = new Vector2(8, 578),
+            Size = new Vector2(180, 16),
+            Text = "比奇省 330:270",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            ZIndex = 3
+        };
+        FontManager.ApplyOfficialStyle(_lblMapCoord, Colors.White, 12, true);
+        AddChild(_lblMapCoord);
 
         // 攻击模式图标 (IDA sub_48B2A0 0x48b8e0..0x48b92b: 当 mode∈[1,4] 时取 Prguse_(15+mode)，以 (754,553) 叠加绘制于日夜齿轮上层)
         _attackModeIcon = new TextureRect
@@ -563,13 +624,9 @@ public partial class HudController : CanvasLayer
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
-                ZIndex = 2
+                ZIndex = 2,
+                Visible = false // 盛大官方 1.5 原版底盘绝无常显粗体文字，仅悬停提示
             };
-            _lblExpValue.AddThemeFontSizeOverride("font_size", 9);
-            _lblExpValue.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-            _lblExpValue.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.9f));
-            _lblExpValue.AddThemeConstantOverride("shadow_offset_x", 1);
-            _lblExpValue.AddThemeConstantOverride("shadow_offset_y", 1);
             AddChild(_lblExpValue);
 
             _weightBar = new TextureProgressBar
@@ -597,17 +654,13 @@ public partial class HudController : CanvasLayer
                 Name = "WeightValueLabel",
                 Position = new Vector2(666, 559),
                 Size = new Vector2(76, 14),
-                Text = "0/40",
+                Text = "0/15",
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
-                ZIndex = 2
+                ZIndex = 2,
+                Visible = false // 盛大官方 1.5 原版底盘绝无常显粗体文字，仅悬停提示
             };
-            _lblWeightValue.AddThemeFontSizeOverride("font_size", 9);
-            _lblWeightValue.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-            _lblWeightValue.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.9f));
-            _lblWeightValue.AddThemeConstantOverride("shadow_offset_x", 1);
-            _lblWeightValue.AddThemeConstantOverride("shadow_offset_y", 1);
             AddChild(_lblWeightValue);
         }
 
@@ -687,10 +740,10 @@ public partial class HudController : CanvasLayer
                                         return;
                                     }
                                 }
-                                ShowSlotTooltip(name, desc, btn.GlobalPosition, showFloating: false);
+                                ShowSlotTooltip(name, desc, btn.GlobalPosition, showFloating: false, slotType: SlotButton.SlotType.Bag);
                             }
                         };
-                        btn.MouseExited += HideSlotTooltip;
+                        btn.MouseExited += () => HideSlotTooltip(SlotButton.SlotType.Bag);
                         btn.GuiInput += (ev) =>
                         {
                             // 官方 1.5 Ctrl+点击堆叠物品触发拆分输入模态框 (SplitDlg)
@@ -836,8 +889,8 @@ public partial class HudController : CanvasLayer
                 AutowrapMode = TextServer.AutowrapMode.WordSmart,
                 MouseFilter = Control.MouseFilterEnum.Ignore
             };
-            lblBagDesc.AddThemeFontSizeOverride("normal_font_size", 10);
-            lblBagDesc.AddThemeConstantOverride("line_separation", -2);
+            FontManager.ApplyOfficialStyleToRichText(lblBagDesc, new Color(0.9f, 0.9f, 0.9f), 12);
+            lblBagDesc.AddThemeConstantOverride("line_separation", 2);
             _lblBagItemDesc = lblBagDesc;
             _bagPanel.AddChild(lblBagDesc);
 
@@ -895,9 +948,25 @@ public partial class HudController : CanvasLayer
             BtnEquipToStatus = btnEquipToStatus;
             _equipPanel.AddChild(btnEquipToStatus);
 
-            // 纸娃娃裸身底板 Prguse_0376.png (168x199 男角色立绘与槽位，IDA sub_488AF4 [0x488c09..0x488c15]: Left+38, Top+52)
+            // 盛大官方 1.5 装备面板顶部拱门角色名字居中显示 (FrmDlg.pas 0x489EBE..0x489F00: Left + 122 - TextWidth(UserName)/2, Top + 23)
+            _lblEquipCharName = new Label
+            {
+                Name = "LblEquipCharName",
+                Position = new Vector2(36, 17), // 36 + 172/2 = 122，字形中心对齐 Top+23
+                Size = new Vector2(172, 18),
+                Text = _playerName,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+                ZIndex = 6
+            };
+            FontManager.ApplyOfficialStyle(_lblEquipCharName, Colors.White, 12, false);
+            _equipPanel.AddChild(_lblEquipCharName);
+
+            // 纸娃娃裸身底板 (0=男 Prguse_0376, 1=女 Prguse_0377, IDA sub_488AF4 [0x488c09..0x488c15]: Left+38, Top+52)
             _dollBackground = _equipPanel.GetNodeOrNull<TextureRect>("DollBackground");
-            var texDoll = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0376.png");
+            string dollPng = _playerGender != 0 ? "Prguse_0377.png" : "Prguse_0376.png";
+            var texDoll = ResPath.LoadImageTexture($"resources/wil/png/Prguse/{dollPng}");
             if (_dollBackground != null && texDoll != null)
             {
                 _dollBackground.Texture = texDoll;
@@ -905,17 +974,18 @@ public partial class HudController : CanvasLayer
                 _dollBackground.Size = new Vector2(168, 199);
             }
 
-            // 盛大官方 1.5 角色纸娃娃核心立绘层 (挂在 _dollBackground 下，与男角色裸身立绘 100% 严丝合缝对齐)
-            // 0. 发型层: 官方 IDA sub_488AF4 [0x488c73..0x488caf] 实证：男角色基准发型 Prguse_0441 (24x16 @ 73, 44)，完全覆盖额头发际线与头顶
-            var texHair = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0441.png");
+            // 盛大官方 1.5 角色纸娃娃核心立绘层 (挂在 _dollBackground 下，依据 StateItem.wil & Prguse.wil 原生 Origin 绝对对齐)
+            // 0. 发型层: 官方实证：男基准发型 0441 @ (76, 45)；女基准发型 0482 @ (75, 42) (红棕盘发自然垂落耳际，严丝合缝露脸)
+            string initialHair = _playerGender != 0 ? "Prguse_0482.png" : "Prguse_0441.png";
+            var texHair = ResPath.LoadImageTexture($"resources/wil/png/Prguse/{initialHair}");
             if (_dollBackground != null)
             {
                 _dollHair = new TextureRect
                 {
                     Name = "DollHair",
                     Texture = texHair,
-                    Position = new Vector2(73, 44),
-                    Size = new Vector2(24, 16),
+                    Position = _playerGender != 0 ? new Vector2(75, 42) : new Vector2(76, 45),
+                    Size = texHair != null ? texHair.GetSize() : new Vector2(24, 16),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                     Visible = true,
                     ZIndex = 1
@@ -923,23 +993,25 @@ public partial class HudController : CanvasLayer
                 _dollBackground.AddChild(_dollHair);
             }
 
-            // 1. 衣服立绘层: 盛大官方 1.5 正宗男布衣 StateItem_0060.png (80x128 @ 39, 63，白袍金边深蓝长裤男战士经典布衣)
-            var texCloth = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0060.png");
+            // 1. 衣服立绘层: 盛大官方 1.5 正宗布衣 (男布衣 StateItem_0060 @ (41, 65); 女布衣 StateItem_0080 @ (42, 65))
+            // 物理对齐：V领紧扣胸膛与锁骨，长袖完全盖住手腕，裙摆靴尖严密咬合，彻底杜绝多重残肢与恐怖谷效应
+            string initialCloth = _playerGender != 0 ? "StateItem_0080.png" : "StateItem_0060.png";
+            var texCloth = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{initialCloth}");
             if (_dollBackground != null)
             {
                 _dollCloth = new TextureRect
                 {
                     Name = "DollCloth",
                     Texture = texCloth,
-                    Position = new Vector2(39, 63),
-                    Size = new Vector2(80, 128),
+                    Position = _playerGender != 0 ? new Vector2(42, 65) : new Vector2(41, 65),
+                    Size = texCloth != null ? texCloth.GetSize() : new Vector2(80, 128),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                     ZIndex = 2
                 };
                 _dollBackground.AddChild(_dollCloth);
             }
 
-            // 2. 武器立绘层: 初始为木剑 StateItem_0030 (28x57 @ 20, 48，剑柄紧紧握在右手手心 (45, 101)，剑尖斜指长空)
+            // 2. 武器立绘层: 初始为木剑 StateItem_0030 (28x57 @ (25, 56)，剑柄 100% 紧扣右手手心)
             var texWeapon = ResPath.LoadImageTexture("resources/wil/png/StateItem/StateItem_0030.png");
             if (_dollBackground != null)
             {
@@ -947,7 +1019,7 @@ public partial class HudController : CanvasLayer
                 {
                     Name = "DollWeapon",
                     Texture = texWeapon,
-                    Position = new Vector2(20, 48),
+                    Position = new Vector2(25, 56),
                     Size = new Vector2(28, 57),
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                     ZIndex = 3
@@ -991,8 +1063,8 @@ public partial class HudController : CanvasLayer
                 ScrollActive = false,
                 MouseFilter = Control.MouseFilterEnum.Ignore
             };
-            lblEquipDesc.AddThemeFontSizeOverride("normal_font_size", 10);
-            lblEquipDesc.AddThemeConstantOverride("line_separation", 1);
+            FontManager.ApplyOfficialStyleToRichText(lblEquipDesc, new Color(0.9f, 0.9f, 0.9f), 12);
+            lblEquipDesc.AddThemeConstantOverride("line_separation", 2);
             _lblEquipItemDesc = lblEquipDesc;
             _equipPanel.AddChild(lblEquipDesc);
 
@@ -1013,27 +1085,13 @@ public partial class HudController : CanvasLayer
                 (7, 168, 215, 34, 31),  // 右戒指 (0x394, IDA 0x4840aa..0x4840e8: Left=168, Top=215, W=34, H=31)
             };
 
+            // 预设新手默认穿戴的衣服(0)与武器(1)官方属性描述，其余首饰槽位(2~8)初始为空，严禁硬编码假图标或假属性！
+            _equipItemDetails[0] = ("布衣(女)", "[color=#c0c0c0]重量 5   持久力 5/5[/color]\n[color=#ffff00]防御 0-2   魔御 0-1[/color]\n[color=#c0c0c0]需要等级 1[/color]");
+            _equipItemDetails[1] = ("木剑", "[color=#c0c0c0]重量 7   持久力 4/4[/color]\n[color=#ffff00]攻击 2-5[/color]\n[color=#c0c0c0]需要等级 1[/color]");
+
             foreach (var s in slotDefs)
             {
                 int equipSlot = s.Slot;
-
-                // 盛大官方 1.5 角色装备栏真实部件贴图映射 (StateItem.wil 独立外观):
-                // 首饰与手持类（项链、手镯、戒指、照明/药粉）在槽位中展示标准原版独立立绘，居中对齐槽位框；
-                // 衣服/武器/头盔则作为纸娃娃真实穿戴贴合在人物身上，槽位热区保留透明点击与 Tooltip 交互！
-                string? iconFile = equipSlot switch
-                {
-                    2 => "StateItem_0001.png", // 官方 1.5 物理真值: 右持物/火把/蜡烛/药粉 (StateItem 贴图)
-                    3 => "StateItem_0218.png", // 项链 (幽灵项链 32x30)
-                    5 => "StateItem_0188.png", // 右手镯 (死神手套 36x35)
-                    6 => "StateItem_0141.png", // 左手镯 (金手镯 16x15)
-                    7 => "StateItem_0170.png", // 右戒指 (珊瑚戒指 28x25)
-                    8 => "StateItem_0161.png", // 左戒指 (骷髅戒指 20x23)
-                    _ => null                  // 衣服、武器、头盔已在纸娃娃层 100% 真实穿戴贴合
-                };
-
-                Texture2D? equipIcon = !string.IsNullOrEmpty(iconFile)
-                    ? ResPath.LoadImageTexture($"resources/wil/png/StateItem/{iconFile}")
-                    : null;
 
                 var btn = new SlotButton
                 {
@@ -1044,7 +1102,7 @@ public partial class HudController : CanvasLayer
                     Size = new Vector2(s.W, s.H),
                     CustomMinimumSize = new Vector2(s.W, s.H),
                     Flat = true,
-                    ItemTexture = equipIcon
+                    ItemTexture = null
                 };
                 _equipSlots[equipSlot] = btn;
                 btn.Pressed += () => EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
@@ -1058,25 +1116,13 @@ public partial class HudController : CanvasLayer
                 };
                 btn.MouseEntered += () =>
                 {
-                    var (fallbackName, fallbackDesc) = equipSlot switch
-                    {
-                        0 => ("重盔甲(男)", "[color=#c0c0c0]重量 23   持久力 25/25[/color]\n[color=#ffff00]防御 4-7[/color] [color=#00ffff](+1)[/color]   [color=#ffff00]魔御 2-3[/color]\n[color=#c0c0c0]需要等级 22[/color]"),
-                        1 => ("炼狱", "[color=#c0c0c0]重量 60   持久力 28/28[/color]\n[color=#ffff00]攻击 0-25[/color] [color=#00ffff](+1)[/color]\n[color=#c0c0c0]需要等级 26[/color]"),
-                        2 => ("火把", "[color=#c0c0c0]重量 1   持久力 20/20[/color]\n[color=#ffff00]黑夜与地牢中提供光亮范围[/color]"),
-                        3 => ("幽灵项链", "[color=#c0c0c0]重量 1   持久力 8/8[/color]\n[color=#ffff00]攻击 0-5[/color]\n[color=#c0c0c0]需要等级 24[/color]"),
-                        4 => ("道士头盔", "[color=#c0c0c0]重量 3   持久力 8/8[/color]\n[color=#ffff00]防御 1-2   魔御 2-3[/color]\n[color=#c0c0c0]需要等级 24[/color]"),
-                        5 => ("死神手套(右)", "[color=#c0c0c0]重量 2   持久力 8/8[/color]\n[color=#ffff00]攻击 1-3[/color] [color=#00ffff](+1)[/color]\n[color=#c0c0c0]需要等级 22[/color]"),
-                        6 => ("金手镯(左)", "[color=#c0c0c0]重量 1   持久力 9/9[/color]\n[color=#ffff00]魔御 2-3   攻击 0-1[/color]\n[color=#c0c0c0]需要等级 22[/color]"),
-                        7 => ("珊瑚戒指(右)", "[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]攻击 0-4[/color]\n[color=#c0c0c0]需要等级 25[/color]"),
-                        8 => ("骷髅戒指(左)", "[color=#c0c0c0]重量 1   持久力 5/5[/color]\n[color=#ffff00]攻击 0-3[/color]\n[color=#c0c0c0]需要等级 20[/color]"),
-                        _ => ("装备", "[color=#c0c0c0]重量 1   持久力 10/10[/color]")
-                    };
                     var details = _equipItemDetails[equipSlot];
-                    string itemName = details?.Name ?? fallbackName;
-                    string itemDesc = details?.Desc ?? fallbackDesc;
-                    ShowSlotTooltip(itemName, itemDesc, btn.GlobalPosition, showFloating: false);
+                    if (details != null && !string.IsNullOrEmpty(details.Value.Name))
+                    {
+                        ShowSlotTooltip(details.Value.Name, details.Value.Desc, btn.GlobalPosition, showFloating: false, slotType: SlotButton.SlotType.Equip);
+                    }
                 };
-                btn.MouseExited += HideSlotTooltip;
+                btn.MouseExited += () => HideSlotTooltip(SlotButton.SlotType.Equip);
                 _equipSlotsContainer?.AddChild(btn);
             }
         }
@@ -1187,7 +1233,7 @@ public partial class HudController : CanvasLayer
         };
         _tradePanelView.DelDealItemRequested += (slot) =>
         {
-            EmitSignal(SignalName.TradeDelItemRequested, slot);
+            TakeTradeItemToBagSlot(slot, -1);
         };
         AddChild(_tradePanelView);
 
@@ -1322,25 +1368,13 @@ public partial class HudController : CanvasLayer
         _itemTooltipView = new ItemTooltipView();
         AddChild(_itemTooltipView);
 
-        // 默认初始化 35 级战神经验条、负重条、血球数值与金币 (对齐官方 1.5 初始战士规格)
-        UpdateExp(650000, 1200000);
-        UpdateWeight(25, 60);
-        UpdateHp(520, 520);
-        UpdateMp(100, 100);
-        UpdateLevel(35);
-        UpdateGold(88888);
-
-        // 盛大官方 1.5 35 级战士初始装备属性预载 (衣服与武器立绘已在 DollCloth/DollWeapon 层 100% 真实穿戴贴合)
-        if (_equipSlots[0] != null)
-        {
-            _equipSlots[0]!.ItemTexture = null;
-            _equipItemDetails[0] = ("重盔甲(男)", "重量 23   持久力 25/25\n防御 4-7   魔御 2-3\n需要等级 22");
-        }
-        if (_equipSlots[1] != null)
-        {
-            _equipSlots[1]!.ItemTexture = null;
-            _equipItemDetails[1] = ("修罗", "重量 40   持久力 25/25\n攻击 0-20\n需要等级 22");
-        }
+        // 官方 1.5 默认纯净初始化 1 级基础数值 (实际数据由服务端 SM_SENDUSERSTATE / SM_MYSTATUS 权威下发)
+        UpdateExp(0, 100);
+        UpdateWeight(0, 15);
+        UpdateHp(19, 19);
+        UpdateMp(11, 11);
+        UpdateLevel(1);
+        UpdateGold(0);
 
         GD.Print("[HudController] 官方 1.5 C# HUD 控制器初始化就绪 (全量大世界原生窗体 100% 挂载完成)");
     }
@@ -1482,6 +1516,17 @@ public partial class HudController : CanvasLayer
             };
             btn.MouseExited += HideSlotTooltip;
 
+            // 盛大官方 1.5 快捷槽位纯黑不透明底垫 (彻底阻断大世界地面怪物与名字从 Prguse_0001 透明槽孔穿透视效)
+            var slotBg = new ColorRect
+            {
+                Name = "SlotBg",
+                Size = new Vector2(32f, 29f),
+                Position = Vector2.Zero,
+                Color = new Color(0f, 0f, 0f, 1.0f),
+                MouseFilter = Control.MouseFilterEnum.Ignore
+            };
+            btn.AddChild(slotBg);
+
             var icon = new TextureRect
             {
                 Name = "Icon",
@@ -1493,6 +1538,18 @@ public partial class HudController : CanvasLayer
             };
             btn.AddChild(icon);
 
+            // 盛大官方 1.5 DBottonBeltDirectPaint (IDA 0x48BE80) 物理真值：
+            // 腰带快捷栏 6 格右下角 (13, 19) 固定绘制 Prguse.wil 31..36 艺术贴图序号 1..6，严禁绘制白色 GDI 药水堆叠数字！
+            var hotkeyTexRect = new TextureRect
+            {
+                Name = "BeltKeyIdx",
+                Position = new Vector2(13f, 19f),
+                Texture = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{31 + i:D4}.png"),
+                StretchMode = TextureRect.StretchModeEnum.Keep,
+                MouseFilter = Control.MouseFilterEnum.Ignore
+            };
+            btn.AddChild(hotkeyTexRect);
+
             var countLbl = new Label
             {
                 Name = "CountLbl",
@@ -1500,10 +1557,9 @@ public partial class HudController : CanvasLayer
                 Size = new Vector2(20f, 14f),
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Bottom,
+                Visible = false,
                 MouseFilter = Control.MouseFilterEnum.Ignore
             };
-            countLbl.AddThemeFontSizeOverride("font_size", 9);
-            countLbl.AddThemeColorOverride("font_color", new Color(1.0f, 1.0f, 1.0f));
             btn.AddChild(countLbl);
 
             _quickSlotButtons[i] = btn;
@@ -1512,10 +1568,10 @@ public partial class HudController : CanvasLayer
             parent.AddChild(btn);
         }
 
-        // 默认预设 1~6 官方常见药水（采用 Items.wil 官方药水真实图标）
-        SetQuickSlot(0, "强效金创药", 6, ResPath.LoadImageTexture("resources/wil/png/Items/Items_0014.png"));
-        SetQuickSlot(1, "强效魔法药", 6, ResPath.LoadImageTexture("resources/wil/png/Items/Items_0015.png"));
-        SetQuickSlot(2, "太阳水", 4, ResPath.LoadImageTexture("resources/wil/png/Items/Items_0016.png"));
+        // 默认预设 1~6 官方常见药水（严格对齐 Items.wil: 28 强效金创药, 29 强效魔法药, 16 太阳水）
+        SetQuickSlot(0, "强效金创药", 6, ResPath.LoadImageTexture($"resources/wil/png/Items/{ItemIconMapper.GetIconFile("强效金创药")}"));
+        SetQuickSlot(1, "强效魔法药", 6, ResPath.LoadImageTexture($"resources/wil/png/Items/{ItemIconMapper.GetIconFile("强效魔法药")}"));
+        SetQuickSlot(2, "太阳水", 4, ResPath.LoadImageTexture($"resources/wil/png/Items/{ItemIconMapper.GetIconFile("太阳水")}"));
     }
 
     public void SetQuickSlot(int slot, string itemName, int count, Texture2D? icon)
@@ -1530,8 +1586,8 @@ public partial class HudController : CanvasLayer
         }
         if (_quickSlotCounts[slot] != null)
         {
-            _quickSlotCounts[slot].Text = count > 1 ? count.ToString() : "";
-            _quickSlotCounts[slot].Visible = count > 0;
+            _quickSlotCounts[slot].Text = "";
+            _quickSlotCounts[slot].Visible = false;
         }
     }
 
@@ -1665,9 +1721,30 @@ public partial class HudController : CanvasLayer
         UpdateHp(newHp, _maxHp);
     }
 
+    private int _currentMp = 0;
+    private int _maxMpInternal = 0;
+
+    public void SetHasLearnedMpSkill(bool learned)
+    {
+        _hasLearnedMpSkill = learned;
+        UpdateMp(_currentMp, _maxMpInternal);
+    }
+
     public void UpdateMp(int mp, int maxMp)
     {
+        _currentMp = mp;
+        _maxMpInternal = maxMp;
         if (_lblMp != null) _lblMp.Text = $"{mp}/{maxMp}";
+        
+        // 盛大官方 1.5 铁律：战士在未学会耗蓝技能（如半月弯刀）之前，魔球右侧保持空水状态（无蓝）
+        if (_playerJob == 0 && !_hasLearnedMpSkill)
+        {
+            _targetMpRatio = 0f;
+            _displayMpRatio = 0f;
+            _orbShaderMat?.SetShaderParameter("mp_ratio", 0.0f);
+            return;
+        }
+
         _targetMpRatio = maxMp > 0 ? Mathf.Clamp((float)mp / maxMp, 0f, 1f) : 0f;
         if (mp <= 0 || maxMp <= 0 || _displayMpRatio < 0)
         {
@@ -1745,7 +1822,7 @@ public partial class HudController : CanvasLayer
         _statusPanelView.UpdateAbilityValue(10, mpRecover);
     }
 
-    private int _playerLevel = 35;
+    private int _playerLevel = 1;
     private int _playerJob = 0; // 0: 战, 1: 法, 2: 道
     private int _dcMax = 35;
     private int _mcMax = 20;
@@ -1762,6 +1839,14 @@ public partial class HudController : CanvasLayer
     {
         _playerJob = job;
         _playerLevel = Math.Max(1, level);
+        UpdateLevel(_playerLevel);
+        if (_playerJob == 0 && !_hasLearnedMpSkill)
+        {
+            _targetMpRatio = 0f;
+            _displayMpRatio = 0f;
+            _orbShaderMat?.SetShaderParameter("mp_ratio", 0.0f);
+        }
+        RefreshHpMpOrbDisplay();
     }
 
     public int GetCurrentWearWeight()
@@ -1807,10 +1892,93 @@ public partial class HudController : CanvasLayer
     public void UpdateLevel(int level)
     {
         _playerLevel = level;
-        // 盛大原版官方 HUD 嵌入 Lv 徽章右侧黑槽 (636, 484)
         if (_lblLevel != null)
         {
             _lblLevel.Text = $"{level}";
+            _lblLevel.Visible = false; // 隐藏普通字体，官方使用贴图艺术字
+        }
+        UpdateLevelTextureDisplay(level);
+        RefreshHpMpOrbDisplay();
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 原版等级艺术字贴图数字渲染 (IDA 0x48b749 @ sub_48B2A0 & 0x45ec70)
+    /// 官方使用 Prguse.wil 切片 30~39 (Prguse_0030..0039)，每个字符宽 8 像素，起始于 (660, 496)
+    /// </summary>
+    public void UpdateLevelTextureDisplay(int level)
+    {
+        if (_levelNumberContainer == null) return;
+        foreach (Node child in _levelNumberContainer.GetChildren())
+        {
+            child.QueueFree();
+        }
+
+        string s = level.ToString();
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            int imgIndex = (c >= '0' && c <= '9') ? (30 + (c - '0')) : 40;
+            var tex = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{imgIndex:D4}.png");
+            if (tex != null)
+            {
+                var tr = new TextureRect
+                {
+                    Texture = tex,
+                    Position = new Vector2(i * 8, 0),
+                    Size = new Vector2(12, 10),
+                    MouseFilter = Control.MouseFilterEnum.Ignore,
+                    ZIndex = 2
+                };
+                _levelNumberContainer.AddChild(tr);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 原版血球魔球物理真值刷新 (IDA 0x48b4b4..0x48b721 @ sub_48B2A0)
+    /// 铁律实证：
+    /// 1. 战士且等级 < 28 级 (0x1c)：
+    ///    底槽加载 Prguse_0005 (96x92 @ 38, 439)，血液加载 Prguse_0006 (96x92 纯红满血单球 @ 38, 439)
+    ///    启用 is_single_hp_ball = true，无蓝条、无中线分割、无半边缺失。
+    /// 2. 法师/道士或战士等级 >= 28 级：
+    ///    血液/魔法加载 Prguse_0004 (92x90 红蓝双球 @ 40, 440)
+    ///    启用 is_single_hp_ball = false，左红右蓝。
+    /// </summary>
+    public void RefreshHpMpOrbDisplay()
+    {
+        bool isSingleHp = (_playerJob == 0 && _playerLevel < 28);
+        if (_orbShaderMat != null)
+        {
+            _orbShaderMat.SetShaderParameter("is_single_hp_ball", isSingleHp);
+        }
+
+        if (isSingleHp)
+        {
+            var singleBgTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0005.png");
+            if (_orbBgTextureRect != null && singleBgTex != null)
+            {
+                _orbBgTextureRect.Texture = singleBgTex;
+                _orbBgTextureRect.Position = new Vector2(38, 439);
+                _orbBgTextureRect.Size = new Vector2(96, 92);
+            }
+
+            var singleFillTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0006.png");
+            if (_orbTextureRect != null && singleFillTex != null)
+            {
+                _orbTextureRect.Texture = singleFillTex;
+                _orbTextureRect.Position = new Vector2(38, 439);
+                _orbTextureRect.Size = new Vector2(96, 92);
+            }
+        }
+        else
+        {
+            var doubleFillTex = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0004.png");
+            if (_orbTextureRect != null && doubleFillTex != null)
+            {
+                _orbTextureRect.Texture = doubleFillTex;
+                _orbTextureRect.Position = new Vector2(40, 440);
+                _orbTextureRect.Size = new Vector2(92, 90);
+            }
         }
     }
 
@@ -1994,7 +2162,24 @@ public partial class HudController : CanvasLayer
 
     public void UpdateName(string name)
     {
-        if (_lblName != null) _lblName.Text = name;
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            _playerName = name;
+        }
+        if (_lblName != null) _lblName.Text = _playerName;
+        if (_lblEquipCharName != null) _lblEquipCharName.Text = _playerName;
+    }
+
+    public void UpdateMapAndCoords(string mapTitle, int x, int y)
+    {
+        if (!string.IsNullOrWhiteSpace(mapTitle))
+        {
+            _currentMapTitle = mapTitle;
+        }
+        if (_lblMapCoord != null)
+        {
+            _lblMapCoord.Text = $"{_currentMapTitle} {x}:{y}";
+        }
     }
 
     public void UpdateGold(int gold)
@@ -2011,7 +2196,8 @@ public partial class HudController : CanvasLayer
         if (_chatLog != null)
         {
             string colorHex = color.ToHtml(false);
-            _chatLog.AppendText($"[color=#{colorHex}][{channel}] {msg}[/color]\n");
+            string prefix = (!string.IsNullOrEmpty(channel) && !msg.StartsWith($"[{channel}]") && !msg.StartsWith($"【{channel}】")) ? $"[{channel}] " : "";
+            _chatLog.AppendText($"[color=#{colorHex}]{prefix}{msg}[/color]\n");
         }
     }
 
@@ -2240,6 +2426,15 @@ public partial class HudController : CanvasLayer
 
     public void OnPlayerPositionChanged(int playerTileX, int playerTileY)
     {
+        if (_lblMapCoord != null)
+        {
+            string expected = $"{_currentMapTitle} {playerTileX}:{playerTileY}";
+            if (_lblMapCoord.Text != expected)
+            {
+                _lblMapCoord.Text = expected;
+            }
+        }
+
         if (!_currentNpcTile.HasValue) return;
 
         int deltaX = Math.Abs(playerTileX - _currentNpcTile.Value.X);
@@ -2551,7 +2746,7 @@ public partial class HudController : CanvasLayer
         }
     }
 
-    public void ShowSlotTooltip(string title, string desc, Vector2 globalPos, bool showFloating = true)
+    public void ShowSlotTooltip(string title, string desc, Vector2 globalPos, bool showFloating = true, SlotButton.SlotType slotType = SlotButton.SlotType.Bag)
     {
         // 盛大官方 1.5 规则：当装备持久力为 0 时，显示鲜红警示字 (IDA sub_488AF4 / DrawItemHint)
         string warningDesc = desc;
@@ -2560,16 +2755,29 @@ public partial class HudController : CanvasLayer
             warningDesc = warningDesc.Replace("持久力 0/", "[color=#ff3333]持久力 0/[/color]");
         }
 
-        // 1. 如果背包面板处于打开状态，同步更新背包底部的官方原生物品属性内胆
-        if (_bagPanel != null && _bagPanel.Visible && _lblBagItemDesc != null)
-        {
-            _lblBagItemDesc.Text = $"[color=#ffff40]{title}[/color]\n{warningDesc}";
-        }
+        string displayText = warningDesc.StartsWith(title, StringComparison.OrdinalIgnoreCase) ||
+                             warningDesc.Contains($"[color=#ffffff]{title}[/color]") ||
+                             warningDesc.Contains($"[color=#ffff40]{title}[/color]") ||
+                             warningDesc.Contains(title)
+            ? warningDesc
+            : $"[color=#ffff40]{title}[/color]\n{warningDesc}";
 
-        // 2. 如果装备面板处于打开状态，同步更新装备面板底部的官方原生物品属性内胆
-        if (_equipPanel != null && _equipPanel.Visible && _lblEquipItemDesc != null)
+        // 盛大官方 1.5 原版严密面板隔离铁律 (杜绝“纸娃娃显示药量”或“背包显示装备属性”乱窜):
+        // 1. 只有在背包槽位悬停时，且背包开启时，更新背包底部的物品描述内胆
+        if (slotType == SlotButton.SlotType.Bag)
         {
-            _lblEquipItemDesc.Text = $"[color=#ffff40]{title}[/color]\n{warningDesc}";
+            if (_bagPanel != null && _bagPanel.Visible && _lblBagItemDesc != null)
+            {
+                _lblBagItemDesc.Text = displayText;
+            }
+        }
+        // 2. 只有在角色装备槽位悬停时，且装备面板开启时，更新装备面板底部的属性内胆
+        else if (slotType == SlotButton.SlotType.Equip)
+        {
+            if (_equipPanel != null && _equipPanel.Visible && _lblEquipItemDesc != null)
+            {
+                _lblEquipItemDesc.Text = displayText;
+            }
         }
 
         // 3. 浮动 Tooltip
@@ -2583,11 +2791,19 @@ public partial class HudController : CanvasLayer
         }
     }
 
-    public void HideSlotTooltip()
+    public void HideSlotTooltip() => HideSlotTooltip(null);
+
+    public void HideSlotTooltip(SlotButton.SlotType? slotType)
     {
         _itemTooltipView?.HideTooltip();
-        if (_lblBagItemDesc != null) _lblBagItemDesc.Text = "";
-        if (_lblEquipItemDesc != null) _lblEquipItemDesc.Text = "";
+        if (!slotType.HasValue || slotType == SlotButton.SlotType.Bag)
+        {
+            if (_lblBagItemDesc != null) _lblBagItemDesc.Text = "";
+        }
+        if (!slotType.HasValue || slotType == SlotButton.SlotType.Equip)
+        {
+            if (_lblEquipItemDesc != null) _lblEquipItemDesc.Text = "";
+        }
     }
 
     public void ShowComparisonTooltip(string currentEquipName, string currentDesc, string newEquipName, string newDesc, Vector2 globalPos)
@@ -2831,7 +3047,49 @@ public partial class HudController : CanvasLayer
 
     public bool IsMouseOverUi(Vector2 mousePos)
     {
-        return _stackManager.IsMouseOverUi((int)mousePos.X, (int)mousePos.Y);
+        // 1. 窗口栈管理器判定已打开的模态/可拖拽/可堆叠窗体
+        if (_stackManager != null && _stackManager.IsMouseOverUi((int)mousePos.X, (int)mousePos.Y)) return true;
+
+        // 2. 检查 HUD 自带面板 (背包、装备、状态、技能、加点、交易、修理、商店、NPC 对话框、小地图等)
+        if (_bagPanel != null && _bagPanel.Visible && _bagPanel.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_equipPanel != null && _equipPanel.Visible && _equipPanel.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_skillPanelView != null && _skillPanelView.Visible && _skillPanelView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_statusPanelView != null && _statusPanelView.Visible && _statusPanelView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_adjustAbilPanelView != null && _adjustAbilPanelView.Visible && _adjustAbilPanelView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_groupPanelView != null && _groupPanelView.Visible && _groupPanelView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_guildPanelView != null && _guildPanelView.Visible && _guildPanelView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_tradePanelView != null && _tradePanelView.Visible && _tradePanelView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_repairPanelView != null && _repairPanelView.Visible && _repairPanelView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_shopPanelView != null && _shopPanelView.Visible && _shopPanelView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_npcDialogView != null && _npcDialogView.Visible && _npcDialogView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_inspectPanelView != null && _inspectPanelView.Visible && _inspectPanelView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_minimapView != null && _minimapView.Visible && _minimapView.GetGlobalRect().HasPoint(mousePos)) return true;
+        if (_messageBoxDialog != null && _messageBoxDialog.Visible && _messageBoxDialog.GetGlobalRect().HasPoint(mousePos)) return true;
+
+        // 3. 聊天输入框与聊天历史滚动区
+        if (_chatInput != null && _chatInput.Visible && _chatInput.GetGlobalRect().HasPoint(mousePos)) return true;
+
+        // 4. 盛大官方 1.5 原版底栏异形像素命中检测 (IDA 0x48ba74 TFrmDlg_DBottomInRealArea 权威物理真值)
+        // 废除 mousePos.Y >= 349 的粗暴一刀切，仅在 Prguse_0001 非透明像素上判定为 UI，透明镂空处放行大世界点击
+        int mx = (int)mousePos.X;
+        int my = (int)mousePos.Y;
+        if (mx >= 0 && mx < 800 && my >= 349 && my < 600)
+        {
+            if (_hudBottomBarAlphaMask != null)
+            {
+                int relX = mx;
+                int relY = my - 349;
+                if (relX >= 0 && relX < _hudBottomBarAlphaMask.GetLength(0) &&
+                    relY >= 0 && relY < _hudBottomBarAlphaMask.GetLength(1))
+                {
+                    return _hudBottomBarAlphaMask[relX, relY];
+                }
+            }
+            // 若掩码未就绪，使用官方 DFM DBottom (Left=12, Top=416) 保守判定，绝不切断 349~416 的大世界视野
+            return my >= 416;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -2869,6 +3127,10 @@ public partial class HudController : CanvasLayer
         var btn = _bagSlots[slot];
         if (btn != null)
         {
+            if (string.IsNullOrEmpty(iconFile) || iconFile.StartsWith("StateItem"))
+            {
+                iconFile = ItemIconMapper.GetIconFile(itemName);
+            }
             string folder = iconFile.StartsWith("Items") ? "Items" : (iconFile.StartsWith("DnItems") ? "DnItems" : "StateItem");
             btn.ItemTexture = string.IsNullOrEmpty(iconFile) ? null : ResPath.LoadImageTexture($"resources/wil/png/{folder}/{iconFile}");
         }
@@ -2921,6 +3183,7 @@ public partial class HudController : CanvasLayer
     public void SetEquipSlot(int equipSlot, string? itemName, string? iconFile, string? desc)
     {
         if (equipSlot < 0 || equipSlot >= 9) return;
+        if (!string.IsNullOrEmpty(itemName) && !IsItemCompatibleWithEquipSlot(itemName, equipSlot)) return;
         _pendingEquipActions.Remove(equipSlot); // 确认成功，提交事务，解除互斥锁定
         if (string.IsNullOrEmpty(itemName))
         {
@@ -2965,19 +3228,41 @@ public partial class HudController : CanvasLayer
         if (curDura <= 2)
         {
             btn.LowDurabilityWarning = true;
-            string eqName = _equipItemDetails[equipSlot]?.Name ?? "装备";
-            if (curDura == 0)
-            {
-                AddChat("装备", $"[装备] 危险：您的【{eqName}】持久已降为 0，继续受到物理攻击将可能彻底碎裂！", new Color(1f, 0.2f, 0.2f));
-            }
-            else
-            {
-                AddChat("装备", $"[装备] 警告：您的【{eqName}】持久仅剩 {curDura}/{maxDura} 点，请尽快修理！", new Color(1f, 0.7f, 0.2f));
-            }
         }
         else
         {
             btn.LowDurabilityWarning = false;
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 角色性别纸娃娃底板切换 (0=男 Prguse_0376, 1=女 Prguse_0377, IDA sub_488AF4)
+    /// </summary>
+    public void SetDollGender(int gender)
+    {
+        _playerGender = gender;
+        GD.Print($"[HudController] SetDollGender 被调用: gender={gender}, _dollBackground={(_dollBackground != null ? "有效" : "null")}");
+        if (_dollBackground == null) return;
+        string dollPng = gender != 0 ? "Prguse_0377.png" : "Prguse_0376.png";
+        var texDoll = ResPath.LoadImageTexture($"resources/wil/png/Prguse/{dollPng}");
+        if (texDoll != null)
+        {
+            _dollBackground.Texture = texDoll;
+        }
+        SetDollHair(1, gender != 0);
+
+        // 如果当前穿戴了新手衣服，联动刷新衣服贴图 (盛大官方 1.5 正宗女布衣为 StateItem_0080 @ (42, 65), 男布衣为 StateItem_0060 @ (41, 65))
+        if (_dollCloth != null)
+        {
+            string clothFile = gender != 0 ? "StateItem_0080.png" : "StateItem_0060.png";
+            var texCloth = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{clothFile}");
+            if (texCloth != null)
+            {
+                _dollCloth.Texture = texCloth;
+                _dollCloth.Size = texCloth.GetSize();
+                _dollCloth.Position = gender != 0 ? new Vector2(42, 65) : new Vector2(41, 65);
+                _dollCloth.Visible = true;
+            }
         }
     }
 
@@ -2987,14 +3272,29 @@ public partial class HudController : CanvasLayer
     public void SetDollHair(int hairIndex = 1, bool isFemale = false)
     {
         if (_dollHair == null) return;
-        int baseIdx = isFemale ? 480 : 440;
-        int imgIdx = baseIdx + Math.Max(1, hairIndex);
-        var tex = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{imgIdx:D4}.png");
+        string hairFile;
+        Vector2 hairPos;
+        if (isFemale || _playerGender != 0)
+        {
+            // 盛大官方 1.5 原版女性发型：Prguse_0482 为经典红棕发 (与大世界完全对齐)
+            // 依据 Prguse.wil Origin 绝对物理偏移：(75, 42) 严丝合缝扣在女性头顶，完全露出五官与双眼
+            int imgIdx = (hairIndex == 2) ? 483 : 482;
+            hairFile = $"resources/wil/png/Prguse/Prguse_{imgIdx:D4}.png";
+            hairPos = new Vector2(75, 42);
+        }
+        else
+        {
+            int baseIdx = 440;
+            int imgIdx = baseIdx + Math.Max(1, hairIndex);
+            hairFile = $"resources/wil/png/Prguse/Prguse_{imgIdx:D4}.png";
+            hairPos = new Vector2(76, 45);
+        }
+        var tex = ResPath.LoadImageTexture(hairFile);
         if (tex != null)
         {
             _dollHair.Texture = tex;
             _dollHair.Size = tex.GetSize();
-            _dollHair.Position = isFemale ? new Vector2(74, 38) : new Vector2(73, 39);
+            _dollHair.Position = hairPos;
             _dollHair.Visible = true;
         }
     }
@@ -3012,11 +3312,21 @@ public partial class HudController : CanvasLayer
             }
             else
             {
-                var tex = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{clothFile}");
+                string actualCloth = clothFile;
+                if (_playerGender != 0)
+                {
+                    // 女性角色自适应：如果是布衣系列(0060/0061)，映射为盛大官方正品女布衣 StateItem_0080.png
+                    if (actualCloth.Contains("0060") || actualCloth.Contains("0061"))
+                    {
+                        actualCloth = "StateItem_0080.png";
+                    }
+                }
+                var tex = ResPath.LoadImageTexture($"resources/wil/png/StateItem/{actualCloth}");
                 if (tex != null)
                 {
                     _dollCloth.Texture = tex;
                     _dollCloth.Size = tex.GetSize();
+                    _dollCloth.Position = _playerGender != 0 ? new Vector2(42, 65) : new Vector2(41, 65);
                     _dollCloth.Visible = true;
                 }
             }
@@ -3035,8 +3345,8 @@ public partial class HudController : CanvasLayer
                 {
                     _dollWeapon.Texture = tex;
                     _dollWeapon.Size = tex.GetSize();
-                    // 木剑握把在手心 (20, 48)，其他武器 (如裁决/屠龙/龙纹) 在 (10, 28)
-                    _dollWeapon.Position = weaponFile.Contains("0030") ? new Vector2(20, 48) : new Vector2(10, 28);
+                    // 木剑握把在手心 (25, 56)，其他武器在 (10, 28)
+                    _dollWeapon.Position = weaponFile.Contains("0030") ? new Vector2(25, 56) : new Vector2(10, 28);
                     _dollWeapon.Visible = true;
                 }
             }
@@ -3207,7 +3517,7 @@ public partial class HudController : CanvasLayer
         }
 #endif
 
-        EmitSignal(SignalName.TradeAddItemRequested, tradeSlot, bagItem.Value.Name);
+        EmitSignal(SignalName.TradeAddItemRequested, bagSlot, bagItem.Value.Name);
         AddChat("系统", $"[交易] 放入物品 [{bagItem.Value.Name}] 到交易栏 #{tradeSlot + 1} 格。", new Color(0.8f, 1f, 0.8f));
     }
 
@@ -3997,6 +4307,21 @@ public partial class HudController : CanvasLayer
             _stackManager.PopWindow(_npcDialogView);
             _npcDialogView.Visible = false;
             AddChat("系统", "[系统] NPC 对话已关闭。", new Color(0.7f, 0.7f, 0.7f));
+        }
+        if (_shopPanelView != null && _shopPanelView.Visible)
+        {
+            _stackManager.PopWindow(_shopPanelView);
+            _shopPanelView.Visible = false;
+        }
+        if (_repairPanelView != null && _repairPanelView.Visible)
+        {
+            _stackManager.PopWindow(_repairPanelView);
+            _repairPanelView.Visible = false;
+        }
+        if (_storagePanelView != null && _storagePanelView.Visible)
+        {
+            _stackManager.PopWindow(_storagePanelView);
+            _storagePanelView.Visible = false;
         }
     }
 

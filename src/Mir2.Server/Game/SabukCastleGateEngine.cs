@@ -38,16 +38,16 @@ public sealed class SabukCastleGateEngine
     {
         if (!isLord)
         {
-            return (false, "只有沙巴克城主方有权下达开合城门军令！");
+            return (false, "只有沙巴克城主才能开关城门。");
         }
 
         if (State == GateState.Broken)
         {
-            return (false, "城门已在战火中被击碎倒塌！必须先修缮城门方可重新开关！");
+            return (false, "城门已损坏，请先修理城门。");
         }
 
         State = open ? GateState.Opened : GateState.Closed;
-        string msg = open ? "沙巴克沉重的生铁大门缓缓升起开启！" : "沙巴克大门轰然关闭落锁！严防死守！";
+        string msg = open ? "城门已打开。" : "城门已关闭。";
         return (true, msg);
     }
 
@@ -65,10 +65,10 @@ public sealed class SabukCastleGateEngine
         if (Hp == 0)
         {
             State = GateState.Broken;
-            return (true, true, "【破门告急】轰隆！沙巴克正门被攻城大军彻底击溃粉碎！防线沦陷！");
+            return (true, true, "沙巴克城门被攻破了！");
         }
 
-        return (true, false, $"城门受到巨力轰击！剩余耐久: {Hp}/{MaxGateHp}");
+        return (true, false, $"城门受到攻击，耐久度: {Hp}/{MaxGateHp}");
     }
 
     /// <summary>
@@ -85,13 +85,13 @@ public sealed class SabukCastleGateEngine
 
         if (lordState.Gold < RepairGateCost)
         {
-            return (false, $"修缮城门需要军费 {RepairGateCost} 金币，资金不足！");
+            return (false, $"修理城门需要 {RepairGateCost} 金币，金币不足。");
         }
 
         lordState.Gold -= RepairGateCost;
         Hp = MaxGateHp;
         State = GateState.Closed;
 
-        return (true, $"工匠日夜赶工，沙巴克正门已修缮如初！耐久度恢复至 {MaxGateHp} 点！");
+        return (true, "城门已修理完毕。");
     }
 }

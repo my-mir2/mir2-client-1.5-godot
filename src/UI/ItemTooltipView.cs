@@ -54,7 +54,7 @@ public partial class ItemTooltipView : Control
             MouseFilter = MouseFilterEnum.Ignore,
             Position = new Vector2(8, 6)
         };
-        _lblContent.AddThemeFontSizeOverride("normal_font_size", 12);
+        Mir2Client.Utils.FontManager.ApplyOfficialStyleToRichText(_lblContent, new Color(1f, 1f, 1f), 12);
         _lblContent.AddThemeConstantOverride("line_separation", 2);
         _panel.AddChild(_lblContent);
     }
@@ -99,7 +99,7 @@ public partial class ItemTooltipView : Control
         string highlightedDesc = HighlightSuperAttributes(desc);
         if (_lblContent != null)
         {
-            _lblContent.Text = $"[b][color=#ffff40]{itemName}[/color][/b]\n{highlightedDesc}";
+            _lblContent.Text = $"[color=#ffff40]{itemName}[/color]\n{highlightedDesc}";
         }
 
         // 计算文本行数以动态适配精确面板高度
@@ -126,7 +126,7 @@ public partial class ItemTooltipView : Control
         string hCurrent = HighlightSuperAttributes(currentDesc);
         string hNew = HighlightSuperAttributes(newDesc);
         string slotTag = CompareSlotIndex == 0 ? "[对比-左]" : "[对比-右]";
-        string fullText = $"[b][color=#ffff40]{newEquipName}[/color][/b] [color=#00ffff]{slotTag}[/color]\n{hNew}\n[color=#808080]------------------------[/color]\n[color=#a0a0a0]已装备: [/color][b][color=#ffff40]{currentEquipName}[/color][/b]\n{hCurrent}";
+        string fullText = $"[color=#ffff40]{newEquipName}[/color] [color=#00ffff]{slotTag}[/color]\n{hNew}\n[color=#808080]------------------------[/color]\n[color=#a0a0a0]已装备: [/color][color=#ffff40]{currentEquipName}[/color]\n{hCurrent}";
         if (_lblContent != null)
         {
             _lblContent.Text = fullText;

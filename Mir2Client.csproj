@@ -6,7 +6,12 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace></RootNamespace>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests/CSharp/**;src/Mir2.Shared/**;src/Mir2.Server/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/CSharp/**;src/Mir2.Shared/**;src/Mir2.Server/**;src/Mir2.ScriptPlugin/**;scratch/**;archive/**;tools/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <!-- 严禁默认定义 MIR2_SANDBOX_DEV；仅在显式传入 EnableSandboxDev=true 且为 Debug 模式时开启内部演练，杜绝发布版残留无网单机后门 -->
+  <PropertyGroup Condition="'$(EnableSandboxDev)' == 'true' And '$(Configuration)' != 'Release'">
+    <DefineConstants>$(DefineConstants);MIR2_SANDBOX_DEV</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

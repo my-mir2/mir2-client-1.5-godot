@@ -1,0 +1,121 @@
+{
+  "kills": 2,
+  "seconds": 20.5840981,
+  "rollbacks": 1,
+  "level": 15,
+  "hp": 149,
+  "maxHp": 149,
+  "dead": false,
+  "finalMap": "1",
+  "x": 497,
+  "y": 467,
+  "gold": 200,
+  "exp": 29,
+  "maxExp": 40000,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "level 15 => GM: 等级=15 HP=149/149",
+    "tp 1 497 465 => GM: 已传送到 1(497,465)",
+    "spawn 钉耙猫 6 => GM: 刷出 钉耙猫 x6"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4432519,
+      "Kills": 0,
+      "MaxExp": 40000
+    },
+    {
+      "Level": 15,
+      "AtSec": 6.224902,
+      "Kills": 0,
+      "MaxExp": 40000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [
+    {
+      "who": "钉耙猫",
+      "hits": 5,
+      "dmg": 90
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [],
+  "magicUpdates": [],
+  "spellsCast": 0,
+  "spellEffects": 5,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 0,
+  "groupLists": [
+    {
+      "count": 1,
+      "members": "队长_0"
+    },
+    {
+      "count": 2,
+      "members": "队长_0/队员_0"
+    },
+    {
+      "count": 1,
+      "members": "队长_0"
+    }
+  ],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 等级=15 HP=149/149",
+    "GM: 已传送到 1(497,465)",
+    "GM: 刷出 钉耙猫 x6",
+    "允许编组",
+    "队员_0 加入队伍。"
+  ],
+  "characterName": "队长_0",
+  "fights": [
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 2,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        14,
+        27
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 3,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        11,
+        18,
+        20
+      ],
+      "drops": []
+    }
+  ]
+}

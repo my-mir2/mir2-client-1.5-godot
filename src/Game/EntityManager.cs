@@ -161,6 +161,7 @@ public class EntityManager
     {
         if (_entities.TryGetValue(uid, out var ent))
         {
+            if (ent.IsDead) return;
             ent.Direction = dir;
             EntityTurned?.Invoke(uid, dir);
         }
@@ -170,6 +171,7 @@ public class EntityManager
     {
         if (_entities.TryGetValue(uid, out var ent))
         {
+            if (ent.IsDead) return;
             ent.TileX = x;
             ent.TileY = y;
             ent.Direction = dir;
@@ -187,6 +189,7 @@ public class EntityManager
     {
         if (_entities.TryGetValue(uid, out var ent))
         {
+            if (ent.IsDead) return;
             ent.TileX = x;
             ent.TileY = y;
             double nowSec = System.Environment.TickCount64 / 1000.0;
@@ -202,6 +205,10 @@ public class EntityManager
     {
         if (_entities.TryGetValue(uid, out var ent))
         {
+            if (ent.IsDead)
+            {
+                return DeadReckoningEngine.TileToWorld(ent.TileX, ent.TileY);
+            }
             if (ent.InterpolationBuffer.Count > 0)
             {
                 var (pos, _, _) = ent.InterpolationBuffer.Sample(clientTime);
@@ -216,6 +223,7 @@ public class EntityManager
     {
         if (_entities.TryGetValue(uid, out var ent))
         {
+            if (ent.IsDead) return;
             ent.TileX = x;
             ent.TileY = y;
             ent.Direction = dir;
@@ -228,6 +236,7 @@ public class EntityManager
     {
         if (_entities.TryGetValue(uid, out var ent))
         {
+            if (ent.IsDead) return;
             ent.TileX = x;
             ent.TileY = y;
             ent.Direction = dir;
@@ -273,6 +282,23 @@ public class EntityManager
         _entities.Clear();
         foreach (var uid in uids)
         {
+            EntityRemoved?.Invoke(uid);
+        }
+    }
+
+    /// <summary>
+    /// 地图转场与切图时清除其他实体，保留本机主角实体
+    /// </summary>
+    public void ClearExceptLocalPlayer()
+    {
+        var removeUids = new List<int>();
+        foreach (var uid in _entities.Keys)
+        {
+            if (uid != LocalPlayerUid) removeUids.Add(uid);
+        }
+        foreach (var uid in removeUids)
+        {
+            _entities.Remove(uid);
             EntityRemoved?.Invoke(uid);
         }
     }

@@ -226,25 +226,66 @@ public static class MageCombatEngine
         public const int BreakSoundId = 138; // 破盾金属碎裂音效
 
         /// <summary>
-        /// 判定魔法盾减免伤害与破盾
+        /// 盛大官方 1.5 魔法盾权威受击伤害计算 (Delphi sub_4C6ED0)
+        /// 承受伤害比例: ((damage / 100.0) * (level + 2.0) * 8.0)
+        /// - 0级: 承受 16% 伤害 (减免 84%)
+        /// - 1级: 承受 24% 伤害 (减免 76%)
+        /// - 2级: 承受 32% 伤害 (减免 68%)
+        /// - 3级: 承受 40% 伤害 (减免 60%)
+        /// 耐久衰减: 每次受击扣减 3 秒 (3000ms) 持续时间。
+        /// 若剩余时间 <= 3 秒，降为 1 秒 (1000ms)，保持护盾在该击下不破裂，待后续时钟自然衰减到期。
+        /// </summary>
+        public static (int takenDamage, int absorbedDamage, int remainingDurationMs, bool shieldBroken) ProcessShieldHit(
+            int incomingDamage, int currentDurationMs, int shieldLevel)
+        {
+            if (incomingDamage <= 0 || currentDurationMs <= 0)
+            {
+                return (incomingDamage, 0, currentDurationMs, currentDurationMs <= 0);
+            }
+
+            shieldLevel = Math.Clamp(shieldLevel, 0, 3);
+            double ratio = (shieldLevel + 2.0) * 8.0 / 100.0;
+            int takenDamage = (int)Math.Round(incomingDamage * ratio);
+            int absorbedDamage = Math.Max(0, incomingDamage - takenDamage);
+
+            // 官方 Delphi sub_4C6ED0: 每次受击扣减 3 秒 (3000ms) 持续时间
+            int remainingDurationMs;
+            if (currentDurationMs <= 3000)
+            {
+                remainingDurationMs = 1000; // 保持 1 秒最低残余
+            }
+            else
+            {
+                remainingDurationMs = currentDurationMs - 3000;
+            }
+
+            bool broken = remainingDurationMs <= 0;
+            return (takenDamage, absorbedDamage, remainingDurationMs, broken);
+        }
+
+        /// <summary>
+        /// 判定魔法盾减免伤害与破盾 (兼容旧签名与测试用例)
         /// </summary>
         public static (int absorbedDmg, int remainingHpDmg, bool shieldBroken) ProcessShieldDamage(
             int incomingDamage, int currentShieldHp, int shieldLevel)
         {
             if (incomingDamage <= 0 || currentShieldHp <= 0)
             {
-                return (0, incomingDamage, false);
+                return (0, incomingDamage, currentShieldHp <= 0);
             }
 
-            double absorbRatio = shieldLevel switch
+            // 若传入的是以毫秒为单位的持续时间 (>= 1000ms)，执行官方 Delphi sub_4C6ED0 时间衰减计算
+            if (currentShieldHp >= 1000)
             {
-                1 => 0.50,
-                2 => 0.60,
-                3 => 0.70,
-                _ => 0.40
-            };
+                var res = ProcessShieldHit(incomingDamage, currentShieldHp, shieldLevel);
+                return (res.absorbedDamage, res.takenDamage, res.shieldBroken);
+            }
 
-            int maxAbsorb = (int)Math.Round(incomingDamage * absorbRatio);
+            // 官方 Delphi sub_4C6ED0 承受比例 (0级 16%, 1级 24%, 2级 32%, 3级 40%)
+            shieldLevel = Math.Clamp(shieldLevel, 0, 3);
+            double ratio = (shieldLevel + 2.0) * 8.0 / 100.0;
+            int takenDamage = (int)Math.Round(incomingDamage * ratio);
+            int maxAbsorb = Math.Max(0, incomingDamage - takenDamage);
             int actualAbsorb = Math.Min(currentShieldHp, maxAbsorb);
             int remainingShield = currentShieldHp - actualAbsorb;
             bool broken = remainingShield <= 0;

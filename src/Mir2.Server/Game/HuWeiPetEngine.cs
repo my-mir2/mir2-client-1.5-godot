@@ -184,7 +184,7 @@ public sealed class HuWeiPetEngine
     public static (bool isResting, string message) TogglePetMode(SlavePet pet)
     {
         pet.IsResting = !pet.IsResting;
-        string msg = pet.IsResting ? $"{pet.Name}已进入休息状态，原地戒备待命。" : $"{pet.Name}解除休息，跟随主人前进！";
+        string msg = pet.IsResting ? "你的宝宝处于休息状态。" : "你的宝宝处于跟随主人战斗状态。";
         return (pet.IsResting, msg);
     }
 

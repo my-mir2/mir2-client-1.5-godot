@@ -163,7 +163,7 @@ public partial class MinimapView : Control, IManagedWindow
             Name = "LblNoMapNotice",
             Size = new Vector2(500, 30),
             Position = new Vector2(20, 160),
-            Text = "【当前环境受磁场干扰，无法侦测全景雷达】",
+            Text = "无法查看该地图",
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Visible = false,
@@ -693,7 +693,7 @@ public partial class MinimapView : Control, IManagedWindow
                     _lblNoMapNotice.Visible = _mapTexRect?.Texture == null;
                     _lblNoMapNotice.Position = new Vector2(20, 160);
                     _lblNoMapNotice.Size = new Vector2(500, 30);
-                    _lblNoMapNotice.Text = "【当前环境受磁场干扰，无法侦测全景雷达】";
+                    _lblNoMapNotice.Text = "无法查看该地图";
                     _lblNoMapNotice.AddThemeFontSizeOverride("font_size", 12);
                 }
                 UpdatePlayerDotPosition();

@@ -37,6 +37,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="FlameSlot0" type="TextureRect" parent="."]
+z_index = 0
 offset_left = 90.0
 offset_top = 58.0
 offset_right = 382.0
@@ -45,6 +46,7 @@ mouse_filter = 2
 stretch_mode = 2
 
 [node name="FlameSlot1" type="TextureRect" parent="."]
+z_index = 0
 offset_left = 430.0
 offset_top = 60.0
 offset_right = 722.0
@@ -53,6 +55,7 @@ mouse_filter = 2
 stretch_mode = 2
 
 [node name="CharSlot0" type="TextureRect" parent="."]
+z_index = 1
 offset_left = 71.0
 offset_top = 52.0
 offset_right = 371.0
@@ -61,6 +64,7 @@ mouse_filter = 2
 stretch_mode = 2
 
 [node name="CharSlot1" type="TextureRect" parent="."]
+z_index = 1
 offset_left = 511.0
 offset_top = 99.0
 offset_right = 811.0
@@ -213,6 +217,7 @@ offset_left = 71.0
 offset_top = 107.0
 offset_right = 208.0
 offset_bottom = 123.0
+max_length = 14
 theme_override_styles/normal = SubResource("StyleBoxEmpty_edit")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_edit")
 theme_override_styles/read_only = SubResource("StyleBoxEmpty_edit")
@@ -251,15 +256,29 @@ offset_bottom = 265.0
 
 [node name="BtnLeftHair" type="TextureButton" parent="NewCharPanel"]
 offset_left = 70.0
-offset_top = 309.0
+offset_top = 305.0
 offset_right = 106.0
-offset_bottom = 336.0
+offset_bottom = 332.0
+
+[node name="LblHair" type="Label" parent="NewCharPanel"]
+offset_left = 106.0
+offset_top = 305.0
+offset_right = 168.0
+offset_bottom = 332.0
+text = "发型 1"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 12
 
 [node name="BtnRightHair" type="TextureButton" parent="NewCharPanel"]
 offset_left = 168.0
-offset_top = 304.0
+offset_top = 305.0
 offset_right = 204.0
-offset_bottom = 331.0
+offset_bottom = 332.0
 
 [node name="BtnCreate" type="TextureButton" parent="NewCharPanel"]
 offset_left = 100.0

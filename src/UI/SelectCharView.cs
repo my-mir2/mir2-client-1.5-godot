@@ -52,10 +52,10 @@ public partial class SelectCharView : Control
     public const string PromptDeleteConfirm = "删除的角色是不能被恢复的。\n一段时间内，你将不能使用相同的角色名。\n你真的想要删除角色吗？";
 
     [Signal]
-    public delegate void CharSelectedEventHandler(int index, string charName, int level);
+    public delegate void CharSelectedEventHandler(int index, string charName, int level, int sex, int job);
 
     [Signal]
-    public delegate void NewCharRequestedEventHandler(string name, int job, int sex);
+    public delegate void NewCharRequestedEventHandler(string name, int job, int sex, int hair);
 
     [Signal]
     public delegate void DelCharRequestedEventHandler(int index);
@@ -101,6 +101,7 @@ public partial class SelectCharView : Control
     private TextureButton? _btnFemale;
     private TextureButton? _btnLeftHair;
     private TextureButton? _btnRightHair;
+    private Label? _lblHair;
     private TextureButton? _btnCreate;
     private TextureButton? _btnCancel;
     private TextureRect? _previewCharRect;
@@ -204,16 +205,21 @@ public partial class SelectCharView : Control
 
             _btnLeftHair = BindTextureButton("NewCharPanel/BtnLeftHair", 79);
             _btnRightHair = BindTextureButton("NewCharPanel/BtnRightHair", 80);
+            _lblHair = _newCharPanel.GetNodeOrNull<Label>("LblHair");
+            if (_lblHair != null) _lblHair.Text = "发型 1";
             _btnCreate = BindTextureButton("NewCharPanel/BtnCreate", 62, 81);
             _btnCancel = BindTextureButton("NewCharPanel/BtnCancel", 64);
+
+            if (_newCharName != null) _newCharName.MaxLength = 14;
 
             _previewCharRect = new TextureRect
             {
                 Name = "PreviewCharRect",
-                Position = new Vector2(170, 60),
-                MouseFilter = MouseFilterEnum.Ignore
+                ZIndex = 1,
+                MouseFilter = MouseFilterEnum.Ignore,
+                Visible = false
             };
-            _newCharPanel.AddChild(_previewCharRect);
+            AddChild(_previewCharRect);
 
             if (_btnWarrior != null) _btnWarrior.Pressed += () => SelectJob(0);
             if (_btnWizzard != null) _btnWizzard.Pressed += () => SelectJob(1);
@@ -223,7 +229,7 @@ public partial class SelectCharView : Control
             if (_btnLeftHair != null) _btnLeftHair.Pressed += () => ChangeHair(-1);
             if (_btnRightHair != null) _btnRightHair.Pressed += () => ChangeHair(1);
             if (_btnCreate != null) _btnCreate.Pressed += OnConfirmCreateChar;
-            if (_btnCancel != null) _btnCancel.Pressed += () => _newCharPanel.Visible = false;
+            if (_btnCancel != null) _btnCancel.Pressed += OnCancelCreateChar;
 
             UpdateJobAndSexButtonVisuals();
         }
@@ -267,7 +273,7 @@ public partial class SelectCharView : Control
         if (_btnStart != null) _btnStart.Pressed += OnStartGame;
         if (_btnNew != null) _btnNew.Pressed += OnOpenCreateChar;
         if (_btnDel != null) _btnDel.Pressed += OnDeleteChar;
-        if (_btnExit != null) _btnExit.Pressed += () => GetTree().Quit();
+        if (_btnExit != null) _btnExit.Pressed += () => AppLifecycle.SafeQuit(0);
 
         RefreshCharacterDisplay();
         UpdateAnimations(0);
@@ -552,7 +558,7 @@ public partial class SelectCharView : Control
         if (_characters.Count > _selectedSlot)
         {
             var c = _characters[_selectedSlot];
-            EmitSignal(SignalName.CharSelected, _selectedSlot, c.Name, c.Level);
+            EmitSignal(SignalName.CharSelected, _selectedSlot, c.Name, c.Level, c.Sex, c.Job);
         }
         else
         {
@@ -562,8 +568,7 @@ public partial class SelectCharView : Control
 
     private void OnOpenCreateChar()
     {
-        // 官方 1.5 席位满员校验实证 (sub_47E9F0 @ 0x47EA03):
-        // 两个角色槽位均有角色时，弹出 '你可以为每个单独的帐户创建两个角色。'
+        // 官方 1.5 席位满员校验实证 (sub_47EA03)
         if (_characters.Count >= 2)
         {
             ShowMessageModal(PromptTwoCharactersMax);
@@ -574,7 +579,14 @@ public partial class SelectCharView : Control
         {
             _newCharPanel.Visible = true;
             _newCharName?.GrabFocus();
+            UpdateJobAndSexButtonVisuals();
         }
+    }
+
+    private void OnCancelCreateChar()
+    {
+        if (_newCharPanel != null) _newCharPanel.Visible = false;
+        if (_previewCharRect != null) _previewCharRect.Visible = false;
     }
 
     private void SelectJob(int job)
@@ -614,7 +626,7 @@ public partial class SelectCharView : Control
         if (_btnMale != null) _btnMale.TextureNormal = (_newCharSex == 0) ? texMalePressed : texMaleNormal;
         if (_btnFemale != null) _btnFemale.TextureNormal = (_newCharSex == 1) ? texFemalePressed : texFemaleNormal;
 
-        // 联动创角全身立绘预览 (ChrSel 贴图库)
+        // 联动创角全身立绘预览：在神龛右侧席位精准站位
         if (_previewCharRect != null)
         {
             int previewFrame = CalculateCharBaseFrame(_newCharJob, _newCharSex, true);
@@ -623,15 +635,22 @@ public partial class SelectCharView : Control
             {
                 _previewCharRect.Texture = texPreview;
                 _previewCharRect.Size = texPreview.GetSize();
-                _previewCharRect.Visible = true;
+                _previewCharRect.Position = GetCharacterCoordinate(1, _newCharJob, _newCharSex, true);
+                _previewCharRect.Visible = _newCharPanel != null && _newCharPanel.Visible;
             }
         }
     }
 
     private void ChangeHair(int delta)
     {
-        _newCharHair = Math.Clamp(_newCharHair + delta, 0, 1);
-        GD.Print($"[SelectCharView] 切换发型: {_newCharHair}");
+        _newCharHair = (_newCharHair + delta + 2) % 2;
+        if (_lblHair != null)
+        {
+            _lblHair.Text = $"发型 {_newCharHair + 1}";
+        }
+        AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.NormButtonClick);
+        UpdateJobAndSexButtonVisuals();
+        GD.Print($"[SelectCharView] 切换发型: {_newCharHair + 1}");
     }
 
     private void OnConfirmCreateChar()
@@ -643,8 +662,21 @@ public partial class SelectCharView : Control
             return;
         }
 
-        EmitSignal(SignalName.NewCharRequested, name, _newCharJob, _newCharSex);
+        if (name.Length > 14)
+        {
+            ShowMessageModal("角色名称不能超过14个字符！");
+            return;
+        }
+
+        if (name.Contains('/') || name.Contains('\\') || name.Contains(' ') || name.Contains('|'))
+        {
+            ShowMessageModal("角色名称不能包含空格或斜杠等特殊字符！");
+            return;
+        }
+
+        EmitSignal(SignalName.NewCharRequested, name, _newCharJob, _newCharSex, _newCharHair);
         if (_newCharPanel != null) _newCharPanel.Visible = false;
+        if (_previewCharRect != null) _previewCharRect.Visible = false;
     }
 
     private void OnDeleteChar()
@@ -666,6 +698,7 @@ public partial class SelectCharView : Control
     {
         _pendingOkAction = onOk;
         if (_newCharPanel != null) _newCharPanel.Visible = false;
+        if (_previewCharRect != null) _previewCharRect.Visible = false;
         if (_msgModal != null && _msgText != null)
         {
             string normalized = string.IsNullOrEmpty(text) ? string.Empty : text.Replace("\\\\", "\n").Replace('\\', '\n');

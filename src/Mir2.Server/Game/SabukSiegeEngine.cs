@@ -252,24 +252,24 @@ public sealed class SabukSiegeEngine
     {
         if (string.IsNullOrWhiteSpace(OwnerGuild) || !OwnerGuild.Equals(guildName, StringComparison.OrdinalIgnoreCase))
         {
-            return (false, 0, "你非沙巴克霸主行会成员，无权触碰城池金库！");
+            return (false, 0, "你不是沙巴克行会成员。");
         }
         if (!isGuildLeader)
         {
-            return (false, 0, "只有沙巴克行会掌门人（城主）方可提取城池商业税金！");
+            return (false, 0, "只有掌门人才能取钱。");
         }
         if (requestAmount <= 0)
         {
-            return (false, 0, "提取金币数额必须大于 0！");
+            return (false, 0, "输入的金币数不正确。");
         }
         if (SabukGold <= 0)
         {
-            return (false, 0, "沙巴克金库空空如也，暂无税金可提取！");
+            return (false, 0, "城里的资金不足。");
         }
 
         int withdraw = Math.Min(SabukGold, requestAmount);
         SabukGold -= withdraw;
-        return (true, withdraw, $"成功提取沙巴克城池税金 {withdraw} 金币！金库剩余 {SabukGold} 金币！");
+        return (true, withdraw, $"已取出 {withdraw} 金币。");
     }
 
     /// <summary>

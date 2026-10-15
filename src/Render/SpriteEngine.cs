@@ -56,18 +56,18 @@ namespace Mir2Client.Render
         public static readonly Dictionary<ActionType, int> ActionIntervalMs = new()
         {
             [ActionType.Stand] = 200,
-            [ActionType.Walk] = 60,
-            [ActionType.Run] = 50,
-            [ActionType.Hit] = 60,
-            [ActionType.HeavyHit] = 60,
-            [ActionType.BigHit] = 60,
-            [ActionType.PowerHit] = 60,
-            [ActionType.LongHit] = 60,
-            [ActionType.FireHit] = 60,
-            [ActionType.CrsHit] = 60,
-            [ActionType.Cast] = 60,
-            [ActionType.Struck] = 100,
-            [ActionType.Die] = 100,
+            [ActionType.Walk] = 100,     // IDA sub_4CAF08 @ 0x4CAF08：服务端行走门禁 600ms，单步 6 帧 = 600ms
+            [ActionType.Run] = 100,      // IDA sub_4CB11C @ 0x4CB11C：服务端奔跑门禁 600ms，单次 2 格 6 帧 = 600ms
+            [ActionType.Hit] = 80,       // 盛大官方 1.5 物理出刀斩击 6 帧 ~480ms
+            [ActionType.HeavyHit] = 80,
+            [ActionType.BigHit] = 80,
+            [ActionType.PowerHit] = 80,
+            [ActionType.LongHit] = 80,
+            [ActionType.FireHit] = 80,
+            [ActionType.CrsHit] = 80,
+            [ActionType.Cast] = 80,      // 盛大官方 1.5 施法施咒 6 帧 ~480ms
+            [ActionType.Struck] = 125,   // 盛大官方 1.5 怪物/人物受击硬直 2 帧严格 250ms (Actor.pas:472)
+            [ActionType.Die] = 130,      // 盛大官方 1.5 倒地死亡 4 帧 ~520ms
             [ActionType.SitDown] = 200
         };
 
@@ -171,10 +171,31 @@ namespace Mir2Client.Render
             return dir == 1 || dir == 2 || dir == 3;
         }
 
-        public static int CalcHairFrame(ActionType action, int direction, int animFrame, int hairStyle = 0)
+        public static int CalcHairFrame(ActionType action, int direction, int animFrame, int hairStyle = 0, int gender = 0)
         {
-            // 官方 Hair.wil 中 index 0 和 1 为空白占位帧 (单像素透明)，默认经典男短发为发型 4 (Base 2400)
-            int actualStyle = hairStyle <= 1 ? 4 : hairStyle;
+            // 盛大官方 1.5 原版《Hair.wil》资产逆向结构实证：
+            // Base 0/1 (0~1199): 单像素透明占位帧
+            // Base 2 (1200~1799): 女披肩红长发
+            // Base 3 (1800~2399): 女披肩蓝长发
+            // Base 4 (2400~2999): 男经典深棕短发
+            // Base 5 (3000~3599): 女干练红棕盘发/短发
+            int actualStyle;
+            if (gender != 0) // 女性
+            {
+                actualStyle = hairStyle switch
+                {
+                    1 => 5, // 创角发型 1: 红棕盘发/短发 (与大世界及纸娃娃最契合)
+                    2 => 2, // 创角发型 2: 女红长发
+                    3 => 3, // 创角发型 3: 女蓝长发
+                    5 => 5,
+                    _ => 5  // 女性默认发型 5
+                };
+            }
+            else // 男性
+            {
+                actualStyle = 4; // 官方 1.5 原版男战士经典深棕短发
+            }
+
             int hairBase = actualStyle * HairStep;
             int actionOffset = ActionOffsets.GetValueOrDefault(action, 0);
             int dirClamped = direction & 0x07;

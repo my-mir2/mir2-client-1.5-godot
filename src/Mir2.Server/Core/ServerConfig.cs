@@ -17,6 +17,12 @@ public sealed class ServerConfig
     public string DatabaseConnectionString { get; set; } = "Host=127.0.0.1;Port=5432;Database=mir2_world;Username=postgres;Password=postgres";
     public bool StrictPgMode { get; set; } = true;
 
+    /// <summary>击杀经验倍率 (官方为 1.0)。仅用于压测与无头机器人快速升级，生产环境必须保持 1.0。ini: ExpRate=，环境变量: MIR2_EXP_RATE。</summary>
+    public double ExpRate { get; set; } = 1.0;
+
+    /// <summary>启用聊天 GM 命令 (@gm ...)，仅供无头机器人/测试造场景；生产必须关闭。ini: GmEnabled=1，环境变量: MIR2_GM=1。</summary>
+    public bool GmEnabled { get; set; } = false;
+
     public int AdminPort { get; set; } = 8080;
     public string AdminSecret { get; set; } = "mir2_admin_secret_2026";
 
@@ -64,6 +70,8 @@ public sealed class ServerConfig
                     case "MaxBufferSize" when int.TryParse(val, out int mbs): cfg.MaxBufferSize = mbs; break;
                     case "ConnectionString": cfg.DatabaseConnectionString = val; break;
                     case "StrictPgMode": cfg.StrictPgMode = val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase); break;
+                    case "GmEnabled": cfg.GmEnabled = val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase); break;
+                case "ExpRate" when double.TryParse(val, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double er): cfg.ExpRate = er; break;
                     case "AdminPort" when int.TryParse(val, out int ap): cfg.AdminPort = ap; break;
                     case "AdminSecret": cfg.AdminSecret = val; break;
                     case "LogDirectory": cfg.LogDirectory = val; break;
@@ -79,6 +87,10 @@ public sealed class ServerConfig
         // 2. 环境变量覆盖
         string? envPg = Environment.GetEnvironmentVariable("MIR2_PG_CONN");
         if (!string.IsNullOrEmpty(envPg)) cfg.DatabaseConnectionString = envPg;
+
+        string? envExp = Environment.GetEnvironmentVariable("MIR2_EXP_RATE");
+        if (double.TryParse(envExp, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double eer) && eer > 0) cfg.ExpRate = eer;
+        if (Environment.GetEnvironmentVariable("MIR2_GM") == "1") cfg.GmEnabled = true;
 
         string? envPort = Environment.GetEnvironmentVariable("MIR2_PORT");
         if (int.TryParse(envPort, out int ep)) cfg.GatewayPort = ep;

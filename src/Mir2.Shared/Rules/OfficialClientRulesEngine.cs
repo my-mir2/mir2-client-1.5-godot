@@ -161,8 +161,8 @@ public static class OfficialClientRulesEngine
             "魔法药(小量)" => new PotionEffect { InstantMp = 0, HotMpTotal = 35, HotDurationSec = 4 },
             "太阳水" => new PotionEffect { InstantHp = 30, InstantMp = 40 },
             "强效太阳水" => new PotionEffect { InstantHp = 50, InstantMp = 80 },
-            "万年雪霜" => new PotionEffect { InstantHp = 120, InstantMp = 120 },
-            "疗伤药" => new PotionEffect { InstantHp = 250, InstantMp = 250 },
+            "万年雪霜" => new PotionEffect { InstantHp = 100, InstantMp = 100 },
+            "疗伤药" => new PotionEffect { InstantHp = 150, InstantMp = 150 },
             _ => new PotionEffect()
         };
     }

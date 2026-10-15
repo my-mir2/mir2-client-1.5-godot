@@ -110,7 +110,23 @@ public sealed class ServerMessageRouter
         if (pkt != null && pkt.Length >= 10)
         {
             var parsed = PacketDecoder.Parse(pkt);
-            packet = parsed ?? new ServerPacket(smCode, 0, 0, 0, pkt);
+            if (parsed is { } p && (p.Ident == smCode || smCode == 0))
+            {
+                packet = p;
+            }
+            else if (pkt.Length >= 16 && smCode > 0)
+            {
+                // 现代 HPSocket TCP-Pack 二进制下行载荷 (16 字节整数: Recog, Param, Tag, Series + UTF-8 Extra)
+                packet = PacketDecoder.ParseModernPayload(smCode, pkt);
+            }
+            else
+            {
+                packet = parsed ?? new ServerPacket(smCode, 0, 0, 0, pkt);
+                if (smCode > 0 && packet.Ident != smCode)
+                {
+                    packet = new ServerPacket(smCode, packet.Recog, packet.Param, packet.Tag, packet.Extra);
+                }
+            }
         }
         else
         {
@@ -125,7 +141,7 @@ public sealed class ServerMessageRouter
     public void OnPacket(ServerPacket packet)
     {
         short smCode = packet.Ident;
-        ProtocolDispatcher.Dispatch(smCode, packet.Recog, packet.Param, packet.Tag, 0, packet.Extra);
+        ProtocolDispatcher.Dispatch(smCode, packet.Recog, packet.Param, packet.Tag, packet.Series, packet.Extra);
 
         switch (smCode)
         {
@@ -216,7 +232,6 @@ public sealed class ServerMessageRouter
                 break;
             case ProtocolConsts.SM_BAGITEMS: // 600: 背包物品全量刷新 / 官方 1.5 handle_sm_refresh (IDA case 0x258u)
                 _hud?.ClearAllBagItems();
-                _hud?.AddChat("包裹", "[包裹] 背包数据已重置同步。", new Color(0.7f, 0.9f, 0.7f));
                 break;
             case ProtocolConsts.SM_MINERESULT: // 601: 采矿结果 / 官方 1.5 handle_sm_refresh2 (IDA case 0x259u)
                 HandleMineResult(packet);
@@ -440,9 +455,10 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_GROUP_INVITE_CONFIRM: // 658: 组队邀请模态确认 (IDA case 658)
                 HandleGroupInviteConfirm(packet);
                 break;
-            case ProtocolConsts.SM_GROUP_MODE_CHANGED: // 660: 盛大官方 1.5 组队模式强制开启与建队成功 (IDA case 660: dword_4F94E8 = GetTickCount(); byte_4F94F8 = 1)
-                _hud?.GroupPanel?.SetAllowGroup(true);
-                _hud?.AddChat("组队", "[组队] 已开启允许组队模式。", new Color(0.4f, 1f, 0.5f));
+            case ProtocolConsts.SM_GROUP_MODE_CHANGED: // 660: 盛大官方 1.5 组队模式开关变动回显 (IDA case 660)
+                bool allowGrp = packet.Recog != 0 || packet.Param != 0;
+                _hud?.GroupPanel?.SetAllowGroup(allowGrp);
+                _hud?.AddChat("组队", allowGrp ? "[组队] 已开启允许组队模式。" : "[组队] 已关闭允许组队模式。", new Color(0.4f, 1f, 0.5f));
                 break;
             case ProtocolConsts.SM_MAPDESCRIPTION: // 661: 地图描述公告 / 组队邀请反馈 (IDA 0x46A3A2)
                 if (packet.Recog < 0)
@@ -510,9 +526,53 @@ public sealed class ServerMessageRouter
             case ProtocolConsts.SM_DLGMSG: // 636: NPC 对话框脚本交互下发
                 HandleNpcDialogMsg(packet);
                 break;
-            case ProtocolConsts.SM_BUY_OK_DELPHI: // 648: 购买成功更新金币 (recog = gold_left)
-                _hud?.UpdateGold(packet.Recog);
-                _hud?.AddChat("商店", $"[商店] 购买成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
+            case ProtocolConsts.SM_BUY_OK_DELPHI: // 648: 购买成功更新金币 (recog = gold_left) 或 SM_ABILITY 全量能力同步
+                if (!string.IsNullOrEmpty(packet.ExtraStr) && packet.ExtraStr.Contains('/'))
+                {
+                    // SM_ABILITY 全量属性同步: level=recog, hp=param, maxhp=tag, mp=series, extraStr=maxmp/exp/maxexp/weight...
+                    var parts = packet.ExtraStr.Split(new[] { '/', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    int hp = packet.Param;
+                    int maxHp = packet.Tag > 0 ? packet.Tag : Math.Max(hp, 1);
+                    int mp = packet.Series;
+                    int maxMp = parts.Length >= 1 && int.TryParse(parts[0], out var m) ? m : Math.Max(mp, 1);
+                    if (_gameView?.PlayerInstance != null)
+                    {
+                        _gameView.PlayerInstance.Hp = hp;
+                        _gameView.PlayerInstance.MaxHp = maxHp;
+                        _gameView.PlayerInstance.Mp = mp;
+                        _gameView.PlayerInstance.MaxMp = maxMp;
+                        if (packet.Recog > 0) _gameView.PlayerInstance.Level = packet.Recog;
+                    }
+                    _hud?.UpdateHp(hp, maxHp);
+                    _hud?.UpdateMp(mp, maxMp);
+                    if (packet.Recog > 0) _hud?.UpdateLevel(packet.Recog);
+                    if (parts.Length >= 10 && int.TryParse(parts[9], out var goldVal))
+                    {
+                        _hud?.UpdateGold(goldVal);
+                    }
+
+                    var sp = _hud?.StatusPanel;
+                    if (sp != null)
+                    {
+                        sp.UpdateStat("HP", $"{hp}/{maxHp}");
+                        sp.UpdateStat("MP", $"{mp}/{maxMp}");
+
+                        // 能力页第 0~3 行: 经验值, 背包重量, 负重量, 腕力
+                        if (parts.Length >= 3)
+                            sp.UpdateAbilityValue(0, $"{parts[1]}/{parts[2]}"); // 经验值
+                        if (parts.Length >= 5)
+                            sp.UpdateAbilityValue(1, $"{parts[3]}/{parts[4]}"); // 背包重量
+                        if (parts.Length >= 7)
+                            sp.UpdateAbilityValue(2, $"{parts[5]}/{parts[6]}"); // 负重量
+                        if (parts.Length >= 9)
+                            sp.UpdateAbilityValue(3, $"{parts[7]}/{parts[8]}"); // 腕力
+                    }
+                }
+                else
+                {
+                    _hud?.UpdateGold(packet.Recog);
+                    _hud?.AddChat("商店", $"[商店] 购买成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
+                }
                 break;
             case ProtocolConsts.SM_SELL_FAIL_DELPHI: // 649: 出售物品失败 (IDA 0x469F04)
                 _hud?.ShowModalMessage("商店提示", "你不能卖这个物品"); // 0x46B820
@@ -570,7 +630,7 @@ public sealed class ServerMessageRouter
                 _hud?.AddChat("系统", $"[服药] {DecodeExtraText(packet.Extra)}", new Color(1f, 1f, 0.6f));
                 break;
             case ProtocolConsts.SM_SAVEITEM_OK: // 701: 寄存物品成功
-                _hud?.OnServerStorageDepositOk(packet.Recog);
+                _hud?.OnServerStorageDepositOk(packet.Param >= 0 && packet.Param < 40 ? packet.Param : packet.Recog);
                 break;
             case ProtocolConsts.SM_SAVEITEM_FULL: // 702: 个人包袱已满 (IDA 0x46B85C)
                 _hud?.ShowModalMessage("保管箱提示", "你的个人包袱已经满了，你不能再寄存任何东西了。");
@@ -579,7 +639,7 @@ public sealed class ServerMessageRouter
                 _hud?.ShowModalMessage("保管箱提示", "你不能寄存。");
                 break;
             case ProtocolConsts.SM_TAKEBACKITEM_OK: // 705: 取回物品成功
-                _hud?.OnServerStorageWithdrawOk(packet.Recog);
+                _hud?.OnServerStorageWithdrawOk(packet.Param >= 0 ? packet.Param : packet.Recog);
                 break;
             case ProtocolConsts.SM_TAKEBACKITEM_FAIL: // 706: 不能取回 (IDA 0x46B8CC)
                 _hud?.ShowModalMessage("保管箱提示", "你不能取回。");
@@ -824,6 +884,10 @@ public sealed class ServerMessageRouter
                 if (_entityManager != null && packet.Recog > 0)
                 {
                     _entityManager.LocalPlayerUid = packet.Recog;
+                    if (_gameView?.PlayerInstance != null)
+                    {
+                        _gameView.PlayerInstance.Uid = packet.Recog;
+                    }
                     var actor = _entityManager.GetEntity(packet.Recog);
                     if (actor == null)
                     {
@@ -831,7 +895,8 @@ public sealed class ServerMessageRouter
                         int x = packet.Param > 0 ? (packet.Param & 0xFFFF) : 100;
                         int y = packet.Tag > 0 ? (packet.Tag & 0xFFFF) : 100;
                         byte dir = (byte)((packet.Param >> 16) & 7);
-                        _entityManager.AddEntity(packet.Recog, "本地玩家", EntityManager.EntityType.Player, x, y, dir, 0);
+                        string heroName = !string.IsNullOrEmpty(_gameView?.Username) ? _gameView.Username : "热血战士";
+                        _entityManager.AddEntity(packet.Recog, heroName, EntityManager.EntityType.Player, x, y, dir, 0);
                     }
                     else if (packet.Param > 0 && packet.Tag > 0)
                     {
@@ -1352,11 +1417,16 @@ public sealed class ServerMessageRouter
         if (slot < 0 || slot >= 40) return;
 
         string itemName = "新物品";
-        string iconFile = "StateItem_0001.png";
-        string desc = "[color=#c0c0c0]重量 1   持久力 10/10[/color]";
-
         string rawText = DecodeExtraText(pkt.Extra);
         if (string.IsNullOrEmpty(rawText)) rawText = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(rawText))
+        {
+            var parts = rawText.Split(new[] { '\t', '/', '|' }, StringSplitOptions.None);
+            if (parts.Length >= 1 && !string.IsNullOrEmpty(parts[0])) itemName = parts[0];
+        }
+
+        string iconFile = ItemIconMapper.GetIconFile(itemName);
+        string desc = $"[color=#ffff00]{itemName}[/color]\n[color=#c0c0c0]重量 1   持久力 10/10[/color]";
 
         if (!string.IsNullOrEmpty(rawText))
         {
@@ -1367,9 +1437,9 @@ public sealed class ServerMessageRouter
                 if (parts.Length >= 1 && !string.IsNullOrEmpty(parts[0])) itemName = parts[0];
                 int dura = parts.Length >= 2 && int.TryParse(parts[1], out var d) ? d : 10;
                 int duraMax = parts.Length >= 3 && int.TryParse(parts[2], out var dm) ? dm : 10;
-                int itemIndex = parts.Length >= 4 && int.TryParse(parts[3], out var idx) ? idx : 1;
-                iconFile = $"StateItem_{itemIndex:D4}.png";
-                desc = $"[color=#c0c0c0]重量 1   持久力 {dura}/{duraMax}[/color]";
+                int itemIndex = parts.Length >= 4 && int.TryParse(parts[3], out var idx) ? idx : 0;
+                if (itemIndex > 0) iconFile = $"Items_{itemIndex:D4}.png";
+                desc = $"[color=#ffff00]{itemName}[/color]\n[color=#c0c0c0]重量 1   持久力 {dura}/{duraMax}[/color]";
             }
             else
             {
@@ -1389,7 +1459,7 @@ public sealed class ServerMessageRouter
         string rawText = DecodeExtraText(pkt.Extra);
         if (string.IsNullOrEmpty(rawText)) rawText = pkt.ExtraStr;
         string oreName = !string.IsNullOrEmpty(rawText) ? rawText : "矿石";
-        int purity = pkt.Recog > 0 ? pkt.Recog : (pkt.Param > 0 ? pkt.Param : 10);
+        int purity = (pkt.Param > 0 && pkt.Param <= 100) ? pkt.Param : (pkt.Recog > 0 && pkt.Recog <= 100 ? pkt.Recog : 10);
         _hud?.AddChat("采矿", $"[采矿] 挖矿获得：{oreName} (纯度 {purity})", new Color(0.85f, 0.75f, 0.5f));
     }
 
@@ -1514,9 +1584,33 @@ public sealed class ServerMessageRouter
         _hud?.SkillPanel?.UpdateSkillExp(magicId, level, curTrain, maxTrain);
     }
 
+    public static string ResolveEquipIcon(string name, int slot, int gender)
+    {
+        if (string.IsNullOrEmpty(name)) return "";
+        if (slot == 0) // 衣服
+        {
+            if (name.Contains("布衣")) return gender != 0 ? "StateItem_0080.png" : "StateItem_0060.png";
+            if (name.Contains("轻盔")) return gender != 0 ? "StateItem_0081.png" : "StateItem_0061.png";
+            if (name.Contains("重盔")) return gender != 0 ? "StateItem_0082.png" : "StateItem_0062.png";
+            if (name.Contains("魔法长袍")) return gender != 0 ? "StateItem_0083.png" : "StateItem_0063.png";
+            if (name.Contains("灵魂")) return gender != 0 ? "StateItem_0084.png" : "StateItem_0064.png";
+            if (name.Contains("战神")) return gender != 0 ? "StateItem_0085.png" : "StateItem_0065.png";
+            if (name.Contains("恶魔")) return gender != 0 ? "StateItem_0086.png" : "StateItem_0066.png";
+            if (name.Contains("幽灵")) return gender != 0 ? "StateItem_0087.png" : "StateItem_0067.png";
+            return gender != 0 ? "StateItem_0080.png" : "StateItem_0060.png";
+        }
+        string itemPng = ItemIconMapper.GetIconFile(name);
+        if (!string.IsNullOrEmpty(itemPng) && itemPng.StartsWith("Items_", StringComparison.OrdinalIgnoreCase))
+        {
+            return "StateItem_" + itemPng.Substring("Items_".Length);
+        }
+        return "";
+    }
+
     private void HandleEquipInfo(ServerPacket pkt)
     {
         if (string.IsNullOrEmpty(pkt.ExtraStr)) return;
+        int gender = _gameView?.PlayerInstance?.Gender ?? 0;
         var parts = pkt.ExtraStr.Split(new[] { ',', ';' }, StringSplitOptions.None);
         for (int i = 0; i < parts.Length && i < 9; i++)
         {
@@ -1524,17 +1618,14 @@ public sealed class ServerMessageRouter
             if (itemParts.Length >= 1 && int.TryParse(itemParts[0], out var itemId) && itemId > 0)
             {
                 string name = itemParts.Length > 1 ? itemParts[1] : $"装备 #{itemId}";
-                string icon = $"StateItem_{itemId:D4}.png";
+                string icon = ResolveEquipIcon(name, i, gender);
                 string desc = itemParts.Length > 2 ? itemParts[2] : "[color=#ffff00]官方实证装备[/color]";
                 _hud?.SetEquipSlot(i, name, icon, desc);
 
                 // 同步本地玩家纸娃娃体态 (衣服 slot=0, 武器 slot=1)
                 if (i == 0 && _gameView?.PlayerInstance != null)
                 {
-                    if (name.Contains("重盔") || name.Contains("战神") || itemId == 2)
-                        _gameView.PlayerInstance.BodyDressType = 2; // 重盔甲男
-                    else if (name.Contains("布衣") || itemId == 1)
-                        _gameView.PlayerInstance.BodyDressType = 1;
+                    _gameView.PlayerInstance.BodyDressType = CalcBodyDressType(name, itemId, gender);
                 }
                 else if (i == 1 && _gameView?.PlayerInstance != null)
                 {
@@ -1547,31 +1638,63 @@ public sealed class ServerMessageRouter
             else
             {
                 _hud?.SetEquipSlot(i, null, null, null);
-                if (i == 0 && _gameView?.PlayerInstance != null) _gameView.PlayerInstance.BodyDressType = 0;
-                else if (i == 1 && _gameView?.PlayerInstance != null) _gameView.PlayerInstance.WeaponType = 0;
+                if (i == 0 && _gameView?.PlayerInstance != null)
+                    _gameView.PlayerInstance.BodyDressType = gender != 0 ? 1 : 0;
+                else if (i == 1 && _gameView?.PlayerInstance != null)
+                    _gameView.PlayerInstance.WeaponType = 0;
             }
         }
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 角色衣服纸娃娃帧索引计算 (男女分立与裸模映射)
+    /// </summary>
+    private static int CalcBodyDressType(string itemName, int itemId, int gender)
+    {
+        // 裸体: 男=0, 女=1
+        // 布衣: 男=2, 女=3
+        // 轻盔: 男=4, 女=5
+        // 重盔/战神: 男=6, 女=7
+        int dressId = 0;
+        if (itemName.Contains("重盔") || itemName.Contains("战神") || itemId == 3)
+            dressId = 3;
+        else if (itemName.Contains("轻盔") || itemId == 2)
+            dressId = 2;
+        else if (itemName.Contains("布衣") || itemId == 1)
+            dressId = 1;
+
+        if (dressId == 0) return gender != 0 ? 1 : 0;
+        return dressId * 2 + (gender != 0 ? 1 : 0);
+    }
+
     private void HandleTakeOnOk(ServerPacket pkt)
     {
+        int gender = _gameView?.PlayerInstance?.Gender ?? 0;
         int slot = pkt.Param >= 0 && pkt.Param < 9 ? pkt.Param : pkt.Recog;
         string name = "已装备";
-        string icon = $"StateItem_{slot:D4}.png";
+        string icon = "";
         string desc = "[color=#ffff00]穿戴装备成功[/color]";
         if (!string.IsNullOrEmpty(pkt.ExtraStr))
         {
             var parts = pkt.ExtraStr.Split(new[] { '/', '|' }, StringSplitOptions.None);
-            if (parts.Length >= 1) name = parts[0];
-            if (parts.Length >= 2) icon = parts[1];
+            if (parts.Length >= 1 && !string.IsNullOrWhiteSpace(parts[0])) name = parts[0];
+            if (parts.Length >= 2 && !string.IsNullOrWhiteSpace(parts[1])) icon = parts[1];
             if (parts.Length >= 3) desc = parts[2];
+        }
+        else if (_hud != null && _hud.GetEquipItemDetail(slot) is { } existing && !string.IsNullOrWhiteSpace(existing.Name))
+        {
+            name = existing.Name;
+            desc = existing.Desc;
+        }
+        if (string.IsNullOrEmpty(icon) || icon.StartsWith("StateItem_000") || icon.Contains("StateItem_100"))
+        {
+            icon = ResolveEquipIcon(name, slot, gender);
         }
         _hud?.SetEquipSlot(slot, name, icon, desc);
 
         if (slot == 0 && _gameView?.PlayerInstance != null)
         {
-            if (name.Contains("重盔") || name.Contains("战神")) _gameView.PlayerInstance.BodyDressType = 2;
-            else if (name.Contains("布衣")) _gameView.PlayerInstance.BodyDressType = 1;
+            _gameView.PlayerInstance.BodyDressType = CalcBodyDressType(name, 0, _gameView.PlayerInstance.Gender);
         }
         else if (slot == 1 && _gameView?.PlayerInstance != null)
         {
@@ -1584,8 +1707,10 @@ public sealed class ServerMessageRouter
     {
         int slot = pkt.Param >= 0 && pkt.Param < 9 ? pkt.Param : pkt.Recog;
         _hud?.SetEquipSlot(slot, null, null, null);
-        if (slot == 0 && _gameView?.PlayerInstance != null) _gameView.PlayerInstance.BodyDressType = 0;
-        else if (slot == 1 && _gameView?.PlayerInstance != null) _gameView.PlayerInstance.WeaponType = 0;
+        if (slot == 0 && _gameView?.PlayerInstance != null)
+            _gameView.PlayerInstance.BodyDressType = _gameView.PlayerInstance.Gender != 0 ? 1 : 0;
+        else if (slot == 1 && _gameView?.PlayerInstance != null)
+            _gameView.PlayerInstance.WeaponType = 0;
     }
 
     private void HandleNpcDialog(ServerPacket pkt)
@@ -1716,11 +1841,24 @@ public sealed class ServerMessageRouter
                     }
                 }
             }
-            // 2. 若为 52 (SM_SENDUSERSTATE 主角属性下行)，驱动主角自己的 StatusPanel 与 HUD
+            // 2. 若为 52 (SM_SENDUSERSTATE 主角属性下行)，驱动主角自己的 StatusPanel 与 HUD 及场景头顶显示
             else
             {
                 _hud?.UpdateName(name);
                 _hud?.UpdateLevel(level);
+                _hud?.SetDollGender(gender);
+
+                if (_gameView?.PlayerInstance != null)
+                {
+                    _gameView.PlayerInstance.CharacterName = name;
+                    _gameView.PlayerInstance.Level = level;
+                    _gameView.PlayerInstance.Gender = gender;
+                    if (_gameView.PlayerInstance.BodyDressType <= 1)
+                    {
+                        _gameView.PlayerInstance.BodyDressType = gender != 0 ? 1 : 0;
+                    }
+                    _gameView.PlayerInstance.UpdateNameLabelText();
+                }
 
                 var sp = _hud?.StatusPanel;
                 if (sp != null)
@@ -1733,10 +1871,18 @@ public sealed class ServerMessageRouter
                     if (baseParts.Length > 1)
                     {
                         var tokens = baseParts[1].Split(new[] { '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
-                        // 驱动能力页第 4~10 行属性 (准确、敏捷、魔御、中毒防御、中毒恢复、体力恢复、魔法恢复)
-                        for (int i = 0; i < tokens.Length && (4 + i) <= 10; i++)
+                        if (tokens.Length >= 5)
                         {
-                            sp.UpdateAbilityValue(4 + i, tokens[i].Trim());
+                            sp.UpdateStat("AC", tokens[0].Trim());
+                            sp.UpdateStat("MAC", tokens[1].Trim());
+                            sp.UpdateStat("DC", tokens[2].Trim());
+                            sp.UpdateStat("MC", tokens[3].Trim());
+                            sp.UpdateStat("SC", tokens[4].Trim());
+                        }
+                        if (tokens.Length >= 7)
+                        {
+                            sp.UpdateAbilityValue(4, tokens[5].Trim()); // 精确度
+                            sp.UpdateAbilityValue(5, tokens[6].Trim()); // 敏捷度
                         }
                     }
                 }
@@ -1858,7 +2004,7 @@ public sealed class ServerMessageRouter
         string text = DecodeExtraText(pkt.Extra);
         if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
         if (string.IsNullOrEmpty(text) || _hud?.GroupPanel == null) return;
-        var names = new List<string>(text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
+        var names = new List<string>(text.Split(new[] { '/', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
         for (int i = 0; i < names.Count; i++) names[i] = names[i].Trim();
         names.RemoveAll(string.IsNullOrEmpty);
         if (names.Count == 0) return;
@@ -2028,7 +2174,6 @@ public sealed class ServerMessageRouter
                 _hud.SkillPanel.AddOrUpdateSkill(new SkillPanelView.SkillItemData(magicId, skillName, iconIdx, "", level, curTrain, maxTrain, desc));
             }
         }
-        _hud?.AddChat("技能", $"[技能] 技能熟练度同步: 【{skillName}】 (ID:{magicId}, Lv.{level}, 修炼:{curTrain})。", new Color(1f, 0.9f, 0.4f));
     }
 
     // 官方 1.5 进入地图描述公告 (IDA ProcessServerMessage case 661)
@@ -2109,7 +2254,7 @@ public sealed class ServerMessageRouter
             bool isLocal = _gameView?.PlayerInstance != null && (uid == 0 || uid == _gameView.SessionId || uid == _gameView.PlayerInstance.Uid);
             if (isLocal)
             {
-                _hud?.AddChat("割肉", $"[割肉] 割肉成功，获得了【{itemName}】。", new Color(1f, 0.85f, 0.2f));
+                _hud?.AddChat("提示", $"发现了 {itemName}", new Color(1f, 0.85f, 0.2f));
                 AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick);
             }
             else if (_entityManager != null && uid > 0)
@@ -2209,25 +2354,36 @@ public sealed class ServerMessageRouter
         if (_entityManager == null) return;
         int uid = pkt.Recog;
         int x = 0, y = 0;
-        byte dir = (byte)(pkt.Param & 7);
-        string text = !string.IsNullOrEmpty(pkt.ExtraStr) ? pkt.ExtraStr : DecodeExtraText(pkt.Extra);
-        if (!string.IsNullOrEmpty(text))
+        byte dir = (byte)(pkt.Series >= 0 ? (pkt.Series & 7) : (pkt.Param & 7));
+
+        // 盛大官方 1.5 封包规约：Param/Tag 分别承载目标瓦片 X/Y，Series 承载朝向
+        if (pkt.Param > 0 && pkt.Tag > 0)
         {
-            var parts = text.Split(new[] { '\t', '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2 && int.TryParse(parts[0], out var px) && int.TryParse(parts[1], out var py))
-            {
-                x = px;
-                y = py;
-            }
-            if (parts.Length >= 3 && byte.TryParse(parts[2], out var pd))
-            {
-                dir = (byte)(pd & 7);
-            }
+            x = pkt.Param;
+            y = pkt.Tag;
+            if (pkt.Series >= 0) dir = (byte)(pkt.Series & 7);
         }
         else
         {
-            x = pkt.Recog & 0xFFFF;
-            y = (pkt.Recog >> 16) & 0xFFFF;
+            string text = !string.IsNullOrEmpty(pkt.ExtraStr) ? pkt.ExtraStr : DecodeExtraText(pkt.Extra);
+            if (!string.IsNullOrEmpty(text))
+            {
+                var parts = text.Split(new[] { '\t', '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2 && int.TryParse(parts[0], out var px) && int.TryParse(parts[1], out var py))
+                {
+                    x = px;
+                    y = py;
+                }
+                if (parts.Length >= 3 && byte.TryParse(parts[2], out var pd))
+                {
+                    dir = (byte)(pd & 7);
+                }
+            }
+            else
+            {
+                x = pkt.Recog & 0xFFFF;
+                y = (pkt.Recog >> 16) & 0xFFFF;
+            }
         }
 
         if (x > 0 && y > 0)
@@ -2242,25 +2398,35 @@ public sealed class ServerMessageRouter
         if (_entityManager == null) return;
         int uid = pkt.Recog;
         int x = 0, y = 0;
-        byte dir = (byte)(pkt.Param & 7);
-        string text = !string.IsNullOrEmpty(pkt.ExtraStr) ? pkt.ExtraStr : DecodeExtraText(pkt.Extra);
-        if (!string.IsNullOrEmpty(text))
+        byte dir = (byte)(pkt.Series >= 0 ? (pkt.Series & 7) : (pkt.Param & 7));
+
+        if (pkt.Param > 0 && pkt.Tag > 0)
         {
-            var parts = text.Split(new[] { '\t', '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2 && int.TryParse(parts[0], out var px) && int.TryParse(parts[1], out var py))
-            {
-                x = px;
-                y = py;
-            }
-            if (parts.Length >= 3 && byte.TryParse(parts[2], out var pd))
-            {
-                dir = (byte)(pd & 7);
-            }
+            x = pkt.Param;
+            y = pkt.Tag;
+            if (pkt.Series >= 0) dir = (byte)(pkt.Series & 7);
         }
         else
         {
-            x = pkt.Recog & 0xFFFF;
-            y = (pkt.Recog >> 16) & 0xFFFF;
+            string text = !string.IsNullOrEmpty(pkt.ExtraStr) ? pkt.ExtraStr : DecodeExtraText(pkt.Extra);
+            if (!string.IsNullOrEmpty(text))
+            {
+                var parts = text.Split(new[] { '\t', '/', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2 && int.TryParse(parts[0], out var px) && int.TryParse(parts[1], out var py))
+                {
+                    x = px;
+                    y = py;
+                }
+                if (parts.Length >= 3 && byte.TryParse(parts[2], out var pd))
+                {
+                    dir = (byte)(pd & 7);
+                }
+            }
+            else
+            {
+                x = pkt.Recog & 0xFFFF;
+                y = (pkt.Recog >> 16) & 0xFFFF;
+            }
         }
 
         if (x > 0 && y > 0)
@@ -2354,7 +2520,22 @@ public sealed class ServerMessageRouter
         }
         if (!string.IsNullOrEmpty(text))
         {
-            _hud?.AddChat("系统", $"[系统] {text}", new Color(1f, 0.9f, 0.4f));
+            if (text.StartsWith("[组队]") || text.StartsWith("【组队】"))
+            {
+                _hud?.AddChat("组队", text, new Color(0.2f, 0.65f, 1.0f));
+            }
+            else if (text.StartsWith("[行会]") || text.StartsWith("【行会】"))
+            {
+                _hud?.AddChat("行会", text, new Color(0.3f, 0.85f, 1.0f));
+            }
+            else if (text.StartsWith("[千里传音]"))
+            {
+                _hud?.AddChat("喊话", text, new Color(1.0f, 0.95f, 0.4f));
+            }
+            else
+            {
+                _hud?.AddChat("系统", text.StartsWith("[系统]") ? text : $"[系统] {text}", new Color(1f, 0.9f, 0.4f));
+            }
         }
         SafeLog($"[SM] 官方系统提示: {text} sound={pkt.Param} (SM_SYSMSG_DELPHI {pkt.Ident})");
     }
@@ -2406,15 +2587,24 @@ public sealed class ServerMessageRouter
 
     private void HandleNewMap(ServerPacket pkt)
     {
-        // 优先使用官方地图数字ID (Recog 即 MapId，如 0 对应 0.map 比奇省)
-        string mapId = pkt.Recog.ToString();
-        string mapPath = ResPath.Resolve($"resources/maps/Map/{mapId}.map");
-        if (!System.IO.File.Exists(mapPath) && !string.IsNullOrEmpty(pkt.ExtraStr))
+        // 服务端数据库世界下发 "官方地图号|地图名" (如 "0100|Academy"、"D001|...")，地图号即 .map 文件名主干；
+        // 老协议仍为纯地图名，此时按 Recog 数字 ID 回退。
+        string officialId = string.Empty;
+        string extraName = pkt.ExtraStr;
+        if (!string.IsNullOrEmpty(extraName) && extraName.Contains('|'))
         {
-            var altPath = ResPath.Resolve($"resources/maps/Map/{pkt.ExtraStr}.map");
+            int bar = extraName.IndexOf('|');
+            officialId = extraName[..bar];
+            extraName = extraName[(bar + 1)..];
+        }
+        string mapId = string.IsNullOrEmpty(officialId) ? pkt.Recog.ToString() : officialId;
+        string mapPath = ResPath.Resolve($"resources/maps/Map/{mapId}.map");
+        if (!System.IO.File.Exists(mapPath) && !string.IsNullOrEmpty(extraName))
+        {
+            var altPath = ResPath.Resolve($"resources/maps/Map/{extraName}.map");
             if (System.IO.File.Exists(altPath))
             {
-                mapId = pkt.ExtraStr;
+                mapId = extraName;
                 mapPath = altPath;
             }
         }
@@ -2422,6 +2612,7 @@ public sealed class ServerMessageRouter
         {
             _gameView.CurrentMapName = mapId;
             _gameView.MapRendererInstance?.LoadMap(mapPath);
+            _entityManager?.ClearExceptLocalPlayer();
             _gameView.UpdateEnvironmentLighting();
 
             if (pkt.Param > 0 && pkt.Tag > 0)
@@ -2431,7 +2622,8 @@ public sealed class ServerMessageRouter
 
             int mapW = _gameView.MapRendererInstance?.MapWidth ?? 400;
             int mapH = _gameView.MapRendererInstance?.MapHeight ?? 400;
-            string mapName = mapId == "0" ? "比奇省" : (mapId == "3" ? "盟重省" : (!string.IsNullOrEmpty(pkt.ExtraStr) ? pkt.ExtraStr : $"地图_{mapId}"));
+            string mapName = mapId == "0" ? "比奇省" : (mapId == "3" ? "盟重省" : (!string.IsNullOrEmpty(extraName) ? extraName : $"地图_{mapId}"));
+            _hud?.UpdateMapAndCoords(mapName, _gameView.PlayerInstance?.TileX ?? 330, _gameView.PlayerInstance?.TileY ?? 270);
             _hud?.Minimap?.SetMap(mapId, mapName, mapW, mapH);
             _hud?.Minimap?.ClearTarget();
         }
@@ -2441,17 +2633,17 @@ public sealed class ServerMessageRouter
     {
         if (_entityManager == null) return;
         int uid = pkt.Recog;
-        string text = pkt.ExtraStr;
-        if (string.IsNullOrEmpty(text)) return;
+        string text = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(text)) text = pkt.ExtraStr;
+        if (string.IsNullOrEmpty(text)) text = "实体";
 
         var parts = text.Split(new[] { '\t', '/' }, StringSplitOptions.None);
-        if (parts.Length < 3) return;
-
         string name = parts[0];
-        int x = int.TryParse(parts[1], out var tx) ? tx : 300;
-        int y = int.TryParse(parts[2], out var ty) ? ty : 300;
-        byte dir = parts.Length > 3 && byte.TryParse(parts[3], out var td) ? td : (byte)2;
-        int appr = pkt.Param;
+
+        int x = parts.Length > 1 && int.TryParse(parts[1], out var tx) ? tx : (pkt.Param > 0 ? pkt.Param : 300);
+        int y = parts.Length > 2 && int.TryParse(parts[2], out var ty) ? ty : (pkt.Tag > 0 ? pkt.Tag : 300);
+        byte dir = parts.Length > 3 && byte.TryParse(parts[3], out var td) ? td : (byte)(pkt.Series & 7);
+        int appr = 0;
         if (parts.Length > 4 && int.TryParse(parts[4], out var a)) appr = a;
 
         var type = pkt.Ident switch
@@ -2461,15 +2653,9 @@ public sealed class ServerMessageRouter
             _ => Mir2Client.Game.EntityManager.EntityType.Player
         };
 
-        if (appr == 0)
+        if (appr <= 0 && type == Mir2Client.Game.EntityManager.EntityType.Monster)
         {
-            if (name.Contains("稻草人")) appr = 1;
-            else if (name.Contains("钉耙猫")) appr = 2;
-            else if (name.Contains("半兽人")) appr = 3;
-            else if (name.Contains("森林雪人")) appr = 4;
-            else if (name.Contains("食人花")) appr = 5;
-            else if (name.Contains("毒蜘蛛")) appr = 6;
-            else if (name.Contains("骷髅")) appr = 10;
+            appr = Mir2.Shared.Data.OfficialMonsterDBRegistry.ResolveAppr(name, 25);
         }
 
         _entityManager.AddEntity(uid, name, type, x, y, dir, appr);
@@ -2594,6 +2780,8 @@ public sealed class ServerMessageRouter
             fromTile = new Vector2I(ent.TileX, ent.TileY);
         }
 
+        if (targetY == 0 && pkt.Series > 0) targetY = pkt.Series;
+
         Vector2I toTile = new Vector2I(targetX, targetY);
         _gameView?.MagicManagerInstance?.PlayMagic(magicId, fromTile, toTile, casterId);
     }
@@ -2601,12 +2789,25 @@ public sealed class ServerMessageRouter
     private void HandleSpellResult(ServerPacket pkt)
     {
         int targetId = pkt.Recog;
-        int targetHp = pkt.Param;
-        int damage = pkt.Tag;
+        bool isObjectStruck = (pkt.Ident == SM_OBJECTSTRUCK || pkt.Ident == SM_OBJECTSTRUCK_DELPHI);
+
+        int damage;
+        int targetHp;
 
         bool isPlayer = (_gameView?.PlayerInstance != null && (targetId == 0 || targetId == _gameView.SessionId));
         if (isPlayer && _gameView?.PlayerInstance != null)
         {
+            if (isObjectStruck)
+            {
+                damage = pkt.Series > 0 ? pkt.Series : 0;
+                targetHp = Math.Max(0, _gameView.PlayerInstance.Hp - damage);
+            }
+            else
+            {
+                damage = pkt.Tag;
+                targetHp = pkt.Param;
+            }
+
             _gameView.PlayerInstance.Hp = Math.Max(0, targetHp);
             _hud?.UpdateHp(_gameView.PlayerInstance.Hp, _gameView.PlayerInstance.MaxHp);
             _gameView.PlayerInstance.Anim.SetAction(ActionType.Struck, _gameView.PlayerInstance.Direction);
@@ -2622,6 +2823,17 @@ public sealed class ServerMessageRouter
         }
         else if (_entityManager?.GetEntity(targetId) is { } targetEnt)
         {
+            if (isObjectStruck)
+            {
+                damage = pkt.Series > 0 ? pkt.Series : 0;
+                targetHp = Math.Max(0, targetEnt.Hp - damage);
+            }
+            else
+            {
+                damage = pkt.Tag;
+                targetHp = pkt.Param;
+            }
+
             _entityManager.TriggerStruck(targetId, damage, targetHp);
             if (damage > 0)
             {
@@ -2673,17 +2885,24 @@ public sealed class ServerMessageRouter
         int itemId = pkt.Recog;
         int x = pkt.Param;
         int y = pkt.Tag;
-        int looks = 0;
+        int looks = pkt.Series;
         string name = "掉落物";
 
-        if (pkt.Extra.Length > 0)
+        string rawExtra = DecodeExtraText(pkt.Extra);
+        if (string.IsNullOrEmpty(rawExtra)) rawExtra = pkt.ExtraStr ?? string.Empty;
+
+        if (!string.IsNullOrEmpty(rawExtra))
         {
-            string extraStr = System.Text.Encoding.UTF8.GetString(pkt.Extra);
-            string[] parts = extraStr.Split('\t');
+            string[] parts = rawExtra.Split('\t');
             if (parts.Length > 0 && !string.IsNullOrEmpty(parts[0])) name = parts[0];
             if (parts.Length > 1 && int.TryParse(parts[1], out var tx)) x = tx;
             if (parts.Length > 2 && int.TryParse(parts[2], out var ty)) y = ty;
             if (parts.Length > 3 && int.TryParse(parts[3], out var lk)) looks = lk;
+        }
+
+        if (looks <= 0)
+        {
+            looks = name.Contains("金币") ? 1 : ((name.Contains("药") || name.Contains("水") || name.Contains("霜") || name.Contains("丹")) ? 2 : (name.Contains("甲") || name.Contains("袍") ? 13 : 3));
         }
 
         gm.AddItem(itemId, name, x, y, looks);
@@ -2772,6 +2991,19 @@ public sealed class ServerMessageRouter
 
     private static void SafeLog(string msg)
     {
-        System.Diagnostics.Debug.WriteLine(msg);
+        if (System.AppDomain.CurrentDomain.FriendlyName.Contains("test", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine(msg);
+            return;
+        }
+
+        try
+        {
+            Godot.GD.Print(msg);
+        }
+        catch
+        {
+            Console.WriteLine(msg);
+        }
     }
 }

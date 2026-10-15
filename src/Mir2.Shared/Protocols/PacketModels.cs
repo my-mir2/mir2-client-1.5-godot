@@ -28,19 +28,26 @@ public readonly struct ServerPacket
 {
     public readonly short Ident;
     public readonly int Recog;
-    public readonly short Param;
-    public readonly short Tag;
+    public readonly int Param;
+    public readonly int Tag;
+    public readonly int Series;
     public readonly byte[] Extra;
     public readonly string ExtraStr;
 
-    public ServerPacket(short ident, int recog, short param, short tag, byte[] extra)
+    public ServerPacket(short ident, int recog, int param, int tag, byte[] extra)
+        : this(ident, recog, param, tag, 0, extra)
+    {
+    }
+
+    public ServerPacket(short ident, int recog, int param, int tag, int series, byte[] extra)
     {
         Ident = ident;
         Recog = recog;
         Param = param;
         Tag = tag;
-        Extra = extra;
-        ExtraStr = SafeUtf8String(extra);
+        Series = series;
+        Extra = extra ?? Array.Empty<byte>();
+        ExtraStr = SafeUtf8String(Extra);
     }
 
     private static string SafeUtf8String(ReadOnlySpan<byte> data)

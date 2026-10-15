@@ -224,14 +224,27 @@ public partial class InspectPanelView : Control, IManagedWindow
     public void SetDollHair(int hairIndex = 1, bool isFemale = false)
     {
         if (_dollHair == null) return;
-        int baseIdx = isFemale ? 480 : 440;
-        int imgIdx = baseIdx + Math.Max(1, hairIndex);
-        var tex = ResPath.LoadImageTexture($"resources/wil/png/Prguse/Prguse_{imgIdx:D4}.png");
+        string hairFile;
+        Vector2 hairPos;
+        if (isFemale)
+        {
+            int imgIdx = (hairIndex == 2) ? 483 : 482;
+            hairFile = $"resources/wil/png/Prguse/Prguse_{imgIdx:D4}.png";
+            hairPos = new Vector2(75, 42);
+        }
+        else
+        {
+            int baseIdx = 440;
+            int imgIdx = baseIdx + Math.Max(1, hairIndex);
+            hairFile = $"resources/wil/png/Prguse/Prguse_{imgIdx:D4}.png";
+            hairPos = new Vector2(76, 45);
+        }
+        var tex = ResPath.LoadImageTexture(hairFile);
         if (tex != null)
         {
             _dollHair.Texture = tex;
             _dollHair.Size = tex.GetSize();
-            _dollHair.Position = isFemale ? new Vector2(74, 38) : new Vector2(73, 39);
+            _dollHair.Position = hairPos;
             _dollHair.Visible = true;
         }
     }

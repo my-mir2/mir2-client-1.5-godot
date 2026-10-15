@@ -80,6 +80,10 @@ public static class BinaryProtocol
         CreateCharResponse = 0x0008,
         Heartbeat = 0x0009,
         ReconnectionSync = 0x000A,
+        CreateAccountRequest = 0x000B,
+        CreateAccountResponse = 0x000C,
+        ChangePasswordRequest = 0x000D,
+        ChangePasswordResponse = 0x000E,
 
         // ============ 客户端权威操作意图 (Client Intents, 0x0100 ~ 0x01FF) ============
         IntentMove = 0x0101,          // 移动意图 (行走/奔跑)
@@ -900,6 +904,73 @@ public static class BinaryProtocol
                 int accLen = 0; while (accLen < 32 && pAcc[accLen] != 0) accLen++;
                 int pwdLen = 0; while (pwdLen < 32 && pPwd[pwdLen] != 0) pwdLen++;
                 return (Encoding.UTF8.GetString(pAcc, accLen), Encoding.UTF8.GetString(pPwd, pwdLen));
+            }
+        }
+    }
+
+    /// <summary>账号注册意图载荷 (固定 64 字节)</summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public unsafe struct CreateAccountPayload
+    {
+        public fixed byte Account[32];
+        public fixed byte Password[32];
+
+        public static CreateAccountPayload Create(string account, string password)
+        {
+            var p = new CreateAccountPayload();
+            byte* pAcc = p.Account;
+            byte* pPwd = p.Password;
+            var accBytes = Encoding.UTF8.GetBytes(account ?? string.Empty);
+            var pwdBytes = Encoding.UTF8.GetBytes(password ?? string.Empty);
+            int accLen = Math.Min(accBytes.Length, 31);
+            int pwdLen = Math.Min(pwdBytes.Length, 31);
+            Marshal.Copy(accBytes, 0, (IntPtr)pAcc, accLen);
+            Marshal.Copy(pwdBytes, 0, (IntPtr)pPwd, pwdLen);
+            return p;
+        }
+
+        public readonly (string account, string password) Read()
+        {
+            fixed (byte* pAcc = Account, pPwd = Password)
+            {
+                int accLen = 0; while (accLen < 32 && pAcc[accLen] != 0) accLen++;
+                int pwdLen = 0; while (pwdLen < 32 && pPwd[pwdLen] != 0) pwdLen++;
+                return (Encoding.UTF8.GetString(pAcc, accLen), Encoding.UTF8.GetString(pPwd, pwdLen));
+            }
+        }
+    }
+
+    /// <summary>修改密码意图载荷 (固定 96 字节)</summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public unsafe struct ChangePasswordPayload
+    {
+        public fixed byte Account[32];
+        public fixed byte OldPassword[32];
+        public fixed byte NewPassword[32];
+
+        public static ChangePasswordPayload Create(string account, string oldPassword, string newPassword)
+        {
+            var p = new ChangePasswordPayload();
+            byte* pAcc = p.Account;
+            byte* pOld = p.OldPassword;
+            byte* pNew = p.NewPassword;
+            var accBytes = Encoding.UTF8.GetBytes(account ?? string.Empty);
+            var oldBytes = Encoding.UTF8.GetBytes(oldPassword ?? string.Empty);
+            var newBytes = Encoding.UTF8.GetBytes(newPassword ?? string.Empty);
+            Marshal.Copy(accBytes, 0, (IntPtr)pAcc, Math.Min(accBytes.Length, 31));
+            Marshal.Copy(oldBytes, 0, (IntPtr)pOld, Math.Min(oldBytes.Length, 31));
+            Marshal.Copy(newBytes, 0, (IntPtr)pNew, Math.Min(newBytes.Length, 31));
+            return p;
+        }
+
+        public readonly (string account, string oldPassword, string newPassword) Read()
+        {
+            fixed (byte* pAcc = Account, pOld = OldPassword, pNew = NewPassword)
+            {
+                int aLen = 0; while (aLen < 32 && pAcc[aLen] != 0) aLen++;
+                int oLen = 0; while (oLen < 32 && pOld[oLen] != 0) oLen++;
+                int nLen = 0; while (nLen < 32 && pNew[nLen] != 0) nLen++;
+                return (Encoding.UTF8.GetString(pAcc, aLen), Encoding.UTF8.GetString(pOld, oLen), Encoding.UTF8.GetString(pNew, nLen));
             }
         }
     }

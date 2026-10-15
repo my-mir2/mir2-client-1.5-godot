@@ -21,6 +21,21 @@ public sealed class SafeZoneAndGuardEngine
 
     public SabukSiegeEngine? SabukEngine { get; set; }
 
+    private readonly HashSet<int> _safeMapIds = new();
+
+    /// <summary>
+    /// 用官方规则整体替换安全区 (M2Server sub_4BEE20 实证): 地图带 SAFE 标记即整图安全；
+    /// 其余为 StartPoint.txt 每个出生点 ±10 格的方形区域 (|dx|&lt;=10 且 |dy|&lt;=10)。
+    /// 构造函数里的矩形仅为单元测试夹具，生产启动经本方法覆盖。
+    /// </summary>
+    public void ReplaceWithOfficialSafeZones(IEnumerable<int> safeMapIds, IEnumerable<SafeZoneRect> rects)
+    {
+        _safeMapIds.Clear();
+        foreach (var m in safeMapIds) _safeMapIds.Add(m);
+        _safeZones.Clear();
+        _safeZones.AddRange(rects);
+    }
+
     private readonly List<SafeZoneRect> _safeZones = new()
     {
         new(0, 320, 260, 345, 285), // 比奇大城安全区
@@ -39,6 +54,7 @@ public sealed class SafeZoneAndGuardEngine
     /// </summary>
     public bool IsInSafeZone(int mapId, int x, int y)
     {
+        if (_safeMapIds.Contains(mapId)) return true;
         bool isSabukInWar = SabukEngine != null && SabukEngine.Phase == SabukSiegeEngine.WarPhase.InWar;
 
         for (int i = 0; i < _safeZones.Count; i++)
@@ -77,7 +93,9 @@ public sealed class SafeZoneAndGuardEngine
         public int X { get; set; }
         public int Y { get; set; }
         public bool IsArcher { get; init; }
-        public int AttackRange => IsArcher ? 8 : 12;
+        // 盛大官方 1.5 权威射程: 弓箭守卫与大刀卫士全屏 12 格远程刀光/射箭秒杀 (索敌即斩)
+        public int AttackRange => SightRange;
+        public int SightRange => 12; // 守卫索敌视野 12 格
     }
 
     private readonly List<GuardEntity> _guards = new();

@@ -88,6 +88,8 @@ public partial class AudioManager : Node
         public const int WomDie = 145;
     }
 
+    private string _currentBgmFile = string.Empty;
+
     public override void _Ready()
     {
         Instance = this;
@@ -95,7 +97,7 @@ public partial class AudioManager : Node
         _bgmPlayer = new AudioStreamPlayer
         {
             Bus = "Master",
-            VolumeDb = -6.0f
+            VolumeDb = -2.0f
         };
         AddChild(_bgmPlayer);
 
@@ -104,7 +106,7 @@ public partial class AudioManager : Node
             var p = new AudioStreamPlayer
             {
                 Bus = "Master",
-                VolumeDb = -1.0f
+                VolumeDb = 1.5f
             };
             AddChild(p);
             _sfxPlayers.Add(p);
@@ -153,7 +155,7 @@ public partial class AudioManager : Node
 
     public void PlaySoundId(int soundId)
     {
-        if (_muted) return;
+        if (_muted || soundId <= 0) return;
         if (_soundMap.TryGetValue(soundId, out var wavFile))
         {
             PlaySfx(wavFile);
@@ -162,6 +164,48 @@ public partial class AudioManager : Node
         {
             // 回退直接按 ID 查找
             PlaySfx($"{soundId}.wav");
+        }
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 武器挥击破空音效 (对齐 Delphi SoundUtil.pas:PlayWeaponSound)
+    /// 50: 短剑/匕首, 51: 木剑, 52: 铁剑/长剑, 53: 刀类, 54: 斧类, 55: 棍棒, 57: 空手挥拳
+    /// </summary>
+    public void PlayWeaponSwingSound(int weaponType)
+    {
+        int sid = weaponType switch
+        {
+            <= 0 => 57, // 空手挥拳 (s_hit_fist)
+            1 => 51,    // 木剑 (s_hit_wooden)
+            2 => 50,    // 匕首/短剑 (s_hit_short)
+            _ => 52     // 铁剑/斩马刀/裁决等 (s_hit_sword)
+        };
+        PlaySoundId(sid);
+    }
+
+    /// <summary>
+    /// 盛大官方 1.5 怪物原生态音效公式调度 (严格 1:1 对齐 Delphi Actor.pas:LoadActorFrame & RunActSound)
+    /// 官方铁律: BaseSound = 200 + Appr * 10
+    /// offset: 1=发现/待机吼叫(Appear), 2=普攻挥击(Attack), 3=武器挥击(Weapon), 4=受击惨叫(Scream), 5=倒地死亡(Die)
+    /// </summary>
+    public void PlayMonsterSound(string monsterName, int appr, int offset)
+    {
+        if (_muted) return;
+        int resolvedAppr = appr;
+        if (resolvedAppr <= 0 && !string.IsNullOrEmpty(monsterName))
+        {
+            resolvedAppr = Mir2.Shared.Data.OfficialMonsterDBRegistry.ResolveAppr(monsterName, -1);
+        }
+        if (resolvedAppr < 0) return;
+
+        int soundId = 200 + resolvedAppr * 10 + offset;
+        if (_soundMap.TryGetValue(soundId, out var wavFile))
+        {
+            PlaySfx(wavFile);
+        }
+        else
+        {
+            PlaySfx($"{200 + resolvedAppr * 10}-{offset}.wav");
         }
     }
 
@@ -243,7 +287,7 @@ public partial class AudioManager : Node
 
         if (!_cache.TryGetValue(fullPath, out var stream))
         {
-            stream = LoadWavStream(fullPath);
+            stream = LoadWavStream(fullPath, normalizeLowAmplitude: true);
             if (stream != null) _cache[fullPath] = stream;
         }
 
@@ -256,8 +300,51 @@ public partial class AudioManager : Node
         }
     }
 
+    /// <summary>
+    /// 播放盛大官方 1.5 阶段背景音乐 (Log-in-long2.wav / sellect-loop2.wav / main_theme.wav / Game over2.wav)
+    /// </summary>
+    public void PlayBgm(string wavFileName, bool loop = true)
+    {
+        if (_muted || _bgmPlayer == null) return;
+
+        string fileName = Path.GetFileName(wavFileName.Replace('\\', '/'));
+        if (_bgmPlayer.Playing && string.Equals(_currentBgmFile, fileName, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        string fullPath = ResPath.Resolve(Path.Combine(WavDir, fileName));
+        if (!File.Exists(fullPath)) return;
+
+        string cacheKey = $"{fullPath}#bgm_{loop}";
+        if (!_cache.TryGetValue(cacheKey, out var stream))
+        {
+            stream = LoadWavStream(fullPath, normalizeLowAmplitude: true);
+            if (stream != null)
+            {
+                stream.LoopMode = loop ? AudioStreamWav.LoopModeEnum.Forward : AudioStreamWav.LoopModeEnum.Disabled;
+                if (loop)
+                {
+                    int bytesPerSample = (stream.Format == AudioStreamWav.FormatEnum.Format8Bits ? 1 : 2) * (stream.Stereo ? 2 : 1);
+                    stream.LoopBegin = 0;
+                    stream.LoopEnd = Math.Max(0, stream.Data.Length / Math.Max(1, bytesPerSample));
+                }
+                _cache[cacheKey] = stream;
+            }
+        }
+
+        if (stream != null)
+        {
+            _currentBgmFile = fileName;
+            _bgmPlayer.Stop();
+            _bgmPlayer.Stream = stream;
+            _bgmPlayer.Play();
+        }
+    }
+
     public void StopBgm()
     {
+        _currentBgmFile = string.Empty;
         _bgmPlayer?.Stop();
     }
 
@@ -329,9 +416,9 @@ public partial class AudioManager : Node
 
     /// <summary>
     /// 标准 RIFF/WAVE 格式解析器，精准提取采样率、声道数、位数与纯 PCM 字节流
-    /// 彻底消除直接传文件头导致的爆音以及采样率错配导致的音调扭曲
+    /// 彻底消除直接传文件头导致的爆音以及采样率错配导致的音调扭曲，并对极低采样振幅音效进行无损增益补偿
     /// </summary>
-    public static AudioStreamWav? LoadWavStream(string path)
+    public static AudioStreamWav? LoadWavStream(string path, bool normalizeLowAmplitude = false)
     {
         try
         {
@@ -339,12 +426,39 @@ public partial class AudioManager : Node
             var info = ParseWavRiff(fileBytes);
             if (info == null) return null;
 
+            byte[] pcm = info.Value.PcmData;
+            if (normalizeLowAmplitude && info.Value.BitsPerSample == 16 && pcm.Length >= 4)
+            {
+                int maxAmp = 0;
+                for (int i = 0; i <= pcm.Length - 2; i += 2)
+                {
+                    int sample = BitConverter.ToInt16(pcm, i);
+                    int abs = sample == short.MinValue ? 32767 : Math.Abs(sample);
+                    if (abs > maxAmp) maxAmp = abs;
+                }
+
+                // 若原始 WAV 峰值过低 (例如官方 1.wav~4.wav 脚步声与 102.wav 峰值仅 1500~5700)，进行平滑软件增益放大至听感清晰区间
+                if (maxAmp > 100 && maxAmp < 12000)
+                {
+                    float gain = Math.Min(5.0f, 14000.0f / maxAmp);
+                    byte[] boosted = new byte[pcm.Length];
+                    for (int i = 0; i <= pcm.Length - 2; i += 2)
+                    {
+                        short sample = BitConverter.ToInt16(pcm, i);
+                        int scaled = Math.Clamp((int)(sample * gain), short.MinValue, short.MaxValue);
+                        boosted[i] = (byte)(scaled & 0xFF);
+                        boosted[i + 1] = (byte)((scaled >> 8) & 0xFF);
+                    }
+                    pcm = boosted;
+                }
+            }
+
             var stream = new AudioStreamWav
             {
-                Data = info.Value.PcmData,
                 Format = info.Value.BitsPerSample == 8 ? AudioStreamWav.FormatEnum.Format8Bits : AudioStreamWav.FormatEnum.Format16Bits,
                 MixRate = info.Value.SampleRate,
-                Stereo = info.Value.NumChannels >= 2
+                Stereo = info.Value.NumChannels >= 2,
+                Data = pcm
             };
 
             return stream;

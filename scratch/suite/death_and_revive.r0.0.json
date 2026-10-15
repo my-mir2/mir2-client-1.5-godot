@@ -1,0 +1,72 @@
+{
+  "kills": 0,
+  "seconds": 10.7862193,
+  "rollbacks": 1,
+  "level": 1,
+  "hp": 10,
+  "maxHp": 19,
+  "dead": false,
+  "finalMap": "0",
+  "x": 330,
+  "y": 270,
+  "gold": 0,
+  "exp": 0,
+  "maxExp": 100,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "level 1 => GM: 等级=1 HP=19/19",
+    "tp 1 497 465 => GM: 已传送到 1(497,465)",
+    "spawn 半兽勇士 6 => GM: 刷出 半兽勇士 x6",
+    "die => GM: 已触发死亡处决"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4445454,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 1,
+      "AtSec": 6.6512396,
+      "Kills": 0,
+      "MaxExp": 100
+    }
+  ],
+  "arrivals": [],
+  "deaths": 1,
+  "deathPackets": 1,
+  "revives": 1,
+  "struckBy": [],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [],
+  "magicUpdates": [],
+  "spellsCast": 0,
+  "spellEffects": 0,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 0,
+  "groupLists": [],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 等级=1 HP=19/19",
+    "GM: 已传送到 1(497,465)",
+    "GM: 刷出 半兽勇士 x6",
+    "GM: 已触发死亡处决"
+  ],
+  "characterName": "机器人7544",
+  "fights": []
+}

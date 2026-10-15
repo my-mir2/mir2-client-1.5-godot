@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,42 +42,14 @@ public sealed class Mir2ServerHostedService(
     public Task StartAsync(CancellationToken cancellationToken)
     {
         Log.Information("[Mir2ServerHostedService] 正在通过现代依赖注入容器拉起传奇 1.5 核心引擎...");
+        dispatcher.ExpRate = config.ExpRate;
+        dispatcher.GmEnabled = config.GmEnabled;
+        if (config.GmEnabled) Log.Warning("[Mir2.Server] GM 聊天命令已启用 (@gm ...)，仅供测试，生产环境请勿开启");
+        if (config.ExpRate != 1.0)
+            Log.Warning("[Mir2.Server] 击杀经验倍率 ExpRate = {Rate}x (官方为 1.0，仅用于压测/机器人，生产环境请勿修改)", config.ExpRate);
 
-        // 1. 初始化主地图与物理碰撞网格
-        var mainMap = mapManager.GetMap(0) ?? new GameMap(0, "比奇省", 700, 700);
-        string mapPath = Path.Combine(Directory.GetCurrentDirectory(), "resources", "maps", "Map", "0.map");
-        if (File.Exists(mapPath))
-        {
-            mainMap.LoadMapFile(mapPath);
-            Log.Information("[Mir2.Server] 比奇省官方真实物理碰撞网格装载成功。");
-        }
-        mapManager.RegisterMap(mainMap);
-        int zoneCols = (mainMap.Width + 15) / 16;
-        int zoneRows = (mainMap.Height + 15) / 16;
-        Log.Information("[Mir2.Server] 比奇省地图 AOI 空间索引初始化完成 (尺寸: {Width}x{Height}, 划分 {Zones} 个 Zone).",
-            mainMap.Width, mainMap.Height, zoneCols * zoneRows);
-
-        // 2. 初始化经典怪物刷新规则
-        regenEngine.AddRule(new MonsterSpawnRule { RuleId = 1, MonsterName = "半兽人", MapId = 0, CenterX = 330, CenterY = 270, Radius = 30, MaxCount = 30, BaseHp = 90 });
-        regenEngine.AddRule(new MonsterSpawnRule { RuleId = 2, MonsterName = "多钩猫", MapId = 0, CenterX = 340, CenterY = 260, Radius = 25, MaxCount = 25, BaseHp = 65 });
-        regenEngine.AddRule(new MonsterSpawnRule { RuleId = 3, MonsterName = "钉耙猫", MapId = 0, CenterX = 320, CenterY = 280, Radius = 25, MaxCount = 25, BaseHp = 65 });
-        regenEngine.AddRule(new MonsterSpawnRule { RuleId = 4, MonsterName = "稻草人", MapId = 0, CenterX = 310, CenterY = 250, Radius = 20, MaxCount = 20, BaseHp = 45 });
-        regenEngine.AddRule(new MonsterSpawnRule { RuleId = 5, MonsterName = "森林雪人", MapId = 0, CenterX = 350, CenterY = 290, Radius = 20, MaxCount = 20, BaseHp = 110 });
-
-        // 3. 初始化官方商人与 NPC 实体 (100% 对齐官方 merchant.txt)
-        var biqiPharmacy = new NpcEntity { Uid = 101, Name = "比奇药店老板", MapId = 0, X = 313, Y = 271 };
-        biqiPharmacy.ScriptPages["@main"] = "欢迎光临比奇大药房，这里提供最好的草药！\\ \\<购买/@buy> 药品\\<出售/@sell> 物品\\<离开/@exit>";
-        biqiPharmacy.Goods.Add(new MerchantGoods { GoodsId = 1, Name = "金创药(小量)", Price = 55, Weight = 1 });
-        biqiPharmacy.Goods.Add(new MerchantGoods { GoodsId = 2, Name = "魔法药(小量)", Price = 55, Weight = 1 });
-        biqiPharmacy.Goods.Add(new MerchantGoods { GoodsId = 3, Name = "太阳水", Price = 550, Weight = 2 });
-        biqiPharmacy.Goods.Add(new MerchantGoods { GoodsId = 4, Name = "强效太阳水", Price = 1100, Weight = 2 });
-        npcEngine.RegisterNpc(biqiPharmacy);
-
-        var biqiBlacksmith = new NpcEntity { Uid = 102, Name = "比奇铁匠", MapId = 0, X = 302, Y = 219 };
-        biqiBlacksmith.ScriptPages["@main"] = "想要锋利的宝剑吗？我这里能修也能卖！\\ \\<购买/@buy> 武器\\<修理/@repair> 装备\\<特殊修理/@s_repair> 装备\\<离开/@exit>";
-        biqiBlacksmith.Goods.Add(new MerchantGoods { GoodsId = 10, Name = "木剑", Price = 100, Weight = 7, MaxDura = 4000 });
-        biqiBlacksmith.Goods.Add(new MerchantGoods { GoodsId = 11, Name = "铁剑", Price = 1000, Weight = 10, MaxDura = 10000 });
-        npcEngine.RegisterNpc(biqiBlacksmith);
+        // 1~3. 地图碰撞 / 传送门 / 刷怪 / 掉落 / NPC 全部由数据库提供 (见下方 PostgreSQL 接入后的 LoadOfficialWorld)，
+        //      不再有任何硬编码地图、刷怪规则或虚构 NPC。
 
         // 4. PostgreSQL 工业级持久化接入
         if (config.EnableDatabaseLogging || !string.IsNullOrWhiteSpace(config.DatabaseConnectionString))
@@ -87,6 +61,26 @@ public sealed class Mir2ServerHostedService(
                 dispatcher.PgPersistenceEngine = pgEngine;
                 Log.Information("[Mir2.Server] PostgreSQL 工业级数据库物理连接成功，DDL 表结构与索引已就绪！");
                 pgEngine.LoadWorld(dispatcher.TreasuryEngine, dispatcher.GuildEngine);
+
+                // 官方 Monster.DB 数据以数据库为唯一真值：启动时读入内存，供刷怪与战斗结算使用
+                try
+                {
+                    var rows = pgEngine.LoadOfficialMonsterStats();
+                    if (rows != null)
+                    {
+                        Mir2.Shared.Data.OfficialMonsterStatsTable.ReplaceRuntime(rows, $"PostgreSQL official_monster ({rows.Count} 条)");
+                        Log.Information("[Mir2.Server] 官方怪物属性已从数据库载入内存: {Count} 条", rows.Count);
+                        LoadOfficialWorld(pgEngine);
+                    }
+                    else
+                    {
+                        Log.Warning("[Mir2.Server] 数据库中无 official_monster 数据，回退内置生成表。请执行 tools/convert_official_db_to_sql.py 并导入 data/official_14/official_14_db.sql");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[Mir2.Server] 读取 official_monster 失败 ({Error})，回退内置生成表。", ex.Message);
+                }
             }
             catch (Exception ex)
             {
@@ -170,15 +164,43 @@ public sealed class Mir2ServerHostedService(
     private void OnSessionConnected(ClientSession session)
     {
         Log.Information("[网关] 玩家连接建立: 会话 #{SessionId} (端点: {RemoteEndPoint})", session.SessionId, session.RemoteEndPoint);
-        session.CurrentMapId = 0;
-        session.X = 330;
-        session.Y = 270;
-        session.State = new PlayerState();
+    }
 
-        var map = mapManager.GetMap(session.CurrentMapId) ?? mapManager.DefaultMap;
-        map?.Aoi.Enter(session, session.X, session.Y);
+    /// <summary>
+    /// 从 PostgreSQL 一次性装载官方世界：地图碰撞网格、MapInfo 传送门、Mongen 刷怪规则、MonItems 掉落表、NPC 摆放与脚本。
+    /// 刷怪按地图懒激活 (官方全图约 3 万只怪)：仅为有玩家的地图及预热地图刷怪。
+    /// </summary>
+    private void LoadOfficialWorld(PostgreSqlPersistenceEngine pgEngine)
+    {
+        var repo = new OfficialWorldRepository(pgEngine.DataSource);
+        if (!repo.HasWorldData())
+        {
+            Log.Error("[Mir2.Server] 数据库中没有官方世界数据 (official_map)，世界将为空！请先执行 python tools/import_official_envir_to_pg.py");
+            return;
+        }
 
-        session.EnqueuePacket(ProtocolConsts.SM_LOGON_DELPHI, 1, 0, 0, 0, "盛大传奇1.5官方服务器");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var world = repo.Load();
+        var rep = world.Report;
+
+        OfficialWorldApplier.Apply(world, mapManager, regenEngine, npcEngine, dispatcher.SafeZoneEngine,
+            () => dispatcher.ActiveSessions.Values.Select(s => s.CurrentMapId));
+
+        var initRng = OfficialClientRulesEngine.DelphiRandom.Shared;
+        for (int i = 0; i < 5; i++) regenEngine.ProcessRegenTick(initRng, enforceTimeSlice: false);
+
+        Log.Information("[Mir2.Server] 官方世界已从数据库装载 ({Ms}ms): 地图 {Maps} 张 (因尺寸异常跳过 {Bad} 张), 传送门 {Gates} 条, " +
+                        "刷怪规则 {Rules} 条 (官方总计 {Total} 只, 拼写错误跳过 {Skip} 条), 掉落表 {DropMon} 种怪/{DropRules} 条规则, NPC {Npcs} 个 (含货品 {Goods} 个)",
+            sw.ElapsedMilliseconds, rep.MapsLoaded, rep.MapsSkippedBadSize, rep.GatesLoaded, world.Spawns.Count,
+            rep.SpawnMonsterTotal, rep.SpawnRowsSkippedUnknownMonster, rep.DropMonsters, rep.DropRules, rep.NpcsLoaded, rep.NpcsWithGoods);
+        if (rep.SkippedMaps.Count > 0)
+            Log.Warning("[Mir2.Server] 跳过的地图: {Maps}", string.Join(", ", rep.SkippedMaps));
+        if (rep.UnknownMonsters.Count > 0)
+            Log.Warning("[Mir2.Server] 官方 Mongen 中不存在于 Monster.DB 的怪物名 (原版拼写错误): {Names}", string.Join(", ", rep.UnknownMonsters));
+        if (rep.UnmatchedDropItems.Count > 0)
+            Log.Warning("[Mir2.Server] 掉落表中无法对应 StdItems 的物品名 {N} 种 (保留原名): {Names}", rep.UnmatchedDropItems.Count,
+                string.Join(", ", rep.UnmatchedDropItems.Take(20)));
+        Log.Information("[Mir2.Server] 当前活跃怪物总数: {Count}", regenEngine.TotalActiveMonsters);
     }
 
     private void OnSessionDisconnected(ClientSession session)
@@ -207,12 +229,40 @@ public sealed class Mir2ServerHostedService(
         // 3. 玩家持续状态循环 (药水、毒素、复活戒等)
         foreach (var session in gateway.AllSessions)
         {
-            if (session.State != null && session.IsConnected)
+            // 死亡玩家不得自然回血，否则 HP 悄悄变回 >0，客户端仍显示死亡且 CM_REVIVE 被服务端忽略 (机器人套件抓到的缺陷)
+            if (session.State != null && session.IsConnected && session.State.Hp > 0)
             {
                 var (hpGain, mpGain) = PotionEngine.TickIncHealthSpell(session.State);
                 if (hpGain > 0 || mpGain > 0)
                 {
                     session.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, session.State.Hp, session.State.Mp, session.State.MaxHp, session.State.MaxMp);
+                }
+
+                // 盛大官方 1.5 权威心跳自然生命与魔法回复 (IDA sub_4C7720 @ 0x4C7851 ~ 0x4C78EA)
+                if (session.State.LastNaturalRegenMs == 0)
+                {
+                    session.State.LastNaturalRegenMs = nowMs;
+                }
+                else if (nowMs - session.State.LastNaturalRegenMs >= 3000)
+                {
+                    session.State.LastNaturalRegenMs = nowMs;
+                    bool naturalChanged = false;
+                    if (!session.State.HasGreenPoison && session.State.Hp < session.State.MaxHp)
+                    {
+                        int stepHp = Math.Max(1, (session.State.MaxHp / 75) + 1);
+                        session.State.Hp = Math.Min(session.State.MaxHp, session.State.Hp + stepHp);
+                        naturalChanged = true;
+                    }
+                    if (session.State.Mp < session.State.MaxMp)
+                    {
+                        int stepMp = Math.Max(1, (session.State.MaxMp / 18) + 1);
+                        session.State.Mp = Math.Min(session.State.MaxMp, session.State.Mp + stepMp);
+                        naturalChanged = true;
+                    }
+                    if (naturalChanged)
+                    {
+                        session.EnqueuePacket(ProtocolConsts.SM_HEALTHSPELLCHANGED, session.State.Hp, session.State.Mp, session.State.MaxHp, session.State.MaxMp);
+                    }
                 }
 
                 var (tookDmg, dmg, greenExpired, redExpired) = session.State.ProcessPoisonTick(nowMs);
@@ -224,7 +274,7 @@ public sealed class Mir2ServerHostedService(
                         var (revived, revHp, revMp) = session.State.CheckAndTriggerRevivalRing(nowMs);
                         if (revived)
                         {
-                            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "【神戒护佑】复活戒指释放神圣光芒，生命值完全恢复！");
+                            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, "The Ring made you live");
                             session.EnqueuePacket(ProtocolConsts.SM_MYSTATUS, session.State.Hp, session.State.MaxHp, session.State.Mp, session.State.MaxMp);
                         }
                         else

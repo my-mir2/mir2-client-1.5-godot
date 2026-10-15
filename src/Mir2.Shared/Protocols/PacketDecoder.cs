@@ -57,7 +57,7 @@ public static class PacketDecoder
         int series = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload[12..16]);
         byte[] extra = payload.Length > 16 ? payload[16..].ToArray() : Array.Empty<byte>();
 
-        return new ServerPacket(ident, recog, (short)param, (short)tag, extra);
+        return new ServerPacket(ident, recog, param, tag, series, extra);
     }
 
     /// <summary>

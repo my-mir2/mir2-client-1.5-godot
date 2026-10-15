@@ -22,7 +22,7 @@ void fragment() {
                 col.a = 0.0;
             }
         } else {
-            if (fill_y > mp_ratio) {
+            if (mp_ratio <= 0.001 || fill_y > mp_ratio) {
                 col.a = 0.0;
             }
         }

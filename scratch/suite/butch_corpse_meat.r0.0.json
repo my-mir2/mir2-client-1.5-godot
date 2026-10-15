@@ -1,0 +1,89 @@
+{
+  "kills": 1,
+  "seconds": 20.6933661,
+  "rollbacks": 0,
+  "level": 10,
+  "hp": 89,
+  "maxHp": 89,
+  "dead": false,
+  "finalMap": "0",
+  "x": 341,
+  "y": 287,
+  "gold": 0,
+  "exp": 5,
+  "maxExp": 6000,
+  "bonusPoint": 0,
+  "problems": [],
+  "gm": [
+    "level 10 => GM: 等级=10 HP=89/89"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4417398,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 10,
+      "AtSec": 5.3806656,
+      "Kills": 0,
+      "MaxExp": 6000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "deathPackets": 0,
+  "revives": 0,
+  "struckBy": [
+    {
+      "who": "鸡",
+      "hits": 1,
+      "dmg": 19
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130",
+    "鸡肉"
+  ],
+  "buys": [],
+  "eats": 0,
+  "npcDialogs": [],
+  "magics": [],
+  "magicUpdates": [],
+  "spellsCast": 0,
+  "spellEffects": 1,
+  "takeOns": [],
+  "takeOffs": [],
+  "delItems": [],
+  "groundCount": 0,
+  "groupLists": [],
+  "butchResults": [],
+  "sells": [],
+  "repairs": [],
+  "sysMsgs": [
+    "欢迎来到热血传奇！",
+    "GM: 等级=10 HP=89/89"
+  ],
+  "characterName": "机器人9783",
+  "fights": [
+    {
+      "Map": "0",
+      "Name": "鸡",
+      "Killed": true,
+      "Swings": 1,
+      "Spells": 0,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        19
+      ],
+      "drops": [
+        "鸡肉"
+      ]
+    }
+  ]
+}

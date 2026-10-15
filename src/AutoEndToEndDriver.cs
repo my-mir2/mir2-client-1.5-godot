@@ -1882,8 +1882,8 @@ public partial class AutoEndToEndDriver : Node
                 var gameView = _main.GetNodeOrNull<GameView>("Game");
                 if (gameView?.HudInstance != null)
                 {
-                    GD.Print("[AutoE2E] === 验证官方 1.5 升级、饥饿度、小地图、掉落物消失与行会失败模态 (SM 653/657/708/710/805/758/760/761/769/771) ===");
-                    // 1. 模拟角色升级协议 (SM_LEVELUP_DELPHI 653, level=40)
+                    GD.Print("[AutoE2E] === 验证官方 1.5 升级、饥饿度、小地图、掉落物消失与行会失败模态 (SM 44/657/708/710/805/758/760/761/769/771) ===");
+                    // 1. 模拟角色升级协议 (SM_LEVELUP_DELPHI 44, level=40)
                     gameView.ServerMessageRouterInstance?.OnPacket(new ServerPacket(
                         ProtocolConsts.SM_LEVELUP_DELPHI,
                         40, 0, 0, Array.Empty<byte>()
@@ -2286,7 +2286,7 @@ public partial class AutoEndToEndDriver : Node
             case 129:
             {
                 GD.Print("[AutoE2E] ALL 129 E2E REAL RENDERING STAGES COMPLETED SUCCESSFULLY WITH 0 FAILURES!");
-                GetTree().Quit();
+                AppLifecycle.SafeQuit(0);
                 break;
             }
         }

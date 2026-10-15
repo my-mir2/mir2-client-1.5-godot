@@ -1,0 +1,108 @@
+{
+  "kills": 3,
+  "seconds": 18.5953588,
+  "rollbacks": 1,
+  "level": 30,
+  "hp": 4,
+  "maxHp": 19,
+  "dead": false,
+  "finalMap": "1",
+  "x": 496,
+  "y": 465,
+  "gold": 5070,
+  "exp": 68,
+  "maxExp": 2000000,
+  "problems": [],
+  "gm": [
+    "level 30 => GM: 等级=30 HP=19/19",
+    "gold 5000 => GM: 金币=5000",
+    "item 金创药(小量) 3 => GM: 发放 (HP)DrugSmall x3",
+    "tp 1 497 465 => GM: 已传送到 1(497,465)",
+    "spawn 半兽人 3 => GM: 刷出 半兽人 x3"
+  ],
+  "levels": [
+    {
+      "Level": 0,
+      "AtSec": 3.4419758,
+      "Kills": 0,
+      "MaxExp": 100
+    },
+    {
+      "Level": 30,
+      "AtSec": 7.0770883,
+      "Kills": 0,
+      "MaxExp": 2000000
+    }
+  ],
+  "arrivals": [],
+  "deaths": 0,
+  "revives": 0,
+  "struckBy": [
+    {
+      "who": "半兽人",
+      "hits": 9,
+      "dmg": 115
+    },
+    {
+      "who": "钉耙猫",
+      "hits": 3,
+      "dmg": 55
+    },
+    {
+      "who": "多钩猫",
+      "hits": 2,
+      "dmg": 4
+    }
+  ],
+  "bag": [
+    "金创药(小量)\t1\t0\t398",
+    "金创药(小量)\t1\t0\t398",
+    "魔法药(小量)\t1\t0\t394",
+    "蜡烛\t1\t0\t130",
+    "(HP)DrugSmall\t1\t1\t398",
+    "(HP)DrugSmall\t1\t1\t398",
+    "(HP)DrugSmall\t1\t1\t398"
+  ],
+  "fights": [
+    {
+      "Map": "1",
+      "Name": "半兽人",
+      "Killed": true,
+      "Swings": 1,
+      "Misses": 0,
+      "DamageTaken": 0,
+      "Hits": [
+        34
+      ],
+      "drops": []
+    },
+    {
+      "Map": "1",
+      "Name": "半兽人",
+      "Killed": true,
+      "Swings": 2,
+      "Misses": 0,
+      "DamageTaken": 5,
+      "Hits": [
+        25,
+        37
+      ],
+      "drops": [
+        "金币"
+      ]
+    },
+    {
+      "Map": "1",
+      "Name": "钉耙猫",
+      "Killed": true,
+      "Swings": 2,
+      "Misses": 0,
+      "DamageTaken": 7,
+      "Hits": [
+        30,
+        25
+      ],
+      "drops": []
+    }
+  ]
+}

@@ -115,7 +115,7 @@ public static class RedNameDropAndReviveEngine
         // 1. 红名玩家无论身处何处阵亡，灵魂强制流放至盟重红名村
         if (state != null && state.IsRedName)
         {
-            return (RedTownMapId, RedTownSafeX, RedTownSafeY, "因你作恶多端化身红名，死后灵魂被流放至盟重红名村！");
+            return (RedTownMapId, RedTownSafeX, RedTownSafeY, "你在盟重红名村复活。");
         }
 
         // 2. 沙巴克攻城战期间阵亡处理
@@ -128,11 +128,11 @@ public static class RedNameDropAndReviveEngine
                 if (!string.IsNullOrWhiteSpace(playerGuild) &&
                     playerGuild.Equals(sabukEngine.OwnerGuild, StringComparison.OrdinalIgnoreCase))
                 {
-                    return (SabukCityMapId, SabukCityReviveX, SabukCityReviveY, "【沙城战备】作为沙巴克守护行会英烈，你在沙巴克城堡内殿火速复活支援战线！");
+                    return (SabukCityMapId, SabukCityReviveX, SabukCityReviveY, "你在沙巴克城复活。");
                 }
 
                 // 攻击方行会或未参战散人 -> 死亡回盟重土城安全区复活
-                return (SabukCityMapId, MengZhengCitySafeX, MengZhengCitySafeY, "【沙城战役】你在沙巴克战火中倒地，灵魂在盟重土城安全区复活！");
+                return (SabukCityMapId, MengZhengCitySafeX, MengZhengCitySafeY, "你在盟重土城复活。");
             }
         }
 

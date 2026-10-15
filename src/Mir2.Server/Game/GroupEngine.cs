@@ -60,7 +60,7 @@ public sealed class GroupEngine
         {
             session.State.AllowGroup = enable;
             session.EnqueuePacket(ProtocolConsts.SM_GROUP_MODE_CHANGED, enable ? 1 : 0, 0, 0, 0);
-            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, enable ? "【组队】已开启允许组队模式。" : "【组队】已关闭允许组队模式。");
+            session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, enable ? "允许编组" : "拒绝编组");
         }
     }
 

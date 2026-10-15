@@ -137,40 +137,41 @@ public static class TaoistCombatEngine
     }
 
     /// <summary>
-    /// 获取变异骷髅 0~7 级属性规格
+    /// <summary>
+    /// 获取变异骷髅 0~7 级属性规格 (官方原版名字始终为变异骷髅，等级由头顶变色体现)
     /// </summary>
     public static PetTemplate GetSkeletonStats(int petLevel)
     {
         petLevel = Math.Clamp(petLevel, 0, 7);
         return new PetTemplate
         {
-            Name = petLevel == 7 ? "变异骷髅 (7级极品)" : $"变异骷髅 ({petLevel}级)",
+            Name = "变异骷髅",
             Level = petLevel,
             MaxHp = 100 + petLevel * 28,      // 0级 100, 7级 296
             MinDc = 5 + petLevel * 2,         // 0级 5, 7级 19
             MaxDc = 12 + petLevel * 3,        // 0级 12, 7级 33
             Ac = 5 + petLevel * 2,            // 0级 5, 7级 19
             Mac = 3 + petLevel,
-            Appr = 20 // 官方骷髅外观号 (Mon3.wil 对应 official_monsters.csv Appr=20)
+            Appr = 20 // 官方骷髅外观号 (Mon3.wil)
         };
     }
 
     /// <summary>
-    /// 获取召唤神兽 0~7 级属性规格
+    /// 获取召唤神兽 0~7 级属性规格 (官方 1.5 原版外观均为爬行吐火神兽 Appr=13)
     /// </summary>
     public static PetTemplate GetShinsuStats(int petLevel)
     {
         petLevel = Math.Clamp(petLevel, 0, 7);
         return new PetTemplate
         {
-            Name = petLevel == 7 ? "烈焰神兽 (7级终极)" : $"神兽 ({petLevel}级)",
+            Name = "神兽",
             Level = petLevel,
             MaxHp = 200 + petLevel * 85,      // 0级 200, 7级 795
             MinDc = 15 + petLevel * 3,        // 0级 15, 7级 36
             MaxDc = 25 + petLevel * 5,        // 0级 25, 7级 60
             Ac = 12 + petLevel * 2,           // 0级 12, 7级 26
             Mac = 12 + petLevel * 2,
-            Appr = petLevel >= 7 ? 14 : 13    // 7级直立行走神兽
+            Appr = 13 // 官方 1.5 原版神兽外观 (爬行喷火)
         };
     }
 

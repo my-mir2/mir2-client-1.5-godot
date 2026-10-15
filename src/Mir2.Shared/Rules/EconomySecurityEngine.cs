@@ -155,15 +155,49 @@ public static class EconomySecurityEngine
         }
     }
 
-    // 细节 242: 客户端移动加速作弊检测 (允许合理网络时序抖动，阈值设为 240ms 拦截极端变速齿轮外挂，保障 300ms 官方奔跑流畅通过)
+    // 细节 242: 客户端移动加速作弊检测 (允许合理网络时序抖动，采用容差与连续违规判定，杜绝单次网络抖动暴力拉回)
     public static class SpeedHackDetectorEngine
     {
-        public const int MinMoveIntervalMs = 240;
+        public const int HardMinIntervalMs = 150; // 绝对物理极限下限 (拦截极端加速齿轮外挂)
+        public const int NormalRunIntervalMs = 270; // 官方 300ms 奔跑基准下限 (容许 30ms 客户端渲染与网络延迟抖动)
+
+        public static (bool isSpeedHack, bool rollbackToLastPos) CheckMovePacket(long currentPacketTimeMs, long lastPacketTimeMs, ref int consecutiveFastMoves)
+        {
+            long delta = currentPacketTimeMs - lastPacketTimeMs;
+            if (delta < HardMinIntervalMs)
+            {
+                // 极端瞬移/加速外挂，立即强制拉回制动
+                consecutiveFastMoves = Math.Max(consecutiveFastMoves + 1, 3);
+                return (true, true);
+            }
+            if (delta < NormalRunIntervalMs)
+            {
+                consecutiveFastMoves++;
+                // 偶发 1~2 次网络波动或合包正常放行，只有连续 3 次以上持续超速才触发拉回
+                if (consecutiveFastMoves >= 3)
+                {
+                    return (true, true);
+                }
+                return (false, false);
+            }
+            // 若停顿超过 600ms，彻底清零历史抖动计数；正常步速则快速衰减违规计数
+            if (delta >= 600)
+            {
+                consecutiveFastMoves = 0;
+            }
+            else
+            {
+                consecutiveFastMoves = Math.Max(0, consecutiveFastMoves - 1);
+            }
+            return (false, false);
+        }
+
         public static (bool isSpeedHack, bool rollbackToLastPos) CheckMovePacket(long currentPacketTimeMs, long lastPacketTimeMs)
         {
-            if (currentPacketTimeMs - lastPacketTimeMs < MinMoveIntervalMs)
+            long delta = currentPacketTimeMs - lastPacketTimeMs;
+            if (delta < 240)
             {
-                return (true, true); // 移动过快，判定外挂拉回
+                return (true, true);
             }
             return (false, false);
         }
@@ -172,10 +206,12 @@ public static class EconomySecurityEngine
     // 细节 243: 客户端挥刀出刀速度检测 (攻击间隔动态对齐攻击速度 AttackSpeed)
     public static class AttackSpeedValidatorEngine
     {
-        public const int MinAttackIntervalMs = 680;
+        // IDA sub_4CB7F8 @ 0x4CB833：攻速基准 900 - 60 * HitSpeed
+        public const int MinAttackIntervalMs = 900;
 
         /// <summary>
-        /// 校验出刀攻击间隔 (盛大官方 1.5 规则: 狂风套/极品攻速动态缩短攻击硬直，每点攻速缩减 60ms，下限 420ms，上限 1000ms)
+        /// 校验出刀攻击间隔 (IDA sub_4CB7F8: 基准 900ms，每点攻速缩减 60ms，下限 420ms，上限 1000ms)
+        /// 注意：当前调用点尚未传入装备 HitSpeed，攻速加成待接入 (见 AUDIT 近战缺口)
         /// </summary>
         public static bool IsAttackValid(long currentAttackMs, long lastAttackMs, int attackSpeed = 0)
         {
