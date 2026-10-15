@@ -70,3 +70,100 @@
 3. **防退化测试熔断机制**：
    - 任何涉及 UI 坐标或渲染修改，必须在 `tests/CSharp/TestOfficialUiGroundTruth.cs` 中补充断言，并确保 100% 通过！一旦发生坐标偏差，CI 立即红牌熔断！
 
+## 7. Google Jules 云端自主开发与实证工作流 (Cloud Jules Autonomous Workflow)
+
+### 7.1 环境与依赖 (Linux VM Environment)
+- **.NET 10 / C#**：工程完全基于 .NET 10 SDK 构建与测试。
+- **radare2 (r2) 逆向工具链**：云端 Linux 容器内如需实时穿透官方二进制，可直接运行：
+  ```bash
+  sudo apt-get update && sudo apt-get install -y radare2
+  ```
+- **官方二进制路径**：`docs/official_binary/MIR_final_v3_p.exe` (745KB，PE32 格式，Delphi 编译)。
+
+### 7.2 关键真值资产索引 (无需外部 IDA，项目内直接全局检索)
+1. **24 个原生窗体与全部控件静态坐标**：
+   - 检索 `scratch/official_dfm_tree.json`，内含官方客户端全部窗体（`TFrmDlg`、`TFrmMain`）中每个按钮、输入框、标签、面板的原始 `Left`、`Top`、`Width`、`Height` 绝对数值。
+2. **协议物理映射与状态码**：
+   - 上行客户端协议全集：`docs/ida_evidence/cm-protocol-map-15.md`
+   - 下行服务端广播协议全集：`docs/ida_evidence/SM_truth_table.md`
+   - 对话框与窗体交互状态机：`docs/ida_evidence/dialog_truth_table.md`
+   - radare2 符号与 VMT 分析记录：`docs/ida_evidence/client-r2-refactor-findings.md`
+3. **物品、怪物与掉落数据库**：
+   - 官方怪物属性与切片表：`src/Mir2.Shared/Data/OfficialMonsterStats.g.cs`
+   - 官方物品与外观 Looks 映射：`src/Mir2.Shared/Data/OfficialStdItemsRegistry.cs`
+
+### 7.3 自动化构建、数据库与脚本运行全集 (Linux Zero-UI Verification & Server Launch)
+Jules 在云端无图形桌面环境下，必须且仅能通过以下命令行走完验证闭环：
+
+#### 1. 系统依赖与 Python 环境准备
+```bash
+# 安装 PostgreSQL、radare2 及 Python psycopg2 数据库驱动
+sudo apt-get update && sudo apt-get install -y postgresql postgresql-contrib radare2 python3-pip python3-psycopg2
+```
+
+#### 2. 一键安装与初始化 PostgreSQL 官方数据库
+```bash
+bash scripts/setup_postgres_linux.sh
+```
+*执行过程：*
+- 自动拉起本地 PostgreSQL 实例并配置 `postgres:postgres` 凭证；
+- 自动创建 `mir2_world` 数据库；
+- 自动从 `data/official_14/mir2_world_official_data.sql.gz` 解压并导入官方全量大盘数据（475 张地图、2346 条 Mongen 刷怪、17333 条 MonItems 掉落、221 个 NPC 等）；
+- 执行物理表行数校验，确保数据 100% 落盘。
+
+#### 3. 官方数据重放与二次生成脚本 (按需使用)
+若需从官方原始 Envir 文本重新生成或增量更新数据库，可直接运行：
+```bash
+# 重新将 official_14 文本/二进制重放写入 PostgreSQL:
+python tools/import_official_envir_to_pg.py --no-maps   # 跳过大地图二进制快速重放
+python tools/import_official_envir_to_pg.py             # 全量重放 (包含地图网格)
+
+# 重新将 Paradox .DB (Monster/Magic/StdItems) 转换为 SQL:
+python tools/convert_official_db_to_sql.py
+```
+
+#### 4. 编译构建全解决方案
+```bash
+dotnet build Mir2Client.sln
+```
+*要求：0 警告 0 错误。*
+
+#### 5. 启动官方原版 M2 服务端进程
+```bash
+dotnet run --project src/Mir2.Server/Mir2.Server.csproj
+```
+*特性：监听 7000 端口，Web 监控面板端口 8080，自动连接本地 PostgreSQL 数据库加载全量世界。*
+
+#### 6. 单元与集成测试
+```bash
+dotnet test tests/CSharp/Mir2Client.Tests.csproj --no-build
+```
+*要求：100% 全部通过。*
+
+#### 7. 真实无头机器人端到端验证套件 (Mir2.Bot)
+```bash
+python tools/run_bot_suite.py
+```
+*特性：*
+- 自动启动后台服务端实例（GM 模式启用）；
+- 逐个执行 18 大核心场景并发验证（移动走位、打怪、掉落保护、装备穿脱、商店买卖、修理、组队分经验、死亡复活等）；
+- 严格对照 PostgreSQL 官方掉落真值表进行防自嗨断言判定；
+- 自动产出 markdown 报告至 `docs/bot_reports/suite_latest.md`。
+
+#### 8. 微端资源完整性校验器
+```bash
+python scripts/micro_client_patcher.py
+```
+*用于对客户端二进制与资源文件进行 SHA-256 哈希完整性自验。*
+
+### 7.4 当前已知未闭环缺陷与任务缺口清单 (Jules Actionable Backlog)
+1. **NPC 对话文本与商人名称中文化**：
+   - 目前部分 NPC 对话脚本与商人名字仍保留了欧洲版英文原文，需依据盛大官方 1.5 中文版对照替换。
+2. **断线重连与网络异常容灾**：
+   - 客户端与服务端断线重连（`SM_RECONNECT` / 状态恢复）协议链路尚未完全走通。
+3. **行会与交易面板互锁安全校验**：
+   - 交易进行中打开行会/仓库存取物品时的并发死锁与状态互斥防护待强化。
+4. **长时间高并发压测与内存稳定性**：
+   - 针对 `PacketDispatcher.cs` 与网关进行千人并发模拟压测，确保内存零泄漏与消息队列无拥塞。
+
+
