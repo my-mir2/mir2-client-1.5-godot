@@ -5,8 +5,10 @@
 - **客户端实证原则**：客户端的表现层、UI 像素与核心渲染逻辑依然以官方原版二进制 (`MIR_final_v3_p.exe`) IDA Pro 逆向和官方 WIL/WIX 资产为基准。
 
 ## 1.1 官方 1.5 唯一真值基准与非标 1.5+ (delphi-custom) 绝绝对对隔离铁律
-- **唯一真值来源**：本项目当前以盛大官方原版 1.5 (`MIR_final_v3_p.exe`) 的 IDA MCP 逆向元数据为唯一准绳。
-- **本地 IDA 元数据检索优先**：所有 IDA MCP 逆向成果已完全导出并归档在本项目工程内（如 `docs/ida_evidence/SM_truth_table.md`, `docs/ida_evidence/dialog_truth_table.md`, `docs/ida_evidence/sub_ledger.md`, `scratch/ida_processmsg.c` 等）。**无需额外调用外部 IDA MCP，直接在项目工程内进行文本搜索即可获得官方 1.5 的绝对物理真值**！
+- **唯一真值来源**：本项目当前以盛大官方原版 1.5 (`MIR_final_v3_p.exe`) 的 IDA / radare2 逆向元数据为唯一准绳。官方二进制原件已直接存放在本工程 [`docs/official_binary/MIR_final_v3_p.exe`](docs/official_binary/MIR_final_v3_p.exe)（仅 745KB，PE32 格式，Delphi 编译）。
+- **本地 IDA/r2 元数据检索与自分析**：
+  1. 所有关键 IDA 逆向成果已完全导出并归档在本项目工程内（如 `docs/ida_evidence/SM_truth_table.md`, `docs/ida_evidence/dialog_truth_table.md`, `docs/ida_evidence/sub_ledger.md`, `docs/ida_evidence/client-r2-refactor-findings.md`, `scratch/ida_processmsg.c`, `scratch/official_dfm_tree.json` 等）。**优先在项目工程内进行文本搜索即可获得官方 1.5 的绝对物理真值**！
+  2. 若遇到全新未知函数或需实时反编译分析，可直接在 Linux 容器/云端环境（如 Google Jules VM）中通过 `apt-get install -y radare2` 或 `r2 docs/official_binary/MIR_final_v3_p.exe` 进行本地静态反汇编、字符串提取、交叉引用分析与指令穿透，无须任何外部商业 IDA 授权。
 - **严禁参考与混淆 `delphi-custom`**：`delphi-custom` 是一个非标的、更高的 1.5+ 私服分支，存在大量协议篡改、非官方魔改字段与逻辑漂移，**绝对严禁将其作为参考分母或开发依据**！
 - **协议收敛铁律**：协议通信只遵守官方 1.5 原版二进制有什么，客户端就实现什么。
 - **双端分工重心**：服务端为 1.4 底座（`mir2-my`），与 1.5 差异不大；当前项目的最高战略重心始终且唯一是**客户端的表现层与逻辑细节 1:1 闭环**。
