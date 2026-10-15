@@ -92,19 +92,33 @@
    - 官方怪物属性与切片表：`src/Mir2.Shared/Data/OfficialMonsterStats.g.cs`
    - 官方物品与外观 Looks 映射：`src/Mir2.Shared/Data/OfficialStdItemsRegistry.cs`
 
-### 7.3 自动化构建与验证命令 (Zero-UI Verification)
+### 7.3 自动化构建、数据库与服务端运行命令 (Zero-UI Verification & Server Launch)
 Jules 在云端无图形桌面环境下，必须且仅能通过以下命令行走完验证闭环：
-1. **编译构建**：
+1. **一键安装与初始化 PostgreSQL 官方数据库**：
+   ```bash
+   bash scripts/setup_postgres_linux.sh
+   ```
+   *说明：自动安装并启动 PostgreSQL，创建 `mir2_world` 库，并从 `data/official_14/mir2_world_official_data.sql.gz` 导入官方 475 张地图、2346 条刷怪、17333 条掉落等全量大盘数据。*
+
+2. **编译构建全解决方案**：
    ```bash
    dotnet build Mir2Client.sln
    ```
    *要求：0 警告 0 错误。*
-2. **单元与集成测试**：
+
+3. **启动官方原版 M2 服务端进程**：
+   ```bash
+   dotnet run --project src/Mir2.Server/Mir2.Server.csproj
+   ```
+   *特性：监听 7000 端口，Web 监控面板端口 8080，自动连接本地 PostgreSQL 数据库加载全量世界。*
+
+4. **单元与集成测试**：
    ```bash
    dotnet test tests/CSharp/Mir2Client.Tests.csproj --no-build
    ```
    *要求：100% 全部通过。*
-3. **真实无头机器人端到端验证套件 (Mir2.Bot)**：
+
+5. **真实无头机器人端到端验证套件 (Mir2.Bot)**：
    ```bash
    python tools/run_bot_suite.py
    ```
