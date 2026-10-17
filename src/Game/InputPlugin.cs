@@ -265,13 +265,15 @@ namespace Mir2Client.Game
                             case Key.E: EmitSignal(SignalName.GroupAllowToggleRequested); break;
                             case Key.B: EmitSignal(SignalName.HalfMoonToggleRequested); break;
                             case Key.F: EmitSignal(SignalName.ThrustingToggleRequested); break;
+                            case Key.S: EmitSignal(SignalName.SkillToggleRequested); break; // 官方 1.5 Ctrl+S: 打开技能书 (与 F11 等效)
+                            case Key.W: EmitSignal(SignalName.GroupToggleRequested); break; // 官方 1.5 Ctrl+W: 编组呼叫 (与 Alt+W 等效)
                         }
                     }
                     else
                     {
                         switch (key.Keycode)
                         {
-                            case Key.Print: case Key.Pause:
+                            case Key.Print: case Key.Pause: case Key.F12:
                                 EmitSignal(SignalName.ScreenCaptureRequested);
                                 break;
                             case Key.Key1: case Key.Key2: case Key.Key3:
@@ -286,7 +288,7 @@ namespace Mir2Client.Game
                             case Key.I: case Key.F9: EmitSignal(SignalName.BagToggleRequested); break;
                             case Key.C: case Key.F10: EmitSignal(SignalName.EquipToggleRequested); break;
                             case Key.F11: EmitSignal(SignalName.SkillToggleRequested); break;
-                            case Key.Tab: EmitSignal(SignalName.MinimapToggleRequested); break;
+                            case Key.Tab: case Key.V: EmitSignal(SignalName.MinimapToggleRequested); break;
                             case Key.Escape: EmitSignal(SignalName.EscapeRequested); break;
                             case Key.Space: EmitSignal(SignalName.PickupRequested); break;
                             case Key.Enter: EmitSignal(SignalName.ChatInputRequested); break;

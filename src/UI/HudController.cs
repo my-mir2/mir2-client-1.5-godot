@@ -1273,6 +1273,23 @@ public partial class HudController : CanvasLayer
             AddChat("系统", $"[系统] 正在申请从仓库取回保管物品 [{itemName}]...", new Color(1f, 1f, 0f));
             GD.Print($"[HudController] 仓库取回请求: slot={storageSlot}, item={itemName}");
         };
+        _shopPanelView.PanelClosed += () =>
+        {
+            if (_shopPanelView != null)
+                _stackManager.PopWindow(_shopPanelView);
+            if (_shopPanelView?.CurrentMode == ShopPanelView.ShopMode.Storage)
+            {
+                if (_repairPanelView != null && _repairPanelView.Visible && _repairPanelView.IsStorageMode)
+                {
+                    _stackManager.PopWindow(_repairPanelView);
+                }
+                if (_bagPanel != null)
+                {
+                    _bagPanel.Position = _bagPosBeforeStorage;
+                    _bagPanel.Visible = false;
+                }
+            }
+        };
         AddChild(_shopPanelView);
 
         _repairPanelView = new RepairPanelView();
@@ -1288,6 +1305,23 @@ public partial class HudController : CanvasLayer
             EmitSignal(SignalName.StorageDepositRequested, bagSlot, itemName);
             AddChat("系统", $"[系统] 正在向仓库申请寄存物品 [{itemName}]...", new Color(1f, 1f, 0f));
             GD.Print($"[HudController] 仓库寄存请求: slot={bagSlot}, item={itemName}");
+        };
+        _repairPanelView.PanelClosed += () =>
+        {
+            if (_repairPanelView != null)
+                _stackManager.PopWindow(_repairPanelView);
+            if (_repairPanelView?.IsStorageMode == true)
+            {
+                if (_shopPanelView != null && _shopPanelView.Visible && _shopPanelView.CurrentMode == ShopPanelView.ShopMode.Storage)
+                {
+                    _stackManager.PopWindow(_shopPanelView);
+                }
+                if (_bagPanel != null)
+                {
+                    _bagPanel.Position = _bagPosBeforeStorage;
+                    _bagPanel.Visible = false;
+                }
+            }
         };
         AddChild(_repairPanelView);
 
@@ -2510,6 +2544,20 @@ public partial class HudController : CanvasLayer
             _shopPanelView.OpenForStorage(items, npcUid);
             _stackManager.PushWindow(_shopPanelView);
         }
+        if (_repairPanelView != null && !_repairPanelView.Visible)
+        {
+            _repairPanelView.SetStorageMode(true);
+            _stackManager.PushWindow(_repairPanelView);
+        }
+        if (_bagPanel != null)
+        {
+            if (!_bagPanel.Visible)
+            {
+                _bagPosBeforeStorage = _bagPanel.Position;
+            }
+            _bagPanel.Position = new Vector2(475, 0);
+            _bagPanel.Visible = true;
+        }
     }
 
     /// <summary>
@@ -2521,6 +2569,20 @@ public partial class HudController : CanvasLayer
         {
             _shopPanelView.OpenForStorage(items, npcUid);
             _stackManager.PushWindow(_shopPanelView);
+        }
+        if (_repairPanelView != null && !_repairPanelView.Visible)
+        {
+            _repairPanelView.SetStorageMode(true);
+            _stackManager.PushWindow(_repairPanelView);
+        }
+        if (_bagPanel != null)
+        {
+            if (!_bagPanel.Visible)
+            {
+                _bagPosBeforeStorage = _bagPanel.Position;
+            }
+            _bagPanel.Position = new Vector2(475, 0);
+            _bagPanel.Visible = true;
         }
     }
 

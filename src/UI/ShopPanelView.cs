@@ -56,6 +56,8 @@ public partial class ShopPanelView : Control, IManagedWindow
     private readonly List<Panel> _itemRowPanels = new();
     private TextureButton? _btnPrev;
     private TextureButton? _btnNext;
+    private TextureButton? _btnBuy;
+    private Texture2D? _texBuy;
 
     public ShopMode CurrentMode => _currentMode;
 
@@ -168,19 +170,20 @@ public partial class ShopPanelView : Control, IManagedWindow
         _btnNext.Pressed += OnNextPage;
         _panel.AddChild(_btnNext);
 
-        // 确定 (Prguse_0386 @ 215,171 44x16, IDA sub_481dd4 [0x48506a..0x48509d])
-        var texBuy = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0386.png");
-        var btnBuy = new TextureButton
+        // 确定/取回按钮 (Prguse_0386 @ 215,171 44x16, IDA sub_481dd4 [0x48506a..0x48509d])
+        // 原版底板已烘焙确定字样，常态 TextureNormal 为空；按下态使用 Prguse_0386
+        _texBuy = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0386.png");
+        _btnBuy = new TextureButton
         {
             Name = "BtnShopBuy",
             Position = new Vector2(215, 171),
             Size = new Vector2(44, 16),
             TextureNormal = null,
-            TexturePressed = texBuy,
+            TexturePressed = _texBuy,
             TextureHover = null
         };
-        btnBuy.Pressed += OnBuyCurrentSelection;
-        _panel.AddChild(btnBuy);
+        _btnBuy.Pressed += OnBuyCurrentSelection;
+        _panel.AddChild(_btnBuy);
     }
 
     private void OnPanelGuiInput(InputEvent @event)
@@ -302,6 +305,10 @@ public partial class ShopPanelView : Control, IManagedWindow
         if (_lblHeaderDura != null)
         {
             _lblHeaderDura.Text = stored ? "" : "持久";
+        }
+        if (_btnBuy != null)
+        {
+            _btnBuy.TooltipText = stored ? "取回选中的保管物品" : "购买选中的商品";
         }
     }
 

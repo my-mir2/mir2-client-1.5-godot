@@ -159,5 +159,20 @@ public sealed class TestIssueFixesGroundTruth
         Assert.Contains("不可重复领取", p3);
         Assert.Equal(2, session.State.BagItems.Count);
     }
+
+    [Fact]
+    public void TestOfficialStorage_ProtocolAndModeAlignment()
+    {
+        // 验证官方 1.5 仓库协议常量权威对齐 (IDA case 700/701/704/705/709)
+        Assert.Equal(700, Mir2.Shared.Protocols.ProtocolConsts.SM_OPENSTORAGEDLG);
+        Assert.Equal(701, Mir2.Shared.Protocols.ProtocolConsts.SM_SAVEITEM_OK);
+        Assert.Equal(704, Mir2.Shared.Protocols.ProtocolConsts.SM_USERSTORAGE_ITEMS);
+        Assert.Equal(705, Mir2.Shared.Protocols.ProtocolConsts.SM_TAKEBACKITEM_OK);
+        Assert.Equal(709, Mir2.Shared.Protocols.ProtocolConsts.SM_STORAGE_CLEARITEMS_DELPHI);
+
+        // 验证客户端 CM 存取协议号 (IDA sub_458D3C / sub_4669D0: 1031 存, 1032 取)
+        Assert.Equal(1031, Mir2.Shared.Protocols.ProtocolConsts.CM_USERSTORAGEDEPOSIT);
+        Assert.Equal(1032, Mir2.Shared.Protocols.ProtocolConsts.CM_USERSTORAGEWITHDRAW);
+    }
 }
 
