@@ -4,9 +4,11 @@ using Mir2.Server.Game;
 using Mir2.Server.Maps;
 using Mir2.Server.Network;
 using Mir2.Server.Persistence;
+using Mir2.Shared.Data;
 using Mir2.Shared.Models;
 using Mir2Client.Game;
 using Xunit;
+
 
 namespace Mir2Client.Tests;
 
@@ -203,5 +205,69 @@ public sealed class TestIssueFixesGroundTruth
         Assert.False(mockWindow.IsVisible);
         Assert.Equal(0, stack.Count);
     }
+
+    [Fact]
+    public void TestOfficialEquipSlot_DataDrivenAndCompatibilityAlignment()
+    {
+        // 1. 验证 StdItems.DB 权威数据驱动的槽位映射 (零猜测、纯数据驱动)
+        // 衣服 (StdMode 10, 11)
+        Assert.Equal(0, OfficialStdItemsRegistry.ResolveEquipSlot("BaseDress(M)"));
+        Assert.Equal(0, OfficialStdItemsRegistry.ResolveEquipSlot("战神盔甲(男)"));
+        Assert.Equal(0, OfficialStdItemsRegistry.ResolveEquipSlot("幽灵战衣(女)"));
+        Assert.Equal(0, OfficialStdItemsRegistry.ResolveEquipSlot("恶魔长袍(男)"));
+
+        // 武器 (StdMode 5, 6)
+        Assert.Equal(1, OfficialStdItemsRegistry.ResolveEquipSlot("裁决之杖"));
+        Assert.Equal(1, OfficialStdItemsRegistry.ResolveEquipSlot("骨玉权杖"));
+        Assert.Equal(1, OfficialStdItemsRegistry.ResolveEquipSlot("无极棍"));
+        Assert.Equal(1, OfficialStdItemsRegistry.ResolveEquipSlot("屠龙"));
+        Assert.Equal(1, OfficialStdItemsRegistry.ResolveEquipSlot("井中月"));
+
+        // 照明/持物 (StdMode 25, 30)
+        Assert.Equal(2, OfficialStdItemsRegistry.ResolveEquipSlot("蜡烛"));
+        Assert.Equal(2, OfficialStdItemsRegistry.ResolveEquipSlot("火把"));
+        Assert.Equal(2, OfficialStdItemsRegistry.ResolveEquipSlot("护身符"));
+        Assert.Equal(2, OfficialStdItemsRegistry.ResolveEquipSlot("灰色药粉(小)"));
+
+        // 项链 (StdMode 19, 20, 21)
+        Assert.Equal(3, OfficialStdItemsRegistry.ResolveEquipSlot("绿色项链"));
+        Assert.Equal(3, OfficialStdItemsRegistry.ResolveEquipSlot("灵魂项链"));
+        Assert.Equal(3, OfficialStdItemsRegistry.ResolveEquipSlot("幽灵项链"));
+        Assert.Equal(3, OfficialStdItemsRegistry.ResolveEquipSlot("金项链"));
+
+        // 头盔 (StdMode 15)
+        Assert.Equal(4, OfficialStdItemsRegistry.ResolveEquipSlot("青铜头盔"));
+        Assert.Equal(4, OfficialStdItemsRegistry.ResolveEquipSlot("黑铁头盔(乙)"));
+
+        // 手镯 (StdMode 24, 26) -> 映射为 5 (左手镯)
+        Assert.Equal(5, OfficialStdItemsRegistry.ResolveEquipSlot("金手镯"));
+        Assert.Equal(5, OfficialStdItemsRegistry.ResolveEquipSlot("死神手套"));
+        Assert.Equal(5, OfficialStdItemsRegistry.ResolveEquipSlot("骑士手镯"));
+        Assert.Equal(5, OfficialStdItemsRegistry.ResolveEquipSlot("三眼手镯"));
+
+        // 戒指 (StdMode 22, 23) -> 映射为 7 (左戒指)
+        Assert.Equal(7, OfficialStdItemsRegistry.ResolveEquipSlot("珊瑚戒指"));
+        Assert.Equal(7, OfficialStdItemsRegistry.ResolveEquipSlot("红宝石戒指"));
+        Assert.Equal(7, OfficialStdItemsRegistry.ResolveEquipSlot("铂金戒指"));
+        Assert.Equal(7, OfficialStdItemsRegistry.ResolveEquipSlot("降妖除魔戒指"));
+
+        // 2. 验证客户端 HudController.IsItemCompatibleWithEquipSlot 槽位双向兼容性
+        // 手镯槽位同时兼容 5 和 6
+        Assert.True(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("骑士手镯", 5));
+        Assert.True(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("骑士手镯", 6));
+        Assert.False(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("骑士手镯", 7));
+
+        // 戒指槽位同时兼容 7 和 8
+        Assert.True(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("珊瑚戒指", 7));
+        Assert.True(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("珊瑚戒指", 8));
+        Assert.False(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("珊瑚戒指", 1));
+
+        // 项链与武器、衣服
+        Assert.True(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("绿色项链", 3));
+        Assert.True(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("裁决之杖", 1));
+        Assert.True(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("战神盔甲(男)", 0));
+        Assert.True(Mir2Client.UI.HudController.IsItemCompatibleWithEquipSlot("蜡烛", 2));
+    }
 }
+
 

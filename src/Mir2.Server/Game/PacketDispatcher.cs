@@ -6056,7 +6056,7 @@ public sealed partial class PacketDispatcher
         if (bagSlot < 0 || bagSlot >= session.State.BagItems.Count) return false;
 
         var item = session.State.BagItems[bagSlot];
-        if (!session.State.CheckCanEquipAuthoritative(equipSlot, item.Weight, out string reason))
+        if (!session.State.CheckCanEquipAuthoritative(equipSlot, item, out string reason))
         {
             session.EnqueuePacket(ProtocolConsts.SM_SYSMSG_DELPHI, 0, 0, 0, 0, $"穿戴失败：{reason}");
             return false;

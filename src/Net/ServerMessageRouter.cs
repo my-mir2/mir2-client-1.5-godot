@@ -571,6 +571,8 @@ public sealed class ServerMessageRouter
                 else
                 {
                     _hud?.UpdateGold(packet.Recog);
+                    Mir2Client.Audio.AudioManager.Instance?.PlaySoundId(204); // 盛大官方 1.5 交易/购买金币叮当音效
+                    _hud?.AddChat("商店", $"[商店] 购买成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
                 }
                 break;
             case ProtocolConsts.SM_SELL_FAIL_DELPHI: // 649: 出售物品失败 (IDA 0x469F04)

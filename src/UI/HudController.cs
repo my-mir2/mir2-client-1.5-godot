@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Mir2.Shared.Data;
+using Mir2.Shared.Models;
 using Mir2.Shared.Rules;
 using Mir2Client.Audio;
 using Mir2Client.Game;
 using Mir2Client.Utils;
 
 namespace Mir2Client.UI;
+
 
 /// <summary>
 /// 盛大官方 1.5 客户端 HUD 控制器与 24 窗体状态管理 (纯 C# 实现)
@@ -3921,14 +3924,26 @@ public partial class HudController : CanvasLayer
     /// <summary>
     /// 判断物品是否符合指定装备槽位规约 (IDA sub_488AF4 槽位合法性验证)
     /// 0: 衣服, 1: 武器, 2: 照明/右持物(火把/蜡烛/护符/毒药/药粉), 3: 项链, 4: 头盔, 5/6: 手镯, 7/8: 戒指
+    /// 优先依据 OfficialStdItemsRegistry 权威 StdMode 数据驱动；若未匹配则降级至关键词回退。
     /// </summary>
     public static bool IsItemCompatibleWithEquipSlot(string itemName, int equipSlot)
     {
         if (string.IsNullOrEmpty(itemName)) return false;
 
+        // 1. 优先采用官方 1.4/1.5 StdItems.DB 规范 StdMode 属性权威判定
+        int resolvedSlot = OfficialStdItemsRegistry.ResolveEquipSlot(itemName);
+        if (resolvedSlot >= 0)
+        {
+            if (resolvedSlot == equipSlot) return true;
+            if (resolvedSlot == 5 && (equipSlot == 5 || equipSlot == 6)) return true; // 手镯槽对
+            if (resolvedSlot == 7 && (equipSlot == 7 || equipSlot == 8)) return true; // 戒指槽对
+            return false;
+        }
+
+        // 2. 降级关键词容错匹配 (用于动态生成或未收录的自定义物品)
         return equipSlot switch
         {
-            0 => itemName.Contains("甲") || itemName.Contains("袍") || itemName.Contains("衣") || itemName.Contains("布衣"),
+            0 => itemName.Contains("甲") || itemName.Contains("袍") || itemName.Contains("衣") || itemName.Contains("布衣") || itemName.Contains("披风"),
             1 => itemName.Contains("剑") || itemName.Contains("刀") || itemName.Contains("斧") ||
                  itemName.Contains("杖") || itemName.Contains("棍") || itemName.Contains("扇") ||
                  itemName.Contains("枪") || itemName.Contains("匕首") || itemName.Contains("镐") ||
@@ -3936,16 +3951,17 @@ public partial class HudController : CanvasLayer
                  itemName.Contains("骨玉") || itemName.Contains("龙纹") || itemName.Contains("凝霜") ||
                  itemName.Contains("炼狱") || itemName.Contains("降魔") || itemName.Contains("银蛇") ||
                  itemName.Contains("井中月") || itemName.Contains("海魂") || itemName.Contains("修罗") ||
-                 itemName.Contains("偃月"),
+                 itemName.Contains("偃月") || itemName.Contains("破魂") || itemName.Contains("凌风"),
             2 => itemName.Contains("火把") || itemName.Contains("蜡烛") ||
-                 itemName.Contains("护身符") || itemName.Contains("药粉") || itemName.Contains("毒药"), // 官方 1.5 权威照明/右持物
-            3 => itemName.Contains("项链") || itemName.Contains("铃铛"),
-            4 => itemName.Contains("头盔") || itemName.Contains("头巾") || itemName.Contains("冠"),
-            5 or 6 => itemName.Contains("手镯") || itemName.Contains("手套"),
-            7 or 8 => itemName.Contains("戒指") || itemName.Contains("指环"),
+                 itemName.Contains("护身符") || itemName.Contains("药粉") || itemName.Contains("毒药") || itemName.Contains("佩"), // 官方 1.5 权威照明/右持物
+            3 => itemName.Contains("项链") || itemName.Contains("铃铛") || itemName.Contains("链"),
+            4 => itemName.Contains("头盔") || itemName.Contains("头巾") || itemName.Contains("冠") || itemName.Contains("帽"),
+            5 or 6 => itemName.Contains("手镯") || itemName.Contains("手套") || itemName.Contains("镯"),
+            7 or 8 => itemName.Contains("戒指") || itemName.Contains("指环") || itemName.Contains("戒"),
             _ => false
         };
     }
+
 
     /// <summary>
     /// 盛大官方 1.5 装备拖拽合法性即时高亮反馈 (合法槽位淡金高亮，非法暗淡)
@@ -4389,19 +4405,27 @@ public partial class HudController : CanvasLayer
     public static int GetBestEquipSlotForItem(string itemName)
     {
         if (string.IsNullOrEmpty(itemName)) return -1;
+
+        // 1. 优先采用官方 1.4/1.5 StdItems.DB 规范 StdMode 属性权威判定
+        int resolvedSlot = OfficialStdItemsRegistry.ResolveEquipSlot(itemName);
+        if (resolvedSlot >= 0) return resolvedSlot;
+
+        // 2. 降级关键词容错匹配
         if (itemName.Contains("甲") || itemName.Contains("袍") || itemName.Contains("衣") || 
             itemName.Contains("布衣") || itemName.Contains("披风") || itemName.Contains("铠") || itemName.Contains("重盔")) return (int)OfficialEquipSlot.Dress; // 0: 衣服 (战神盔甲/恶魔长袍/幽灵战衣等)
         if (itemName.Contains("剑") || itemName.Contains("刀") || itemName.Contains("斧") || itemName.Contains("杖") || 
             itemName.Contains("棍") || itemName.Contains("匕首") || itemName.Contains("刃") || itemName.Contains("月") || 
             itemName.Contains("屠龙") || itemName.Contains("炼狱") || itemName.Contains("银蛇") || itemName.Contains("降魔") || 
-            itemName.Contains("凝霜") || itemName.Contains("修罗") || itemName.Contains("破魂") || itemName.Contains("凌风")) return (int)OfficialEquipSlot.Weapon; // 1: 武器
+            itemName.Contains("凝霜") || itemName.Contains("修罗") || itemName.Contains("破魂") || itemName.Contains("凌风") ||
+            itemName.Contains("扇") || itemName.Contains("枪") || itemName.Contains("镐") || itemName.Contains("锤")) return (int)OfficialEquipSlot.Weapon; // 1: 武器
         if (itemName.Contains("符") || itemName.Contains("毒") || itemName.Contains("粉") || itemName.Contains("火把") || itemName.Contains("蜡烛") || itemName.Contains("佩")) return (int)OfficialEquipSlot.Lighting; // 2: 照明/护身符/毒药/药粉
-        if (itemName.Contains("项链") || itemName.Contains("链")) return (int)OfficialEquipSlot.Necklace; // 3: 项链
+        if (itemName.Contains("项链") || itemName.Contains("铃铛") || itemName.Contains("链")) return (int)OfficialEquipSlot.Necklace; // 3: 项链
         if (itemName.Contains("头盔") || itemName.Contains("冠") || itemName.Contains("帽") || itemName.Contains("头巾")) return (int)OfficialEquipSlot.Helmet; // 4: 头盔
         if (itemName.Contains("手镯") || itemName.Contains("手套") || itemName.Contains("镯")) return (int)OfficialEquipSlot.ArmringL; // 5: 手镯 (默认左手镯)
         if (itemName.Contains("戒") || itemName.Contains("指")) return (int)OfficialEquipSlot.RingL; // 7: 戒指 (默认左戒指)
         return -1;
     }
+
 
     public void ConsumeBagItem(int bagSlot, string itemName)
     {
