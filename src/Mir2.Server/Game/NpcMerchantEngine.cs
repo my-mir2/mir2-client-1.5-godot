@@ -66,11 +66,18 @@ public sealed class NpcMerchantEngine
 
     private void EnsureDefaultGoods(NpcEntity npc)
     {
-        if (npc.Goods.Count == 0 && (npc.Name.Contains("屠夫") || npc.Name.Contains("肉")))
+        bool isMeatShop = npc.Name.Contains("屠夫") || npc.Name.Contains("肉") ||
+                          npc.Name.Equals("Jim", StringComparison.OrdinalIgnoreCase) ||
+                          npc.Name.Equals("Danielle", StringComparison.OrdinalIgnoreCase) ||
+                          npc.Name.Equals("Daisy", StringComparison.OrdinalIgnoreCase) ||
+                          npc.Name.Equals("Vincent", StringComparison.OrdinalIgnoreCase) ||
+                          npc.Name.Equals("Peter", StringComparison.OrdinalIgnoreCase);
+
+        if (npc.Goods.Count == 0 && isMeatShop)
         {
-            npc.Goods.Add(new MerchantGoods { GoodsId = 1, Name = "鸡肉", Price = 100, Weight = 1, MaxDura = 10 });
-            npc.Goods.Add(new MerchantGoods { GoodsId = 2, Name = "肉", Price = 220, Weight = 2, MaxDura = 15 });
-            npc.Goods.Add(new MerchantGoods { GoodsId = 3, Name = "优质肉", Price = 450, Weight = 2, MaxDura = 20 });
+            npc.Goods.Add(new MerchantGoods { GoodsId = 1, Name = "鸡肉", Price = 100, Weight = 1, MaxDura = 10000 });
+            npc.Goods.Add(new MerchantGoods { GoodsId = 2, Name = "肉", Price = 220, Weight = 2, MaxDura = 15000 });
+            npc.Goods.Add(new MerchantGoods { GoodsId = 3, Name = "优质肉", Price = 450, Weight = 2, MaxDura = 20000 });
         }
     }
 
@@ -130,6 +137,22 @@ public sealed class NpcMerchantEngine
     {
         if (_npcs.TryGetValue(npcUid, out var npc))
         {
+            bool isMeatShop = npc.Name.Contains("屠夫") || npc.Name.Contains("肉") ||
+                              npc.Name.Equals("Jim", StringComparison.OrdinalIgnoreCase) ||
+                              npc.Name.Equals("Danielle", StringComparison.OrdinalIgnoreCase) ||
+                              npc.Name.Equals("Daisy", StringComparison.OrdinalIgnoreCase) ||
+                              npc.Name.Equals("Vincent", StringComparison.OrdinalIgnoreCase) ||
+                              npc.Name.Equals("Peter", StringComparison.OrdinalIgnoreCase);
+
+            if (isMeatShop)
+            {
+                return "嘿！客官，刚宰杀的鸡肉和新鲜鹿肉，肉质紧实肥美！割下品质好的肉拿来卖我，价格包你满意！\\ \\" +
+                       "<购买肉品/@buy>\\ \\" +
+                       "<出售肉块/@sell>\\ \\" +
+                       "<打听如何割肉/@how_to_butcher>\\ \\" +
+                       "<离开/@exit>";
+            }
+
             if (npc.ScriptPages.TryGetValue("@main", out var script))
             {
                 return script;
@@ -146,6 +169,22 @@ public sealed class NpcMerchantEngine
     {
         if (_npcs.TryGetValue(npcUid, out var npc))
         {
+            bool isMeatShop = npc.Name.Contains("屠夫") || npc.Name.Contains("肉") ||
+                              npc.Name.Equals("Jim", StringComparison.OrdinalIgnoreCase) ||
+                              npc.Name.Equals("Danielle", StringComparison.OrdinalIgnoreCase) ||
+                              npc.Name.Equals("Daisy", StringComparison.OrdinalIgnoreCase) ||
+                              npc.Name.Equals("Vincent", StringComparison.OrdinalIgnoreCase) ||
+                              npc.Name.Equals("Peter", StringComparison.OrdinalIgnoreCase);
+
+            if (isMeatShop)
+            {
+                string normLabel = label.ToLowerInvariant();
+                if (normLabel is "@buy") return "挑选你中意的新鲜肉品吧。烹饪或喂养宠物都是绝佳上选！\\ \\<返回/@main>";
+                if (normLabel is "@sell") return "把你包裹里割下的肉拿出来吧，品质越纯，换得的金币越多！\\ \\<返回/@main>";
+                if (normLabel is "@how_to_butcher" or "@meathelp") return "击杀鹿或者鸡之后，站在尸体旁边按住键盘 【Alt】 键，再用鼠标左键点击尸体，就能割下新鲜肉块！\\ \\<返回/@main>";
+                if (normLabel is "@main") return GetNpcHomePage(npcUid);
+            }
+
             if (npc.ScriptPages.TryGetValue(label, out var script))
             {
                 return script;

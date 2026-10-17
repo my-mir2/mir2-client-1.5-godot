@@ -318,6 +318,7 @@ namespace Mir2Client.Render
                         sp.Visible = false;
                         sm.Visible = false;
                         so.Visible = false;
+                        so.Material = null;
                         poolIdx++;
                         continue;
                     }
@@ -429,12 +430,19 @@ namespace Mir2Client.Render
 
                             so.Position = objPos;
                             so.Visible = true;
-
                             so.Modulate = new Color(1f, 1f, 1f, 1.0f);
                         }
-                        else so.Visible = false;
+                        else
+                        {
+                            so.Visible = false;
+                            so.Material = null;
+                        }
                     }
-                    else so.Visible = false;
+                    else
+                    {
+                        so.Visible = false;
+                        so.Material = null;
+                    }
 
                     poolIdx++;
                 }

@@ -244,10 +244,14 @@ namespace Mir2Client.UI
 
         /// <summary>
         /// 盛大官方 1.5 移动阻挡与实体占位双重判定 (PlayScn.pas CanWalk)：
-        /// 既检查地图静态阻挡，也禁止玩家踏入存活怪物/NPC 所在的瓦片（已死亡或尸体不阻挡通行）
+        /// 既检查地图静态阻挡，也禁止玩家踏入存活怪物/NPC 所在的瓦片（已死亡或尸体不阻挡通行）。
+        /// 传送门与功能性建筑门点具有最高通行优先级，允许玩家踏入触发换图。
         /// </summary>
         public bool IsTileWalkableForPlayer(int tx, int ty)
         {
+            if (IsKnownMapPassageTile(tx, ty))
+                return true;
+
             if (!(MapRendererInstance?.IsPassable(tx, ty) ?? true))
                 return false;
 
@@ -257,6 +261,35 @@ namespace Mir2Client.UI
                     return false;
             }
             return true;
+        }
+
+        private bool IsKnownMapPassageTile(int tx, int ty)
+        {
+            // 盛大官方 1.5 比奇城与核心跳点坐标豁免
+            if (CurrentMapName is "0" or "比奇省")
+            {
+                return (tx == 295 && ty is 284 or 285) || // 仓库西门
+                       (tx == 305 && ty is 275 or 276) || // 仓库东门
+                       (tx == 286 && ty == 295) || (tx == 289 && ty == 292) || // 药店
+                       (tx == 308 && ty == 264) || // 书店
+                       (tx is 335 && ty is 299 or 300) || (tx is 344 or 345 && ty == 308) || // 肉店
+                       (tx == 307 && ty is 310 or 311) || (tx == 317 && ty is 301 or 302) || // 铁匠铺
+                       (tx == 323 && ty == 247) || // 首饰店
+                       (tx == 354 && ty == 319) || // 服装店
+                       (tx == 326 && ty == 288) || // 杂货铺
+                       (tx is >= 324 and <= 329 && ty is >= 33 and <= 38) || // 沃玛森林关卡
+                       (tx is >= 671 and <= 676 && ty is >= 81 and <= 86);   // 毒蛇山谷关卡
+            }
+            // 店铺离开门点
+            if (CurrentMapName is "0105" or "105") return (tx == 9 && ty is 24 or 25) || (tx == 21 && ty is 12 or 13);
+            if (CurrentMapName is "0101" or "101") return (tx == 10 && ty == 22) || (tx == 18 && ty == 14);
+            if (CurrentMapName is "0102" or "102") return tx == 3 && ty == 8;
+            if (CurrentMapName is "0103" or "103") return (tx is 4 or 5 && ty == 13) || (tx is 16 or 17 && ty == 25);
+            if (CurrentMapName is "0106" or "106") return (tx == 9 && ty is 24 or 25) || (tx == 21 && ty is 12 or 13);
+            if (CurrentMapName is "0104" or "104") return tx == 4 && ty == 11;
+            if (CurrentMapName is "0107" or "107") return tx == 10 && ty == 13;
+            if (CurrentMapName is "0108" or "108") return tx == 10 && ty == 13;
+            return false;
         }
 
         private void SetupGroundItemEvents()

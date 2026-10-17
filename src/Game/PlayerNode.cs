@@ -345,8 +345,13 @@ namespace Mir2Client.Game
             _targetTileY = ty;
             Direction = dir & 7;
             _moveTimer = 0f;
-            // IDA sub_4CAF08 / sub_4CB11C：服务端行走与奔跑均有 600ms 速度门禁，客户端行走设为 0.65s (跑动 0.60s)
-            _moveDuration = (action == ActionType.Run) ? 0.60f : 0.65f;
+            // 盛大官方 1.5 权威节奏 (IDA 0x471A40 & Actor.pas Walk/Run)：
+            // 行走 1 格 600ms (0.60s)；奔跑 2 格位移 520ms (0.52s)并在落脚时赋予 80ms 步频微后摇，确保单次奔跑步频严格稳定在 600ms/2格
+            _moveDuration = (action == ActionType.Run) ? 0.52f : 0.60f;
+            if (action == ActionType.Run && Engine.GetMainLoop() != null)
+            {
+                _moveCooldownUntilMs = (ulong)(Time.GetTicksMsec() + 600); // 跑动全周期锁定 600ms 门禁
+            }
             Anim.SetAction(action, dir);
 
             // 触发官方 1:1 左右脚交替脚步声 (对齐 Delphi SoundUtil.pas: s_walk_ground / s_run_ground)

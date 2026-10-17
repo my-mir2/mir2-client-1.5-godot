@@ -14,13 +14,23 @@ public sealed class MapManager
     public MapManager()
     {
         // 注册官方 1.5 核心地图世界实例 (100% 严格对齐官方 .map 二进制文件 Header 真实物理尺寸)
-        RegisterMap(new GameMap(0, "比奇省", 700, 700));
-        RegisterMap(new GameMap(3, "盟重省", 1000, 800));
-        RegisterMap(new GameMap(1, "沃玛森林", 600, 600));
-        RegisterMap(new GameMap(2, "毒蛇山谷", 600, 600));
-        RegisterMap(new GameMap(10, "未知暗殿", 100, 100));
-        RegisterMap(new GameMap(11, "白日门/祖玛寺庙", 500, 500));
-        RegisterMap(new GameMap(157, "祖玛寺庙大厅", 500, 500));
+        RegisterMap(new GameMap(0, "比奇省", 700, 700) { OfficialId = "0" });
+        RegisterMap(new GameMap(3, "盟重省", 1000, 800) { OfficialId = "3" });
+        RegisterMap(new GameMap(1, "沃玛森林", 600, 600) { OfficialId = "1" });
+        RegisterMap(new GameMap(2, "毒蛇山谷", 600, 600) { OfficialId = "2" });
+        RegisterMap(new GameMap(10, "未知暗殿", 100, 100) { OfficialId = "10" });
+        RegisterMap(new GameMap(11, "白日门/祖玛寺庙", 500, 500) { OfficialId = "11" });
+        RegisterMap(new GameMap(157, "祖玛寺庙大厅", 500, 500) { OfficialId = "0157" });
+
+        // 盛大官方 1.5 比奇城核心功能性店铺建筑室内地图 (100% 官方 MapInfo / official_map 物理尺寸)
+        RegisterMap(new GameMap(101, "比奇药店", 20, 28) { OfficialId = "0101" });
+        RegisterMap(new GameMap(102, "比奇书店", 15, 15) { OfficialId = "0102" });
+        RegisterMap(new GameMap(103, "比奇肉店", 27, 29) { OfficialId = "0103" });
+        RegisterMap(new GameMap(104, "比奇首饰店", 13, 16) { OfficialId = "0104" });
+        RegisterMap(new GameMap(105, "比奇仓库", 27, 29) { OfficialId = "0105" });
+        RegisterMap(new GameMap(106, "比奇铁匠铺", 27, 29) { OfficialId = "0106" });
+        RegisterMap(new GameMap(107, "比奇服装店", 15, 18) { OfficialId = "0107" });
+        RegisterMap(new GameMap(108, "比奇杂货铺", 15, 18) { OfficialId = "0108" });
 
         var biqi = GetMap(0);
         if (biqi != null)
@@ -70,6 +80,59 @@ public sealed class MapManager
         // 5. 沃玛森林 (1) <-> 白日门要塞 (11) (官方 1.5 虎卫传说主线通道)
         AddPassage(new MapPassage { FromMapId = 1, FromX = 350, FromY = 20, ToMapId = 11, ToX = 180, ToY = 300, Description = "沃玛森林通往白日门要塞 (官方 1.5 虎卫传说)" });
         AddPassage(new MapPassage { FromMapId = 11, FromX = 180, FromY = 305, ToMapId = 1, ToX = 350, ToY = 25, Description = "白日门要塞通往沃玛森林 (官方 1.5)" });
+
+        // 6. 盛大官方 1.4/1.5 比奇城核心功能性店铺建筑传送门 (100% 严格对齐 official_map_gate)
+        // (1) 比奇仓库 (0 <-> 0105 / 105)
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 295, FromY = 284, ToMapId = 105, ToX = 8, ToY = 24, Description = "比奇城进入仓库西门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 295, FromY = 285, ToMapId = 105, ToX = 9, ToY = 23, Description = "比奇城进入仓库西门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 305, FromY = 275, ToMapId = 105, ToX = 20, ToY = 12, Description = "比奇城进入仓库东门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 305, FromY = 276, ToMapId = 105, ToX = 21, ToY = 11, Description = "比奇城进入仓库东门" });
+        AddPassage(new MapPassage { FromMapId = 105, FromX = 9, FromY = 25, ToMapId = 0, ToX = 295, ToY = 286, Description = "比奇仓库离开西门" });
+        AddPassage(new MapPassage { FromMapId = 105, FromX = 9, FromY = 24, ToMapId = 0, ToX = 296, ToY = 285, Description = "比奇仓库离开西门" });
+        AddPassage(new MapPassage { FromMapId = 105, FromX = 21, FromY = 12, ToMapId = 0, ToX = 306, ToY = 276, Description = "比奇仓库离开东门" });
+        AddPassage(new MapPassage { FromMapId = 105, FromX = 21, FromY = 13, ToMapId = 0, ToX = 306, ToY = 277, Description = "比奇仓库离开东门" });
+
+        // (2) 比奇药店 (0 <-> 0101 / 101)
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 286, FromY = 295, ToMapId = 101, ToX = 9, ToY = 22, Description = "比奇城进入药店正门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 289, FromY = 292, ToMapId = 101, ToX = 17, ToY = 14, Description = "比奇城进入药店侧门" });
+        AddPassage(new MapPassage { FromMapId = 101, FromX = 10, FromY = 22, ToMapId = 0, ToX = 287, ToY = 296, Description = "比奇药店离开正门" });
+        AddPassage(new MapPassage { FromMapId = 101, FromX = 18, FromY = 14, ToMapId = 0, ToX = 290, ToY = 293, Description = "比奇药店离开侧门" });
+
+        // (3) 比奇书店 (0 <-> 0102 / 102)
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 308, FromY = 264, ToMapId = 102, ToX = 3, ToY = 7, Description = "比奇城进入书店" });
+        AddPassage(new MapPassage { FromMapId = 102, FromX = 3, FromY = 8, ToMapId = 0, ToX = 308, ToY = 265, Description = "比奇书店离开大门" });
+
+        // (4) 比奇肉店 (0 <-> 0103 / 103)
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 335, FromY = 299, ToMapId = 103, ToX = 5, ToY = 12, Description = "比奇城进入肉店大门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 335, FromY = 300, ToMapId = 103, ToX = 6, ToY = 12, Description = "比奇城进入肉店大门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 344, FromY = 308, ToMapId = 103, ToX = 17, ToY = 24, Description = "比奇城进入肉店后门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 345, FromY = 308, ToMapId = 103, ToX = 18, ToY = 24, Description = "比奇城进入肉店后门" });
+        AddPassage(new MapPassage { FromMapId = 103, FromX = 4, FromY = 13, ToMapId = 0, ToX = 334, ToY = 300, Description = "比奇肉店离开大门" });
+        AddPassage(new MapPassage { FromMapId = 103, FromX = 5, FromY = 13, ToMapId = 0, ToX = 334, ToY = 301, Description = "比奇肉店离开大门" });
+        AddPassage(new MapPassage { FromMapId = 103, FromX = 16, FromY = 25, ToMapId = 0, ToX = 345, ToY = 310, Description = "比奇肉店离开后门" });
+        AddPassage(new MapPassage { FromMapId = 103, FromX = 17, FromY = 25, ToMapId = 0, ToX = 344, ToY = 309, Description = "比奇肉店离开后门" });
+
+        // (5) 比奇铁匠铺 / 武器店 (0 <-> 0106 / 106)
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 307, FromY = 310, ToMapId = 106, ToX = 8, ToY = 24, Description = "比奇城进入铁匠铺西门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 307, FromY = 311, ToMapId = 106, ToX = 9, ToY = 23, Description = "比奇城进入铁匠铺西门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 317, FromY = 301, ToMapId = 106, ToX = 21, ToY = 11, Description = "比奇城进入铁匠铺东门" });
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 317, FromY = 302, ToMapId = 106, ToX = 20, ToY = 12, Description = "比奇城进入铁匠铺东门" });
+        AddPassage(new MapPassage { FromMapId = 106, FromX = 9, FromY = 25, ToMapId = 0, ToX = 307, ToY = 312, Description = "比奇铁匠铺离开西门" });
+        AddPassage(new MapPassage { FromMapId = 106, FromX = 9, FromY = 24, ToMapId = 0, ToX = 308, ToY = 311, Description = "比奇铁匠铺离开西门" });
+        AddPassage(new MapPassage { FromMapId = 106, FromX = 21, FromY = 13, ToMapId = 0, ToX = 318, ToY = 302, Description = "比奇铁匠铺离开东门" });
+        AddPassage(new MapPassage { FromMapId = 106, FromX = 21, FromY = 12, ToMapId = 0, ToX = 318, ToY = 303, Description = "比奇铁匠铺离开东门" });
+
+        // (6) 比奇首饰店 (0 <-> 0104 / 104)
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 323, FromY = 247, ToMapId = 104, ToX = 4, ToY = 10, Description = "比奇城进入首饰店" });
+        AddPassage(new MapPassage { FromMapId = 104, FromX = 4, FromY = 11, ToMapId = 0, ToX = 323, ToY = 248, Description = "比奇首饰店离开大门" });
+
+        // (7) 比奇服装店 (0 <-> 0107 / 107)
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 354, FromY = 319, ToMapId = 107, ToX = 9, ToY = 13, Description = "比奇城进入服装店" });
+        AddPassage(new MapPassage { FromMapId = 107, FromX = 10, FromY = 13, ToMapId = 0, ToX = 354, ToY = 320, Description = "比奇服装店离开大门" });
+
+        // (8) 比奇杂货铺 (0 <-> 0108 / 108)
+        AddPassage(new MapPassage { FromMapId = 0, FromX = 326, FromY = 288, ToMapId = 108, ToX = 10, ToY = 12, Description = "比奇城进入杂货铺" });
+        AddPassage(new MapPassage { FromMapId = 108, FromX = 10, FromY = 13, ToMapId = 0, ToX = 326, ToY = 289, Description = "比奇杂货铺离开大门" });
         FreezePassages();
     }
 

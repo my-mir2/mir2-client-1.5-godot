@@ -1105,13 +1105,12 @@ public partial class HudController : CanvasLayer
                     ItemTexture = null
                 };
                 _equipSlots[equipSlot] = btn;
-                btn.Pressed += () => EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
                 btn.GuiInput += (ev) =>
                 {
-                    // 盛大官方 1.5 微交互：右键点击穿戴中装备直接脱下放回背包
+                    // 盛大官方 1.5 微交互：右键点击穿戴中装备直接脱下放回背包 (调用完整状态机 TakeoffEquipSlotToBag)
                     if (ev is InputEventMouseButton rmb && rmb.Pressed && rmb.ButtonIndex == MouseButton.Right)
                     {
-                        EmitSignal(SignalName.TakeoffItemRequested, equipSlot);
+                        TakeoffEquipSlotToBag(equipSlot, -1);
                     }
                 };
                 btn.MouseEntered += () =>

@@ -52,15 +52,19 @@ public sealed class ModernNpcPluginEngine
         RegisterPlugin(new SkillBookSynthesizerNpcBehavior());
         RegisterPlugin(new NewbieGuideNpcBehavior());
         RegisterPlugin(new RedBloodSwordNpcBehavior());
-        RegisterPlugin(new ButcherNpcBehavior());
+        RegisterPlugin(new ButcherNpcBehavior(), "肉店老板", "肉店", "Jim", "Danielle", "Daisy", "Vincent", "Peter");
     }
 
-    public void RegisterPlugin(INpcBehavior plugin)
+    public void RegisterPlugin(INpcBehavior plugin, params string[] aliases)
     {
         _pluginsByName[plugin.NpcName] = plugin;
         if (plugin.NpcId > 0)
         {
             _pluginsById[plugin.NpcId] = plugin;
+        }
+        foreach (var alias in aliases)
+        {
+            _pluginsByName[alias] = plugin;
         }
     }
 
@@ -997,7 +1001,7 @@ public sealed class ModernNpcPluginEngine
                 case "@main":
                     ctx.DialogText = "嘿！客官，刚宰杀的鸡肉和新鲜鹿肉，肉质紧实肥美！割下品质好的肉拿来卖我，价格包你满意！";
                     ctx.AddLink("购买肉品", "@buy");
-                    ctx.AddLink("卖新鲜肉", "@sell");
+                    ctx.AddLink("出售包裹内的肉块", "@sell");
                     ctx.AddLink("打听如何割肉", "@how_to_butcher");
                     ctx.AddLink("离开", "@close");
                     break;
@@ -1007,7 +1011,36 @@ public sealed class ModernNpcPluginEngine
                     break;
 
                 case "@sell":
-                    ctx.DialogText = "把你包裹里割下的肉拿出来吧，品质越纯，换得的金币越多！\\ \\<返回/@main>";
+                case "@sell_all_meat":
+                    int count = 0;
+                    int earn = 0;
+                    var toRemove = new List<EquipItem>();
+                    foreach (var it in ctx.Session.State.BagItems)
+                    {
+                        if (it.Name.Contains("肉"))
+                        {
+                            count++;
+                            int quality = Math.Clamp(it.Dura / 1000, 1, 30);
+                            int price = Math.Max(100, quality * 40);
+                            earn += price;
+                            toRemove.Add(it);
+                        }
+                    }
+                    if (count > 0)
+                    {
+                        foreach (var it in toRemove)
+                        {
+                            ctx.Session.State.BagItems.Remove(it);
+                            ctx.Session.State.BagWeight = Math.Max(0, ctx.Session.State.BagWeight - it.Weight);
+                        }
+                        ctx.Session.State.Gold = Math.Min(PlayerState.MaxGoldLimit, ctx.Session.State.Gold + earn);
+                        ctx.Session.EnqueuePacket(ProtocolConsts.SM_SELL_OK_DELPHI, earn, ctx.Session.State.Gold, 0, 0, "肉块");
+                        ctx.DialogText = $"掌柜掂量了你的肉质：共收购了 {count} 块肉，给你 {earn} 金币！多谢照顾生意！\\ \\<返回/@main>";
+                    }
+                    else
+                    {
+                        ctx.DialogText = "客官，你包裹里并没有生肉。去村外按住键盘【Alt】键左键割肉后再来吧！\\ \\<返回/@main>";
+                    }
                     break;
 
                 case "@how_to_butcher":

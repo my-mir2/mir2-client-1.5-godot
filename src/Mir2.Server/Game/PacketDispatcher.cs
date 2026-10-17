@@ -751,8 +751,9 @@ public sealed partial class PacketDispatcher
     private void HandleSelectChar(ClientSession session, ReadOnlySpan<char> payload)
     {
         string name = payload.ToString();
-        int spawnX = 288;
-        int spawnY = 615;
+        // 盛大官方 1.5 边界村/银杏山谷新手出生点：设置在指导员周边安全空地 (289, 618)，偏移 3 格杜绝与 NPC 穿模重合
+        int spawnX = 289;
+        int spawnY = 618;
 
         int slash1 = payload.IndexOf('/');
         if (slash1 > 0)
@@ -4052,13 +4053,31 @@ public sealed partial class PacketDispatcher
         }
         else if (NpcEngine != null)
         {
+            // 盛大官方 1.5 铁律：优先在当前玩家所在地图寻找同名且切比雪夫距离最近的 NPC，杜绝跨地图同名匹配冲突
+            NpcEntity? bestNpc = null;
+            int bestDist = int.MaxValue;
             foreach (var n in NpcEngine.AllNpcs)
             {
                 if (string.Equals(n.Name, npcTarget, StringComparison.OrdinalIgnoreCase))
                 {
-                    npcUid = n.Uid;
-                    break;
+                    if (n.MapId == session.CurrentMapId)
+                    {
+                        int d = Math.Max(Math.Abs(n.X - session.X), Math.Abs(n.Y - session.Y));
+                        if (d < bestDist)
+                        {
+                            bestDist = d;
+                            bestNpc = n;
+                        }
+                    }
+                    else if (bestNpc == null)
+                    {
+                        bestNpc = n;
+                    }
                 }
+            }
+            if (bestNpc != null)
+            {
+                npcUid = bestNpc.Uid;
             }
         }
         if (npcUid > 0)

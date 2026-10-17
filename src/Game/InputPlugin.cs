@@ -170,11 +170,23 @@ namespace Mir2Client.Game
                 return;
             }
 
-            // 2. 盛大官方 1.5 左键长按 (若指着活体怪物则出刀挥砍/追击，否则连续走动)
+            // 2. 盛大官方 1.5 左键长按 (若按住 Shift 强制原地攻击；若指着活体怪物则出刀挥砍/追击，否则连续走动)
             if (Input.IsMouseButtonPressed(MouseButton.Left))
             {
-                // 功能键组合优先 (Shift 强制攻击, Ctrl 刺杀, Alt 挖肉)，不触发走动
-                if (!Input.IsKeyPressed(Key.Shift) && !Input.IsKeyPressed(Key.Ctrl) && !Input.IsKeyPressed(Key.Alt))
+                // 盛大官方 1.5 铁律：Shift 按住时优先强制原地朝光标方向挥刀斩击 (IDA sub_461324)
+                if (Input.IsKeyPressed(Key.Shift))
+                {
+                    ulong nowTick = Time.GetTicksMsec();
+                    if (nowTick >= _lastContinuousAttackTick + AttackIntervalMs)
+                    {
+                        _lastContinuousAttackTick = nowTick;
+                        EmitSignal(SignalName.HitRequested, dir);
+                    }
+                    return;
+                }
+
+                // 功能键组合优先 (Ctrl 刺杀, Alt 挖肉)，不触发走动
+                if (!Input.IsKeyPressed(Key.Ctrl) && !Input.IsKeyPressed(Key.Alt))
                 {
                     var targetTile = _mapRenderer != null ? _mapRenderer.ScreenToTile(mousePos) : new Vector2I(-1, -1);
                     var ent = FindEntityUnderCursor(mousePos, targetTile);
@@ -429,8 +441,8 @@ namespace Mir2Client.Game
                         continue;
 
                     var entCenter = _mapRenderer.WorldToScreen(new Vector2(candidate.TileX * 48 + 24, candidate.TileY * 32 + 16));
-                    // 覆盖官方 1.5 怪物完整切片像素范围 (宽 90px, 高 135px)
-                    var bbox = new Rect2(entCenter.X - 45, entCenter.Y - 115, 90, 135);
+                    // 覆盖官方 1.5 怪物完整切片像素范围 (宽 90px, 高 145px，向上覆盖至 115px，向下延伸至地面 30px 贴合小型怪)
+                    var bbox = new Rect2(entCenter.X - 45, entCenter.Y - 115, 90, 145);
                     bool isHitBbox = bbox.HasPoint(screenPos);
                     bool isHitTile = (targetTile.X >= 0 && candidate.TileX == targetTile.X && candidate.TileY == targetTile.Y);
                     if (isHitBbox || isHitTile)

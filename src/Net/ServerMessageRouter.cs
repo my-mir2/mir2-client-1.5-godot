@@ -571,7 +571,6 @@ public sealed class ServerMessageRouter
                 else
                 {
                     _hud?.UpdateGold(packet.Recog);
-                    _hud?.AddChat("商店", $"[商店] 购买成功，当前剩余金币：{packet.Recog:N0}", new Color(0.5f, 1f, 0.5f));
                 }
                 break;
             case ProtocolConsts.SM_SELL_FAIL_DELPHI: // 649: 出售物品失败 (IDA 0x469F04)
@@ -1284,6 +1283,16 @@ public sealed class ServerMessageRouter
                 int eMaxMp = parts.Length >= 4 && int.TryParse(parts[3], out var maxMpVal) ? maxMpVal : Math.Max(eMp, 1);
                 _hud?.UpdateHp(eHp, eMaxHp);
                 if (parts.Length >= 4) _hud?.UpdateMp(eMp, eMaxMp);
+                if (_gameView?.PlayerInstance != null)
+                {
+                    _gameView.PlayerInstance.Hp = eHp;
+                    _gameView.PlayerInstance.MaxHp = eMaxHp;
+                    if (parts.Length >= 4)
+                    {
+                        _gameView.PlayerInstance.Mp = eMp;
+                        _gameView.PlayerInstance.MaxMp = eMaxMp;
+                    }
+                }
                 var localPlayer = _entityManager?.LocalPlayer;
                 if (localPlayer != null) _entityManager?.UpdateHp(localPlayer.Uid, eHp, eMaxHp);
                 return;
@@ -1301,10 +1310,15 @@ public sealed class ServerMessageRouter
             int maxHp = pkt.Tag > 0 ? pkt.Tag : Math.Max(hp, 1);
             _entityManager?.UpdateHp(uid, hp, maxHp);
 
-            // 若更新的目标实体即为主角色，同步驱动 HUD 血球
+            // 若更新的目标实体即为主角色，同步驱动 HUD 血球与头顶血条
             if (_entityManager != null && uid == _entityManager.LocalPlayerUid)
             {
                 _hud?.UpdateHp(hp, maxHp);
+                if (_gameView?.PlayerInstance != null)
+                {
+                    _gameView.PlayerInstance.Hp = hp;
+                    _gameView.PlayerInstance.MaxHp = maxHp;
+                }
             }
         }
         else if (uid == 0 || (_entityManager != null && uid == _entityManager.LocalPlayerUid))
@@ -1313,6 +1327,11 @@ public sealed class ServerMessageRouter
             int hp = pkt.Param;
             int maxHp = pkt.Tag > 0 ? pkt.Tag : Math.Max(hp, 1);
             _hud?.UpdateHp(hp, maxHp);
+            if (_gameView?.PlayerInstance != null)
+            {
+                _gameView.PlayerInstance.Hp = hp;
+                _gameView.PlayerInstance.MaxHp = maxHp;
+            }
             var localPlayer = _entityManager?.LocalPlayer;
             if (localPlayer != null) _entityManager?.UpdateHp(localPlayer.Uid, hp, maxHp);
         }

@@ -203,9 +203,17 @@ public sealed class OfficialWorldRepository(NpgsqlDataSource dataSource)
         {
             int num = r.GetInt32(1);
             if (!loaded.Contains(num)) continue;
+            string rawName = r.GetString(4);
+            string cnName = rawName switch
+            {
+                "Jim" or "Danielle" or "Daisy" or "Vincent" or "Peter" => "肉店老板",
+                "Smith" or "Blacksmith" => "铁匠",
+                "Steven" or "BookStore" => "书店老板",
+                _ => rawName
+            };
             var npc = new NpcEntity
             {
-                Uid = 100000 + r.GetInt32(0), Name = r.GetString(4), MapId = num,
+                Uid = 100000 + r.GetInt32(0), Name = cnName, MapId = num,
                 X = r.GetInt32(2), Y = r.GetInt32(3), Appr = r.IsDBNull(5) ? 0 : r.GetInt32(5)
             };
             if (!r.IsDBNull(6)) ApplyScript(npc, r.GetString(6), items);
