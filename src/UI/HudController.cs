@@ -239,6 +239,8 @@ public partial class HudController : CanvasLayer
     public TextureButton? BtnHudExit => _btnHudExit;
     public TextureButton? BtnHudMyState => _btnHudMyState;
     public TextureButton? BtnHudOption => _btnHudOption;
+    public TextureButton? BtnHudGuild => _btnHudGuild;
+    public TextureButton? BtnHudTrade => _btnHudTrade;
     public TextureButton? BtnEquipToStatus { get; private set; }
     private TextureRect? _attackModeIcon;
     private Label? _lblExpValue;
@@ -374,6 +376,12 @@ public partial class HudController : CanvasLayer
     private Texture2D? _texHighlightEquip;
     private Texture2D? _texHighlightSkill;
     private Texture2D? _texHighlightGroup;
+    private Texture2D? _texNormalGuild;
+    private Texture2D? _texHighlightGuild;
+    private Texture2D? _texNormalTrade;
+    private Texture2D? _texHighlightTrade;
+    private TextureButton? _btnHudGuild;
+    private TextureButton? _btnHudTrade;
 
     // 官方 1.5 地牢黑暗迷雾与火把/蜡烛光照系统 (DarknessFogManager & dungeon_vision_mask.gdshader)
     private readonly Mir2Client.Game.DarknessFogManager _fogManager = new();
@@ -795,7 +803,12 @@ public partial class HudController : CanvasLayer
                 TextureNormal = null,
                 TexturePressed = texBagClose
             };
-            btnBagClose.Pressed += () => _bagPanel.Visible = false;
+            btnBagClose.Pressed += () =>
+            {
+                _bagPanel.Visible = false;
+                HideSlotTooltip();
+                RefreshBottomBarButtonStates();
+            };
             _bagPanel.AddChild(btnBagClose);
 
             // 绑定背包金币图标与金币数量标签 (IDA sub_481dd4 [0x484dd4..0x484de7: left 10, top 190], Prguse_0029)
@@ -929,7 +942,11 @@ public partial class HudController : CanvasLayer
                 TextureNormal = null,
                 TexturePressed = texEquipClose
             };
-            btnEquipClose.Pressed += () => _equipPanel.Visible = false;
+            btnEquipClose.Pressed += () =>
+            {
+                _equipPanel.Visible = false;
+                RefreshBottomBarButtonStates();
+            };
             _equipPanel.AddChild(btnEquipClose);
 
             // 绑定装备面板原生向下翻页切至状态面板按钮 (Prguse_0396/0397 @ 213, 143, 12x21, IDA sub_481dd4 [0x484325..0x48439b] / 0x48a97c)
@@ -1167,16 +1184,40 @@ public partial class HudController : CanvasLayer
 
         // 挂载官方 1.5 大世界原生窗体系统 (加入 WindowStackManager 统一管理)
         _skillPanelView = new SkillPanelView();
+        _skillPanelView.PanelClosed += () =>
+        {
+            if (_skillPanelView != null)
+                _stackManager.PopWindow(_skillPanelView);
+            RefreshBottomBarButtonStates();
+        };
         AddChild(_skillPanelView);
 
         _statusPanelView = new StatusPanelView();
         _statusPanelView.SwitchToEquipRequested += SwitchStatusToEquip;
+        _statusPanelView.PanelClosed += () =>
+        {
+            if (_statusPanelView != null)
+                _stackManager.PopWindow(_statusPanelView);
+            RefreshBottomBarButtonStates();
+        };
         AddChild(_statusPanelView);
 
         _groupPanelView = new GroupPanelView();
+        _groupPanelView.PanelClosed += () =>
+        {
+            if (_groupPanelView != null)
+                _stackManager.PopWindow(_groupPanelView);
+            RefreshBottomBarButtonStates();
+        };
         AddChild(_groupPanelView);
 
         _guildPanelView = new GuildPanelView();
+        _guildPanelView.PanelClosed += () =>
+        {
+            if (_guildPanelView != null)
+                _stackManager.PopWindow(_guildPanelView);
+            RefreshBottomBarButtonStates();
+        };
         AddChild(_guildPanelView);
 
         _tradePanelView = new TradePanelView();
@@ -1334,9 +1375,19 @@ public partial class HudController : CanvasLayer
         AddChild(_inspectPanelView);
 
         _adjustAbilPanelView = new AdjustAbilPanelView();
+        _adjustAbilPanelView.Closed += () =>
+        {
+            if (_adjustAbilPanelView != null)
+                _stackManager.PopWindow(_adjustAbilPanelView);
+        };
         AddChild(_adjustAbilPanelView);
 
         _keySelectDialogView = new KeySelectDialogView();
+        _keySelectDialogView.DialogClosed += () =>
+        {
+            if (_keySelectDialogView != null)
+                _stackManager.PopWindow(_keySelectDialogView);
+        };
         AddChild(_keySelectDialogView);
 
         // 绑定技能魔法书点击技能呼出快捷键设置弹窗、以及设置完毕回写魔法书的双向联动
@@ -1460,6 +1511,10 @@ public partial class HudController : CanvasLayer
         _texHighlightEquip = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0009.png");
         _texHighlightSkill = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0010.png");
         _texHighlightGroup = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0011.png");
+        _texNormalGuild = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0134.png");
+        _texHighlightGuild = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0135.png");
+        _texNormalTrade = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0140.png");
+        _texHighlightTrade = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0141.png");
 
         foreach (var def in btnDefs)
         {
@@ -1496,6 +1551,8 @@ public partial class HudController : CanvasLayer
             else if (def.Name == "BtnHudEquip") _btnHudEquip = btn;
             else if (def.Name == "BtnHudSkill") _btnHudSkill = btn;
             else if (def.Name == "BtnHudGroup") _btnHudGroup = btn;
+            else if (def.Name == "BtnHudGuild") _btnHudGuild = btn;
+            else if (def.Name == "BtnHudTrade") _btnHudTrade = btn;
             else if (def.Name == "BtnHudPlusAbil") _btnHudPlusAbil = btn;
             else if (def.Name == "BtnHudMiniMap") _btnHudMiniMap = btn;
             else if (def.Name == "BtnHudLogout") _btnHudLogout = btn;
@@ -2253,6 +2310,14 @@ public partial class HudController : CanvasLayer
         {
             _btnHudGroup.TextureNormal = (_groupPanelView != null && _groupPanelView.Visible) ? _texHighlightGroup : null;
         }
+        if (_btnHudGuild != null)
+        {
+            _btnHudGuild.TextureNormal = (_guildPanelView != null && _guildPanelView.Visible) ? _texHighlightGuild : _texNormalGuild;
+        }
+        if (_btnHudTrade != null)
+        {
+            _btnHudTrade.TextureNormal = (_tradePanelView != null && _tradePanelView.Visible) ? _texHighlightTrade : _texNormalTrade;
+        }
     }
 
     public void ToggleBag()
@@ -2358,6 +2423,7 @@ public partial class HudController : CanvasLayer
         if (_guildPanelView != null)
         {
             _stackManager.ToggleWindow(_guildPanelView);
+            RefreshBottomBarButtonStates();
             GD.Print($"[HudController] 切换行会面板显示状态: {_guildPanelView.Visible}");
         }
     }
@@ -2382,6 +2448,7 @@ public partial class HudController : CanvasLayer
                     _bagPanel.Visible = true;
                 }
             }
+            RefreshBottomBarButtonStates();
             GD.Print($"[HudController] 切换交易面板显示状态: {_tradePanelView.Visible}");
         }
     }
@@ -3079,6 +3146,7 @@ public partial class HudController : CanvasLayer
             {
                 _tradePanelView?.CloseTrade();
             }
+            RefreshBottomBarButtonStates();
             GD.Print($"[HudController] CloseTopDialog 关闭了: {closed.WindowName}, 剩余StackCount={_stackManager.Count}");
             return true;
         }
@@ -3092,6 +3160,7 @@ public partial class HudController : CanvasLayer
         if (_tradePanelView != null && _tradePanelView.Visible)
         {
             CloseTrade();
+            RefreshBottomBarButtonStates();
             return true;
         }
 
@@ -3104,11 +3173,15 @@ public partial class HudController : CanvasLayer
         if (_equipPanel != null && _equipPanel.Visible)
         {
             _equipPanel.Visible = false;
+            HideSlotTooltip();
+            RefreshBottomBarButtonStates();
             return true;
         }
         if (_bagPanel != null && _bagPanel.Visible)
         {
             _bagPanel.Visible = false;
+            HideSlotTooltip();
+            RefreshBottomBarButtonStates();
             return true;
         }
         return false;

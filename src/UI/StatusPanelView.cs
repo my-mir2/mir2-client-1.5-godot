@@ -35,6 +35,9 @@ public partial class StatusPanelView : Control, IManagedWindow
     [Signal]
     public delegate void SwitchToEquipRequestedEventHandler();
 
+    [Signal]
+    public delegate void PanelClosedEventHandler();
+
     public TextureButton? BtnStatusToEquip { get; private set; }
 
     public override void _Ready()
@@ -69,7 +72,11 @@ public partial class StatusPanelView : Control, IManagedWindow
             TexturePressed = texClose,
             FocusMode = FocusModeEnum.None
         };
-        btnClose.Pressed += () => Visible = false;
+        btnClose.Pressed += () =>
+        {
+            Visible = false;
+            EmitSignal(SignalName.PanelClosed);
+        };
         AddChild(btnClose);
 
         // 3. 原生切回装备面板按钮 (Prguse_0398/0399 @ 213, 113, 12x21, IDA sub_481dd4 [0x484325..0x48439b] / 0x48a93c)
@@ -192,12 +199,33 @@ public partial class StatusPanelView : Control, IManagedWindow
         }
 
         // 左侧上下键热区 (IDA 0x4843f7/0x484417: Prguse_0373/0372 @ (7,128)/(7,187) 24x23),用于在状态页与能力页间翻页
-        foreach (var (y, name) in new[] { (128f, "BtnStatusPageUp"), (187f, "BtnStatusPageDown") })
+        // 底板 Prguse_0370 已烘焙常态按钮，按下态分别显示 Prguse_0373 (上翻凹陷) 与 Prguse_0372 (下翻凹陷)
+        var texPageUpPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0373.png");
+        var texPageDownPressed = ResPath.LoadImageTexture("resources/wil/png/Prguse/Prguse_0372.png");
+
+        var btnUp = new TextureButton
         {
-            var b = new TextureButton { Name = name, Position = new Vector2(7, y), Size = new Vector2(24, 23), FocusMode = FocusModeEnum.None };
-            b.Pressed += () => SetAbilityPage(_abilityPage != null && !_abilityPage.Visible);
-            AddChild(b);
-        }
+            Name = "BtnStatusPageUp",
+            Position = new Vector2(7, 128f),
+            Size = new Vector2(24, 23),
+            TextureNormal = null,
+            TexturePressed = texPageUpPressed,
+            FocusMode = FocusModeEnum.None
+        };
+        btnUp.Pressed += () => SetAbilityPage(false);
+        AddChild(btnUp);
+
+        var btnDown = new TextureButton
+        {
+            Name = "BtnStatusPageDown",
+            Position = new Vector2(7, 187f),
+            Size = new Vector2(24, 23),
+            TextureNormal = null,
+            TexturePressed = texPageDownPressed,
+            FocusMode = FocusModeEnum.None
+        };
+        btnDown.Pressed += () => SetAbilityPage(true);
+        AddChild(btnDown);
     }
 
     public void SetAbilityPage(bool show)

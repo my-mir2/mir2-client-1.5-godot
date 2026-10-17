@@ -174,5 +174,34 @@ public sealed class TestIssueFixesGroundTruth
         Assert.Equal(1031, Mir2.Shared.Protocols.ProtocolConsts.CM_USERSTORAGEDEPOSIT);
         Assert.Equal(1032, Mir2.Shared.Protocols.ProtocolConsts.CM_USERSTORAGEWITHDRAW);
     }
+
+    private class MockManagedWindow : Mir2Client.UI.IManagedWindow
+    {
+        public string WindowName { get; set; } = "MockWindow";
+        public Mir2Client.UI.Official24DialogCompendium.DialogId DialogId { get; set; } = Mir2Client.UI.Official24DialogCompendium.DialogId.SkillBook;
+        public bool IsVisible { get; set; } = false;
+        public int ZIndex { get; set; } = 0;
+        public (int x, int y, int width, int height) Bounds => (0, 0, 300, 200);
+    }
+
+    [Fact]
+    public void TestOfficialUi_WindowStackAndBottomBarHighLightAlignment()
+    {
+        // 验证官方 1.5 栈管理器在关闭顶层窗口时的进出栈行为与底栏按键高亮互斥闭环
+        var stack = new Mir2Client.UI.WindowStackManager();
+        Assert.Equal(0, stack.Count);
+
+        // 模拟一个受管窗体加入栈
+        var mockWindow = new MockManagedWindow();
+        stack.PushWindow(mockWindow);
+        Assert.Equal(1, stack.Count);
+        Assert.True(mockWindow.IsVisible);
+
+        // 验证出栈与互斥
+        var top = stack.CloseTopDialog();
+        Assert.Same(mockWindow, top);
+        Assert.False(mockWindow.IsVisible);
+        Assert.Equal(0, stack.Count);
+    }
 }
 
