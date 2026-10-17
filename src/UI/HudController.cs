@@ -2810,6 +2810,24 @@ public partial class HudController : CanvasLayer
         _itemTooltipView?.ShowComparisonTooltip(currentEquipName, currentDesc, newEquipName, newDesc, globalPos);
     }
 
+    /// <summary>
+    /// 盛大官方 1.5 聊天输入框激活与提交 (Enter / KpEnter 响应)
+    /// </summary>
+    public void FocusOrSubmitChat()
+    {
+        if (_chatInput != null)
+        {
+            if (!_chatInput.HasFocus())
+            {
+                _chatInput.GrabFocus();
+            }
+            else
+            {
+                OnChatInputSubmitted(_chatInput.Text);
+            }
+        }
+    }
+
     public override void _UnhandledInput(InputEvent @event)
     {
         if (@event is InputEventKey keyEvent && keyEvent.Pressed && !keyEvent.Echo)
@@ -2863,18 +2881,8 @@ public partial class HudController : CanvasLayer
                 case Key.Enter:
                 case Key.KpEnter:
                 {
-                    if (_chatInput != null)
-                    {
-                        if (!_chatInput.HasFocus())
-                        {
-                            _chatInput.GrabFocus();
-                        }
-                        else
-                        {
-                            OnChatInputSubmitted(_chatInput.Text);
-                        }
-                        GetViewport().SetInputAsHandled();
-                    }
+                    FocusOrSubmitChat();
+                    GetViewport().SetInputAsHandled();
                     break;
                 }
                 // 盛大官方 1.5 聊天输入历史记录上下键导航 (IDA TFrmMain_FormKeyDown)

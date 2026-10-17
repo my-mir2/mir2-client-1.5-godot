@@ -50,7 +50,7 @@ public sealed class ModernNpcPluginEngine
         RegisterPlugin(new FateSwordQuestNpcBehavior());
         RegisterPlugin(new DarkHallTeleporterNpcBehavior());
         RegisterPlugin(new SkillBookSynthesizerNpcBehavior());
-        RegisterPlugin(new NewbieGuideNpcBehavior());
+        RegisterPlugin(new NewbieGuideNpcBehavior(), "新手指导员", "新手指导", "助手", "新手助手", "指导员", "Assistant", "Instructor", "Trainer");
         RegisterPlugin(new RedBloodSwordNpcBehavior());
         RegisterPlugin(new ButcherNpcBehavior(), "肉店老板", "肉店", "Jim", "Danielle", "Daisy", "Vincent", "Peter");
     }
@@ -902,11 +902,30 @@ public sealed class ModernNpcPluginEngine
                     break;
 
                 case "@get_gift":
+                    if (ctx.Session.State.HasReceivedNewbieGift)
+                    {
+                        ctx.DialogText = "你已经领取过新手礼包了，不可重复领取！快拿起武器前往村外击杀鸡鹿历练吧。";
+                        ctx.AddLink("学习如何割肉换取金币", "@learn_butcher");
+                        ctx.AddLink("返回", "@main");
+                        break;
+                    }
+
+                    if (ctx.Session.State.BagItems.Count >= 38)
+                    {
+                        ctx.DialogText = "你的背包空间不足，请先清理包裹后再来领取新手礼包。";
+                        ctx.AddLink("返回", "@main");
+                        break;
+                    }
+
                     var woodSword = new EquipItem { Uid = 1001, Name = "木剑", Dura = 4000, MaxDura = 4000, Weight = 7 };
                     var clothArmor = new EquipItem { Uid = 1002, Name = "布衣", Dura = 5000, MaxDura = 5000, Weight = 5 };
                     ctx.Session.State.BagItems.Add(woodSword);
                     ctx.Session.State.BagItems.Add(clothArmor);
+                    ctx.Session.State.HasReceivedNewbieGift = true;
+                    ctx.Session.State.RecalculateAuthoritativeWeights(ctx.Session.State.Gold);
                     ctx.DialogText = "新手装备已放入你的包裹，按 F9 键即可打开背包双击穿戴！";
+                    ctx.AddLink("学习如何割肉换取金币", "@learn_butcher");
+                    ctx.AddLink("返回", "@main");
                     break;
 
                 case "@learn_butcher":

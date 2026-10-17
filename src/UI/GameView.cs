@@ -72,6 +72,7 @@ namespace Mir2Client.UI
         private readonly Dictionary<int, EntityNode> _entityNodes = new();
         private int _selectedTargetUid = 0;
         public int SelectedTargetUid => _selectedTargetUid;
+        public int LastButchCorpseUid { get; set; } = 0;
 
         public Node2D ItemContainer { get; private set; } = null!;
         public GroundItemManager GroundItemManagerInstance { get; } = new();
@@ -714,6 +715,7 @@ namespace Mir2Client.UI
                 InputPluginInstance.ScreenCaptureRequested += () => CaptureScreen();
                 InputPluginInstance.MinimapToggleRequested += () => HudInstance?.ToggleMinimap();
                 InputPluginInstance.EscapeRequested += () => HudInstance?.CloseTopDialog();
+                InputPluginInstance.ChatInputRequested += () => HudInstance?.FocusOrSubmitChat();
             }
 
             if (HudInstance != null)
@@ -2017,9 +2019,8 @@ namespace Mir2Client.UI
         {
             if (PlayerInstance == null || PlayerInstance.IsStunned || PlayerInstance.IsDead) return;
 
-            // 1. 角色转向并进入割肉/蹲下姿势 (Delphi ClMain.pas:2890 ssAlt in Shift -> SendButchAnimal)
-            PlayerInstance.Direction = dir;
-            PlayerInstance.Anim.SetAction(ActionType.SitDown, dir);
+            // 1. 角色转向并播放盛大官方 1.5 割肉动作 (Delphi Actor.pas / PlayButcher 弯腰出刀并在后摇结束后恢复 Stand)
+            PlayerInstance.PlayButcher(dir);
 
             // 2. 检索目标地块上的死者尸体 UID (对齐 bridge.rs:886 pkt.recog)
             int targetUid = 0;
@@ -2032,6 +2033,7 @@ namespace Mir2Client.UI
                     break;
                 }
             }
+            LastButchCorpseUid = targetUid;
 
             // 3. 真实网络发包
             if (_net != null && _net.IsConnectedToServer)

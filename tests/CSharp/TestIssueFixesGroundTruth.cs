@@ -130,4 +130,34 @@ public sealed class TestIssueFixesGroundTruth
         Assert.Contains("嘿！客官，刚宰杀的鸡肉和新鲜鹿肉", homePage);
         Assert.DoesNotContain("welcome, what can i do for you", homePage);
     }
+
+    [Fact]
+    public void TestNewbieGuide_AliasesAndAntiSpamGift()
+    {
+        var engine = new ModernNpcPluginEngine();
+        var session = new ClientSession(2, null!)
+        {
+            CharacterName = "测试萌新",
+            State = new PlayerState { Level = 1, CharacterName = "测试萌新" }
+        };
+
+        // 1. 验证别名能够正确命中 Assistant / 新手指导员
+        var (h1, p1, c1) = engine.DispatchDialog(session, "Assistant", "@main");
+        Assert.True(h1);
+        Assert.Contains("欢迎来到银杏山谷", p1);
+
+        // 2. 领取新手礼包
+        var (h2, p2, c2) = engine.DispatchDialog(session, "新手指导员", "@get_gift");
+        Assert.True(h2);
+        Assert.Contains("新手装备已放入你的包裹", p2);
+        Assert.Equal(2, session.State.BagItems.Count);
+        Assert.True(session.State.HasReceivedNewbieGift);
+
+        // 3. 再次重复领取必须被拒绝
+        var (h3, p3, c3) = engine.DispatchDialog(session, "新手指导员", "@get_gift");
+        Assert.True(h3);
+        Assert.Contains("不可重复领取", p3);
+        Assert.Equal(2, session.State.BagItems.Count);
+    }
 }
+

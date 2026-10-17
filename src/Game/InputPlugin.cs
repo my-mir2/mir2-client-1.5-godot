@@ -292,6 +292,9 @@ namespace Mir2Client.Game
                             case Key.Enter: EmitSignal(SignalName.ChatInputRequested); break;
                         }
                     }
+
+                    // 官方 1.5 规则：输入插件处理的游戏热键在此被标记为已处理，防止向上传播至 HudController 造成单次击键双重触发
+                    GetViewport()?.SetInputAsHandled();
                 }
             }
         }

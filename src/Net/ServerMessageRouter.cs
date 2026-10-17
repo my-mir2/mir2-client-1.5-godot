@@ -2270,18 +2270,33 @@ public sealed class ServerMessageRouter
             if (string.IsNullOrEmpty(itemName)) itemName = "肉块";
 
             int uid = pkt.Recog;
-            bool isLocal = _gameView?.PlayerInstance != null && (uid == 0 || uid == _gameView.SessionId || uid == _gameView.PlayerInstance.Uid);
+            bool isLocal = _gameView?.PlayerInstance != null && (uid == 0 || uid == _gameView.SessionId || uid == _gameView.PlayerInstance.Uid || uid == _gameView.LastButchCorpseUid);
             if (isLocal)
             {
                 _hud?.AddChat("提示", $"发现了 {itemName}", new Color(1f, 0.85f, 0.2f));
                 AudioManager.Instance?.PlaySoundId(AudioManager.SoundId.ItemClick);
+                if (_entityManager != null && uid > 0)
+                {
+                    var corpseEnt = _entityManager.GetEntity(uid);
+                    if (corpseEnt != null)
+                    {
+                        corpseEnt.CanButcher = false;
+                    }
+                }
             }
             else if (_entityManager != null && uid > 0)
             {
                 var ent = _entityManager.GetEntity(uid);
                 if (ent != null)
                 {
-                    ent.Direction = (byte)(pkt.Param & 7);
+                    if (ent.IsDead)
+                    {
+                        ent.CanButcher = false;
+                    }
+                    else
+                    {
+                        ent.Direction = (byte)(pkt.Param & 7);
+                    }
                 }
             }
             SafeLog($"[SM] 割肉广播 (SM_BUTCH=665, uid={uid}, item={itemName})");

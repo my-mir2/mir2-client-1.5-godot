@@ -209,6 +209,7 @@ public sealed class OfficialWorldRepository(NpgsqlDataSource dataSource)
                 "Jim" or "Danielle" or "Daisy" or "Vincent" or "Peter" => "肉店老板",
                 "Smith" or "Blacksmith" => "铁匠",
                 "Steven" or "BookStore" => "书店老板",
+                "Assistant" or "Instructor" or "Trainer" => "新手指导员",
                 _ => rawName
             };
             var npc = new NpcEntity

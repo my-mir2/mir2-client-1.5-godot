@@ -237,6 +237,9 @@ public sealed class PlayerState
     // 武器升级与开刀试刀状态计数
     public int TrialSlashCount { get; set; } = 0;
 
+    // 盛大官方 1.5 新手礼包领取标记 (防重复刷装备)
+    public bool HasReceivedNewbieGift { get; set; } = false;
+
     // 官方 1.4/1.5 药水持续血池与蓝池递增 (IDA sub_4B7100 TCreature.Eat: nIncHealth / nIncSpell)
     public int IncHealth { get; set; } = 0;
     public int IncSpell { get; set; } = 0;
